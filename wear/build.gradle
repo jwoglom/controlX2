@@ -1,3 +1,10 @@
+buildscript {
+    ext {
+        m2_repository = "${System.properties['user.home']}/.m2/repository"
+        pumpx2_version = "1.1.9"
+    }
+}
+
 plugins {
     id 'com.android.application'
     id 'org.jetbrains.kotlin.android'
@@ -5,12 +12,12 @@ plugins {
 
 android {
     namespace 'com.jwoglom.wearx2'
-    compileSdk 32
+    compileSdk 33
 
     defaultConfig {
         applicationId "com.jwoglom.wearx2"
         minSdk 30
-        targetSdk 32
+        targetSdk 33
         versionCode 1
         versionName "1.0"
 
@@ -27,12 +34,28 @@ android {
     }
 }
 
+
+
 dependencies {
-    implementation 'androidx.core:core-ktx:1.7.0'
+    implementation 'androidx.core:core-ktx:1.9.0'
     implementation 'com.google.android.gms:play-services-wearable:18.0.0'
     implementation 'androidx.percentlayout:percentlayout:1.0.0'
     implementation 'androidx.legacy:legacy-support-v4:1.0.0'
     implementation 'androidx.recyclerview:recyclerview:1.2.1'
     implementation 'androidx.wear:wear:1.2.0'
-    wearApp project(":wear")
+    implementation 'org.jetbrains.kotlinx:kotlinx-coroutines-core-jvm:1.6.1'
+
+    // pumpx2-android dependencies
+    implementation 'com.github.weliem:blessed-android:2.2.0'
+    implementation 'com.jakewharton.timber:timber:5.0.1'
+    implementation "me.champeau.openbeans:openbeans:1.0.2"
+    implementation "commons-codec:commons-codec:1.15"
+    implementation "org.apache.commons:commons-lang3:3.12.0"
+    implementation "com.google.guava:guava:31.0.1-android"
+
+    // pumpx2
+    implementation files("${m2_repository}/com/jwoglom/pumpx2/pumpx2-android/${pumpx2_version}/pumpx2-android-${pumpx2_version}.aar")
+    implementation files("${m2_repository}/com/jwoglom/pumpx2/pumpx2-messages/${pumpx2_version}/pumpx2-messages-${pumpx2_version}.jar")
+    implementation files("${m2_repository}/com/jwoglom/pumpx2/pumpx2-shared/${pumpx2_version}/pumpx2-shared-${pumpx2_version}.jar")
+
 }
