@@ -9,15 +9,22 @@ import android.os.Bundle
 import android.widget.Button
 import android.widget.TextView
 import androidx.localbroadcastmanager.content.LocalBroadcastManager
+import com.google.android.gms.common.ConnectionResult
+import com.google.android.gms.common.api.GoogleApiClient
 import com.google.android.gms.tasks.Tasks
+import com.google.android.gms.wearable.MessageApi
+import com.google.android.gms.wearable.MessageEvent
 import com.google.android.gms.wearable.Wearable
 import com.jwoglom.wearx2.databinding.ActivityMainBinding
 import timber.log.Timber
 
-class MainActivity : Activity() {
+class MainActivity : Activity(), MessageApi.MessageListener, GoogleApiClient.ConnectionCallbacks, GoogleApiClient.OnConnectionFailedListener {
+
+    private val WEAR_MESSAGE_PREFIX = "/to-wear"
 
     private lateinit var binding: ActivityMainBinding
-    private var phoneCommBroadcastReceiver = PhoneCommBroadcastReceiver()
+
+    private lateinit var mApiClient: GoogleApiClient
 
     private lateinit var text: TextView
     private lateinit var button: Button
@@ -31,9 +38,51 @@ class MainActivity : Activity() {
 
         text = requireViewById<TextView>(R.id.text)
         button = requireViewById<Button>(R.id.button)
-        button.setOnClickListener { SendMessage("/phone/send-data", "abcd").start() }
+        button.setOnClickListener { sendMessage("/to-phone/message", "from_wear") }
 
-        LocalBroadcastManager.getInstance(this).registerReceiver(phoneCommBroadcastReceiver, IntentFilter("com.jwoglom.wearx2.PhoneCommService"))
+        mApiClient = GoogleApiClient.Builder(this)
+            .addApi(Wearable.API)
+            .addConnectionCallbacks(this)
+            .addOnConnectionFailedListener(this)
+            .build()
+
+        Timber.d("create: mApiClient: $mApiClient")
+        mApiClient.connect()
+    }
+
+    override fun onResume() {
+        super.onResume()
+        Timber.d("resume: mApiClient: $mApiClient")
+        if (!mApiClient.isConnected && !mApiClient.isConnecting) {
+            mApiClient.connect()
+        }
+    }
+
+    override fun onConnected(bundle: Bundle?) {
+        Timber.i("wear onConnected: $bundle")
+        sendMessage("/to-phone/connected", "wear_launched")
+        Wearable.MessageApi.addListener(mApiClient, this)
+    }
+
+    override fun onConnectionSuspended(id: Int) {
+        Timber.w("wear connectionSuspended: $id")
+    }
+
+    override fun onConnectionFailed(result: ConnectionResult) {
+        Timber.w("wear connectionFailed $result")
+    }
+
+    override fun onStop() {
+        super.onStop()
+        Wearable.MessageApi.removeListener(mApiClient, this)
+        if (mApiClient.isConnected) {
+            mApiClient.disconnect()
+        }
+    }
+
+    override fun onDestroy() {
+        mApiClient.unregisterConnectionCallbacks(this)
+        super.onDestroy()
     }
 
     private inner class PhoneCommBroadcastReceiver : BroadcastReceiver() {
@@ -43,18 +92,35 @@ class MainActivity : Activity() {
         }
     }
 
-    private inner class SendMessage(val path: String, val data: String) : Thread() {
-        override fun run() {
-            Timber.d("sendMessage")
-            val nodeList = Wearable.getNodeClient(applicationContext).connectedNodes
-            Tasks.await(nodeList).forEach { node ->
-                Timber.d("node: $node")
-                val result = Tasks.await(
-                    Wearable.getMessageClient(this@MainActivity)
-                        .sendMessage(node.id, path, data.toByteArray())
-                )
+    private fun sendMessage(path: String, message: String) {
+//        Thread {
+//            Timber.i("wear sendMessage: $path $message")
+//            val nodes = Wearable.NodeApi.getConnectedNodes(mApiClient).await().nodes
+//            Timber.i("wear sendMessage nodes: $nodes")
+//            nodes.forEach { node ->
+//                Wearable.MessageApi.sendMessage(mApiClient, node.id, path, message.toByteArray()).await()
+//            }
+//        }.start()
+        Timber.i("wear sendMessage: $path $message")
+        Wearable.NodeApi.getConnectedNodes(mApiClient).setResultCallback { nodes ->
+            Timber.i("wear sendMessage nodes: $nodes")
+            nodes.nodes.forEach { node ->
+                Wearable.MessageApi.sendMessage(mApiClient, node.id, path, message.toByteArray())
+                    .setResultCallback { result ->
+                        Timber.d("wear sendMessage callback: ${result}")
+                        if (result.status.isSuccess) {
+                            Timber.i("Wear message sent: ${path} ${message}")
+                        }
+                    }
+            }
+        }
+    }
 
-                Timber.d("sendMessage result: $result")
+    override fun onMessageReceived(messageEvent: MessageEvent) {
+        runOnUiThread {
+            Timber.i("wear onMessageReceived: $messageEvent: ${messageEvent.path} ${messageEvent.data}")
+            if (messageEvent.path.startsWith(WEAR_MESSAGE_PREFIX)) {
+                text.text = String(messageEvent.data)
             }
         }
     }
