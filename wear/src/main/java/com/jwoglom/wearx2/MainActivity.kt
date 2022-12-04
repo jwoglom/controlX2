@@ -152,56 +152,64 @@ class MainActivity : ComponentActivity(), MessageApi.MessageListener, GoogleApiC
     }
 
     override fun onMessageReceived(messageEvent: MessageEvent) {
-        runOnUiThread {
-            Timber.i("wear onMessageReceived: ${messageEvent.path} ${String(messageEvent.data)}")
-            var text = ""
-            when (messageEvent.path) {
-                "/to-wear/connected" -> {
-                    if (inWaitingState()) {
+        Timber.i("wear onMessageReceived: ${messageEvent.path} ${String(messageEvent.data)}")
+        var text = ""
+        when (messageEvent.path) {
+            "/to-wear/connected" -> {
+                if (inWaitingState()) {
+                    runOnUiThread {
                         navController.navigate(Screen.WaitingToFindPump.route)
-                        sendMessage("/to-phone/is-pump-connected", "".toByteArray())
                     }
+                    sendMessage("/to-phone/is-pump-connected", "".toByteArray())
                 }
-                "/from-pump/pump-model" -> {
-                    if (inWaitingState()) {
+            }
+            "/from-pump/pump-model" -> {
+                if (inWaitingState()) {
+                    runOnUiThread {
                         navController.navigate(Screen.ConnectingToPump.route)
-                        sendMessage("/to-phone/is-pump-connected", "".toByteArray())
                     }
-                    text = "Found model ${String(messageEvent.data)}"
+                    sendMessage("/to-phone/is-pump-connected", "".toByteArray())
                 }
-                "/from-pump/waiting-for-pairing-code" -> {
-                    if (inWaitingState()) {
+                text = "Found model ${String(messageEvent.data)}"
+            }
+            "/from-pump/waiting-for-pairing-code" -> {
+                if (inWaitingState()) {
+                    runOnUiThread {
                         navController.navigate(Screen.ConnectingToPump.route)
-                        sendMessage("/to-phone/is-pump-connected", "".toByteArray())
                     }
-                    text = "Waiting for Pairing Code"
+                    sendMessage("/to-phone/is-pump-connected", "".toByteArray())
                 }
-                "/from-pump/pump-connected" -> {
-                    if (inWaitingState()) {
+                text = "Waiting for Pairing Code"
+            }
+            "/from-pump/pump-connected" -> {
+                if (inWaitingState()) {
+                    runOnUiThread {
                         navController.navigate(Screen.Landing.route)
                     }
-                    text = "Connected to ${String(messageEvent.data)}"
                 }
-                "/from-pump/pump-disconnected" -> {
-                    if (inWaitingState()) {
+                text = "Connected to ${String(messageEvent.data)}"
+            }
+            "/from-pump/pump-disconnected" -> {
+                if (inWaitingState()) {
+                    runOnUiThread {
                         navController.navigate(Screen.PumpDisconnectedReconnecting.route)
                     }
-                    text = "Disconnected from ${String(messageEvent.data)}"
                 }
-                "/from-pump/pump-critical-error" -> {
-                    text = "Error: ${String(messageEvent.data)}"
-                }
-                "/from-pump/receive-qualifying-event" -> {
-                    text = "Event: ${PumpQualifyingEventsSerializer.fromBytes(messageEvent.data)}"
-                }
-                "/from-pump/receive-message" -> {
-                    val pumpMessage = PumpMessageSerializer.fromBytes(messageEvent.data)
-                    text = "${pumpMessage}"
-                    onPumpMessageReceived(pumpMessage)
-                }
-                else -> text = "? ${String(messageEvent.data)}"
+                text = "Disconnected from ${String(messageEvent.data)}"
             }
-            Timber.i("wear text: $text")
+            "/from-pump/pump-critical-error" -> {
+                text = "Error: ${String(messageEvent.data)}"
+            }
+            "/from-pump/receive-qualifying-event" -> {
+                text = "Event: ${PumpQualifyingEventsSerializer.fromBytes(messageEvent.data)}"
+            }
+            "/from-pump/receive-message" -> {
+                val pumpMessage = PumpMessageSerializer.fromBytes(messageEvent.data)
+                text = "${pumpMessage}"
+                onPumpMessageReceived(pumpMessage)
+            }
+            else -> text = "? ${String(messageEvent.data)}"
         }
+        Timber.i("wear text: $text")
     }
 }

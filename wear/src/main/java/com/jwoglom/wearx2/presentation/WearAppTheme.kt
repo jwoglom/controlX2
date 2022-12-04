@@ -47,6 +47,15 @@ internal val greenTheme = ThemeValues(
         secondaryVariant = Color(0xFFD68400)
     )
 )
+internal val redTheme = ThemeValues(
+    "Red (D56D6D)",
+    Colors(
+        primary = Color(0xFFD56D6D),
+        primaryVariant = Color(0xFFA41E1E),
+        secondary = Color(0xFFFFBB29),
+        secondaryVariant = Color(0xFFD68400)
+    )
+)
 internal val purpleTheme = ThemeValues(
     "Lilac (D0BCFF)",
     Colors(

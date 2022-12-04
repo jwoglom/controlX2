@@ -1,6 +1,15 @@
 package com.jwoglom.wearx2
 
+import android.app.Notification
+import android.app.NotificationChannel
+import android.app.NotificationManager
+import android.app.PendingIntent
+import android.app.PendingIntent.FLAG_IMMUTABLE
+import android.content.Context
 import android.content.Intent
+import android.graphics.Color
+import android.media.AudioAttributes
+import android.os.Build
 import android.os.Bundle
 import android.os.Handler
 import android.os.HandlerThread
@@ -150,8 +159,12 @@ class WearCommService : WearableListenerService(), GoogleApiClient.ConnectionCal
                 WearCommServiceCodes.SEND_PUMP_COMMAND.ordinal -> {
                     Timber.i("wearCommHandler send command raw: ${String(msg.obj as ByteArray)}")
                     val pumpMsg = PumpMessageSerializer.fromBytes(msg.obj as ByteArray)
-                    Timber.i("wearCommHandler send command: ${pumpMsg}")
-                    pump.command(pumpMsg)
+                    if (this@WearCommService::pump.isInitialized && pump.isConnected) {
+                        Timber.i("wearCommHandler send command: $pumpMsg")
+                        pump.command(pumpMsg)
+                    } else {
+                        Timber.w("wearCommHandler not sending command due to pump state: $pump $pumpMsg")
+                    }
                 }
             }
         }
@@ -163,9 +176,9 @@ class WearCommService : WearableListenerService(), GoogleApiClient.ConnectionCal
                 nodes.nodes.forEach { node ->
                     Wearable.MessageApi.sendMessage(mApiClient, node.id, path, message)
                         .setResultCallback { result ->
-                            Timber.d("service sendMessage callback: ${result}")
+                            Timber.d("service sendMessage callback: $result")
                             if (result.status.isSuccess) {
-                                Timber.i("service message sent: ${path} ${String(message)}")
+                                Timber.i("service message sent: $path ${String(message)}")
                             }
                         }
                 }
@@ -194,6 +207,9 @@ class WearCommService : WearableListenerService(), GoogleApiClient.ConnectionCal
             // Get the HandlerThread's Looper and use it for our Handler
             serviceLooper = looper
             wearCommHandler = WearCommHandler(looper)
+
+            var notification = createNotification()
+            startForeground(1, notification)
         }
     }
 
@@ -206,7 +222,7 @@ class WearCommService : WearableListenerService(), GoogleApiClient.ConnectionCal
                 )
             }
             "/to-phone/is-pump-connected" -> {
-                if (pump.isConnected && pump.lastPeripheral != null) {
+                if (this::pump.isInitialized && pump.isConnected && pump.lastPeripheral != null) {
                     wearCommHandler?.sendMessage("/from-pump/pump-connected",
                         pump.lastPeripheral?.name!!.toByteArray()
                     )
@@ -267,5 +283,40 @@ class WearCommService : WearableListenerService(), GoogleApiClient.ConnectionCal
 
     override fun onConnectionFailed(result: ConnectionResult) {
         Timber.i("service onConnectionFailed: $result")
+    }
+
+
+    private fun createNotification(): Notification {
+        val notificationChannelId = "WearX2 Background Notification"
+
+        val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager;
+        val channel = NotificationChannel(
+            notificationChannelId,
+            "Endless Service notifications channel",
+            NotificationManager.IMPORTANCE_MIN
+        ).let {
+            it.description = "Endless Service channel"
+            it.vibrationPattern = LongArray(0)
+            it
+        }
+        notificationManager.createNotificationChannel(channel)
+
+        val pendingIntent: PendingIntent = Intent(this, MainActivity::class.java).let { notificationIntent ->
+            PendingIntent.getActivity(this, 0, notificationIntent, FLAG_IMMUTABLE)
+        }
+
+        val builder: Notification.Builder = Notification.Builder(
+            this,
+            notificationChannelId
+        )
+
+        return builder
+            .setContentTitle("WearX2")
+            .setContentText("WearX2 is running")
+            .setContentIntent(pendingIntent)
+            .setSmallIcon(R.mipmap.ic_launcher)
+            .setTicker("WearX2 is running")
+            .setPriority(Notification.PRIORITY_MIN) // for under android 26 compatibility
+            .build()
     }
 }

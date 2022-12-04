@@ -16,13 +16,29 @@
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toTopOf="parent" />
 
-    <Button
-        android:id="@+id/button"
-        android:layout_width="wrap_content"
+    <RelativeLayout
         android:layout_height="wrap_content"
-        android:layout_marginTop="24dp"
-        android:text="Button"
+        android:layout_width="match_parent"
+        android:orientation="vertical"
+        android:gravity="fill_horizontal"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toTopOf="@+id/text" />
+        app:layout_constraintTop_toTopOf="@+id/text">
+        <Spinner
+            android:id="@+id/request_message_spinner"
+            android:layout_width="wrap_content"
+            android:layout_height="50dp"
+            android:visibility="invisible"
+            android:layout_alignParentLeft="true"
+            android:layout_toLeftOf="@+id/request_message_send"/>
+
+        <Button
+            android:id="@+id/request_message_send"
+            android:layout_width="wrap_content"
+            android:layout_height="50dp"
+            android:text="Send"
+            android:visibility="invisible"
+            android:layout_alignParentRight="true"
+            />
+    </RelativeLayout>
 
 </androidx.constraintlayout.widget.ConstraintLayout>

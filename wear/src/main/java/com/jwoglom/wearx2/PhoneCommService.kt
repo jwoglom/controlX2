@@ -1,5 +1,6 @@
 package com.jwoglom.wearx2
 
+import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.content.Intent
@@ -44,14 +45,7 @@ class PhoneCommService : WearableListenerService() {
             "/from-pump/pump-disconnected" -> {
                 currentlyConnected = false
                 disconnectedNotification("pump disconnected")
-
             }
-//            "/wear/send-data" -> {
-//                val intent = Intent("com.jwoglom.wearx2.PhoneCommService");
-//                intent.action = Intent.ACTION_SEND
-//                intent.putExtra("data", messageEvent.data)
-//                LocalBroadcastManager.getInstance(applicationContext).sendBroadcast(intent)
-//            }
         }
     }
 
@@ -72,14 +66,27 @@ class PhoneCommService : WearableListenerService() {
     }
 
     private fun disconnectedNotification(reason: String) {
-        notificationManagerCompat.createNotificationChannel(NotificationChannel("disconnectedChannel", "Disconnected", NotificationManager.IMPORTANCE_DEFAULT))
-        val notif = NotificationCompat.Builder(this)
-            .setSmallIcon(R.drawable.comm_error)
-            .setContentTitle("WearX2 disconnected")
-            .setContentText(reason)
-            .setChannelId("disconnectedChannel")
-            .build()
+        Thread {
+            Thread.sleep(30 * 1000)
+            if (currentlyConnected) {
+                return@Thread
+            }
 
-        notificationManagerCompat.notify(notificationId++, notif)
+            notificationManagerCompat.createNotificationChannel(
+                NotificationChannel(
+                    "disconnectedChannel",
+                    "Disconnected",
+                    NotificationManager.IMPORTANCE_DEFAULT
+                )
+            )
+            val notif = NotificationCompat.Builder(this)
+                .setSmallIcon(R.drawable.comm_error)
+                .setContentTitle("WearX2 disconnected")
+                .setContentText(reason)
+                .setChannelId("disconnectedChannel")
+                .build()
+
+            notificationManagerCompat.notify(notificationId, notif)
+        }.start()
     }
 }

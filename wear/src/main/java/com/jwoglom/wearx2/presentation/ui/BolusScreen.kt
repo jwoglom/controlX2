@@ -216,6 +216,7 @@ fun BolusScreen(
         showDialog = showInProgressDialog,
         onDismissRequest = {
             cancelBolus()
+            showInProgressDialog = false
         },
         scrollState = scrollState
     ) {
@@ -230,7 +231,7 @@ fun BolusScreen(
             negativeButton = {
                 Button(
                     onClick = {
-                        showConfirmDialog = false
+                        showInProgressDialog = false
                     },
                     colors = ButtonDefaults.secondaryButtonColors(),
                     modifier = Modifier.fillMaxWidth()
