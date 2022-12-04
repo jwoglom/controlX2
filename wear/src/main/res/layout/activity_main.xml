@@ -28,7 +28,15 @@
             android:textSize="8dp"
             android:minHeight="30dp"
             android:minWidth="0dp"/>
-            
+        <Button
+            android:id="@+id/bolusButton"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginLeft="20dp"
+            android:text="Bolus"
+            android:textSize="8dp"
+            android:minHeight="30dp"
+            android:minWidth="0dp"/>
         </LinearLayout>
         <TextView
             android:id="@+id/text"

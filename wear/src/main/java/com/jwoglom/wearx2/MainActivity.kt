@@ -29,6 +29,7 @@ class MainActivity : Activity(), MessageApi.MessageListener, GoogleApiClient.Con
 
     private lateinit var text: TextView
     private lateinit var getIOBButton: Button
+    private lateinit var bolusButton: Button
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -41,6 +42,10 @@ class MainActivity : Activity(), MessageApi.MessageListener, GoogleApiClient.Con
         getIOBButton = requireViewById<Button>(R.id.getIOBButton)
         getIOBButton.setOnClickListener {
             sendPumpCommand(ControlIQIOBRequest())
+        }
+        bolusButton = requireViewById<Button>(R.id.bolusButton)
+        bolusButton.setOnClickListener {
+            startActivity(Intent(this, BolusActivity::class.java))
         }
 
         mApiClient = GoogleApiClient.Builder(this)

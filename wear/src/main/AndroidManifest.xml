@@ -35,6 +35,12 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <activity
+            android:name=".BolusActivity"
+            android:exported="true"
+            android:label="WearX2 Bolus">
+        </activity>
         <service android:name=".PhoneCommService"
             android:exported="true">
             <intent-filter>
