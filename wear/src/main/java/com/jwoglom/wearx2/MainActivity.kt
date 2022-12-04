@@ -4,6 +4,7 @@ import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.compose.runtime.compositionLocalOf
 import androidx.navigation.NavHostController
 import androidx.wear.compose.navigation.rememberSwipeDismissableNavController
 import com.google.android.gms.common.ConnectionResult
@@ -12,12 +13,20 @@ import com.google.android.gms.wearable.MessageApi
 import com.google.android.gms.wearable.MessageEvent
 import com.google.android.gms.wearable.Wearable
 import com.jwoglom.pumpx2.pump.messages.Message
+import com.jwoglom.pumpx2.pump.messages.models.InsulinUnit
+import com.jwoglom.pumpx2.pump.messages.response.currentStatus.ControlIQIOBResponse
+import com.jwoglom.pumpx2.pump.messages.response.currentStatus.CurrentBatteryAbstractResponse
+import com.jwoglom.pumpx2.pump.messages.response.currentStatus.InsulinStatusResponse
 import com.jwoglom.wearx2.databinding.ActivityMainBinding
+import com.jwoglom.wearx2.presentation.DataStore
 import com.jwoglom.wearx2.presentation.WearApp
 import com.jwoglom.wearx2.presentation.navigation.Screen
 import com.jwoglom.wearx2.shared.PumpMessageSerializer
 import com.jwoglom.wearx2.shared.PumpQualifyingEventsSerializer
 import timber.log.Timber
+
+var dataStore = DataStore()
+val LocalDataStore = compositionLocalOf { dataStore }
 
 class MainActivity : ComponentActivity(), MessageApi.MessageListener, GoogleApiClient.ConnectionCallbacks, GoogleApiClient.OnConnectionFailedListener {
 
@@ -27,15 +36,21 @@ class MainActivity : ComponentActivity(), MessageApi.MessageListener, GoogleApiC
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        Timber.plant(Timber.DebugTree())
+
 
         setContent {
             navController = rememberSwipeDismissableNavController()
 
+            val sendPumpCommandLocal: (Message) -> Unit = { msg ->
+                this.sendPumpCommand(msg)
+            }
+
             WearApp(
-                swipeDismissableNavController = navController
+                swipeDismissableNavController = navController,
+                sendPumpCommand = sendPumpCommandLocal,
             )
         }
-
 
         mApiClient = GoogleApiClient.Builder(this)
             .addApi(Wearable.API)
@@ -101,9 +116,10 @@ class MainActivity : ComponentActivity(), MessageApi.MessageListener, GoogleApiC
             nodes.nodes.forEach { node ->
                 Wearable.MessageApi.sendMessage(mApiClient, node.id, path, message)
                     .setResultCallback { result ->
-                        Timber.d("wear sendMessage callback: ${result}")
                         if (result.status.isSuccess) {
                             Timber.i("Wear message sent: ${path} ${String(message)}")
+                        } else {
+                            Timber.w("wear sendMessage callback: ${result.status}")
                         }
                     }
             }
@@ -117,6 +133,20 @@ class MainActivity : ComponentActivity(), MessageApi.MessageListener, GoogleApiC
             Screen.ConnectingToPump.route,
             Screen.PumpDisconnectedReconnecting.route -> true
             else -> false
+        }
+    }
+
+    private fun onPumpMessageReceived(message: Message) {
+        when (message) {
+            is CurrentBatteryAbstractResponse -> {
+                dataStore.batteryPercent.value = message.batteryPercent
+            }
+            is ControlIQIOBResponse -> {
+                dataStore.iobUnits.value = InsulinUnit.from1000To1(message.mudaliarIOB)
+            }
+            is InsulinStatusResponse -> {
+                dataStore.cartridgeRemainingUnits.value = message.currentInsulinAmount
+            }
         }
     }
 
@@ -164,7 +194,9 @@ class MainActivity : ComponentActivity(), MessageApi.MessageListener, GoogleApiC
                     text = "Event: ${PumpQualifyingEventsSerializer.fromBytes(messageEvent.data)}"
                 }
                 "/from-pump/receive-message" -> {
-                    text = "${PumpMessageSerializer.fromBytes(messageEvent.data)}"
+                    val pumpMessage = PumpMessageSerializer.fromBytes(messageEvent.data)
+                    text = "${pumpMessage}"
+                    onPumpMessageReceived(pumpMessage)
                 }
                 else -> text = "? ${String(messageEvent.data)}"
             }

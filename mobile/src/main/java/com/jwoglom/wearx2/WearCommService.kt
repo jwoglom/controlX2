@@ -46,6 +46,7 @@ class WearCommService : WearableListenerService(), GoogleApiClient.ConnectionCal
 
         init {
             enableTconnectAppConnectionSharing()
+            enableSendSharedConnectionResponseMessages()
             Timber.i("Pump init")
         }
 

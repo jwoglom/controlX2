@@ -16,13 +16,6 @@ class BolusActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        setContent {
-            navController = rememberSwipeDismissableNavController()
-
-            WearApp(
-                swipeDismissableNavController = navController
-            )
-        }
     }
 
     override fun getDefaultViewModelCreationExtras(): CreationExtras {

@@ -24,6 +24,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.livedata.observeAsState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
@@ -53,6 +54,13 @@ import androidx.wear.compose.material.ToggleChipDefaults
 import androidx.wear.compose.material.curvedText
 import com.google.accompanist.flowlayout.FlowRow
 import com.google.android.horologist.compose.navscaffold.scrollableColumn
+import com.jwoglom.pumpx2.pump.PumpState
+import com.jwoglom.pumpx2.pump.messages.Message
+import com.jwoglom.pumpx2.pump.messages.builders.CurrentBatteryRequestBuilder
+import com.jwoglom.pumpx2.pump.messages.models.KnownApiVersion
+import com.jwoglom.pumpx2.pump.messages.request.currentStatus.ControlIQIOBRequest
+import com.jwoglom.pumpx2.pump.messages.request.currentStatus.InsulinStatusRequest
+import com.jwoglom.wearx2.LocalDataStore
 import com.jwoglom.wearx2.presentation.MenuItem
 import com.jwoglom.wearx2.presentation.components.FirstRowChip
 import com.jwoglom.wearx2.presentation.defaultTheme
@@ -74,8 +82,10 @@ fun LandingScreen(
     menuItems: List<MenuItem>,
     proceedingTimeTextEnabled: Boolean,
     onClickProceedingTimeText: (Boolean) -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    sendPumpCommand: (Message) -> Unit
 ) {
+
     Box(modifier = modifier.fillMaxSize()) {
         // Places both Chips (button and toggle) in the middle of the screen.
         ScalingLazyColumn(
@@ -88,23 +98,45 @@ fun LandingScreen(
                 // Signify we have drawn the content of the first screen
                 ReportFullyDrawn()
 
-                FlowRow() {
+                val dataStore = LocalDataStore.current
+                var apiVersion = PumpState.getPumpAPIVersion()
+                if (apiVersion == null) {
+                    apiVersion = KnownApiVersion.API_V2_5.get()
+                }
+                sendPumpCommand(CurrentBatteryRequestBuilder.create(apiVersion))
+                sendPumpCommand(ControlIQIOBRequest())
+                sendPumpCommand(InsulinStatusRequest())
+
+                FlowRow {
+                    val batteryPercent = dataStore.batteryPercent.observeAsState()
+                    val iobUnits = dataStore.iobUnits.observeAsState()
+                    val cartridgeRemainingUnits = dataStore.cartridgeRemainingUnits.observeAsState()
+
                     FirstRowChip(
-                        labelText = "85%",
+                        labelText = when(batteryPercent.value) {
+                            null -> ""
+                            else -> "${batteryPercent.value}%"
+                        },
                         secondaryLabelText = "  Batt",
                         theme = greenTheme,
                         numItems = 3,
                     )
 
                     FirstRowChip(
-                        labelText = "0.1u",
+                        labelText = when(iobUnits.value) {
+                            null -> ""
+                            else -> "${String.format("%.1f", iobUnits.value)}u"
+                        },
                         secondaryLabelText = "    IOB",
                         theme = defaultTheme,
                         numItems = 3,
                     )
 
                     FirstRowChip(
-                        labelText = "150u",
+                        labelText = when(cartridgeRemainingUnits.value) {
+                            null -> ""
+                            else -> "${cartridgeRemainingUnits.value}u"
+                        },
                         secondaryLabelText = "    Cart",
                         theme = greenTheme,
                         numItems = 3,

@@ -48,6 +48,7 @@ import androidx.wear.compose.navigation.currentBackStackEntryAsState
 import androidx.wear.compose.navigation.rememberSwipeDismissableNavController
 import com.google.android.horologist.compose.layout.fadeAway
 import com.google.android.horologist.compose.layout.fadeAwayScalingLazyList
+import com.jwoglom.pumpx2.pump.messages.Message
 import com.jwoglom.wearx2.presentation.components.CustomTimeText
 import com.jwoglom.wearx2.presentation.navigation.DestinationScrollType
 import com.jwoglom.wearx2.presentation.navigation.SCROLL_TYPE_NAV_ARGUMENT
@@ -61,7 +62,8 @@ import java.time.LocalDateTime
 @Composable
 fun WearApp(
     modifier: Modifier = Modifier,
-    swipeDismissableNavController: NavHostController = rememberSwipeDismissableNavController()
+    swipeDismissableNavController: NavHostController = rememberSwipeDismissableNavController(),
+    sendPumpCommand: (Message) -> Unit
 ) {
     var themeColors by remember { mutableStateOf(defaultTheme.colors) }
     WearAppTheme(colors = themeColors) {
@@ -255,7 +257,8 @@ fun WearApp(
                         proceedingTimeTextEnabled = showProceedingTextBeforeTime,
                         onClickProceedingTimeText = {
                             showProceedingTextBeforeTime = !showProceedingTextBeforeTime
-                        }
+                        },
+                        sendPumpCommand = sendPumpCommand,
                     )
 
                     RequestFocusOnResume(focusRequester)
