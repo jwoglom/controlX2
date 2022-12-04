@@ -1,52 +1,41 @@
 package com.jwoglom.wearx2
 
-import android.app.Activity
-import android.content.BroadcastReceiver
-import android.content.Context
 import android.content.Intent
 import android.os.Bundle
-import android.widget.Button
-import android.widget.TextView
+import androidx.activity.ComponentActivity
+import androidx.activity.compose.setContent
+import androidx.navigation.NavHostController
+import androidx.wear.compose.navigation.rememberSwipeDismissableNavController
 import com.google.android.gms.common.ConnectionResult
 import com.google.android.gms.common.api.GoogleApiClient
 import com.google.android.gms.wearable.MessageApi
 import com.google.android.gms.wearable.MessageEvent
 import com.google.android.gms.wearable.Wearable
 import com.jwoglom.pumpx2.pump.messages.Message
-import com.jwoglom.pumpx2.pump.messages.request.currentStatus.ControlIQIOBRequest
 import com.jwoglom.wearx2.databinding.ActivityMainBinding
+import com.jwoglom.wearx2.presentation.WearApp
+import com.jwoglom.wearx2.presentation.navigation.Screen
 import com.jwoglom.wearx2.shared.PumpMessageSerializer
 import com.jwoglom.wearx2.shared.PumpQualifyingEventsSerializer
 import timber.log.Timber
 
-class MainActivity : Activity(), MessageApi.MessageListener, GoogleApiClient.ConnectionCallbacks, GoogleApiClient.OnConnectionFailedListener {
+class MainActivity : ComponentActivity(), MessageApi.MessageListener, GoogleApiClient.ConnectionCallbacks, GoogleApiClient.OnConnectionFailedListener {
 
-    private val WEAR_MESSAGE_PREFIX = "/to-wear"
-
+    internal lateinit var navController: NavHostController
     private lateinit var binding: ActivityMainBinding
-
     private lateinit var mApiClient: GoogleApiClient
-
-    private lateinit var text: TextView
-    private lateinit var getIOBButton: Button
-    private lateinit var bolusButton: Button
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        Timber.plant(Timber.DebugTree())
 
-        binding = ActivityMainBinding.inflate(layoutInflater)
-        setContentView(binding.root)
+        setContent {
+            navController = rememberSwipeDismissableNavController()
 
-        text = requireViewById<TextView>(R.id.text)
-        getIOBButton = requireViewById<Button>(R.id.getIOBButton)
-        getIOBButton.setOnClickListener {
-            sendPumpCommand(ControlIQIOBRequest())
+            WearApp(
+                swipeDismissableNavController = navController
+            )
         }
-        bolusButton = requireViewById<Button>(R.id.bolusButton)
-        bolusButton.setOnClickListener {
-            startActivity(Intent(this, BolusActivity::class.java))
-        }
+
 
         mApiClient = GoogleApiClient.Builder(this)
             .addApi(Wearable.API)
@@ -56,6 +45,12 @@ class MainActivity : Activity(), MessageApi.MessageListener, GoogleApiClient.Con
 
         Timber.d("create: mApiClient: $mApiClient")
         mApiClient.connect()
+
+
+        // Start PhoneCommService
+        Intent(this, PhoneCommService::class.java).also { intent ->
+            startService(intent)
+        }
     }
 
     override fun onResume() {
@@ -93,13 +88,6 @@ class MainActivity : Activity(), MessageApi.MessageListener, GoogleApiClient.Con
         super.onDestroy()
     }
 
-    private inner class PhoneCommBroadcastReceiver : BroadcastReceiver() {
-        override fun onReceive(context: Context?, intent: Intent?) {
-            val data = intent!!.getByteArrayExtra("data")
-            text.text = data.toString()
-        }
-    }
-
     private fun sendPumpCommand(msg: Message) {
         sendMessage("/to-pump/command", PumpMessageSerializer.toBytes(msg))
     }
@@ -120,37 +108,65 @@ class MainActivity : Activity(), MessageApi.MessageListener, GoogleApiClient.Con
         }
     }
 
+    private fun inWaitingState(): Boolean {
+        return when (navController.currentDestination?.route) {
+            Screen.WaitingForPhone.route,
+            Screen.WaitingToFindPump.route,
+            Screen.ConnectingToPump.route,
+            Screen.PumpDisconnectedReconnecting.route -> true
+            else -> false
+        }
+    }
+
     override fun onMessageReceived(messageEvent: MessageEvent) {
         runOnUiThread {
             Timber.i("wear onMessageReceived: ${messageEvent.path} ${String(messageEvent.data)}")
-            if (messageEvent.path.startsWith(WEAR_MESSAGE_PREFIX)) {
-                text.text = String(messageEvent.data)
-            } else if (messageEvent.path.startsWith("/from-pump")) {
-                when (messageEvent.path) {
-                    "/from-pump/pump-model" -> {
-                        text.text = "Found model ${String(messageEvent.data)}"
+            var text = ""
+            when (messageEvent.path) {
+                "/to-wear/connected" -> {
+                    if (inWaitingState()) {
+                        navController.navigate(Screen.WaitingToFindPump.route)
+                        sendMessage("/to-phone/is-pump-connected", "".toByteArray())
                     }
-                    "/from-pump/waiting-for-pairing-code" -> {
-                        text.text = "Waiting for Pairing Code"
-                    }
-                    "/from-pump/pump-connected" -> {
-                        text.text = "Connected to ${String(messageEvent.data)}"
-                    }
-                    "/from-pump/pump-disconnected" -> {
-                        text.text = "Disconnected from ${String(messageEvent.data)}"
-                    }
-                    "/from-pump/pump-critical-error" -> {
-                        text.text = "Error: ${String(messageEvent.data)}"
-                    }
-                    "/from-pump/receive-qualifying-event" -> {
-                        text.text = "Event: ${PumpQualifyingEventsSerializer.fromBytes(messageEvent.data)}"
-                    }
-                    "/from-pump/receive-message" -> {
-                        text.text = "${PumpMessageSerializer.fromBytes(messageEvent.data)}"
-                    }
-                    else -> text.text = "? ${String(messageEvent.data)}"
                 }
+                "/from-pump/pump-model" -> {
+                    if (inWaitingState()) {
+                        navController.navigate(Screen.ConnectingToPump.route)
+                        sendMessage("/to-phone/is-pump-connected", "".toByteArray())
+                    }
+                    text = "Found model ${String(messageEvent.data)}"
+                }
+                "/from-pump/waiting-for-pairing-code" -> {
+                    if (inWaitingState()) {
+                        navController.navigate(Screen.ConnectingToPump.route)
+                        sendMessage("/to-phone/is-pump-connected", "".toByteArray())
+                    }
+                    text = "Waiting for Pairing Code"
+                }
+                "/from-pump/pump-connected" -> {
+                    if (inWaitingState()) {
+                        navController.navigate(Screen.Landing.route)
+                    }
+                    text = "Connected to ${String(messageEvent.data)}"
+                }
+                "/from-pump/pump-disconnected" -> {
+                    if (inWaitingState()) {
+                        navController.navigate(Screen.PumpDisconnectedReconnecting.route)
+                    }
+                    text = "Disconnected from ${String(messageEvent.data)}"
+                }
+                "/from-pump/pump-critical-error" -> {
+                    text = "Error: ${String(messageEvent.data)}"
+                }
+                "/from-pump/receive-qualifying-event" -> {
+                    text = "Event: ${PumpQualifyingEventsSerializer.fromBytes(messageEvent.data)}"
+                }
+                "/from-pump/receive-message" -> {
+                    text = "${PumpMessageSerializer.fromBytes(messageEvent.data)}"
+                }
+                else -> text = "? ${String(messageEvent.data)}"
             }
+            Timber.i("wear text: $text")
         }
     }
 }

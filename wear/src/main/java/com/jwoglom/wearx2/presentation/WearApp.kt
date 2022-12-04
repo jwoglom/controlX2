@@ -29,14 +29,12 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.platform.LocalLifecycleOwner
-import androidx.compose.ui.res.stringResource
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.repeatOnLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavBackStackEntry
 import androidx.navigation.NavHostController
 import androidx.navigation.NavType
-import androidx.navigation.activity
 import androidx.navigation.navArgument
 import androidx.wear.compose.material.MaterialTheme
 import androidx.wear.compose.material.PositionIndicator
@@ -48,15 +46,13 @@ import androidx.wear.compose.navigation.SwipeDismissableNavHost
 import androidx.wear.compose.navigation.composable
 import androidx.wear.compose.navigation.currentBackStackEntryAsState
 import androidx.wear.compose.navigation.rememberSwipeDismissableNavController
-import com.google.android.horologist.composables.DatePicker
-import com.google.android.horologist.composables.TimePicker
-import com.google.android.horologist.composables.TimePickerWith12HourClock
 import com.google.android.horologist.compose.layout.fadeAway
 import com.google.android.horologist.compose.layout.fadeAwayScalingLazyList
 import com.jwoglom.wearx2.presentation.components.CustomTimeText
 import com.jwoglom.wearx2.presentation.navigation.DestinationScrollType
 import com.jwoglom.wearx2.presentation.navigation.SCROLL_TYPE_NAV_ARGUMENT
 import com.jwoglom.wearx2.presentation.navigation.Screen
+import com.jwoglom.wearx2.presentation.ui.IndeterminateProgressIndicator
 import com.jwoglom.wearx2.presentation.ui.LandingScreen
 import com.jwoglom.wearx2.presentation.ui.ScalingLazyListStateViewModel
 import com.jwoglom.wearx2.presentation.ui.ScrollStateViewModel
@@ -185,9 +181,26 @@ fun WearApp(
              */
             SwipeDismissableNavHost(
                 navController = swipeDismissableNavController,
-                startDestination = Screen.Landing.route,
+                startDestination = Screen.WaitingForPhone.route,
                 modifier = Modifier.background(MaterialTheme.colors.background)
             ) {
+
+                // WaitingForPhone
+                composable(Screen.WaitingForPhone.route) {
+                    IndeterminateProgressIndicator(text = "Waiting for phone")
+                }
+
+                composable(Screen.WaitingToFindPump.route) {
+                    IndeterminateProgressIndicator(text = "Waiting to find pump")
+                }
+
+                composable(Screen.ConnectingToPump.route) {
+                    IndeterminateProgressIndicator(text = "Connecting to pump")
+                }
+
+                composable(Screen.PumpDisconnectedReconnecting.route) {
+                    IndeterminateProgressIndicator(text = "Pump disconnected, reconnecting")
+                }
                 // Main Window
                 composable(
                     route = Screen.Landing.route,

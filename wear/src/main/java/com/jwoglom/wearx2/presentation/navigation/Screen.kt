@@ -29,6 +29,10 @@ const val SCROLL_TYPE_NAV_ARGUMENT = "scrollType"
 sealed class Screen(
     val route: String
 ) {
+    object WaitingForPhone : Screen("Waiting for phone")
+    object WaitingToFindPump : Screen("Waiting to find pump")
+    object ConnectingToPump : Screen("Waiting for pump connection")
+    object PumpDisconnectedReconnecting : Screen("Waiting for pump connection")
     object Landing : Screen("landing")
     object WatchList : Screen("watchList")
     object WatchDetail : Screen("watchDetail")

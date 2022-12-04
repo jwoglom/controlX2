@@ -42,11 +42,11 @@ class WearCommService : WearableListenerService(), GoogleApiClient.ConnectionCal
     private lateinit var tandemBTHandler: TandemBluetoothHandler
 
     private inner class Pump() : TandemPump(applicationContext) {
-        private var lastPeripheral: BluetoothPeripheral? = null
+        var lastPeripheral: BluetoothPeripheral? = null
+        var isConnected = false
 
         init {
             enableTconnectAppConnectionSharing()
-            relyOnConnectionSharingForAuthentication()
             Timber.i("Pump init")
         }
 
@@ -80,6 +80,7 @@ class WearCommService : WearableListenerService(), GoogleApiClient.ConnectionCal
             super.onPumpConnected(peripheral)
             lastPeripheral = peripheral
             Timber.i("service onPumpConnected")
+            isConnected = true
             wearCommHandler?.sendMessage("/from-pump/pump-connected",
                 peripheral?.name!!.toByteArray()
             )
@@ -99,6 +100,7 @@ class WearCommService : WearableListenerService(), GoogleApiClient.ConnectionCal
         ): Boolean {
             Timber.i("service onPumpDisconnected")
             lastPeripheral = null
+            isConnected = false
             wearCommHandler?.sendMessage("/from-pump/pump-disconnected",
                 peripheral?.name!!.toByteArray()
             )
@@ -202,6 +204,13 @@ class WearCommService : WearableListenerService(), GoogleApiClient.ConnectionCal
                     Intent(this, MainActivity::class.java)
                         .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                 )
+            }
+            "/to-phone/is-pump-connected" -> {
+                if (pump.isConnected && pump.lastPeripheral != null) {
+                    wearCommHandler?.sendMessage("/from-pump/pump-connected",
+                        pump.lastPeripheral?.name!!.toByteArray()
+                    )
+                }
             }
             "/to-pump/command" -> {
                 sendPumpCommMessage(messageEvent.data)
