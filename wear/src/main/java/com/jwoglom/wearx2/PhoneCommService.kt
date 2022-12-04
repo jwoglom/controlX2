@@ -74,7 +74,7 @@ class PhoneCommService : WearableListenerService() {
     private fun disconnectedNotification(reason: String) {
         notificationManagerCompat.createNotificationChannel(NotificationChannel("disconnectedChannel", "Disconnected", NotificationManager.IMPORTANCE_DEFAULT))
         val notif = NotificationCompat.Builder(this)
-            .setSmallIcon(androidx.wear.R.drawable.open_on_phone_animation)
+            .setSmallIcon(R.drawable.comm_error)
             .setContentTitle("WearX2 disconnected")
             .setContentText(reason)
             .setChannelId("disconnectedChannel")

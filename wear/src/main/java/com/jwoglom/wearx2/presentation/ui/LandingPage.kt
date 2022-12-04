@@ -66,14 +66,6 @@ import com.jwoglom.wearx2.presentation.components.FirstRowChip
 import com.jwoglom.wearx2.presentation.defaultTheme
 import com.jwoglom.wearx2.presentation.greenTheme
 
-/**
- * Simple landing page with three actions, view a list of watches, toggle on/off text before the
- * time or view a demo of different user input components.
- *
- * A text label indicates the screen shape and places it at the bottom of the screen.
- * If it's a round device, it will curve the text along the bottom curve. Otherwise, for a square
- * device, it's a regular Text composable.
- */
 @Composable
 fun LandingScreen(
     scalingLazyListState: ScalingLazyListState,
@@ -144,19 +136,6 @@ fun LandingScreen(
                 }
             }
 
-            item {
-                Chip(
-                    onClick = onClickWatchList,
-                    label = {
-                        Text(
-                            "List",
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
-                    },
-                    modifier = Modifier.fillMaxWidth()
-                )
-            }
             for (listItem in menuItems) {
                 item {
                     Chip(
@@ -172,28 +151,28 @@ fun LandingScreen(
                     )
                 }
             }
-            item {
-                ToggleChip(
-                    modifier = Modifier.fillMaxWidth(),
-                    checked = proceedingTimeTextEnabled,
-                    onCheckedChange = onClickProceedingTimeText,
-                    label = {
-                        Text(
-                            text = "Switch",
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
-                    },
-                    toggleControl = {
-                        Icon(
-                            imageVector = ToggleChipDefaults.switchIcon(
-                                checked = proceedingTimeTextEnabled
-                            ),
-                            contentDescription = if (proceedingTimeTextEnabled) "On" else "Off"
-                        )
-                    }
-                )
-            }
+//            item {
+//                ToggleChip(
+//                    modifier = Modifier.fillMaxWidth(),
+//                    checked = proceedingTimeTextEnabled,
+//                    onCheckedChange = onClickProceedingTimeText,
+//                    label = {
+//                        Text(
+//                            text = "Switch",
+//                            maxLines = 1,
+//                            overflow = TextOverflow.Ellipsis
+//                        )
+//                    },6g.
+//                    toggleControl = {
+//                        Icon(
+//                            imageVector = ToggleChipDefaults.switchIcon(
+//                                checked = proceedingTimeTextEnabled
+//                            ),
+//                            contentDescription = if (proceedingTimeTextEnabled) "On" else "Off"
+//                        )
+//                    }
+//                )
+//            }
         }
 
         // Places curved text at the bottom of round devices and straight text at the bottom of

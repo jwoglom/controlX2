@@ -20,6 +20,7 @@ import com.google.android.gms.wearable.MessageApi
 import com.google.android.gms.wearable.MessageEvent
 import com.google.android.gms.wearable.Wearable
 import com.jwoglom.pumpx2.pump.bluetooth.TandemBluetoothHandler
+import com.jwoglom.pumpx2.util.timber.DebugTree
 import timber.log.Timber
 import java.util.*
 
@@ -33,7 +34,7 @@ class MainActivity : AppCompatActivity(), GoogleApiClient.ConnectionCallbacks, G
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        Timber.plant(Timber.DebugTree())
+        Timber.plant(DebugTree())
         setContentView(R.layout.activity_main)
 
         text = requireViewById<TextView>(R.id.text)

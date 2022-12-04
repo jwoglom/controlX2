@@ -50,14 +50,16 @@ import com.google.android.horologist.compose.layout.fadeAway
 import com.google.android.horologist.compose.layout.fadeAwayScalingLazyList
 import com.jwoglom.pumpx2.pump.messages.Message
 import com.jwoglom.wearx2.presentation.components.CustomTimeText
+import com.jwoglom.wearx2.presentation.components.DecimalNumberPicker
+import com.jwoglom.wearx2.presentation.components.SingleNumberPicker
 import com.jwoglom.wearx2.presentation.navigation.DestinationScrollType
 import com.jwoglom.wearx2.presentation.navigation.SCROLL_TYPE_NAV_ARGUMENT
 import com.jwoglom.wearx2.presentation.navigation.Screen
+import com.jwoglom.wearx2.presentation.ui.BolusScreen
 import com.jwoglom.wearx2.presentation.ui.IndeterminateProgressIndicator
 import com.jwoglom.wearx2.presentation.ui.LandingScreen
 import com.jwoglom.wearx2.presentation.ui.ScalingLazyListStateViewModel
 import com.jwoglom.wearx2.presentation.ui.ScrollStateViewModel
-import java.time.LocalDateTime
 
 @Composable
 fun WearApp(
@@ -106,7 +108,9 @@ fun WearApp(
         // Display value is passed down to various user input screens, for the slider and stepper
         // components specifically, to demonstrate how they work.
         var displayValueForUserInput by remember { mutableStateOf(5) }
-        var dateTimeForUserInput by remember { mutableStateOf(LocalDateTime.now()) }
+        var bolusUnitsUserInput by remember { mutableStateOf<Double?>(null) }
+        var bolusCarbsGramsUserInput by remember { mutableStateOf<Int?>(null) }
+        var bolusBgMgdlUserInput by remember { mutableStateOf<Int?>(null) }
 
         Scaffold(
             modifier = modifier,
@@ -222,29 +226,9 @@ fun WearApp(
                     val menuItems = listOf(
                         menuNameAndCallback(
                             navController = swipeDismissableNavController,
-                            menuName = "User Input Components",
-                            screen = Screen.UserInputComponents
+                            menuName = "Bolus",
+                            screen = Screen.Bolus
                         ),
-                        menuNameAndCallback(
-                            navController = swipeDismissableNavController,
-                            menuName = "Map",
-                            screen = Screen.Map
-                        ),
-                        menuNameAndCallback(
-                            navController = swipeDismissableNavController,
-                            menuName = "Dialogs",
-                            screen = Screen.Dialogs
-                        ),
-                        menuNameAndCallback(
-                            navController = swipeDismissableNavController,
-                            menuName = "ProgressIndicators",
-                            screen = Screen.ProgressIndicators
-                        ),
-                        menuNameAndCallback(
-                            navController = swipeDismissableNavController,
-                            menuName = "Theme",
-                            screen = Screen.Theme
-                        )
                     )
 
                     LandingScreen(
@@ -264,45 +248,78 @@ fun WearApp(
                     RequestFocusOnResume(focusRequester)
                 }
 
-//                composable(
-//                    route = Screen.UserInputComponents.route,
-//                    arguments = listOf(
-//                        // In this case, the argument isn't part of the route, it's just attached
-//                        // as information for the destination.
-//                        navArgument(SCROLL_TYPE_NAV_ARGUMENT) {
-//                            type = NavType.EnumType(DestinationScrollType::class.java)
-//                            defaultValue = DestinationScrollType.SCALING_LAZY_COLUMN_SCROLLING
-//                        }
-//                    )
-//                ) {
-//                    val scalingLazyListState = scalingLazyListState(it)
-//
-//                    val focusRequester = remember { FocusRequester() }
-//
-//                    UserInputComponentsScreen(
-//                        scalingLazyListState = scalingLazyListState,
-//                        focusRequester = focusRequester,
-//                        value = displayValueForUserInput,
-//                        dateTime = dateTimeForUserInput,
-//                        onClickStepper = {
-//                            swipeDismissableNavController.navigate(Screen.Stepper.route)
-//                        },
-//                        onClickSlider = {
-//                            swipeDismissableNavController.navigate(Screen.Slider.route)
-//                        },
-//                        onClickDemoDatePicker = {
-//                            swipeDismissableNavController.navigate(Screen.DatePicker.route)
-//                        },
-//                        onClickDemo12hTimePicker = {
-//                            swipeDismissableNavController.navigate(Screen.Time12hPicker.route)
-//                        },
-//                        onClickDemo24hTimePicker = {
-//                            swipeDismissableNavController.navigate(Screen.Time24hPicker.route)
-//                        }
-//                    )
-//
-//                    RequestFocusOnResume(focusRequester)
-//                }
+                composable(
+                    route = Screen.Bolus.route,
+                    arguments = listOf(
+                        // In this case, the argument isn't part of the route, it's just attached
+                        // as information for the destination.
+                        navArgument(SCROLL_TYPE_NAV_ARGUMENT) {
+                            type = NavType.EnumType(DestinationScrollType::class.java)
+                            defaultValue = DestinationScrollType.SCALING_LAZY_COLUMN_SCROLLING
+                        }
+                    )
+                ) {
+                    val scalingLazyListState = scalingLazyListState(it)
+
+                    val focusRequester = remember { FocusRequester() }
+
+                    BolusScreen(
+                        scalingLazyListState = scalingLazyListState,
+                        focusRequester = focusRequester,
+                        value = displayValueForUserInput,
+                        bolusUnitsUserInput = bolusUnitsUserInput,
+                        bolusCarbsGramsUserInput = bolusCarbsGramsUserInput,
+                        bolusBgMgdlUserInput = bolusBgMgdlUserInput,
+                        onClickUnits = {
+                            swipeDismissableNavController.navigate(Screen.BolusSelectUnitsScreen.route)
+                        },
+                        onClickCarbs = {
+                            swipeDismissableNavController.navigate(Screen.BolusSelectCarbsScreen.route)
+                        },
+                        onClickBG = {
+                            swipeDismissableNavController.navigate(Screen.BolusSelectBGScreen.route)
+                        },
+                        onClickNext = {
+                            swipeDismissableNavController.navigate(Screen.Time12hPicker.route)
+                        },
+                    )
+
+                    RequestFocusOnResume(focusRequester)
+                }
+
+                composable(Screen.BolusSelectUnitsScreen.route) {
+                    DecimalNumberPicker(
+                        label = "Units",
+                        onNumberConfirm = {
+                            swipeDismissableNavController.popBackStack()
+                            bolusUnitsUserInput = it
+                        }
+                    )
+                }
+
+                composable(Screen.BolusSelectCarbsScreen.route) {
+                    SingleNumberPicker(
+                        label = "Carbs (g)",
+                        maxNumber = 100,
+                        onNumberConfirm = {
+                            swipeDismissableNavController.popBackStack()
+                            bolusCarbsGramsUserInput = it
+                        }
+                    )
+                }
+
+                composable(Screen.BolusSelectBGScreen.route) {
+                    SingleNumberPicker(
+                        label = "BG (mg/dL)",
+                        minNumber = 40,
+                        maxNumber = 400,
+                        defaultNumber = 120,
+                        onNumberConfirm = {
+                            swipeDismissableNavController.popBackStack()
+                            bolusBgMgdlUserInput = it
+                        }
+                    )
+                }
 //
 //                composable(route = Screen.Stepper.route) {
 //                    StepperScreen(

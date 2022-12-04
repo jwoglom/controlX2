@@ -17,6 +17,7 @@ import com.jwoglom.pumpx2.pump.messages.models.InsulinUnit
 import com.jwoglom.pumpx2.pump.messages.response.currentStatus.ControlIQIOBResponse
 import com.jwoglom.pumpx2.pump.messages.response.currentStatus.CurrentBatteryAbstractResponse
 import com.jwoglom.pumpx2.pump.messages.response.currentStatus.InsulinStatusResponse
+import com.jwoglom.pumpx2.util.timber.DebugTree
 import com.jwoglom.wearx2.databinding.ActivityMainBinding
 import com.jwoglom.wearx2.presentation.DataStore
 import com.jwoglom.wearx2.presentation.WearApp
@@ -36,7 +37,7 @@ class MainActivity : ComponentActivity(), MessageApi.MessageListener, GoogleApiC
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        Timber.plant(Timber.DebugTree())
+        Timber.plant(DebugTree())
 
 
         setContent {
