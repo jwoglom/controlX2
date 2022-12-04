@@ -56,7 +56,6 @@ dependencies {
     implementation "com.google.guava:guava:31.0.1-android"
 
     // pumpx2
-    implementation files("${m2_repository}/com/jwoglom/pumpx2/pumpx2-android/${pumpx2_version}/pumpx2-android-${pumpx2_version}.aar")
     implementation files("${m2_repository}/com/jwoglom/pumpx2/pumpx2-messages/${pumpx2_version}/pumpx2-messages-${pumpx2_version}.jar")
     implementation files("${m2_repository}/com/jwoglom/pumpx2/pumpx2-shared/${pumpx2_version}/pumpx2-shared-${pumpx2_version}.jar")
 

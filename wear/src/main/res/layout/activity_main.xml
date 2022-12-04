@@ -28,6 +28,7 @@
             android:textSize="8dp"
             android:minHeight="30dp"
             android:minWidth="0dp"/>
+            
         </LinearLayout>
         <TextView
             android:id="@+id/text"

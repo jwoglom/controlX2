@@ -46,6 +46,7 @@ class WearCommService : WearableListenerService(), GoogleApiClient.ConnectionCal
 
         init {
             enableTconnectAppConnectionSharing()
+            relyOnConnectionSharingForAuthentication()
             Timber.i("Pump init")
         }
 
@@ -68,6 +69,11 @@ class WearCommService : WearableListenerService(), GoogleApiClient.ConnectionCal
             centralChallengeResponse: CentralChallengeResponse?
         ) {
             wearCommHandler?.sendMessage("/from-pump/waiting-for-pairing-code", PumpMessageSerializer.toBytes(centralChallengeResponse))
+        }
+
+        override fun onInitialPumpConnection(peripheral: BluetoothPeripheral?) {
+            super.onInitialPumpConnection(peripheral)
+            lastPeripheral = peripheral
         }
 
         override fun onPumpConnected(peripheral: BluetoothPeripheral?) {
