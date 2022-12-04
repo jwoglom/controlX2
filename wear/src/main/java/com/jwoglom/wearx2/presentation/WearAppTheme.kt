@@ -28,7 +28,26 @@ import androidx.wear.compose.material.Typography
 
 
 internal data class ThemeValues(val description: String, val colors: Colors)
-internal val initialThemeValues = ThemeValues(
+internal val blueTheme = ThemeValues("Blue (Default AECBFA)", Colors())
+internal val darkBlueTheme = ThemeValues(
+    "Blue 2 (7FCFFF)",
+    Colors(
+        primary = Color(0xFF7FCFFF),
+        primaryVariant = Color(0xFF3998D3),
+        secondary = Color(0xFF6DD58C),
+        secondaryVariant = Color(0xFF1EA446)
+    )
+)
+internal val greenTheme = ThemeValues(
+    "Green (6DD58C)",
+    Colors(
+        primary = Color(0xFF6DD58C),
+        primaryVariant = Color(0xFF1EA446),
+        secondary = Color(0xFFFFBB29),
+        secondaryVariant = Color(0xFFD68400)
+    )
+)
+internal val purpleTheme = ThemeValues(
     "Lilac (D0BCFF)",
     Colors(
         primary = Color(0xFFD0BCFF),
@@ -37,6 +56,8 @@ internal val initialThemeValues = ThemeValues(
         secondaryVariant = Color(0xFF3998D3)
     )
 )
+
+internal val defaultTheme = blueTheme
 
 val WearTypography = Typography(
     body1 = TextStyle(
@@ -48,7 +69,7 @@ val WearTypography = Typography(
 
 @Composable
 fun WearAppTheme(
-    colors: Colors = initialThemeValues.colors,
+    colors: Colors = defaultTheme.colors,
     content: @Composable () -> Unit
 ) {
     MaterialTheme(

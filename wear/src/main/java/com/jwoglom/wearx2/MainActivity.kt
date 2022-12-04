@@ -59,6 +59,8 @@ class MainActivity : ComponentActivity(), MessageApi.MessageListener, GoogleApiC
         if (!mApiClient.isConnected && !mApiClient.isConnecting) {
             mApiClient.connect()
         }
+
+        sendMessage("/to-phone/is-pump-connected", "".toByteArray())
     }
 
     override fun onConnected(bundle: Bundle?) {

@@ -8,7 +8,6 @@ import android.os.Looper
 import android.os.Message
 import android.os.Process
 import android.widget.Toast
-import androidx.localbroadcastmanager.content.LocalBroadcastManager
 import com.google.android.gms.common.ConnectionResult
 import com.google.android.gms.common.api.GoogleApiClient
 import com.google.android.gms.wearable.MessageEvent
@@ -219,6 +218,7 @@ class WearCommService : WearableListenerService(), GoogleApiClient.ConnectionCal
     }
 
     override fun onStartCommand(intent: Intent, flags: Int, startId: Int): Int {
+        Timber.i("WearCommService onStartCommand $intent $flags $startId")
         Toast.makeText(this, "service starting", Toast.LENGTH_SHORT).show()
 
         // For each start request, send a message to start a job and deliver the
@@ -232,6 +232,16 @@ class WearCommService : WearableListenerService(), GoogleApiClient.ConnectionCal
         return START_STICKY
     }
 
+    override fun onTaskRemoved(rootIntent: Intent?) {
+        val restartServiceIntent = Intent(
+            applicationContext, this.javaClass
+        )
+        restartServiceIntent.setPackage(packageName)
+        startService(restartServiceIntent)
+        Toast.makeText(this, "WearX2 service removed", Toast.LENGTH_SHORT).show()
+        super.onTaskRemoved(rootIntent)
+    }
+
     private fun sendPumpCommMessage(pumpMsgBytes: ByteArray) {
         wearCommHandler?.obtainMessage()?.also { msg ->
             msg.what = WearCommServiceCodes.SEND_PUMP_COMMAND.ordinal
@@ -243,7 +253,7 @@ class WearCommService : WearableListenerService(), GoogleApiClient.ConnectionCal
     override fun onDestroy() {
         super.onDestroy()
         scope.cancel()
-        Toast.makeText(this, "service done", Toast.LENGTH_SHORT).show()
+        Toast.makeText(this, "WearX2 service destroyed", Toast.LENGTH_SHORT).show()
     }
 
     override fun onConnected(bundle: Bundle?) {

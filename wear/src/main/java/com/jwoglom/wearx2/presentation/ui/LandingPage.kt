@@ -30,7 +30,6 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalConfiguration
-import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -52,9 +51,12 @@ import androidx.wear.compose.material.Text
 import androidx.wear.compose.material.ToggleChip
 import androidx.wear.compose.material.ToggleChipDefaults
 import androidx.wear.compose.material.curvedText
-import com.jwoglom.wearx2.R
+import com.google.accompanist.flowlayout.FlowRow
 import com.google.android.horologist.compose.navscaffold.scrollableColumn
 import com.jwoglom.wearx2.presentation.MenuItem
+import com.jwoglom.wearx2.presentation.components.FirstRowChip
+import com.jwoglom.wearx2.presentation.defaultTheme
+import com.jwoglom.wearx2.presentation.greenTheme
 
 /**
  * Simple landing page with three actions, view a list of watches, toggle on/off text before the
@@ -79,12 +81,38 @@ fun LandingScreen(
         ScalingLazyColumn(
             modifier = Modifier.scrollableColumn(focusRequester, scalingLazyListState),
             state = scalingLazyListState,
-            autoCentering = AutoCenteringParams(itemIndex = 0)
+            autoCentering = AutoCenteringParams()
         ) {
+
             item {
                 // Signify we have drawn the content of the first screen
                 ReportFullyDrawn()
 
+                FlowRow() {
+                    FirstRowChip(
+                        labelText = "85%",
+                        secondaryLabelText = "  Batt",
+                        theme = greenTheme,
+                        numItems = 3,
+                    )
+
+                    FirstRowChip(
+                        labelText = "0.1u",
+                        secondaryLabelText = "    IOB",
+                        theme = defaultTheme,
+                        numItems = 3,
+                    )
+
+                    FirstRowChip(
+                        labelText = "150u",
+                        secondaryLabelText = "    Cart",
+                        theme = greenTheme,
+                        numItems = 3,
+                    )
+                }
+            }
+
+            item {
                 Chip(
                     onClick = onClickWatchList,
                     label = {

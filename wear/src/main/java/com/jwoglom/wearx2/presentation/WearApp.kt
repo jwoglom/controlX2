@@ -63,7 +63,7 @@ fun WearApp(
     modifier: Modifier = Modifier,
     swipeDismissableNavController: NavHostController = rememberSwipeDismissableNavController()
 ) {
-    var themeColors by remember { mutableStateOf(initialThemeValues.colors) }
+    var themeColors by remember { mutableStateOf(defaultTheme.colors) }
     WearAppTheme(colors = themeColors) {
         // Allows user to disable the text before the time.
         var showProceedingTextBeforeTime by rememberSaveable { mutableStateOf(false) }
@@ -199,7 +199,7 @@ fun WearApp(
                 }
 
                 composable(Screen.PumpDisconnectedReconnecting.route) {
-                    IndeterminateProgressIndicator(text = "Pump disconnected, reconnecting")
+                    IndeterminateProgressIndicator(text = "Reconnecting")
                 }
                 // Main Window
                 composable(
