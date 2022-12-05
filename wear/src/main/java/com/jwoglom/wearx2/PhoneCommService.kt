@@ -10,6 +10,7 @@ import androidx.core.app.NotificationChannelCompat
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import androidx.localbroadcastmanager.content.LocalBroadcastManager
+import com.google.android.gms.common.api.GoogleApiClient
 import com.google.android.gms.wearable.DataEventBuffer
 import com.google.android.gms.wearable.MessageEvent
 import com.google.android.gms.wearable.Node
@@ -45,6 +46,11 @@ class PhoneCommService : WearableListenerService() {
             "/from-pump/pump-disconnected" -> {
                 currentlyConnected = false
                 disconnectedNotification("pump disconnected")
+            }
+            // HACK: we need to forward a command from the phone activity to the phone service
+            // and this is the easiest way to do it
+            "/to-pump/command" -> {
+                sendMessage(messageEvent.path, messageEvent.data)
             }
         }
     }
@@ -88,5 +94,30 @@ class PhoneCommService : WearableListenerService() {
 
             notificationManagerCompat.notify(notificationId, notif)
         }.start()
+    }
+
+    private fun sendMessage(path: String, message: ByteArray) {
+        val mApiClient = GoogleApiClient.Builder(this)
+            .addApi(Wearable.API)
+            .build()
+        mApiClient.connect()
+        while (!mApiClient.isConnected) {
+            Timber.d("wear service sendMessage waiting for connect $path ${String(message)}")
+            Thread.sleep(100)
+        }
+        Timber.i("wear sendMessage: $path ${String(message)}")
+        Wearable.NodeApi.getConnectedNodes(mApiClient).setResultCallback { nodes ->
+            Timber.i("wear sendMessage nodes: $nodes")
+            nodes.nodes.forEach { node ->
+                Wearable.MessageApi.sendMessage(mApiClient, node.id, path, message)
+                    .setResultCallback { result ->
+                        if (result.status.isSuccess) {
+                            Timber.i("Wear message sent: $path ${String(message)}")
+                        } else {
+                            Timber.w("wear sendMessage callback: ${result.status}")
+                        }
+                    }
+            }
+        }
     }
 }

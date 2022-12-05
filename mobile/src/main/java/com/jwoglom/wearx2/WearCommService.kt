@@ -193,7 +193,7 @@ class WearCommService : WearableListenerService(), GoogleApiClient.ConnectionCal
         // separate thread because the service normally runs in the process's
         // main thread, which we don't want to block.  We also make it
         // background priority so CPU-intensive work will not disrupt our UI.
-        HandlerThread("PumpCommServiceThread", Process.THREAD_PRIORITY_BACKGROUND).apply {
+        HandlerThread("PumpCommServiceThread", Process.THREAD_PRIORITY_FOREGROUND).apply {
             start()
 
             mApiClient = GoogleApiClient.Builder(applicationContext)
@@ -293,7 +293,7 @@ class WearCommService : WearableListenerService(), GoogleApiClient.ConnectionCal
         val channel = NotificationChannel(
             notificationChannelId,
             "Endless Service notifications channel",
-            NotificationManager.IMPORTANCE_MIN
+            NotificationManager.IMPORTANCE_LOW
         ).let {
             it.description = "Endless Service channel"
             it.vibrationPattern = LongArray(0)

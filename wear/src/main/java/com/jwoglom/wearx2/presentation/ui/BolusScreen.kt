@@ -24,6 +24,7 @@ import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Clear
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.livedata.observeAsState
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -32,6 +33,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.sp
 import androidx.wear.compose.material.AutoCenteringParams
 import androidx.wear.compose.material.Button
 import androidx.wear.compose.material.ButtonDefaults
@@ -46,6 +48,19 @@ import androidx.wear.compose.material.dialog.Alert
 import androidx.wear.compose.material.dialog.Dialog
 import androidx.wear.compose.material.rememberScalingLazyListState
 import com.google.android.horologist.compose.navscaffold.scrollableColumn
+import com.jwoglom.pumpx2.pump.messages.Message
+import com.jwoglom.pumpx2.pump.messages.calculator.BolusCalcCondition
+import com.jwoglom.pumpx2.pump.messages.calculator.BolusCalcDecision
+import com.jwoglom.pumpx2.pump.messages.calculator.BolusCalculator
+import com.jwoglom.pumpx2.pump.messages.calculator.BolusCalculatorBuilder
+import com.jwoglom.pumpx2.pump.messages.calculator.BolusParameters
+import com.jwoglom.pumpx2.pump.messages.request.currentStatus.BolusCalcDataSnapshotRequest
+import com.jwoglom.pumpx2.pump.messages.request.currentStatus.LastBGRequest
+import com.jwoglom.pumpx2.pump.messages.response.currentStatus.BolusCalcDataSnapshotResponse
+import com.jwoglom.pumpx2.pump.messages.response.currentStatus.LastBGResponse
+import com.jwoglom.wearx2.LocalDataStore
+import com.jwoglom.wearx2.presentation.components.LineInfoChip
+import com.jwoglom.wearx2.util.twoDecimalPlaces
 import timber.log.Timber
 
 
@@ -53,31 +68,62 @@ import timber.log.Timber
 fun BolusScreen(
     scalingLazyListState: ScalingLazyListState,
     focusRequester: FocusRequester,
-    value: Int,
     bolusUnitsUserInput: Double?,
     bolusCarbsGramsUserInput: Int?,
     bolusBgMgdlUserInput: Int?,
     onClickUnits: () -> Unit,
     onClickCarbs: () -> Unit,
     onClickBG: () -> Unit,
-    onClickNext: () -> Unit,
+    sendPumpCommand: (Message) -> Unit,
     modifier: Modifier = Modifier
 ) {
     var showConfirmDialog by remember { mutableStateOf(false) }
     var showInProgressDialog by remember { mutableStateOf(false) }
-    var bolusParameters: Double? = null
 
-    fun computeBolusAmount(bolusUnitsUserInput: Double?, bolusCarbsGramsUserInput: Int?, bolusBgMgdlUserInput: Int?): Double {
-        Timber.i("computeBolusAmount: units=$bolusUnitsUserInput carbs=$bolusCarbsGramsUserInput bg=$bolusBgMgdlUserInput")
-        return bolusUnitsUserInput!!
+    val dataStore = LocalDataStore.current
+
+    var bolusCalculatorBuilder: BolusCalculatorBuilder? = null
+    var bolusFinalParameters: BolusParameters? = null
+    var bolusFinalConditions: List<BolusCalcCondition>? = null
+    fun runBolusCalculator(dataSnapshot: BolusCalcDataSnapshotResponse?, lastBG: LastBGResponse?, bolusUnitsUserInput: Double?, bolusCarbsGramsUserInput: Int?, bolusBgMgdlUserInput: Int?): BolusCalculatorBuilder {
+        Timber.i("runBolusCalculator: INPUT units=$bolusUnitsUserInput carbs=$bolusCarbsGramsUserInput bg=$bolusBgMgdlUserInput dataSnapshot=$dataSnapshot lastBG=$lastBG")
+        val bolusCalc = BolusCalculatorBuilder()
+        if (dataSnapshot != null) {
+            bolusCalc.onBolusCalcDataSnapshotResponse(dataSnapshot)
+        }
+        if (lastBG != null) {
+            bolusCalc.onLastBGResponse(lastBG)
+        }
+
+        bolusCalc.setInsulinUnits(bolusUnitsUserInput)
+        bolusCalc.setCarbsValueGrams(bolusCarbsGramsUserInput)
+        bolusCalc.setGlucoseMgdl(bolusBgMgdlUserInput)
+        return bolusCalc
+    }
+
+    fun bolusCalcDecision(bolusCalc: BolusCalculatorBuilder?): BolusCalcDecision? {
+        val decision = bolusCalc?.build()?.parse()
+        Timber.i("bolusCalcDecision: OUTPUT units=${decision?.units} conditions=${decision?.conditions}")
+        return decision
+    }
+
+    fun bolusCalcParameters(bolusCalc: BolusCalculatorBuilder?): BolusParameters {
+        val decision = bolusCalc?.build()?.parse()
+        return BolusParameters(decision?.units?.total, bolusCalc?.carbsValueGrams?.orElse(null), bolusCalc?.glucoseMgdl?.orElse(null))
     }
 
     ScalingLazyColumn(
         modifier = modifier.scrollableColumn(focusRequester, scalingLazyListState),
         state = scalingLazyListState,
-        autoCentering = AutoCenteringParams(itemIndex = 0, itemOffset = 0)
+        autoCentering = AutoCenteringParams()
     ) {
         item {
+            val bolusCalcDataSnapshot = dataStore.bolusCalcDataSnapshot.observeAsState()
+            val bolusCalcLastBG = dataStore.bolusCalcLastBG.observeAsState()
+
+            sendPumpCommand(BolusCalcDataSnapshotRequest())
+            sendPumpCommand(LastBGRequest())
+
             Chip(
                 onClick = onClickUnits,
                 label = {
@@ -89,7 +135,10 @@ fun BolusScreen(
                 },
                 secondaryLabel = {
                     Text(
-                        text = String.format("%.1f", bolusUnitsUserInput)
+                        text = when (bolusUnitsUserInput) {
+                            null -> "Calculated: ${twoDecimalPlaces(bolusCalcParameters(runBolusCalculator(bolusCalcDataSnapshot.value, bolusCalcLastBG.value, bolusUnitsUserInput, bolusCarbsGramsUserInput, bolusBgMgdlUserInput)).units)}"
+                            else -> "Entered: ${String.format("%.2f", bolusUnitsUserInput)}"
+                        }
                     )
                 },
                 modifier = Modifier.fillMaxWidth()
@@ -108,7 +157,10 @@ fun BolusScreen(
                 },
                 secondaryLabel = {
                     Text(
-                        text = "$bolusCarbsGramsUserInput"
+                        text = when (bolusCarbsGramsUserInput) {
+                            null -> "Not Entered"
+                            else -> "$bolusCarbsGramsUserInput"
+                        }
                     )
                 },
                 modifier = Modifier.fillMaxWidth()
@@ -116,6 +168,9 @@ fun BolusScreen(
         }
 
         item {
+            val bolusCalcDataSnapshot = dataStore.bolusCalcDataSnapshot.observeAsState()
+            val bolusCalcLastBG = dataStore.bolusCalcLastBG.observeAsState()
+            val autofilledBg = runBolusCalculator(bolusCalcDataSnapshot.value, bolusCalcLastBG.value, bolusUnitsUserInput, bolusCarbsGramsUserInput, bolusBgMgdlUserInput).glucoseMgdl.orElse(null)
             Chip(
                 onClick = onClickBG,
                 label = {
@@ -127,7 +182,11 @@ fun BolusScreen(
                 },
                 secondaryLabel = {
                     Text(
-                        text = "$bolusBgMgdlUserInput"
+                        text = when {
+                            bolusBgMgdlUserInput != null -> "$bolusBgMgdlUserInput"
+                            autofilledBg != null -> "From CGM: $autofilledBg"
+                            else -> "Not Entered"
+                        }
                     )
                 },
                 modifier = Modifier.fillMaxWidth()
@@ -135,9 +194,13 @@ fun BolusScreen(
         }
 
         item {
+            val bolusCalcDataSnapshot = dataStore.bolusCalcDataSnapshot.observeAsState()
+            val bolusCalcLastBG = dataStore.bolusCalcLastBG.observeAsState()
             CompactButton(
                 onClick = {
-                    bolusParameters = computeBolusAmount(bolusUnitsUserInput, bolusCarbsGramsUserInput, bolusBgMgdlUserInput)
+                    bolusCalculatorBuilder = runBolusCalculator(bolusCalcDataSnapshot.value!!, bolusCalcLastBG.value!!, bolusUnitsUserInput, bolusCarbsGramsUserInput, bolusBgMgdlUserInput)
+                    bolusFinalConditions = bolusCalcDecision(bolusCalculatorBuilder)?.conditions
+                    bolusFinalParameters = bolusCalcParameters(bolusCalculatorBuilder)
                     showConfirmDialog = true
                 },
                 enabled = true
@@ -146,7 +209,20 @@ fun BolusScreen(
                     imageVector = Icons.Filled.Check,
                     contentDescription = "continue",
                     modifier = Modifier
-                        .size(ButtonDefaults.SmallIconSize).wrapContentSize(align = Alignment.Center),
+                        .size(ButtonDefaults.SmallIconSize)
+                        .wrapContentSize(align = Alignment.Center),
+                )
+            }
+        }
+
+        item {
+            val bolusCalcDataSnapshot = dataStore.bolusCalcDataSnapshot.observeAsState()
+            val bolusCalcLastBG = dataStore.bolusCalcLastBG.observeAsState()
+            val conditions = bolusCalcDecision(runBolusCalculator(bolusCalcDataSnapshot.value, bolusCalcLastBG.value, bolusUnitsUserInput, bolusCarbsGramsUserInput, bolusBgMgdlUserInput))?.conditions
+            conditions?.forEach { condition ->
+                LineInfoChip(
+                    labelText = condition.msg,
+                    fontSize = 10.sp
                 )
             }
         }
@@ -157,14 +233,14 @@ fun BolusScreen(
     Dialog(
         showDialog = showConfirmDialog,
         onDismissRequest = {
-
+            showConfirmDialog = false
         },
         scrollState = scrollState
     ) {
         Alert(
             title = {
                 Text(
-                    text = "${bolusParameters}u Bolus",
+                    text = "${bolusFinalParameters?.units?.let { twoDecimalPlaces(it) } ?: 0 }u Bolus",
                     textAlign = TextAlign.Center,
                     color = MaterialTheme.colors.onBackground
                 )
@@ -223,7 +299,7 @@ fun BolusScreen(
         Alert(
             title = {
                 Text(
-                    text = "${bolusParameters}u Bolus",
+                    text = "${bolusCalculatorBuilder}u Bolus",
                     textAlign = TextAlign.Center,
                     color = MaterialTheme.colors.onBackground
                 )

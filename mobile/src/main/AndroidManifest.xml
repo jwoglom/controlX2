@@ -18,7 +18,9 @@
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
         android:theme="@style/Theme.WearX2"
-        tools:targetApi="31">
+        tools:targetApi="31"
+        android:debuggable="true"
+        tools:ignore="HardcodedDebugMode">
         <activity
             android:name=".MainActivity"
             android:exported="true">

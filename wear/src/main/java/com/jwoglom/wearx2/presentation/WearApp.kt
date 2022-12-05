@@ -18,6 +18,7 @@ package com.jwoglom.wearx2.presentation
 
 import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.background
+import androidx.compose.material3.CenterAlignedTopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -46,12 +47,10 @@ import androidx.wear.compose.navigation.SwipeDismissableNavHost
 import androidx.wear.compose.navigation.composable
 import androidx.wear.compose.navigation.currentBackStackEntryAsState
 import androidx.wear.compose.navigation.rememberSwipeDismissableNavController
-import com.google.android.horologist.compose.layout.fadeAway
-import com.google.android.horologist.compose.layout.fadeAwayScalingLazyList
 import com.jwoglom.pumpx2.pump.messages.Message
-import com.jwoglom.wearx2.presentation.components.CustomTimeText
 import com.jwoglom.wearx2.presentation.components.DecimalNumberPicker
 import com.jwoglom.wearx2.presentation.components.SingleNumberPicker
+import com.jwoglom.wearx2.presentation.components.TopCGMReadingText
 import com.jwoglom.wearx2.presentation.navigation.DestinationScrollType
 import com.jwoglom.wearx2.presentation.navigation.SCROLL_TYPE_NAV_ARGUMENT
 import com.jwoglom.wearx2.presentation.navigation.Screen
@@ -118,40 +117,11 @@ fun WearApp(
                 // Scaffold places time at top of screen to follow Material Design guidelines.
                 // (Time is hidden while scrolling.)
 
-                val timeTextModifier =
-                    when (scrollType) {
-                        DestinationScrollType.SCALING_LAZY_COLUMN_SCROLLING -> {
-                            val scrollViewModel: ScalingLazyListStateViewModel =
-                                viewModel(currentBackStackEntry!!)
-                            Modifier.fadeAwayScalingLazyList {
-                                scrollViewModel.scrollState
-                            }
-                        }
-                        DestinationScrollType.COLUMN_SCROLLING -> {
-                            val viewModel: ScrollStateViewModel =
-                                viewModel(currentBackStackEntry!!)
-                            Modifier.fadeAway {
-                                viewModel.scrollState
-                            }
-                        }
-                        DestinationScrollType.TIME_TEXT_ONLY -> {
-                            Modifier
-                        }
-                        else -> {
-                            null
-                        }
+                //key() {
+                key (currentBackStackEntry?.destination?.route) {
+                    if (currentBackStackEntry?.destination?.route == Screen.Landing.route) {
+                        TopCGMReadingText()
                     }
-
-                key(currentBackStackEntry?.destination?.route) {
-                    CustomTimeText(
-                        modifier = timeTextModifier ?: Modifier,
-                        visible = timeTextModifier != null,
-                        startText = if (showProceedingTextBeforeTime) {
-                            "Leading text..."
-                        } else {
-                            null
-                        }
-                    )
                 }
             },
             vignette = {
@@ -234,14 +204,7 @@ fun WearApp(
                     LandingScreen(
                         scalingLazyListState = scalingLazyListState,
                         focusRequester = focusRequester,
-                        onClickWatchList = {
-                            swipeDismissableNavController.navigate(Screen.WatchList.route)
-                        },
-                        menuItems = menuItems,
-                        proceedingTimeTextEnabled = showProceedingTextBeforeTime,
-                        onClickProceedingTimeText = {
-                            showProceedingTextBeforeTime = !showProceedingTextBeforeTime
-                        },
+                        swipeDismissableNavController = swipeDismissableNavController,
                         sendPumpCommand = sendPumpCommand,
                     )
 
@@ -266,7 +229,6 @@ fun WearApp(
                     BolusScreen(
                         scalingLazyListState = scalingLazyListState,
                         focusRequester = focusRequester,
-                        value = displayValueForUserInput,
                         bolusUnitsUserInput = bolusUnitsUserInput,
                         bolusCarbsGramsUserInput = bolusCarbsGramsUserInput,
                         bolusBgMgdlUserInput = bolusBgMgdlUserInput,
@@ -279,9 +241,7 @@ fun WearApp(
                         onClickBG = {
                             swipeDismissableNavController.navigate(Screen.BolusSelectBGScreen.route)
                         },
-                        onClickNext = {
-                            swipeDismissableNavController.navigate(Screen.Time12hPicker.route)
-                        },
+                        sendPumpCommand = sendPumpCommand,
                     )
 
                     RequestFocusOnResume(focusRequester)
@@ -299,7 +259,7 @@ fun WearApp(
 
                 composable(Screen.BolusSelectCarbsScreen.route) {
                     SingleNumberPicker(
-                        label = "Carbs (g)",
+                        label = "Carbs",
                         maxNumber = 100,
                         onNumberConfirm = {
                             swipeDismissableNavController.popBackStack()
@@ -310,7 +270,7 @@ fun WearApp(
 
                 composable(Screen.BolusSelectBGScreen.route) {
                     SingleNumberPicker(
-                        label = "BG (mg/dL)",
+                        label = "BG",
                         minNumber = 40,
                         maxNumber = 400,
                         defaultNumber = 120,

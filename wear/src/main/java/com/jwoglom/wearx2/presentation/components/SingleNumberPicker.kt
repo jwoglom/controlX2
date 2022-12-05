@@ -117,7 +117,7 @@ fun SingleNumberPicker(
                     readOnly = false,
                     state = leftState,
                     focusRequester = focusRequester1,
-                    modifier = Modifier.size(64.dp, 100.dp),
+                    modifier = Modifier.size(100.dp, 100.dp),
                     readOnlyLabel = { LabelText("") }
                 ) { leftNumber: Int ->
                     if (leftNumber > maxNumber) {

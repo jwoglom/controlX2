@@ -63,6 +63,7 @@ class MainActivity : AppCompatActivity(), GoogleApiClient.ConnectionCallbacks, G
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         Timber.plant(DebugTree())
+        Timber.d("mobile activity onCreate $savedInstanceState")
         setContentView(R.layout.activity_main)
 
         text = requireViewById<TextView>(R.id.text)

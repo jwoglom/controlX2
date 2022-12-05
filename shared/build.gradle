@@ -11,6 +11,14 @@ plugins {
 }
 
 android {
+    signingConfigs {
+        release_testing {
+            storeFile file("${System.properties['user.home']}/repos/wearx2/debug.keystore")
+            storePassword 'password'
+            keyAlias 'alias_name'
+            keyPassword 'password'
+        }
+    }
     namespace 'com.jwoglom.wearx2.shared'
     compileSdk 32
 
@@ -26,6 +34,7 @@ android {
         release {
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+            signingConfig signingConfigs.release_testing
         }
     }
     compileOptions {
