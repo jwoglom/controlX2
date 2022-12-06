@@ -44,6 +44,7 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.compose.ui.zIndex
 import androidx.wear.compose.material.AutoCenteringParams
 import androidx.wear.compose.material.Button
@@ -92,7 +93,7 @@ fun BolusScreen(
     bolusUnitsUserInput: Double?,
     bolusCarbsGramsUserInput: Int?,
     bolusBgMgdlUserInput: Int?,
-    onClickUnits: () -> Unit,
+    onClickUnits: (Double?) -> Unit,
     onClickCarbs: () -> Unit,
     onClickBG: () -> Unit,
     sendPumpCommands: (SendType, List<Message>) -> Unit,
@@ -158,6 +159,7 @@ fun BolusScreen(
         dataStore.bolusCurrentParameters
     )
 
+    @Synchronized
     fun waitForLoaded() = refreshScope.launch {
         var sinceLastFetchTime = 0
         while (true) {
@@ -168,8 +170,9 @@ fun BolusScreen(
 
             Timber.i("BolusScreen loading: remaining ${nullBaseFields.size}: ${baseFields.map { it.value }}")
             if (sinceLastFetchTime >= 2500) {
-                Timber.i("BolusScreen loading re-fetching with cache")
-                sendPumpCommands(SendType.CACHED, commands)
+                Timber.i("BolusScreen loading re-fetching")
+                // for safety reasons, NEVER CACHE.
+                sendPumpCommands(SendType.STANDARD, commands)
                 sinceLastFetchTime = 0
             }
 
@@ -255,7 +258,13 @@ fun BolusScreen(
                 val bolusUnitsDisplayedText = dataStore.bolusUnitsDisplayedText.observeAsState()
 
                 Chip(
-                    onClick = onClickUnits,
+                    onClick = {
+                        if (dataStore.bolusCurrentParameters.value != null) {
+                            onClickUnits(dataStore.bolusCurrentParameters.value!!.units)
+                        } else {
+                            onClickUnits(null)
+                        }
+                    },
                     label = {
                         Text(
                             "Units",
@@ -296,7 +305,7 @@ fun BolusScreen(
 
             item {
                 val bolusBGDisplayedText = dataStore.bolusBGDisplayedText.observeAsState()
-                
+
                 Chip(
                     onClick = onClickBG,
                     label = {
@@ -359,6 +368,7 @@ fun BolusScreen(
                 if (index < conditions.size) {
                     LineTextDescription(
                         labelText = conditions[index].msg,
+                        fontSize = 8.sp,
                     )
                 } else {
                     Spacer(modifier = Modifier.height(1.dp))

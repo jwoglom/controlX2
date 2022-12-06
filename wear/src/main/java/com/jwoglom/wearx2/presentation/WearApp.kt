@@ -117,6 +117,8 @@ fun WearApp(
         var bolusCarbsGramsUserInput by remember { mutableStateOf<Int?>(null) }
         var bolusBgMgdlUserInput by remember { mutableStateOf<Int?>(null) }
 
+        var bolusUnitsDefaultNumber by remember { mutableStateOf<Double?>(null) }
+
         Scaffold(
             modifier = modifier,
             timeText = {
@@ -230,7 +232,8 @@ fun WearApp(
                         bolusUnitsUserInput = bolusUnitsUserInput,
                         bolusCarbsGramsUserInput = bolusCarbsGramsUserInput,
                         bolusBgMgdlUserInput = bolusBgMgdlUserInput,
-                        onClickUnits = {
+                        onClickUnits = { default ->
+                            bolusUnitsDefaultNumber = default
                             swipeDismissableNavController.navigate(Screen.BolusSelectUnitsScreen.route)
                         },
                         onClickCarbs = {
@@ -261,6 +264,7 @@ fun WearApp(
                             null -> 30
                             else -> maxBolusAmount.value!!
                         },
+                        defaultNumber = bolusUnitsDefaultNumber,
                     )
                 }
 
@@ -268,6 +272,10 @@ fun WearApp(
                     SingleNumberPicker(
                         label = "Carbs",
                         maxNumber = 100,
+                        defaultNumber = when (bolusCarbsGramsUserInput) {
+                            null -> 0
+                            else -> bolusCarbsGramsUserInput!!
+                        },
                         onNumberConfirm = {
                             swipeDismissableNavController.popBackStack()
                             bolusCarbsGramsUserInput = it

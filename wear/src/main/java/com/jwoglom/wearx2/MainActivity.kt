@@ -222,7 +222,9 @@ class MainActivity : ComponentActivity(), MessageApi.MessageListener, GoogleApiC
                 dataStore.cgmDelta.value = message.trendRate
             }
             is BolusCalcDataSnapshotResponse -> {
-                dataStore.bolusCalcDataSnapshot.value = message
+                if (!cached) {
+                    dataStore.bolusCalcDataSnapshot.value = message
+                }
             }
             is LastBGResponse -> {
                 dataStore.bolusCalcLastBG.value = message

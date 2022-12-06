@@ -64,6 +64,7 @@ fun DecimalNumberPicker(
     modifier: Modifier = Modifier,
     label: String? = null,
     maxNumber: Int = 30,
+    defaultNumber: Double? = null,
     rotaryScrollWeight: Float = 1f,
     labelColors: Colors = MaterialTheme.colors,
 ) {
@@ -73,13 +74,20 @@ fun DecimalNumberPicker(
             fontSize = with(LocalDensity.current) { 40.dp.toSp() }
         )
     )
+
     val leftState = rememberPickerState(
         initialNumberOfOptions = maxNumber + 10, // Add extra blank options to prevent accidental selection of the maximum
-        initiallySelectedOption = 0
+        initiallySelectedOption = when (defaultNumber) {
+            null -> 0
+            else -> defaultNumber.toInt()
+        }
     )
     val rightState = rememberPickerState(
         initialNumberOfOptions = 10 * (maxNumber + 10),
-        initiallySelectedOption = 0
+        initiallySelectedOption = when (defaultNumber) {
+            null -> 0
+            else -> ((defaultNumber * 10) % 10).toInt()
+        }
     )
 
     val coroutineScope = rememberCoroutineScope()
@@ -163,7 +171,7 @@ fun DecimalNumberPicker(
                             )
                         }
                     },
-                    colors = ChipDefaults.chipColors(backgroundColor = labelColors.secondary),
+                    colors = ChipDefaults.chipColors(backgroundColor = labelColors.onPrimary),
                     contentPadding = PaddingValues(vertical = 0.dp),
                 )
             }
