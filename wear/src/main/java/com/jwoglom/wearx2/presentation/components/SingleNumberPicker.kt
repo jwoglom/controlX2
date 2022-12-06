@@ -3,6 +3,7 @@ package com.jwoglom.wearx2.presentation.components
 import android.view.MotionEvent
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.gestures.FlingBehavior
+import androidx.compose.foundation.gestures.scrollBy
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
@@ -24,6 +25,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.ExperimentalComposeUiApi
@@ -31,6 +33,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.input.pointer.pointerInteropFilter
+import androidx.compose.ui.input.rotary.onRotaryScrollEvent
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.TextStyle
@@ -47,14 +50,18 @@ import androidx.wear.compose.material.PickerScope
 import androidx.wear.compose.material.PickerState
 import androidx.wear.compose.material.Text
 import androidx.wear.compose.material.rememberPickerState
+import com.google.accompanist.pager.ExperimentalPagerApi
+import com.google.accompanist.pager.rememberPagerState
 import com.google.android.horologist.composables.R
+import kotlinx.coroutines.launch
 import timber.log.Timber
 
+@OptIn(ExperimentalPagerApi::class, ExperimentalComposeUiApi::class)
 @Composable
 fun SingleNumberPicker(
+    modifier: Modifier = Modifier,
     label: String? = null,
     onNumberConfirm: (Int) -> Unit,
-    modifier: Modifier = Modifier,
     maxNumber: Int = 30,
     minNumber: Int = 0,
     defaultNumber: Int = minNumber,
@@ -69,6 +76,8 @@ fun SingleNumberPicker(
         initialNumberOfOptions = maxNumber + 10, // Add extra blank options to prevent accidental selection of the maximum
         initiallySelectedOption = defaultNumber - minNumber
     )
+
+    val coroutineScope = rememberCoroutineScope()
 
     MaterialTheme(typography = typography) {
         var selectedColumn by remember { mutableStateOf(0) }
@@ -117,7 +126,12 @@ fun SingleNumberPicker(
                     readOnly = false,
                     state = leftState,
                     focusRequester = focusRequester1,
-                    modifier = Modifier.size(100.dp, 100.dp),
+                    modifier = Modifier.size(100.dp, 100.dp).onRotaryScrollEvent {
+                        coroutineScope.launch {
+                            leftState.scrollBy(it.verticalScrollPixels)
+                        }
+                        true
+                    },
                     readOnlyLabel = { LabelText("") }
                 ) { leftNumber: Int ->
                     if (leftNumber > maxNumber) {
