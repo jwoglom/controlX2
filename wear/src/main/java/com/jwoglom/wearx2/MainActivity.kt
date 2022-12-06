@@ -22,6 +22,7 @@ import com.jwoglom.pumpx2.pump.messages.response.currentStatus.ControlIQIOBRespo
 import com.jwoglom.pumpx2.pump.messages.response.currentStatus.CurrentBasalStatusResponse
 import com.jwoglom.pumpx2.pump.messages.response.currentStatus.CurrentBatteryAbstractResponse
 import com.jwoglom.pumpx2.pump.messages.response.currentStatus.CurrentEGVGuiDataResponse
+import com.jwoglom.pumpx2.pump.messages.response.currentStatus.GlobalMaxBolusSettingsResponse
 import com.jwoglom.pumpx2.pump.messages.response.currentStatus.HomeScreenMirrorResponse
 import com.jwoglom.pumpx2.pump.messages.response.currentStatus.HomeScreenMirrorResponse.ApControlStateIcon
 import com.jwoglom.pumpx2.pump.messages.response.currentStatus.HomeScreenMirrorResponse.CGMAlertIcon
@@ -35,8 +36,8 @@ import com.jwoglom.wearx2.presentation.navigation.Screen
 import com.jwoglom.wearx2.shared.PumpMessageSerializer
 import com.jwoglom.wearx2.shared.PumpQualifyingEventsSerializer
 import com.jwoglom.wearx2.shared.util.DebugTree
+import com.jwoglom.wearx2.util.SendType
 import com.jwoglom.wearx2.util.shortTime
-import com.jwoglom.wearx2.util.shortTimeAgo
 import com.jwoglom.wearx2.util.twoDecimalPlaces1000Unit
 import timber.log.Timber
 
@@ -51,19 +52,20 @@ class MainActivity : ComponentActivity(), MessageApi.MessageListener, GoogleApiC
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        Timber.plant(DebugTree())
+        Timber.uprootAll()
+        Timber.plant(DebugTree("WA"))
 
 
         setContent {
             navController = rememberSwipeDismissableNavController()
 
-            val sendPumpCommandLocal: (Message) -> Unit = { msg ->
-                this.sendPumpCommand(msg)
+            val sendPumpCommands: (SendType, List<Message>) -> Unit = { type, msg ->
+                this.sendPumpCommands(type, msg)
             }
 
             WearApp(
                 swipeDismissableNavController = navController,
-                sendPumpCommand = sendPumpCommandLocal,
+                sendPumpCommands = sendPumpCommands,
             )
         }
 
@@ -124,6 +126,11 @@ class MainActivity : ComponentActivity(), MessageApi.MessageListener, GoogleApiC
         sendMessage("/to-pump/command", PumpMessageSerializer.toBytes(msg))
     }
 
+
+    private fun sendPumpCommands(type: SendType, msgs: List<Message>) {
+        sendMessage("/to-pump/${type.slug}", PumpMessageSerializer.toBulkBytes(msgs))
+    }
+
     private fun sendMessage(path: String, message: ByteArray) {
         Timber.i("wear sendMessage: $path ${String(message)}")
         Wearable.NodeApi.getConnectedNodes(mApiClient).setResultCallback { nodes ->
@@ -151,7 +158,7 @@ class MainActivity : ComponentActivity(), MessageApi.MessageListener, GoogleApiC
         }
     }
 
-    private fun onPumpMessageReceived(message: Message) {
+    private fun onPumpMessageReceived(message: Message, cached: Boolean) {
         when (message) {
             is CurrentBatteryAbstractResponse -> {
                 dataStore.batteryPercent.value = message.batteryPercent
@@ -220,6 +227,9 @@ class MainActivity : ComponentActivity(), MessageApi.MessageListener, GoogleApiC
             is LastBGResponse -> {
                 dataStore.bolusCalcLastBG.value = message
             }
+            is GlobalMaxBolusSettingsResponse -> {
+                dataStore.maxBolusAmount.value = message.maxBolus
+            }
         }
     }
 
@@ -277,8 +287,13 @@ class MainActivity : ComponentActivity(), MessageApi.MessageListener, GoogleApiC
             }
             "/from-pump/receive-message" -> {
                 val pumpMessage = PumpMessageSerializer.fromBytes(messageEvent.data)
+                onPumpMessageReceived(pumpMessage, false)
                 text = "${pumpMessage}"
-                onPumpMessageReceived(pumpMessage)
+            }
+            "/from-pump/receive-cached-message" -> {
+                val pumpMessage = PumpMessageSerializer.fromBytes(messageEvent.data)
+                onPumpMessageReceived(pumpMessage, true)
+                text = "${pumpMessage}"
             }
             else -> text = "? ${String(messageEvent.data)}"
         }

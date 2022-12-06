@@ -23,6 +23,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
+import androidx.compose.runtime.livedata.observeAsState
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -48,6 +49,9 @@ import androidx.wear.compose.navigation.composable
 import androidx.wear.compose.navigation.currentBackStackEntryAsState
 import androidx.wear.compose.navigation.rememberSwipeDismissableNavController
 import com.jwoglom.pumpx2.pump.messages.Message
+import com.jwoglom.pumpx2.pump.messages.request.currentStatus.GlobalMaxBolusSettingsRequest
+import com.jwoglom.wearx2.LocalDataStore
+import com.jwoglom.wearx2.MainActivity
 import com.jwoglom.wearx2.presentation.components.DecimalNumberPicker
 import com.jwoglom.wearx2.presentation.components.SingleNumberPicker
 import com.jwoglom.wearx2.presentation.components.TopCGMReadingText
@@ -59,12 +63,14 @@ import com.jwoglom.wearx2.presentation.ui.IndeterminateProgressIndicator
 import com.jwoglom.wearx2.presentation.ui.LandingScreen
 import com.jwoglom.wearx2.presentation.ui.ScalingLazyListStateViewModel
 import com.jwoglom.wearx2.presentation.ui.ScrollStateViewModel
+import com.jwoglom.wearx2.util.SendType
+import kotlinx.coroutines.coroutineScope
 
 @Composable
 fun WearApp(
     modifier: Modifier = Modifier,
     swipeDismissableNavController: NavHostController = rememberSwipeDismissableNavController(),
-    sendPumpCommand: (Message) -> Unit
+    sendPumpCommands: (SendType, List<Message>) -> Unit,
 ) {
     var themeColors by remember { mutableStateOf(defaultTheme.colors) }
     WearAppTheme(colors = themeColors) {
@@ -193,19 +199,11 @@ fun WearApp(
 
                     val focusRequester = remember { FocusRequester() }
 
-                    val menuItems = listOf(
-                        menuNameAndCallback(
-                            navController = swipeDismissableNavController,
-                            menuName = "Bolus",
-                            screen = Screen.Bolus
-                        ),
-                    )
-
                     LandingScreen(
                         scalingLazyListState = scalingLazyListState,
                         focusRequester = focusRequester,
                         swipeDismissableNavController = swipeDismissableNavController,
-                        sendPumpCommand = sendPumpCommand,
+                        sendPumpCommands = sendPumpCommands,
                     )
 
                     RequestFocusOnResume(focusRequester)
@@ -241,19 +239,28 @@ fun WearApp(
                         onClickBG = {
                             swipeDismissableNavController.navigate(Screen.BolusSelectBGScreen.route)
                         },
-                        sendPumpCommand = sendPumpCommand,
+                        sendPumpCommands = sendPumpCommands,
                     )
 
                     RequestFocusOnResume(focusRequester)
                 }
 
                 composable(Screen.BolusSelectUnitsScreen.route) {
+                    val maxBolusAmount = LocalDataStore.current.maxBolusAmount.observeAsState()
+                    sendPumpCommands(SendType.CACHED, listOf(GlobalMaxBolusSettingsRequest()))
+
                     DecimalNumberPicker(
                         label = "Units",
                         onNumberConfirm = {
                             swipeDismissableNavController.popBackStack()
                             bolusUnitsUserInput = it
-                        }
+                        },
+                        labelColors = defaultTheme.colors,
+                        rotaryScrollWeight = 4f,
+                        maxNumber = when (maxBolusAmount.value) {
+                            null -> 30
+                            else -> maxBolusAmount.value!!
+                        },
                     )
                 }
 
@@ -280,206 +287,6 @@ fun WearApp(
                         }
                     )
                 }
-//
-//                composable(route = Screen.Stepper.route) {
-//                    StepperScreen(
-//                        displayValue = displayValueForUserInput,
-//                        onValueChange = {
-//                            displayValueForUserInput = it
-//                        }
-//                    )
-//                }
-//
-//                composable(route = Screen.Slider.route) {
-//                    SliderScreen(
-//                        displayValue = displayValueForUserInput,
-//                        onValueChange = {
-//                            displayValueForUserInput = it
-//                        }
-//                    )
-//                }
-//
-//                composable(
-//                    route = Screen.WatchList.route,
-//                    arguments = listOf(
-//                        // In this case, the argument isn't part of the route, it's just attached
-//                        // as information for the destination.
-//                        navArgument(SCROLL_TYPE_NAV_ARGUMENT) {
-//                            type = NavType.EnumType(DestinationScrollType::class.java)
-//                            defaultValue = DestinationScrollType.SCALING_LAZY_COLUMN_SCROLLING
-//                        }
-//                    )
-//                ) {
-//                    val scalingLazyListState = scalingLazyListState(it)
-//                    val focusRequester = remember { FocusRequester() }
-//
-//                    val viewModel: WatchListViewModel = viewModel(
-//                        factory = WatchListViewModel.Factory
-//                    )
-//
-//                    WatchListScreen(
-//                        viewModel = viewModel,
-//                        scalingLazyListState = scalingLazyListState,
-//                        focusRequester = focusRequester,
-//                        showVignette = vignetteVisiblePreference,
-//                        onClickVignetteToggle = { showVignette ->
-//                            vignetteVisiblePreference = showVignette
-//                        },
-//                        onClickWatch = { id ->
-//                            swipeDismissableNavController.navigate(
-//                                route = Screen.WatchDetail.route + "/" + id
-//                            )
-//                        }
-//                    )
-//
-//                    RequestFocusOnResume(focusRequester)
-//                }
-//
-//                composable(
-//                    route = Screen.WatchDetail.route + "/{$WATCH_ID_NAV_ARGUMENT}",
-//                    arguments = listOf(
-//                        navArgument(WATCH_ID_NAV_ARGUMENT) {
-//                            type = NavType.IntType
-//                        },
-//                        // In this case, the argument isn't part of the route, it's just attached
-//                        // as information for the destination.
-//                        navArgument(SCROLL_TYPE_NAV_ARGUMENT) {
-//                            type = NavType.EnumType(DestinationScrollType::class.java)
-//                            defaultValue = DestinationScrollType.COLUMN_SCROLLING
-//                        }
-//                    )
-//                ) {
-//                    val watchId: Int = it.arguments!!.getInt(WATCH_ID_NAV_ARGUMENT)
-//
-//                    val viewModel: WatchDetailViewModel =
-//                        viewModel(factory = WatchDetailViewModel.factory(watchId))
-//
-//                    val scrollState = scrollState(it)
-//                    val focusRequester = remember { FocusRequester() }
-//
-//                    WatchDetailScreen(
-//                        viewModel = viewModel,
-//                        scrollState = scrollState,
-//                        focusRequester = focusRequester
-//                    )
-//
-//                    RequestFocusOnResume(focusRequester)
-//                }
-//
-//                composable(Screen.DatePicker.route) {
-//                    DatePicker(
-//                        onDateConfirm = {
-//                            swipeDismissableNavController.popBackStack()
-//                            dateTimeForUserInput = it.atTime(dateTimeForUserInput.toLocalTime())
-//                        },
-//                        date = dateTimeForUserInput.toLocalDate()
-//                    )
-//                }
-//
-//                composable(Screen.Time24hPicker.route) {
-//                    TimePicker(
-//                        onTimeConfirm = {
-//                            swipeDismissableNavController.popBackStack()
-//                            dateTimeForUserInput = it.atDate(dateTimeForUserInput.toLocalDate())
-//                        },
-//                        time = dateTimeForUserInput.toLocalTime()
-//                    )
-//                }
-//
-//                composable(Screen.Time12hPicker.route) {
-//                    TimePickerWith12HourClock(
-//                        onTimeConfirm = {
-//                            swipeDismissableNavController.popBackStack()
-//                            dateTimeForUserInput = it.atDate(dateTimeForUserInput.toLocalDate())
-//                        },
-//                        time = dateTimeForUserInput.toLocalTime()
-//                    )
-//                }
-//
-//                composable(Screen.Dialogs.route) {
-//                    Dialogs()
-//                }
-//
-//                composable(
-//                    route = Screen.ProgressIndicators.route,
-//                    arguments = listOf(
-//                        // In this case, the argument isn't part of the route, it's just attached
-//                        // as information for the destination.
-//                        navArgument(SCROLL_TYPE_NAV_ARGUMENT) {
-//                            type = NavType.EnumType(DestinationScrollType::class.java)
-//                            defaultValue = DestinationScrollType.SCALING_LAZY_COLUMN_SCROLLING
-//                        }
-//                    )
-//                ) {
-//                    val scalingLazyListState = scalingLazyListState(it)
-//
-//                    val focusRequester = remember { FocusRequester() }
-//                    val menuItems = listOf(
-//                        menuNameAndCallback(
-//                            navController = swipeDismissableNavController,
-//                            menuName = R.string.indeterminate_progress_indicator_label,
-//                            screen = Screen.IndeterminateProgressIndicator
-//                        ),
-//                        menuNameAndCallback(
-//                            navController = swipeDismissableNavController,
-//                            menuName = R.string.full_screen_progress_indicator_label,
-//                            screen = Screen.FullScreenProgressIndicator
-//                        )
-//                    )
-//                    ProgressIndicatorsScreen(
-//                        scalingLazyListState = scalingLazyListState,
-//                        focusRequester = focusRequester,
-//                        menuItems = menuItems
-//                    )
-//                    RequestFocusOnResume(focusRequester)
-//                }
-//
-//                composable(Screen.IndeterminateProgressIndicator.route) {
-//                    IndeterminateProgressIndicator()
-//                }
-//
-//                composable(
-//                    route = Screen.FullScreenProgressIndicator.route,
-//                    arguments = listOf(
-//                        // In this case, the argument isn't part of the route, it's just attached
-//                        // as information for the destination.
-//                        navArgument(SCROLL_TYPE_NAV_ARGUMENT) {
-//                            type = NavType.EnumType(DestinationScrollType::class.java)
-//                            defaultValue = DestinationScrollType.TIME_TEXT_ONLY
-//                        }
-//                    )
-//                ) {
-//                    FullScreenProgressIndicator()
-//                }
-//
-//                composable(
-//                    route = Screen.Theme.route,
-//                    arguments = listOf(
-//                        // In this case, the argument isn't part of the route, it's just attached
-//                        // as information for the destination.
-//                        navArgument(SCROLL_TYPE_NAV_ARGUMENT) {
-//                            type = NavType.EnumType(DestinationScrollType::class.java)
-//                            defaultValue = DestinationScrollType.SCALING_LAZY_COLUMN_SCROLLING
-//                        }
-//                    )
-//                ) { it ->
-//                    val scalingLazyListState = scalingLazyListState(it)
-//                    val focusRequester = remember { FocusRequester() }
-//
-//                    ThemeScreen(
-//                        scalingLazyListState = scalingLazyListState,
-//                        focusRequester = focusRequester,
-//                        currentlySelectedColors = themeColors,
-//                        availableThemes = themeValues
-//                    ) { colors -> themeColors = colors }
-//                    RequestFocusOnResume(focusRequester)
-//                }
-//
-//                activity(
-//                    route = Screen.Map.route
-//                ) {
-//                    this.activityClass = MapActivity::class
-//                }
             }
         }
     }

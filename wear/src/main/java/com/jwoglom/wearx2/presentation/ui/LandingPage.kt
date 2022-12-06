@@ -24,6 +24,7 @@ import androidx.compose.material.pullrefresh.PullRefreshIndicator
 import androidx.compose.material.pullrefresh.pullRefresh
 import androidx.compose.material.pullrefresh.rememberPullRefreshState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.livedata.observeAsState
 import androidx.compose.runtime.mutableStateOf
@@ -53,32 +54,34 @@ import com.jwoglom.pumpx2.pump.messages.request.currentStatus.CGMStatusRequest
 import com.jwoglom.pumpx2.pump.messages.request.currentStatus.ControlIQIOBRequest
 import com.jwoglom.pumpx2.pump.messages.request.currentStatus.CurrentBasalStatusRequest
 import com.jwoglom.pumpx2.pump.messages.request.currentStatus.CurrentEGVGuiDataRequest
+import com.jwoglom.pumpx2.pump.messages.request.currentStatus.GlobalMaxBolusSettingsRequest
 import com.jwoglom.pumpx2.pump.messages.request.currentStatus.HomeScreenMirrorRequest
 import com.jwoglom.pumpx2.pump.messages.request.currentStatus.InsulinStatusRequest
 import com.jwoglom.wearx2.LocalDataStore
 import com.jwoglom.wearx2.dataStore
-import com.jwoglom.wearx2.presentation.MenuItem
 import com.jwoglom.wearx2.presentation.components.FirstRowChip
 import com.jwoglom.wearx2.presentation.components.LineInfoChip
 import com.jwoglom.wearx2.presentation.defaultTheme
 import com.jwoglom.wearx2.presentation.greenTheme
 import com.jwoglom.wearx2.presentation.navigation.Screen
 import com.jwoglom.wearx2.presentation.redTheme
+import com.jwoglom.wearx2.util.SendType
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import timber.log.Timber
 
 @OptIn(ExperimentalMaterialApi::class)
 @Composable
 fun LandingScreen(
     scalingLazyListState: ScalingLazyListState,
     focusRequester: FocusRequester,
-    sendPumpCommand: (Message) -> Unit,
+    sendPumpCommands: (SendType, List<Message>) -> Unit,
     swipeDismissableNavController: NavHostController,
     modifier: Modifier = Modifier,
 ) {
     val refreshScope = rememberCoroutineScope()
-    var refreshing by remember { mutableStateOf(false) }
+    var refreshing by remember { mutableStateOf(true) }
 
 
     fun apiVersion(): ApiVersion {
@@ -89,50 +92,72 @@ fun LandingScreen(
         return apiVersion
     }
 
-    fun fetchDataStoreFields() {
-        sendPumpCommand(CurrentBatteryRequestBuilder.create(apiVersion()))
-        sendPumpCommand(ControlIQIOBRequest())
-        sendPumpCommand(InsulinStatusRequest())
-        sendPumpCommand(LastBolusStatusRequestBuilder.create(apiVersion()))
-        sendPumpCommand(HomeScreenMirrorRequest())
-        sendPumpCommand(CurrentBasalStatusRequest())
-        sendPumpCommand(CGMStatusRequest())
-        sendPumpCommand(CurrentEGVGuiDataRequest())
+    val commands = listOf(
+        CurrentBatteryRequestBuilder.create(apiVersion()),
+        ControlIQIOBRequest(),
+        InsulinStatusRequest(),
+        LastBolusStatusRequestBuilder.create(apiVersion()),
+        HomeScreenMirrorRequest(),
+        CurrentBasalStatusRequest(),
+        CGMStatusRequest(),
+        CurrentEGVGuiDataRequest(),
+        GlobalMaxBolusSettingsRequest()
+    )
+
+    val fields = listOf(
+        dataStore.batteryPercent,
+        dataStore.iobUnits,
+        dataStore.cartridgeRemainingUnits,
+        dataStore.lastBolusStatus,
+        dataStore.controlIQStatus,
+        dataStore.basalStatus,
+        dataStore.cgmSessionState,
+        dataStore.cgmTransmitterStatus,
+        dataStore.cgmReading,
+    )
+
+    fun fetchDataStoreFields(type: SendType) {
+        sendPumpCommands(type, commands)
     }
 
-    fun refresh() = refreshScope.launch {
-        refreshing = true
-        val fields = listOf(
-            dataStore.batteryPercent,
-            dataStore.iobUnits,
-            dataStore.cartridgeRemainingUnits,
-            dataStore.lastBolusStatus,
-            dataStore.controlIQStatus,
-            dataStore.basalStatus,
-            dataStore.cgmSessionState,
-            dataStore.cgmTransmitterStatus,
-            dataStore.cgmReading,
-        )
-
-        fields.forEach { field -> field.value = null }
-        fetchDataStoreFields()
-
+    fun waitForLoaded() = refreshScope.launch {
+        var sinceLastFetchTime = 0
         while (true) {
-            if (fields.map { field -> field.value == null }.any()) {
+            val nullFields = fields.filter { field -> field.value == null }.toSet()
+            if (nullFields.isEmpty()) {
                 break
+            }
+
+            Timber.i("LandingPage loading: remaining ${nullFields.size}: ${fields.map { it.value }}")
+            if (sinceLastFetchTime >= 2500) {
+                Timber.i("LandingPage loading re-fetching with cache")
+                fetchDataStoreFields(SendType.CACHED)
+                sinceLastFetchTime = 0
             }
 
             withContext(Dispatchers.IO) {
                 Thread.sleep(250)
             }
+            sinceLastFetchTime += 250
         }
-
+        Timber.i("LandingPage loading done: ${fields.map { it.value }}")
         refreshing = false
+    }
+
+    fun refresh() = refreshScope.launch {
+        refreshing = true
+
+        fields.forEach { field -> field.value = null }
+        fetchDataStoreFields(SendType.BUST_CACHE)
     }
 
     val state = rememberPullRefreshState(refreshing, ::refresh)
 
-    fetchDataStoreFields()
+    fetchDataStoreFields(SendType.BUST_CACHE)
+
+    LaunchedEffect (refreshing) {
+        waitForLoaded()
+    }
 
     Box(modifier = modifier
         .fillMaxSize()

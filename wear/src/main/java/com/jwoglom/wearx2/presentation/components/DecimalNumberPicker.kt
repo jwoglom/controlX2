@@ -40,6 +40,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
 import androidx.wear.compose.material.Button
 import androidx.wear.compose.material.ChipDefaults
+import androidx.wear.compose.material.Colors
 import androidx.wear.compose.material.CompactChip
 import androidx.wear.compose.material.Icon
 import androidx.wear.compose.material.MaterialTheme
@@ -49,16 +50,22 @@ import androidx.wear.compose.material.PickerScope
 import androidx.wear.compose.material.PickerState
 import androidx.wear.compose.material.Text
 import androidx.wear.compose.material.rememberPickerState
+import com.google.android.horologist.compose.rotaryinput.onRotaryInputAccumulated
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import timber.log.Timber
 
 @OptIn(ExperimentalComposeUiApi::class)
 @Composable
 fun DecimalNumberPicker(
-    label: String? = null,
     onNumberConfirm: (Double) -> Unit,
     modifier: Modifier = Modifier,
+    label: String? = null,
     maxNumber: Int = 30,
+    rotaryScrollWeight: Float = 1f,
+    labelColors: Colors = MaterialTheme.colors,
 ) {
     // Omit scaling according to Settings > Display > Font size for this screen,
     val typography = MaterialTheme.typography.copy(
@@ -71,18 +78,15 @@ fun DecimalNumberPicker(
         initiallySelectedOption = 0
     )
     val rightState = rememberPickerState(
-        initialNumberOfOptions = 10,
+        initialNumberOfOptions = 10 * (maxNumber + 10),
         initiallySelectedOption = 0
     )
-
-    var leftPixels = 0.0f
-    var rightPixels = 0.0f
 
     val coroutineScope = rememberCoroutineScope()
 
     fun buildNumber(): Double {
         var leftNumber = leftState.selectedOption
-        var rightNumber = rightState.selectedOption
+        var rightNumber = rightState.selectedOption % 10
 
         // selecting a blank option -- return 0
         if (leftNumber > maxNumber) {
@@ -98,16 +102,55 @@ fun DecimalNumberPicker(
         val focusRequesterLeft = remember { FocusRequester() }
         val focusRequesterRight = remember { FocusRequester() }
 
+        var rotaryScrollFix: Job? = null
+        fun runRotaryScrollFix() {
+            rotaryScrollFix?.cancel()
+            rotaryScrollFix = coroutineScope.launch {
+                Timber.d("coroutine: delay")
+                delay(250)
+
+                if (!leftState.isScrollInProgress && !rightState.isScrollInProgress) {
+                    Timber.d("coroutine: scroll")
+                    leftState.scrollToOption(leftState.selectedOption)
+                    rightState.scrollToOption(rightState.selectedOption)
+                } else {
+                    Timber.d("coroutine: skipped")
+                }
+            }
+            rotaryScrollFix?.start()
+        }
+
+        LaunchedEffect (leftState.selectedOption) {
+            if (selectedColumn == 0) {
+                if (rightState.selectedOption != leftState.selectedOption * 10 + rightState.selectedOption % 10 && rightState.selectedOption <= maxNumber) {
+                    rightState.scrollToOption(leftState.selectedOption * 10 + rightState.selectedOption % 10)
+                }
+            }
+            runRotaryScrollFix()
+        }
+
+        LaunchedEffect (rightState.selectedOption) {
+            if (selectedColumn == 1) {
+                if (leftState.selectedOption != rightState.selectedOption / 10) {
+                    leftState.scrollToOption(rightState.selectedOption / 10)
+                }
+            }
+            runRotaryScrollFix()
+        }
+
         Column(
             modifier = modifier.fillMaxSize(),
             verticalArrangement = Arrangement.Center,
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
+
             if (label != null) {
                 Spacer(Modifier.height(8.dp))
                 CompactChip(
                     onClick = { },
-                    modifier = Modifier.size(width = 50.dp, height = 40.dp).zIndex(99F),
+                    modifier = Modifier
+                        .size(width = 50.dp, height = 40.dp)
+                        .zIndex(99F),
                     label = {
                         Row(
                             modifier = Modifier.fillMaxWidth(),
@@ -115,12 +158,12 @@ fun DecimalNumberPicker(
                         ) {
                             Text(
                                 text = label,
-                                color = MaterialTheme.colors.onPrimary,
+                                color = labelColors.primary,
                                 style = MaterialTheme.typography.button
                             )
                         }
                     },
-                    colors = ChipDefaults.chipColors(backgroundColor = MaterialTheme.colors.secondary),
+                    colors = ChipDefaults.chipColors(backgroundColor = labelColors.secondary),
                     contentPadding = PaddingValues(vertical = 0.dp),
                 )
             }
@@ -140,12 +183,14 @@ fun DecimalNumberPicker(
                     readOnly = selectedColumn != 0,
                     state = leftState,
                     focusRequester = focusRequesterLeft,
-                    modifier = Modifier.size(64.dp, 100.dp).onRotaryScrollEvent {
-                        coroutineScope.launch {
-                            leftState.scrollBy(it.verticalScrollPixels)
-                        }
-                        true
-                    },
+                    modifier = Modifier
+                        .size(64.dp, 100.dp)
+                        .onRotaryScrollEvent {
+                            coroutineScope.launch {
+                                leftState.scrollBy(it.verticalScrollPixels * rotaryScrollWeight)
+                            }
+                            true
+                        },
                     readOnlyLabel = { LabelText("") }
                 ) { leftNumber: Int ->
                     if (leftNumber > maxNumber) {
@@ -173,31 +218,20 @@ fun DecimalNumberPicker(
                     readOnly = selectedColumn != 1,
                     state = rightState,
                     focusRequester = focusRequesterRight,
-                    modifier = Modifier.size(64.dp, 100.dp).onRotaryScrollEvent {
-                        coroutineScope.launch {
-                            if (rightState.selectedOption == 0 && rightPixels / 100f > rightState.numberOfOptions-1) {
-                                Timber.d("DecimalNumberPicker ${buildNumber()} advancing parent picker right: ${rightState.selectedOption}/${rightState.numberOfOptions} left: ${leftState.selectedOption}/${leftState.numberOfOptions}")
-                                if (leftPixels > 100 && it.verticalScrollPixels > 0) {
-                                    leftState.scrollToOption(leftState.selectedOption)
-                                    // reset rightPixels to 0
-                                    rightPixels = rightState.scrollBy(it.verticalScrollPixels)
-                                } else {
-                                    leftPixels += leftState.scrollBy(it.verticalScrollPixels)
-                                }
-                            } else {
-                                rightPixels += rightState.scrollBy(it.verticalScrollPixels)
-                                Timber.d("DecimalNumberPicker ${buildNumber()} scroll state: ${rightState.selectedOption}/${rightState.numberOfOptions} scroll: ${it.verticalScrollPixels} rightPixels: ${rightPixels}")
-
+                    modifier = Modifier
+                        .size(64.dp, 100.dp)
+                        .onRotaryScrollEvent {
+                            coroutineScope.launch {
+                                rightState.scrollBy(it.verticalScrollPixels * rotaryScrollWeight)
                             }
-                        }
-                        true
-                    },
+                            true
+                        },
                     readOnlyLabel = { LabelText("") },
                 ) { rightNumber: Int ->
                     NumberPiece(
                         selected = selectedColumn == 1,
                         onSelected = { selectedColumn = 1 },
-                        text = "%1d".format(rightNumber),
+                        text = "%1d".format(rightNumber % 10),
                         style = textStyle
                     )
                 }

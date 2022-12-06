@@ -24,6 +24,10 @@ class DataStore {
     val cgmDeltaArrow = MutableLiveData<String>()
     val bolusCalcDataSnapshot = MutableLiveData<BolusCalcDataSnapshotResponse>()
     val bolusCalcLastBG = MutableLiveData<LastBGResponse>()
+    val maxBolusAmount = MutableLiveData<Int>()
+
+    var bolusUnitsDisplayedText = MutableLiveData<String>()
+    var bolusBGDisplayedText = MutableLiveData<String>()
 
     var bolusCalculatorBuilder = MutableLiveData<BolusCalculatorBuilder>()
     var bolusCurrentParameters = MutableLiveData<BolusParameters>()
@@ -46,6 +50,10 @@ class DataStore {
         cgmDeltaArrow.observeForever { t -> Timber.i("DataStore.cgmDeltaArrow=$t") }
         bolusCalcDataSnapshot.observeForever { t -> Timber.i("DataStore.bolusCalcDataSnapshot=$t") }
         bolusCalcLastBG.observeForever { t -> Timber.i("DataStore.bolusCalcLastBG=$t") }
+        maxBolusAmount.observeForever { t -> Timber.i("DataStore.maxBolusAmount=$t") }
+
+        bolusUnitsDisplayedText.observeForever { t -> Timber.i("DataStore.bolusUnitsDisplayedText=$t") }
+        bolusBGDisplayedText.observeForever { t -> Timber.i("DataStore.bolusBGDisplayedText=$t") }
 
         bolusCalculatorBuilder.observeForever { t -> Timber.i("DataStore.bolusCalculatorBuilder=$t") }
         bolusCurrentParameters.observeForever { t -> Timber.i("DataStore.bolusCurrentParameters=$t") }
