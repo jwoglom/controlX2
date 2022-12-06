@@ -20,7 +20,7 @@ fun shortTimeAgo(time: Instant): String {
         ret += "${diff.toHours()%24}h"
     }
     if (diff.toMinutes() % 60 > 0 && diff.toDays() == 0L) {
-        ret += "${diff.toMinutes()%60}m"
+        ret += "${String.format("%02d", diff.toMinutes()%60)}m"
     }
     if (diff.getSeconds() < 60 && diff.getSeconds() > -60) {
         return "now"
@@ -41,7 +41,7 @@ fun shortTime(time: Instant): String {
         true -> "am"
         false -> "pm"
     }
-    return "${hr}:${zoned.minute}${ampm}"
+    return "${hr}:${String.format("%02d", zoned.minute)}${ampm}"
 }
 
 fun twoDecimalPlaces(decimal: Double): String {

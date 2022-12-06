@@ -1,6 +1,9 @@
 package com.jwoglom.wearx2.presentation
 
 import androidx.lifecycle.MutableLiveData
+import com.jwoglom.pumpx2.pump.messages.calculator.BolusCalcCondition
+import com.jwoglom.pumpx2.pump.messages.calculator.BolusCalculatorBuilder
+import com.jwoglom.pumpx2.pump.messages.calculator.BolusParameters
 import com.jwoglom.pumpx2.pump.messages.response.currentStatus.BolusCalcDataSnapshotResponse
 import com.jwoglom.pumpx2.pump.messages.response.currentStatus.LastBGResponse
 import timber.log.Timber
@@ -22,6 +25,11 @@ class DataStore {
     val bolusCalcDataSnapshot = MutableLiveData<BolusCalcDataSnapshotResponse>()
     val bolusCalcLastBG = MutableLiveData<LastBGResponse>()
 
+    var bolusCalculatorBuilder = MutableLiveData<BolusCalculatorBuilder>()
+    var bolusCurrentParameters = MutableLiveData<BolusParameters>()
+    var bolusFinalParameters = MutableLiveData<BolusParameters>()
+    var bolusFinalConditions = MutableLiveData<Set<BolusCalcCondition>>()
+
     init {
         batteryPercent.observeForever { t -> Timber.i("DataStore.batteryPercent=$t") }
         iobUnits.observeForever { t -> Timber.i("DataStore.iobUnits=$t") }
@@ -38,5 +46,10 @@ class DataStore {
         cgmDeltaArrow.observeForever { t -> Timber.i("DataStore.cgmDeltaArrow=$t") }
         bolusCalcDataSnapshot.observeForever { t -> Timber.i("DataStore.bolusCalcDataSnapshot=$t") }
         bolusCalcLastBG.observeForever { t -> Timber.i("DataStore.bolusCalcLastBG=$t") }
+
+        bolusCalculatorBuilder.observeForever { t -> Timber.i("DataStore.bolusCalculatorBuilder=$t") }
+        bolusCurrentParameters.observeForever { t -> Timber.i("DataStore.bolusCurrentParameters=$t") }
+        bolusFinalParameters.observeForever { t -> Timber.i("DataStore.bolusFinalParameters=$t") }
+        bolusFinalConditions.observeForever { t -> Timber.i("DataStore.bolusFinalConditions=$t") }
     }
 }

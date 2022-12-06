@@ -1,10 +1,3 @@
-buildscript {
-    ext {
-        m2_repository = "${System.properties['user.home']}/.m2/repository"
-        pumpx2_version = "1.2.0"
-    }
-}
-
 plugins {
     id 'com.android.library'
     id 'org.jetbrains.kotlin.android'
@@ -20,11 +13,11 @@ android {
         }
     }
     namespace 'com.jwoglom.wearx2.shared'
-    compileSdk 32
+    compileSdk 33
 
     defaultConfig {
         minSdk 26
-        targetSdk 32
+        targetSdk 33
 
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         consumerProguardFiles "consumer-rules.pro"
@@ -48,7 +41,7 @@ android {
 
 dependencies {
 
-    implementation 'androidx.core:core-ktx:1.7.0'
+    implementation 'androidx.core:core-ktx:1.9.0'
     implementation 'androidx.appcompat:appcompat:1.5.1'
     implementation 'com.google.android.material:material:1.7.0'
     testImplementation 'junit:junit:4.13.2'
@@ -65,8 +58,8 @@ dependencies {
     implementation "com.google.guava:guava:31.0.1-android"
 
     // pumpx2
-    implementation files("${m2_repository}/com/jwoglom/pumpx2/pumpx2-messages/${pumpx2_version}/pumpx2-messages-${pumpx2_version}.jar")
-    implementation files("${m2_repository}/com/jwoglom/pumpx2/pumpx2-shared/${pumpx2_version}/pumpx2-shared-${pumpx2_version}.jar")
+    implementation files("${project.m2_repository}/com/jwoglom/pumpx2/pumpx2-messages/${project.pumpx2_version}/pumpx2-messages-${project.pumpx2_version}.jar")
+    implementation files("${project.m2_repository}/com/jwoglom/pumpx2/pumpx2-shared/${project.pumpx2_version}/pumpx2-shared-${project.pumpx2_version}.jar")
 
 
     testImplementation 'org.json:json:20180813'

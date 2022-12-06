@@ -16,13 +16,16 @@ package com.jwoglom.wearx2.presentation.ui
  * limitations under the License.
  */
 
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.wrapContentSize
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Clear
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.livedata.observeAsState
 import androidx.compose.runtime.mutableStateOf
@@ -33,6 +36,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.wear.compose.material.AutoCenteringParams
 import androidx.wear.compose.material.Button
@@ -50,8 +54,13 @@ import androidx.wear.compose.material.rememberScalingLazyListState
 import com.google.android.horologist.compose.navscaffold.scrollableColumn
 import com.jwoglom.pumpx2.pump.messages.Message
 import com.jwoglom.pumpx2.pump.messages.calculator.BolusCalcCondition
+import com.jwoglom.pumpx2.pump.messages.calculator.BolusCalcCondition.Decision
+import com.jwoglom.pumpx2.pump.messages.calculator.BolusCalcCondition.FailedPrecondition
+import com.jwoglom.pumpx2.pump.messages.calculator.BolusCalcCondition.WaitingOnPrecondition
+import com.jwoglom.pumpx2.pump.messages.calculator.BolusCalcCondition.NonActionDecision
+import com.jwoglom.pumpx2.pump.messages.calculator.BolusCalcCondition.DataDecision
+import com.jwoglom.pumpx2.pump.messages.calculator.BolusCalcCondition.FailedSanityCheck
 import com.jwoglom.pumpx2.pump.messages.calculator.BolusCalcDecision
-import com.jwoglom.pumpx2.pump.messages.calculator.BolusCalculator
 import com.jwoglom.pumpx2.pump.messages.calculator.BolusCalculatorBuilder
 import com.jwoglom.pumpx2.pump.messages.calculator.BolusParameters
 import com.jwoglom.pumpx2.pump.messages.request.currentStatus.BolusCalcDataSnapshotRequest
@@ -60,6 +69,7 @@ import com.jwoglom.pumpx2.pump.messages.response.currentStatus.BolusCalcDataSnap
 import com.jwoglom.pumpx2.pump.messages.response.currentStatus.LastBGResponse
 import com.jwoglom.wearx2.LocalDataStore
 import com.jwoglom.wearx2.presentation.components.LineInfoChip
+import com.jwoglom.wearx2.presentation.components.LineTextDescription
 import com.jwoglom.wearx2.util.twoDecimalPlaces
 import timber.log.Timber
 
@@ -82,9 +92,6 @@ fun BolusScreen(
 
     val dataStore = LocalDataStore.current
 
-    var bolusCalculatorBuilder: BolusCalculatorBuilder? = null
-    var bolusFinalParameters: BolusParameters? = null
-    var bolusFinalConditions: List<BolusCalcCondition>? = null
     fun runBolusCalculator(dataSnapshot: BolusCalcDataSnapshotResponse?, lastBG: LastBGResponse?, bolusUnitsUserInput: Double?, bolusCarbsGramsUserInput: Int?, bolusBgMgdlUserInput: Int?): BolusCalculatorBuilder {
         Timber.i("runBolusCalculator: INPUT units=$bolusUnitsUserInput carbs=$bolusCarbsGramsUserInput bg=$bolusBgMgdlUserInput dataSnapshot=$dataSnapshot lastBG=$lastBG")
         val bolusCalc = BolusCalculatorBuilder()
@@ -121,8 +128,21 @@ fun BolusScreen(
             val bolusCalcDataSnapshot = dataStore.bolusCalcDataSnapshot.observeAsState()
             val bolusCalcLastBG = dataStore.bolusCalcLastBG.observeAsState()
 
+            LaunchedEffect(bolusCalcDataSnapshot, bolusCalcLastBG, bolusUnitsUserInput, bolusCarbsGramsUserInput, bolusBgMgdlUserInput) {
+                dataStore.bolusCalculatorBuilder.value = runBolusCalculator(
+                    bolusCalcDataSnapshot.value,
+                    bolusCalcLastBG.value,
+                    bolusUnitsUserInput,
+                    bolusCarbsGramsUserInput,
+                    bolusBgMgdlUserInput
+                )
+                dataStore.bolusCurrentParameters.value = bolusCalcParameters(dataStore.bolusCalculatorBuilder.value)
+            }
+
             sendPumpCommand(BolusCalcDataSnapshotRequest())
             sendPumpCommand(LastBGRequest())
+
+            val bolusCurrentParameters = dataStore.bolusCurrentParameters.observeAsState()
 
             Chip(
                 onClick = onClickUnits,
@@ -136,7 +156,10 @@ fun BolusScreen(
                 secondaryLabel = {
                     Text(
                         text = when (bolusUnitsUserInput) {
-                            null -> "Calculated: ${twoDecimalPlaces(bolusCalcParameters(runBolusCalculator(bolusCalcDataSnapshot.value, bolusCalcLastBG.value, bolusUnitsUserInput, bolusCarbsGramsUserInput, bolusBgMgdlUserInput)).units)}"
+                            null -> when (bolusCurrentParameters.value) {
+                                null -> "None Entered"
+                                else -> "Calculated: ${twoDecimalPlaces(bolusCurrentParameters.value!!.units)}"
+                            }
                             else -> "Entered: ${String.format("%.2f", bolusUnitsUserInput)}"
                         }
                     )
@@ -168,9 +191,8 @@ fun BolusScreen(
         }
 
         item {
-            val bolusCalcDataSnapshot = dataStore.bolusCalcDataSnapshot.observeAsState()
-            val bolusCalcLastBG = dataStore.bolusCalcLastBG.observeAsState()
-            val autofilledBg = runBolusCalculator(bolusCalcDataSnapshot.value, bolusCalcLastBG.value, bolusUnitsUserInput, bolusCarbsGramsUserInput, bolusBgMgdlUserInput).glucoseMgdl.orElse(null)
+            val bolusCalculatorBuilder = dataStore.bolusCalculatorBuilder.observeAsState()
+            val autofilledBg = bolusCalculatorBuilder.value?.glucoseMgdl?.orElse(null)
             Chip(
                 onClick = onClickBG,
                 label = {
@@ -194,13 +216,10 @@ fun BolusScreen(
         }
 
         item {
-            val bolusCalcDataSnapshot = dataStore.bolusCalcDataSnapshot.observeAsState()
-            val bolusCalcLastBG = dataStore.bolusCalcLastBG.observeAsState()
             CompactButton(
                 onClick = {
-                    bolusCalculatorBuilder = runBolusCalculator(bolusCalcDataSnapshot.value!!, bolusCalcLastBG.value!!, bolusUnitsUserInput, bolusCarbsGramsUserInput, bolusBgMgdlUserInput)
-                    bolusFinalConditions = bolusCalcDecision(bolusCalculatorBuilder)?.conditions
-                    bolusFinalParameters = bolusCalcParameters(bolusCalculatorBuilder)
+                    dataStore.bolusFinalConditions.value = bolusCalcDecision(dataStore.bolusCalculatorBuilder.value)?.conditions
+                    dataStore.bolusFinalParameters.value = bolusCalcParameters(dataStore.bolusCalculatorBuilder.value)
                     showConfirmDialog = true
                 },
                 enabled = true
@@ -215,15 +234,30 @@ fun BolusScreen(
             }
         }
 
-        item {
-            val bolusCalcDataSnapshot = dataStore.bolusCalcDataSnapshot.observeAsState()
-            val bolusCalcLastBG = dataStore.bolusCalcLastBG.observeAsState()
-            val conditions = bolusCalcDecision(runBolusCalculator(bolusCalcDataSnapshot.value, bolusCalcLastBG.value, bolusUnitsUserInput, bolusCarbsGramsUserInput, bolusBgMgdlUserInput))?.conditions
-            conditions?.forEach { condition ->
-                LineInfoChip(
-                    labelText = condition.msg,
-                    fontSize = 10.sp
+        fun sortConditions(set: Set<BolusCalcCondition>?): List<BolusCalcCondition> {
+            if (set == null) {
+                return emptyList()
+            }
+
+            return set.sortedWith(compareBy(
+                { it.javaClass == FailedSanityCheck::class.java },
+                { it.javaClass == FailedPrecondition::class.java },
+                { it.javaClass == WaitingOnPrecondition::class.java },
+                { it.javaClass == Decision::class.java },
+                { it.javaClass == NonActionDecision::class.java },
+            ))
+        }
+
+        items (10) { index ->
+            val bolusCalculatorBuilder = dataStore.bolusCalculatorBuilder.observeAsState()
+            val conditions = sortConditions(bolusCalculatorBuilder.value?.conditions)
+
+            if (index < conditions.size) {
+                LineTextDescription(
+                    labelText = conditions[index].msg,
                 )
+            } else {
+                Spacer(modifier = Modifier.height(1.dp))
             }
         }
     }
@@ -237,10 +271,12 @@ fun BolusScreen(
         },
         scrollState = scrollState
     ) {
+        val bolusFinalParameters = dataStore.bolusFinalParameters.observeAsState()
+
         Alert(
             title = {
                 Text(
-                    text = "${bolusFinalParameters?.units?.let { twoDecimalPlaces(it) } ?: 0 }u Bolus",
+                    text = bolusFinalParameters.value?.units?.let { "${twoDecimalPlaces(it)}u Bolus" } ?: "Invalid",
                     textAlign = TextAlign.Center,
                     color = MaterialTheme.colors.onBackground
                 )
@@ -249,6 +285,8 @@ fun BolusScreen(
                 Button(
                     onClick = {
                         showConfirmDialog = false
+                        dataStore.bolusFinalConditions.value = null
+                        dataStore.bolusFinalParameters.value = null
                     },
                     colors = ButtonDefaults.secondaryButtonColors()
                 ) {
@@ -296,10 +334,14 @@ fun BolusScreen(
         },
         scrollState = scrollState
     ) {
+        val bolusFinalParameters = dataStore.bolusFinalParameters.observeAsState()
+
         Alert(
             title = {
                 Text(
-                    text = "${bolusCalculatorBuilder}u Bolus",
+                    text = when (bolusFinalParameters.value) {
+                        null -> ""
+                        else -> "${bolusFinalParameters.value!!.units}u Bolus"},
                     textAlign = TextAlign.Center,
                     color = MaterialTheme.colors.onBackground
                 )
