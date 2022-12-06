@@ -39,8 +39,8 @@ import com.jwoglom.pumpx2.pump.messages.response.currentStatus.InsulinStatusResp
 import com.jwoglom.pumpx2.pump.messages.response.historyLog.BolusDeliveryHistoryLog
 import com.jwoglom.pumpx2.pump.messages.response.historyLog.HistoryLogStreamResponse
 import com.jwoglom.pumpx2.pump.messages.util.MessageHelpers
-import com.jwoglom.pumpx2.util.timber.DebugTree
 import com.jwoglom.wearx2.shared.PumpMessageSerializer
+import com.jwoglom.wearx2.shared.util.DebugTree
 import timber.log.Timber
 import java.lang.reflect.InvocationTargetException
 import java.util.*

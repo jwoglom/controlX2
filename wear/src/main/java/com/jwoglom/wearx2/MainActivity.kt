@@ -28,13 +28,13 @@ import com.jwoglom.pumpx2.pump.messages.response.currentStatus.HomeScreenMirrorR
 import com.jwoglom.pumpx2.pump.messages.response.currentStatus.InsulinStatusResponse
 import com.jwoglom.pumpx2.pump.messages.response.currentStatus.LastBGResponse
 import com.jwoglom.pumpx2.pump.messages.response.currentStatus.LastBolusStatusAbstractResponse
-import com.jwoglom.pumpx2.util.timber.DebugTree
 import com.jwoglom.wearx2.databinding.ActivityMainBinding
 import com.jwoglom.wearx2.presentation.DataStore
 import com.jwoglom.wearx2.presentation.WearApp
 import com.jwoglom.wearx2.presentation.navigation.Screen
 import com.jwoglom.wearx2.shared.PumpMessageSerializer
 import com.jwoglom.wearx2.shared.PumpQualifyingEventsSerializer
+import com.jwoglom.wearx2.shared.util.DebugTree
 import com.jwoglom.wearx2.util.shortTime
 import com.jwoglom.wearx2.util.shortTimeAgo
 import com.jwoglom.wearx2.util.twoDecimalPlaces1000Unit

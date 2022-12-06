@@ -3,6 +3,7 @@ package com.jwoglom.wearx2.presentation.components
 import android.view.MotionEvent
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.gestures.FlingBehavior
+import androidx.compose.foundation.gestures.scrollBy
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
@@ -24,6 +25,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.ExperimentalComposeUiApi
@@ -31,8 +33,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.input.pointer.pointerInteropFilter
+import androidx.compose.ui.input.rotary.onRotaryScrollEvent
 import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
@@ -47,9 +49,10 @@ import androidx.wear.compose.material.PickerScope
 import androidx.wear.compose.material.PickerState
 import androidx.wear.compose.material.Text
 import androidx.wear.compose.material.rememberPickerState
-import com.google.android.horologist.composables.R
+import kotlinx.coroutines.launch
 import timber.log.Timber
 
+@OptIn(ExperimentalComposeUiApi::class)
 @Composable
 fun DecimalNumberPicker(
     label: String? = null,
@@ -72,11 +75,28 @@ fun DecimalNumberPicker(
         initiallySelectedOption = 0
     )
 
+    var leftPixels = 0.0f
+    var rightPixels = 0.0f
+
+    val coroutineScope = rememberCoroutineScope()
+
+    fun buildNumber(): Double {
+        var leftNumber = leftState.selectedOption
+        var rightNumber = rightState.selectedOption
+
+        // selecting a blank option -- return 0
+        if (leftNumber > maxNumber) {
+            leftNumber = 0
+            rightNumber = 0
+        }
+        return leftNumber + (1.0*rightNumber)/10
+    }
+
     MaterialTheme(typography = typography) {
-        var selectedColumn by remember { mutableStateOf(0) }
+        var selectedColumn by remember { mutableStateOf(1) }
         val textStyle = MaterialTheme.typography.display1
-        val focusRequester1 = remember { FocusRequester() }
-        val focusRequester2 = remember { FocusRequester() }
+        val focusRequesterLeft = remember { FocusRequester() }
+        val focusRequesterRight = remember { FocusRequester() }
 
         Column(
             modifier = modifier.fillMaxSize(),
@@ -119,8 +139,13 @@ fun DecimalNumberPicker(
                 PickerWithRSB(
                     readOnly = selectedColumn != 0,
                     state = leftState,
-                    focusRequester = focusRequester1,
-                    modifier = Modifier.size(64.dp, 100.dp),
+                    focusRequester = focusRequesterLeft,
+                    modifier = Modifier.size(64.dp, 100.dp).onRotaryScrollEvent {
+                        coroutineScope.launch {
+                            leftState.scrollBy(it.verticalScrollPixels)
+                        }
+                        true
+                    },
                     readOnlyLabel = { LabelText("") }
                 ) { leftNumber: Int ->
                     if (leftNumber > maxNumber) {
@@ -147,9 +172,27 @@ fun DecimalNumberPicker(
                 PickerWithRSB(
                     readOnly = selectedColumn != 1,
                     state = rightState,
-                    focusRequester = focusRequester2,
-                    modifier = Modifier.size(64.dp, 100.dp),
-                    readOnlyLabel = { LabelText("") }
+                    focusRequester = focusRequesterRight,
+                    modifier = Modifier.size(64.dp, 100.dp).onRotaryScrollEvent {
+                        coroutineScope.launch {
+                            if (rightState.selectedOption == 0 && rightPixels / 100f > rightState.numberOfOptions-1) {
+                                Timber.d("DecimalNumberPicker ${buildNumber()} advancing parent picker right: ${rightState.selectedOption}/${rightState.numberOfOptions} left: ${leftState.selectedOption}/${leftState.numberOfOptions}")
+                                if (leftPixels > 100 && it.verticalScrollPixels > 0) {
+                                    leftState.scrollToOption(leftState.selectedOption)
+                                    // reset rightPixels to 0
+                                    rightPixels = rightState.scrollBy(it.verticalScrollPixels)
+                                } else {
+                                    leftPixels += leftState.scrollBy(it.verticalScrollPixels)
+                                }
+                            } else {
+                                rightPixels += rightState.scrollBy(it.verticalScrollPixels)
+                                Timber.d("DecimalNumberPicker ${buildNumber()} scroll state: ${rightState.selectedOption}/${rightState.numberOfOptions} scroll: ${it.verticalScrollPixels} rightPixels: ${rightPixels}")
+
+                            }
+                        }
+                        true
+                    },
+                    readOnlyLabel = { LabelText("") },
                 ) { rightNumber: Int ->
                     NumberPiece(
                         selected = selectedColumn == 1,
@@ -166,15 +209,7 @@ fun DecimalNumberPicker(
                     .weight(0.5f)
             )
             Button(onClick = {
-                var leftNumber = leftState.selectedOption
-                var rightNumber = rightState.selectedOption
-
-                // selecting a blank option -- return 0
-                if (leftNumber > maxNumber) {
-                    leftNumber = 0
-                    rightNumber = 0
-                }
-                val confirmedNumber = leftNumber + (1.0*rightNumber)/10
+                val confirmedNumber = buildNumber()
                 Timber.i("DecimalNumberPicker: $confirmedNumber (${leftState.selectedOption}, ${rightState.selectedOption})")
                 onNumberConfirm(confirmedNumber)
             }) {
@@ -188,7 +223,7 @@ fun DecimalNumberPicker(
             }
             Spacer(Modifier.height(8.dp))
             LaunchedEffect(selectedColumn) {
-                listOf(focusRequester1, focusRequester2)[selectedColumn].requestFocus()
+                listOf(focusRequesterLeft, focusRequesterRight)[selectedColumn].requestFocus()
             }
         }
     }
@@ -224,6 +259,7 @@ internal fun NumberPiece(
     }
 }
 
+@OptIn(ExperimentalComposeUiApi::class)
 @Composable
 internal fun PickerWithRSB(
     state: PickerState,
@@ -232,18 +268,13 @@ internal fun PickerWithRSB(
     focusRequester: FocusRequester,
     readOnlyLabel: @Composable (BoxScope.() -> Unit)? = null,
     flingBehavior: FlingBehavior = PickerDefaults.flingBehavior(state = state),
-    option: @Composable PickerScope.(optionIndex: Int) -> Unit
+    option: @Composable PickerScope.(optionIndex: Int) -> Unit,
 ) {
     Picker(
         state = state,
         modifier = modifier
             .focusRequester(focusRequester)
             .focusable(),
-//        .rsbScroll(
-//            scrollableState = state,
-//            flingBehavior = flingBehavior,
-//            focusRequester = focusRequester
-//        )
         flingBehavior = flingBehavior,
         readOnly = readOnly,
         readOnlyLabel = readOnlyLabel,
