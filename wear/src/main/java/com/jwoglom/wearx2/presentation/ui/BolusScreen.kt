@@ -368,7 +368,7 @@ fun BolusScreen(
                 if (index < conditions.size) {
                     LineTextDescription(
                         labelText = conditions[index].msg,
-                        fontSize = 8.sp,
+                        fontSize = 12.sp,
                     )
                 } else {
                     Spacer(modifier = Modifier.height(1.dp))

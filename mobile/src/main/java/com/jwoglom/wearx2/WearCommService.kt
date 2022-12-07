@@ -19,6 +19,7 @@ import com.google.android.gms.common.api.GoogleApiClient
 import com.google.android.gms.wearable.MessageEvent
 import com.google.android.gms.wearable.Wearable
 import com.google.android.gms.wearable.WearableListenerService
+import com.jwoglom.pumpx2.pump.PumpState
 import com.jwoglom.pumpx2.pump.TandemError
 import com.jwoglom.pumpx2.pump.bluetooth.TandemBluetoothHandler
 import com.jwoglom.pumpx2.pump.bluetooth.TandemPump
@@ -73,14 +74,31 @@ class WearCommService : WearableListenerService(), GoogleApiClient.ConnectionCal
             peripheral: BluetoothPeripheral?,
             events: MutableSet<QualifyingEvent>?
         ) {
-            wearCommHandler?.sendMessage("/from-pump/receive-qualifying-event", PumpQualifyingEventsSerializer.toBytes(events))
+            Timber.i("onReceiveQualifyingEvent: $events")
+            events?.forEach { event ->
+                event.suggestedHandlers.forEach {
+                    Timber.i("onReceiveQualifyingEvent: running handler for $event message: ${it.get()}")
+                    command(it.get())
+                }
+            }
+            //wearCommHandler?.sendMessage("/from-pump/receive-qualifying-event", PumpQualifyingEventsSerializer.toBytes(events))
         }
 
         override fun onWaitingForPairingCode(
             peripheral: BluetoothPeripheral?,
             centralChallengeResponse: CentralChallengeResponse?
         ) {
-            wearCommHandler?.sendMessage("/from-pump/waiting-for-pairing-code", PumpMessageSerializer.toBytes(centralChallengeResponse))
+            PumpState.getPairingCode(context)?.let {
+                Timber.i("Pairing with saved code: $it centralChallenge: $centralChallengeResponse")
+                pair(peripheral, centralChallengeResponse, it)
+                wearCommHandler?.sendMessage(
+                    "/from-pump/entered-pairing-code",
+                    PumpMessageSerializer.toBytes(centralChallengeResponse))
+            } ?: run {
+                wearCommHandler?.sendMessage(
+                    "/from-pump/missing-pairing-code",
+                    PumpMessageSerializer.toBytes(centralChallengeResponse))
+            }
         }
 
         override fun onInitialPumpConnection(peripheral: BluetoothPeripheral?) {

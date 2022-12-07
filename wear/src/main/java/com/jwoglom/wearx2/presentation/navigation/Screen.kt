@@ -32,6 +32,8 @@ sealed class Screen(
     object WaitingForPhone : Screen("WaitingForPhone")
     object WaitingToFindPump : Screen("WaitingToFindPump")
     object ConnectingToPump : Screen("ConnectingToPump")
+    object PairingToPump : Screen("PairingToPump")
+    object MissingPairingCode : Screen("MissingPairingCode")
     object PumpDisconnectedReconnecting : Screen("PumpDisconnectedReconnecting")
     object Landing : Screen("Landing")
     object Bolus : Screen("Bolus")

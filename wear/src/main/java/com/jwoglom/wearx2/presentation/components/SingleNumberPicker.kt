@@ -53,6 +53,8 @@ import androidx.wear.compose.material.rememberPickerState
 import com.google.accompanist.pager.ExperimentalPagerApi
 import com.google.accompanist.pager.rememberPagerState
 import com.google.android.horologist.composables.R
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import timber.log.Timber
 
@@ -65,6 +67,7 @@ fun SingleNumberPicker(
     maxNumber: Int = 30,
     minNumber: Int = 0,
     defaultNumber: Int = minNumber,
+    rotaryScrollCalc: (Float) -> Float = {weight -> weight},
 ) {
     // Omit scaling according to Settings > Display > Font size for this screen,
     val typography = MaterialTheme.typography.copy(
@@ -73,11 +76,36 @@ fun SingleNumberPicker(
         )
     )
     val leftState = rememberPickerState(
-        initialNumberOfOptions = maxNumber + 10, // Add extra blank options to prevent accidental selection of the maximum
+        initialNumberOfOptions = maxNumber + 30, // Add extra blank options to prevent accidental selection of the maximum
         initiallySelectedOption = defaultNumber - minNumber
     )
 
     val coroutineScope = rememberCoroutineScope()
+
+    var rotaryScrollFix: Job? = null
+    fun runRotaryScrollFix() {
+        rotaryScrollFix?.cancel()
+        rotaryScrollFix = coroutineScope.launch {
+            Timber.d("coroutine: delay")
+            delay(250)
+            Timber.d("coroutine: start")
+            if (!leftState.isScrollInProgress) {
+                Timber.d("coroutine: scroll")
+                if (leftState.selectedOption > maxNumber) {
+                    leftState.scrollToOption(0)
+                } else {
+                    leftState.scrollToOption(leftState.selectedOption)
+                }
+            } else {
+                runRotaryScrollFix()
+            }
+        }
+        rotaryScrollFix?.start()
+    }
+
+    LaunchedEffect (leftState.selectedOption) {
+        runRotaryScrollFix()
+    }
 
     MaterialTheme(typography = typography) {
         var selectedColumn by remember { mutableStateOf(0) }
@@ -128,7 +156,8 @@ fun SingleNumberPicker(
                     focusRequester = focusRequester1,
                     modifier = Modifier.size(100.dp, 100.dp).onRotaryScrollEvent {
                         coroutineScope.launch {
-                            leftState.scrollBy(it.verticalScrollPixels)
+                            Timber.d("by ${rotaryScrollCalc(it.verticalScrollPixels)} verticalScroll ${it.verticalScrollPixels}")
+                            leftState.scrollBy(rotaryScrollCalc(it.verticalScrollPixels))
                         }
                         true
                     },

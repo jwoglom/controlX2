@@ -62,6 +62,8 @@ import com.jwoglom.wearx2.presentation.ui.LandingScreen
 import com.jwoglom.wearx2.presentation.ui.ScalingLazyListStateViewModel
 import com.jwoglom.wearx2.presentation.ui.ScrollStateViewModel
 import com.jwoglom.wearx2.util.SendType
+import kotlin.math.abs
+import kotlin.math.pow
 
 @Composable
 fun WearApp(
@@ -189,6 +191,14 @@ fun WearApp(
                     IndeterminateProgressIndicator(text = "Connecting to pump")
                 }
 
+                composable(Screen.PairingToPump.route) {
+                    IndeterminateProgressIndicator(text = "Pairing to pump")
+                }
+
+                composable(Screen.MissingPairingCode.route) {
+                    IndeterminateProgressIndicator(text = "Pump pairing needed")
+                }
+
                 composable(Screen.PumpDisconnectedReconnecting.route) {
                     IndeterminateProgressIndicator(text = "Reconnecting")
                 }
@@ -266,7 +276,7 @@ fun WearApp(
                             bolusUnitsUserInput = it
                         },
                         labelColors = defaultTheme.colors,
-                        rotaryScrollWeight = 4f,
+                        rotaryScrollCalc = rotaryExponentialScroll(1.3f),
                         maxNumber = when (maxBolusAmount.value) {
                             null -> 30
                             else -> maxBolusAmount.value!!
@@ -283,6 +293,7 @@ fun WearApp(
                             null -> 0
                             else -> bolusCarbsGramsUserInput!!
                         },
+                        rotaryScrollCalc = rotaryExponentialScroll(1.3f),
                         onNumberConfirm = {
                             navController.popBackStack()
                             bolusCarbsGramsUserInput = it
@@ -296,6 +307,7 @@ fun WearApp(
                         minNumber = 40,
                         maxNumber = 400,
                         defaultNumber = 120,
+                        rotaryScrollCalc = rotaryExponentialScroll(1.5f),
                         onNumberConfirm = {
                             navController.popBackStack()
                             bolusBgMgdlUserInput = it
@@ -305,6 +317,13 @@ fun WearApp(
             }
         }
     }
+}
+
+private fun rotaryExponentialScroll(factor: Float): (Float) -> Float {
+    return { weight -> when {
+        weight < 0f -> -1f * abs(weight).pow(factor)
+        else -> weight.pow(factor)
+    }}
 }
 
 @Composable

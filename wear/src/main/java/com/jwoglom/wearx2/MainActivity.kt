@@ -158,6 +158,8 @@ class MainActivity : ComponentActivity(), MessageApi.MessageListener, GoogleApiC
             Screen.WaitingForPhone.route,
             Screen.WaitingToFindPump.route,
             Screen.ConnectingToPump.route,
+            Screen.PairingToPump.route,
+            Screen.MissingPairingCode.route,
             Screen.PumpDisconnectedReconnecting.route -> true
             else -> false
         }
@@ -261,14 +263,21 @@ class MainActivity : ComponentActivity(), MessageApi.MessageListener, GoogleApiC
                 }
                 text = "Found model ${String(messageEvent.data)}"
             }
-            "/from-pump/waiting-for-pairing-code" -> {
+            "/from-pump/entered-pairing-code" -> {
                 if (inWaitingState()) {
                     runOnUiThread {
-                        navController.navigate(Screen.ConnectingToPump.route)
+                        navController.navigate(Screen.PairingToPump.route)
                     }
                     sendMessage("/to-phone/is-pump-connected", "".toByteArray())
                 }
-                text = "Waiting for Pairing Code"
+            }
+            "/from-pump/missing-pairing-code" -> {
+                if (inWaitingState()) {
+                    runOnUiThread {
+                        navController.navigate(Screen.MissingPairingCode.route)
+                    }
+                    sendMessage("/to-phone/is-pump-connected", "".toByteArray())
+                }
             }
             "/from-pump/pump-connected" -> {
                 if (inWaitingState()) {

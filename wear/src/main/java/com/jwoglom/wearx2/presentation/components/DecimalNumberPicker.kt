@@ -56,6 +56,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import timber.log.Timber
+import kotlin.math.max
 
 @OptIn(ExperimentalComposeUiApi::class)
 @Composable
@@ -65,7 +66,7 @@ fun DecimalNumberPicker(
     label: String? = null,
     maxNumber: Int = 30,
     defaultNumber: Double? = null,
-    rotaryScrollWeight: Float = 1f,
+    rotaryScrollCalc: (Float) -> Float = {weight -> weight},
     labelColors: Colors = MaterialTheme.colors,
 ) {
     // Omit scaling according to Settings > Display > Font size for this screen,
@@ -83,7 +84,7 @@ fun DecimalNumberPicker(
         }
     )
     val rightState = rememberPickerState(
-        initialNumberOfOptions = 10 * (maxNumber + 10),
+        initialNumberOfOptions = 10 * (maxNumber + 10) + 10,
         initiallySelectedOption = when (defaultNumber) {
             null -> 0
             else -> ((defaultNumber * 10) % 10).toInt()
@@ -96,8 +97,8 @@ fun DecimalNumberPicker(
         var leftNumber = leftState.selectedOption
         var rightNumber = rightState.selectedOption % 10
 
-        // selecting a blank option -- return 0
-        if (leftNumber > maxNumber) {
+        // selecting a blank option on either side -- return 0
+        if (leftNumber > maxNumber || rightState.selectedOption > 10 * maxNumber) {
             leftNumber = 0
             rightNumber = 0
         }
@@ -116,13 +117,21 @@ fun DecimalNumberPicker(
             rotaryScrollFix = coroutineScope.launch {
                 Timber.d("coroutine: delay")
                 delay(250)
-
+                Timber.d("coroutine: start")
                 if (!leftState.isScrollInProgress && !rightState.isScrollInProgress) {
                     Timber.d("coroutine: scroll")
-                    leftState.scrollToOption(leftState.selectedOption)
-                    rightState.scrollToOption(rightState.selectedOption)
+                    if (leftState.selectedOption > maxNumber) {
+                        leftState.scrollToOption(0)
+                    } else {
+                        leftState.scrollToOption(leftState.selectedOption)
+                    }
+                    if (rightState.selectedOption > 10 * maxNumber) {
+                        rightState.scrollToOption(0)
+                    } else {
+                        rightState.scrollToOption(rightState.selectedOption)
+                    }
                 } else {
-                    Timber.d("coroutine: skipped")
+                    runRotaryScrollFix()
                 }
             }
             rotaryScrollFix?.start()
@@ -195,7 +204,7 @@ fun DecimalNumberPicker(
                         .size(64.dp, 100.dp)
                         .onRotaryScrollEvent {
                             coroutineScope.launch {
-                                leftState.scrollBy(it.verticalScrollPixels * rotaryScrollWeight)
+                                leftState.scrollBy(rotaryScrollCalc(it.verticalScrollPixels))
                             }
                             true
                         },
@@ -230,18 +239,22 @@ fun DecimalNumberPicker(
                         .size(64.dp, 100.dp)
                         .onRotaryScrollEvent {
                             coroutineScope.launch {
-                                rightState.scrollBy(it.verticalScrollPixels * rotaryScrollWeight)
+                                rightState.scrollBy(rotaryScrollCalc(it.verticalScrollPixels))
                             }
                             true
                         },
                     readOnlyLabel = { LabelText("") },
                 ) { rightNumber: Int ->
-                    NumberPiece(
-                        selected = selectedColumn == 1,
-                        onSelected = { selectedColumn = 1 },
-                        text = "%1d".format(rightNumber % 10),
-                        style = textStyle
-                    )
+                    if (rightNumber > 10 * maxNumber) {
+                        Spacer(Modifier.height(50.dp))
+                    } else {
+                        NumberPiece(
+                            selected = selectedColumn == 1,
+                            onSelected = { selectedColumn = 1 },
+                            text = "%1d".format(rightNumber % 10),
+                            style = textStyle
+                        )
+                    }
                 }
                 Spacer(Modifier.width(8.dp))
             }
