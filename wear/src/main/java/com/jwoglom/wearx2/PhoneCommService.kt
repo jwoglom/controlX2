@@ -47,11 +47,6 @@ class PhoneCommService : WearableListenerService() {
                 currentlyConnected = false
                 disconnectedNotification("pump disconnected")
             }
-            // HACK: we need to forward a command from the phone activity to the phone service
-            // and this is the easiest way to do it
-            "/to-pump/command" -> {
-                sendMessage(messageEvent.path, messageEvent.data)
-            }
         }
     }
 

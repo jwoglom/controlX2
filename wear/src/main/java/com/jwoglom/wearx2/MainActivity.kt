@@ -1,7 +1,7 @@
 package com.jwoglom.wearx2
 
-import android.content.Intent
 import android.os.Bundle
+import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.runtime.compositionLocalOf
@@ -29,7 +29,6 @@ import com.jwoglom.pumpx2.pump.messages.response.currentStatus.HomeScreenMirrorR
 import com.jwoglom.pumpx2.pump.messages.response.currentStatus.InsulinStatusResponse
 import com.jwoglom.pumpx2.pump.messages.response.currentStatus.LastBGResponse
 import com.jwoglom.pumpx2.pump.messages.response.currentStatus.LastBolusStatusAbstractResponse
-import com.jwoglom.wearx2.databinding.ActivityMainBinding
 import com.jwoglom.wearx2.presentation.DataStore
 import com.jwoglom.wearx2.presentation.WearApp
 import com.jwoglom.wearx2.presentation.navigation.Screen
@@ -47,14 +46,16 @@ val LocalDataStore = compositionLocalOf { dataStore }
 class MainActivity : ComponentActivity(), MessageApi.MessageListener, GoogleApiClient.ConnectionCallbacks, GoogleApiClient.OnConnectionFailedListener {
 
     internal lateinit var navController: NavHostController
-    private lateinit var binding: ActivityMainBinding
     private lateinit var mApiClient: GoogleApiClient
+
+    private lateinit var initialRoute: String
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         Timber.uprootAll()
         Timber.plant(DebugTree("WA"))
 
+        initialRoute = intent.getStringExtra("route")?: Screen.Landing.route
 
         setContent {
             navController = rememberSwipeDismissableNavController()
@@ -63,9 +64,14 @@ class MainActivity : ComponentActivity(), MessageApi.MessageListener, GoogleApiC
                 this.sendPumpCommands(type, msg)
             }
 
+            val sendPhoneConnectionCheck: () -> Unit = {
+                this.sendMessage("/to-phone/is-pump-connected", "phone_connection_check".toByteArray())
+            }
+
             WearApp(
-                swipeDismissableNavController = navController,
+                navController = navController,
                 sendPumpCommands = sendPumpCommands,
+                sendPhoneConnectionCheck = sendPhoneConnectionCheck,
             )
         }
 
@@ -78,11 +84,10 @@ class MainActivity : ComponentActivity(), MessageApi.MessageListener, GoogleApiC
         Timber.d("create: mApiClient: $mApiClient")
         mApiClient.connect()
 
-
         // Start PhoneCommService
-        Intent(this, PhoneCommService::class.java).also { intent ->
-            startService(intent)
-        }
+//        Intent(this, PhoneCommService::class.java).also { intent ->
+//            startService(intent)
+//        }
     }
 
     override fun onResume() {
@@ -268,7 +273,7 @@ class MainActivity : ComponentActivity(), MessageApi.MessageListener, GoogleApiC
             "/from-pump/pump-connected" -> {
                 if (inWaitingState()) {
                     runOnUiThread {
-                        navController.navigate(Screen.Landing.route)
+                        navController.navigate(initialRoute)
                     }
                 }
                 text = "Connected to ${String(messageEvent.data)}"
@@ -277,6 +282,10 @@ class MainActivity : ComponentActivity(), MessageApi.MessageListener, GoogleApiC
                 if (inWaitingState()) {
                     runOnUiThread {
                         navController.navigate(Screen.PumpDisconnectedReconnecting.route)
+                    }
+                } else {
+                    runOnUiThread {
+                        Toast.makeText(applicationContext, "Disconnected", Toast.LENGTH_SHORT).show()
                     }
                 }
                 text = "Disconnected from ${String(messageEvent.data)}"
@@ -288,14 +297,30 @@ class MainActivity : ComponentActivity(), MessageApi.MessageListener, GoogleApiC
                 text = "Event: ${PumpQualifyingEventsSerializer.fromBytes(messageEvent.data)}"
             }
             "/from-pump/receive-message" -> {
+                if (inWaitingState()) {
+                    runOnUiThread {
+                        navController.navigate(initialRoute)
+                    }
+                }
                 val pumpMessage = PumpMessageSerializer.fromBytes(messageEvent.data)
                 onPumpMessageReceived(pumpMessage, false)
                 text = "${pumpMessage}"
             }
             "/from-pump/receive-cached-message" -> {
+                if (inWaitingState()) {
+                    runOnUiThread {
+                        navController.navigate(initialRoute)
+                    }
+                }
                 val pumpMessage = PumpMessageSerializer.fromBytes(messageEvent.data)
                 onPumpMessageReceived(pumpMessage, true)
                 text = "${pumpMessage}"
+            }
+            // HACK: we need to forward a command from the phone activity to the phone service
+            // and this is the easiest way to do it
+            "/to-pump/command" -> {
+                Timber.i("forwarding to-pump message from phone to wear to phone ${String(messageEvent.data)}")
+                sendMessage(messageEvent.path, messageEvent.data)
             }
             else -> text = "? ${String(messageEvent.data)}"
         }

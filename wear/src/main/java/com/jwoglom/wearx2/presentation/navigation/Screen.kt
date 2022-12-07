@@ -29,25 +29,14 @@ const val SCROLL_TYPE_NAV_ARGUMENT = "scrollType"
 sealed class Screen(
     val route: String
 ) {
-    object WaitingForPhone : Screen("Waiting for phone")
-    object WaitingToFindPump : Screen("Waiting to find pump")
-    object ConnectingToPump : Screen("Waiting for pump connection")
-    object PumpDisconnectedReconnecting : Screen("Waiting for pump connection")
-    object Landing : Screen("landing")
+    object WaitingForPhone : Screen("WaitingForPhone")
+    object WaitingToFindPump : Screen("WaitingToFindPump")
+    object ConnectingToPump : Screen("ConnectingToPump")
+    object PumpDisconnectedReconnecting : Screen("PumpDisconnectedReconnecting")
+    object Landing : Screen("Landing")
     object Bolus : Screen("Bolus")
-    object BolusSelectUnitsScreen : Screen("Bolus Units")
-    object BolusSelectCarbsScreen : Screen("Bolus Carbs")
-    object BolusSelectBGScreen : Screen("Bolus BG")
+    object BolusSelectUnitsScreen : Screen("BolusSelectUnits")
+    object BolusSelectCarbsScreen : Screen("BolusSelectCarbs")
+    object BolusSelectBGScreen : Screen("BolusSelectBG")
 
-
-    object WatchList : Screen("watchList")
-    object WatchDetail : Screen("watchDetail")
-    object Map : Screen("map")
-    object Time12hPicker : Screen("time12h")
-    object Time24hPicker : Screen("time24h")
-    object Dialogs : Screen("dialogs")
-    object ProgressIndicators : Screen("progressIndicators")
-    object IndeterminateProgressIndicator : Screen("indeterminateProgressIndicator")
-    object FullScreenProgressIndicator : Screen("fullScreenProgressIndicator")
-    object Theme : Screen("theme")
 }

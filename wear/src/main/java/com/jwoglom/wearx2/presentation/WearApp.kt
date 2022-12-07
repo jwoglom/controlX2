@@ -18,7 +18,6 @@ package com.jwoglom.wearx2.presentation
 
 import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.background
-import androidx.compose.material3.CenterAlignedTopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -51,7 +50,6 @@ import androidx.wear.compose.navigation.rememberSwipeDismissableNavController
 import com.jwoglom.pumpx2.pump.messages.Message
 import com.jwoglom.pumpx2.pump.messages.request.currentStatus.GlobalMaxBolusSettingsRequest
 import com.jwoglom.wearx2.LocalDataStore
-import com.jwoglom.wearx2.MainActivity
 import com.jwoglom.wearx2.presentation.components.DecimalNumberPicker
 import com.jwoglom.wearx2.presentation.components.SingleNumberPicker
 import com.jwoglom.wearx2.presentation.components.TopCGMReadingText
@@ -64,13 +62,13 @@ import com.jwoglom.wearx2.presentation.ui.LandingScreen
 import com.jwoglom.wearx2.presentation.ui.ScalingLazyListStateViewModel
 import com.jwoglom.wearx2.presentation.ui.ScrollStateViewModel
 import com.jwoglom.wearx2.util.SendType
-import kotlinx.coroutines.coroutineScope
 
 @Composable
 fun WearApp(
     modifier: Modifier = Modifier,
-    swipeDismissableNavController: NavHostController = rememberSwipeDismissableNavController(),
+    navController: NavHostController = rememberSwipeDismissableNavController(),
     sendPumpCommands: (SendType, List<Message>) -> Unit,
+    sendPhoneConnectionCheck: () -> Unit,
 ) {
     var themeColors by remember { mutableStateOf(defaultTheme.colors) }
     WearAppTheme(colors = themeColors) {
@@ -103,7 +101,7 @@ fun WearApp(
         // Remember, mobile guidelines specify that if you back navigate out of a screen and then
         // later navigate into it again, it should be in its initial scroll state (not the last
         // scroll location it was in before you backed out).
-        val currentBackStackEntry by swipeDismissableNavController.currentBackStackEntryAsState()
+        val currentBackStackEntry by navController.currentBackStackEntryAsState()
 
         val scrollType =
             currentBackStackEntry?.arguments?.getSerializable(SCROLL_TYPE_NAV_ARGUMENT)
@@ -118,6 +116,15 @@ fun WearApp(
         var bolusBgMgdlUserInput by remember { mutableStateOf<Int?>(null) }
 
         var bolusUnitsDefaultNumber by remember { mutableStateOf<Double?>(null) }
+
+
+        LaunchedEffect (Unit) {
+            navController.navigate(Screen.WaitingForPhone.route)
+        }
+
+        LaunchedEffect (navController.currentDestination) {
+            sendPhoneConnectionCheck()
+        }
 
         Scaffold(
             modifier = modifier,
@@ -164,7 +171,7 @@ fun WearApp(
              * gesture on mobile). Otherwise, the code looks very similar.
              */
             SwipeDismissableNavHost(
-                navController = swipeDismissableNavController,
+                navController = navController,
                 startDestination = Screen.WaitingForPhone.route,
                 modifier = Modifier.background(MaterialTheme.colors.background)
             ) {
@@ -204,7 +211,7 @@ fun WearApp(
                     LandingScreen(
                         scalingLazyListState = scalingLazyListState,
                         focusRequester = focusRequester,
-                        swipeDismissableNavController = swipeDismissableNavController,
+                        swipeDismissableNavController = navController,
                         sendPumpCommands = sendPumpCommands,
                     )
 
@@ -234,13 +241,13 @@ fun WearApp(
                         bolusBgMgdlUserInput = bolusBgMgdlUserInput,
                         onClickUnits = { default ->
                             bolusUnitsDefaultNumber = default
-                            swipeDismissableNavController.navigate(Screen.BolusSelectUnitsScreen.route)
+                            navController.navigate(Screen.BolusSelectUnitsScreen.route)
                         },
                         onClickCarbs = {
-                            swipeDismissableNavController.navigate(Screen.BolusSelectCarbsScreen.route)
+                            navController.navigate(Screen.BolusSelectCarbsScreen.route)
                         },
                         onClickBG = {
-                            swipeDismissableNavController.navigate(Screen.BolusSelectBGScreen.route)
+                            navController.navigate(Screen.BolusSelectBGScreen.route)
                         },
                         sendPumpCommands = sendPumpCommands,
                     )
@@ -255,7 +262,7 @@ fun WearApp(
                     DecimalNumberPicker(
                         label = "Units",
                         onNumberConfirm = {
-                            swipeDismissableNavController.popBackStack()
+                            navController.popBackStack()
                             bolusUnitsUserInput = it
                         },
                         labelColors = defaultTheme.colors,
@@ -277,7 +284,7 @@ fun WearApp(
                             else -> bolusCarbsGramsUserInput!!
                         },
                         onNumberConfirm = {
-                            swipeDismissableNavController.popBackStack()
+                            navController.popBackStack()
                             bolusCarbsGramsUserInput = it
                         }
                     )
@@ -290,7 +297,7 @@ fun WearApp(
                         maxNumber = 400,
                         defaultNumber = 120,
                         onNumberConfirm = {
-                            swipeDismissableNavController.popBackStack()
+                            navController.popBackStack()
                             bolusBgMgdlUserInput = it
                         }
                     )
