@@ -2,7 +2,7 @@
 buildscript {
     ext {
         m2_repository = "${System.properties['user.home']}/.m2/repository"
-        pumpx2_version = "1.2.0"
+        pumpx2_version = "1.2.1"
     }
 }
 

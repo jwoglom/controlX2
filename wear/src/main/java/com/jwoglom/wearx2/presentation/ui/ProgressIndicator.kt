@@ -19,6 +19,6 @@ fun IndeterminateProgressIndicator(
 ) {
     Box(modifier = modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
         CircularProgressIndicator(modifier = Modifier.offset(y = (-18).dp))
-        Text(text = text, fontSize = 14.sp, modifier = Modifier.padding(top = 18.dp))
+        Text(text = text, fontSize = 14.sp, modifier = Modifier.padding(top = 24.dp))
     }
 }

@@ -4,13 +4,16 @@ import android.Manifest
 import android.app.AlertDialog
 import android.bluetooth.BluetoothAdapter
 import android.bluetooth.BluetoothManager
+import android.content.ComponentName
 import android.content.Context
 import android.content.DialogInterface
 import android.content.Intent
+import android.content.ServiceConnection
 import android.content.pm.PackageManager
 import android.location.LocationManager
 import android.os.Build
 import android.os.Bundle
+import android.os.IBinder
 import android.provider.Settings
 import android.text.InputType
 import android.widget.ArrayAdapter
@@ -18,14 +21,19 @@ import android.widget.Button
 import android.widget.EditText
 import android.widget.Spinner
 import android.widget.TextView
+import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
+import androidx.core.widget.doOnTextChanged
 import com.google.android.gms.common.ConnectionResult
 import com.google.android.gms.common.api.GoogleApiClient
 import com.google.android.gms.wearable.MessageApi
 import com.google.android.gms.wearable.MessageEvent
 import com.google.android.gms.wearable.Wearable
+import com.google.android.material.textfield.TextInputEditText
+import com.jwoglom.pumpx2.pump.PumpState
 import com.jwoglom.pumpx2.pump.messages.Message
+import com.jwoglom.pumpx2.pump.messages.builders.PumpChallengeRequestBuilder
 import com.jwoglom.pumpx2.pump.messages.request.control.BolusPermissionReleaseRequest
 import com.jwoglom.pumpx2.pump.messages.request.control.BolusPermissionRequest
 import com.jwoglom.pumpx2.pump.messages.request.control.CancelBolusRequest
@@ -35,7 +43,6 @@ import com.jwoglom.pumpx2.pump.messages.request.currentStatus.HistoryLogRequest
 import com.jwoglom.pumpx2.pump.messages.request.currentStatus.IDPSegmentRequest
 import com.jwoglom.pumpx2.pump.messages.request.currentStatus.IDPSettingsRequest
 import com.jwoglom.pumpx2.pump.messages.response.currentStatus.HistoryLogResponse
-import com.jwoglom.pumpx2.pump.messages.response.currentStatus.InsulinStatusResponse
 import com.jwoglom.pumpx2.pump.messages.response.historyLog.BolusDeliveryHistoryLog
 import com.jwoglom.pumpx2.pump.messages.response.historyLog.HistoryLogStreamResponse
 import com.jwoglom.pumpx2.pump.messages.util.MessageHelpers
@@ -55,6 +62,7 @@ class MainActivity : AppCompatActivity(), GoogleApiClient.ConnectionCallbacks, G
     private lateinit var text: TextView
     private lateinit var requestMessageSpinner: Spinner
     private lateinit var requestSendButton: Button
+    private lateinit var pairingCodeInput: TextInputEditText
 
     private var requestedHistoryLogStartId = -1
     private var lastBolusId = -1
@@ -145,6 +153,19 @@ class MainActivity : AppCompatActivity(), GoogleApiClient.ConnectionCallbacks, G
         }
         requestSendButton.postInvalidate()
 
+        pairingCodeInput = findViewById(R.id.pairing_code)
+        pairingCodeInput.setText(PumpState.getPairingCode(applicationContext))
+        pairingCodeInput.doOnTextChanged { text, start, before, count ->
+            try {
+                val code = PumpChallengeRequestBuilder.processPairingCode(text.toString())
+                PumpChallengeRequestBuilder.create(0, code, ByteArray(0))
+                PumpState.setPairingCode(applicationContext, code)
+                Toast.makeText(applicationContext, "Set pairing code: $code", Toast.LENGTH_SHORT).show()
+            } catch (e: Exception) {
+                Timber.w("pairingCodeInput: $e")
+            }
+        }
+
         mApiClient = GoogleApiClient.Builder(this)
             .addApi(Wearable.API)
             .addConnectionCallbacks(this)
@@ -154,11 +175,20 @@ class MainActivity : AppCompatActivity(), GoogleApiClient.ConnectionCallbacks, G
         mApiClient.connect()
 
         // Start WearCommService
-        Intent(this, WearCommService::class.java).also { intent ->
-            if (intent != null) {
-                startService(intent)
+        val intent = Intent(applicationContext, WearCommService::class.java)
+
+        applicationContext.startForegroundService(intent)
+        applicationContext.bindService(intent, object : ServiceConnection {
+            override fun onServiceConnected(name: ComponentName, service: IBinder) {
+                //retrieve an instance of the service here from the IBinder returned
+                //from the onBind method to communicate with
+                Timber.i("WearCommService onServiceConnected")
             }
-        }
+
+            override fun onServiceDisconnected(name: ComponentName) {
+                Timber.i("WearCommService onServiceDisconnected")
+            }
+        }, BIND_AUTO_CREATE)
     }
 
 

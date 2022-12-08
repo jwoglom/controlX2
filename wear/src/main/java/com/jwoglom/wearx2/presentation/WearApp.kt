@@ -48,6 +48,7 @@ import androidx.wear.compose.navigation.composable
 import androidx.wear.compose.navigation.currentBackStackEntryAsState
 import androidx.wear.compose.navigation.rememberSwipeDismissableNavController
 import com.jwoglom.pumpx2.pump.messages.Message
+import com.jwoglom.pumpx2.pump.messages.calculator.BolusParameters
 import com.jwoglom.pumpx2.pump.messages.request.currentStatus.GlobalMaxBolusSettingsRequest
 import com.jwoglom.wearx2.LocalDataStore
 import com.jwoglom.wearx2.presentation.components.DecimalNumberPicker
@@ -70,6 +71,7 @@ fun WearApp(
     modifier: Modifier = Modifier,
     navController: NavHostController = rememberSwipeDismissableNavController(),
     sendPumpCommands: (SendType, List<Message>) -> Unit,
+    sendPhoneBolusRequest: (Int, BolusParameters) -> Unit,
     sendPhoneConnectionCheck: () -> Unit,
 ) {
     var themeColors by remember { mutableStateOf(defaultTheme.colors) }
@@ -260,6 +262,7 @@ fun WearApp(
                             navController.navigate(Screen.BolusSelectBGScreen.route)
                         },
                         sendPumpCommands = sendPumpCommands,
+                        sendPhoneBolusRequest = sendPhoneBolusRequest,
                     )
 
                     RequestFocusOnResume(focusRequester)
@@ -267,7 +270,9 @@ fun WearApp(
 
                 composable(Screen.BolusSelectUnitsScreen.route) {
                     val maxBolusAmount = LocalDataStore.current.maxBolusAmount.observeAsState()
-                    sendPumpCommands(SendType.CACHED, listOf(GlobalMaxBolusSettingsRequest()))
+                    LaunchedEffect(Unit) {
+                        sendPumpCommands(SendType.CACHED, listOf(GlobalMaxBolusSettingsRequest()))
+                    }
 
                     DecimalNumberPicker(
                         label = "Units",

@@ -17,6 +17,7 @@
         app:layout_constraintTop_toTopOf="parent" />
 
     <RelativeLayout
+        android:id="@+id/layout1"
         android:layout_height="wrap_content"
         android:layout_width="match_parent"
         android:orientation="vertical"
@@ -37,6 +38,28 @@
             android:text="Send"
             android:layout_alignParentRight="true"
             />
+    </RelativeLayout>
+
+    <RelativeLayout
+        android:layout_height="wrap_content"
+        android:layout_width="match_parent"
+        android:orientation="vertical"
+        android:gravity="fill_horizontal"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@+id/layout1">
+        <TextView
+            android:id="@+id/pairing_code_label"
+            android:layout_width="100dp"
+            android:layout_height="50dp"
+            android:text="Pairing Code:"
+            android:gravity="center"
+            />
+        <com.google.android.material.textfield.TextInputEditText
+            android:id="@+id/pairing_code"
+            android:layout_width="300dp"
+            android:layout_height="50dp"
+            android:layout_toRightOf="@+id/pairing_code_label"/>
+
     </RelativeLayout>
 
 </androidx.constraintlayout.widget.ConstraintLayout>

@@ -1,4 +1,4 @@
-package com.jwoglom.wearx2.util
+package com.jwoglom.wearx2.shared.util
 
 import com.jwoglom.pumpx2.pump.messages.models.InsulinUnit
 import java.time.Duration

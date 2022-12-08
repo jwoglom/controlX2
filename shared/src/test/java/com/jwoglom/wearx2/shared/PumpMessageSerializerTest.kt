@@ -27,7 +27,7 @@ class PumpMessageSerializerTest {
     fun toBulkBytes_test() {
         assertEquals(
             """{"opCode":33,"cargo":"02000500","characteristic":"CURRENT_STATUS"};;;{"opCode":33,"cargo":"02000100","characteristic":"CURRENT_STATUS"}""",
-            String(PumpMessageSerializer.toBulkBytes(ApiVersionResponse(2, 5), ApiVersionResponse(2, 1))))
+            String(PumpMessageSerializer.toBulkBytes(listOf(ApiVersionResponse(2, 5), ApiVersionResponse(2, 1)))))
     }
 
     @Test

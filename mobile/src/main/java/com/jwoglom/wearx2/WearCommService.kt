@@ -5,15 +5,19 @@ import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
 import android.app.PendingIntent.FLAG_IMMUTABLE
+import android.app.PendingIntent.FLAG_ONE_SHOT
+import android.app.TaskStackBuilder
+import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
+import android.content.Intent.FLAG_ACTIVITY_TASK_ON_HOME
+import android.content.SharedPreferences
 import android.os.Bundle
 import android.os.Handler
-import android.os.HandlerThread
 import android.os.Looper
 import android.os.Message
-import android.os.Process
 import android.widget.Toast
+import androidx.core.app.NotificationCompat
 import com.google.android.gms.common.ConnectionResult
 import com.google.android.gms.common.api.GoogleApiClient
 import com.google.android.gms.wearable.MessageEvent
@@ -24,12 +28,14 @@ import com.jwoglom.pumpx2.pump.TandemError
 import com.jwoglom.pumpx2.pump.bluetooth.TandemBluetoothHandler
 import com.jwoglom.pumpx2.pump.bluetooth.TandemPump
 import com.jwoglom.pumpx2.pump.messages.bluetooth.Characteristic
+import com.jwoglom.pumpx2.pump.messages.models.InsulinUnit
+import com.jwoglom.pumpx2.pump.messages.request.control.InitiateBolusRequest
 import com.jwoglom.pumpx2.pump.messages.response.authentication.CentralChallengeResponse
 import com.jwoglom.pumpx2.pump.messages.response.qualifyingEvent.QualifyingEvent
 import com.jwoglom.wearx2.shared.PumpMessageSerializer
-import com.jwoglom.wearx2.shared.PumpQualifyingEventsSerializer
 import com.jwoglom.wearx2.shared.WearCommServiceCodes
 import com.jwoglom.wearx2.shared.util.DebugTree
+import com.jwoglom.wearx2.shared.util.twoDecimalPlaces
 import com.welie.blessed.BluetoothPeripheral
 import com.welie.blessed.HciStatus
 import kotlinx.coroutines.CoroutineScope
@@ -51,6 +57,8 @@ class WearCommService : WearableListenerService(), GoogleApiClient.ConnectionCal
 
     private var lastResponseMessage: MutableMap<Pair<Characteristic, Byte>, com.jwoglom.pumpx2.pump.messages.Message> = mutableMapOf()
 
+    private var currentBolusToConfirm: InitiateBolusRequest? = null
+
     private inner class Pump() : TandemPump(applicationContext) {
         var lastPeripheral: BluetoothPeripheral? = null
         var isConnected = false
@@ -59,6 +67,10 @@ class WearCommService : WearableListenerService(), GoogleApiClient.ConnectionCal
             enableTconnectAppConnectionSharing()
             enableSendSharedConnectionResponseMessages()
             // before adding relyOnConnectionSharingForAuthentication(), callback issues need to be resolved
+
+            if (isInsulinDeliveryEnabled()) {
+                enableActionsAffectingInsulinDelivery()
+            }
             Timber.i("Pump init")
         }
 
@@ -259,9 +271,9 @@ class WearCommService : WearableListenerService(), GoogleApiClient.ConnectionCal
         // separate thread because the service normally runs in the process's
         // main thread, which we don't want to block.  We also make it
         // background priority so CPU-intensive work will not disrupt our UI.
-        HandlerThread("PumpCommServiceThread", Process.THREAD_PRIORITY_FOREGROUND).apply {
-            start()
-            Timber.d("service thread start")
+//        HandlerThread("PumpCommServiceThread", Process.THREAD_PRIORITY_FOREGROUND).apply {
+//            start()
+//            Timber.d("service thread start")
 
             mApiClient = GoogleApiClient.Builder(applicationContext)
                 .addApi(Wearable.API)
@@ -277,7 +289,7 @@ class WearCommService : WearableListenerService(), GoogleApiClient.ConnectionCal
 
             var notification = createNotification()
             startForeground(1, notification)
-        }
+        // }
     }
 
     override fun onMessageReceived(messageEvent: MessageEvent) {
@@ -294,6 +306,11 @@ class WearCommService : WearableListenerService(), GoogleApiClient.ConnectionCal
                     wearCommHandler?.sendMessage("/from-pump/pump-connected",
                         pump.lastPeripheral?.name!!.toByteArray()
                     )
+                }
+            }
+            "/to-phone/bolus-request" -> {
+                if (this::pump.isInitialized && pump.isConnected && pump.lastPeripheral != null) {
+                    confirmBolusRequest(PumpMessageSerializer.fromBytes(messageEvent.data) as InitiateBolusRequest)
                 }
             }
             "/to-pump/command" -> {
@@ -327,6 +344,7 @@ class WearCommService : WearableListenerService(), GoogleApiClient.ConnectionCal
     }
 
     override fun onTaskRemoved(rootIntent: Intent?) {
+        Timber.w("WearCommService onTaskRemoved")
         val restartServiceIntent = Intent(
             applicationContext, this.javaClass
         )
@@ -365,6 +383,123 @@ class WearCommService : WearableListenerService(), GoogleApiClient.ConnectionCal
         }
     }
 
+    private var bolusNotificationId: Int = 1000
+    private inner class BolusNotificationBroadcastReceiver : BroadcastReceiver() {
+        override fun onReceive(context: Context?, intent: Intent?) {
+            Timber.i("BolusNotificationBroadcastReceiver $context $intent")
+            when (intent?.getStringExtra("action")) {
+                "CONFIRM" -> {
+                    val intentRequestBytes = intent.getByteArrayExtra("request")
+                    if (intentRequestBytes == null) {
+                        Timber.w("BolusNotificationBroadcastReceiver invalid intent")
+                        reply(confirmBolusRequestBaseNotification("Bolus Error", "Invalid intent."))
+                        currentBolusToConfirm = null
+                        return
+                    }
+
+                    val intentRequest = PumpMessageSerializer.fromBytes(intentRequestBytes)
+                    if (intentRequest != currentBolusToConfirm || intentRequest !is InitiateBolusRequest) {
+                        Timber.w("BolusNotificationBroadcastReceiver mismatched intent $intentRequest $currentBolusToConfirm")
+                        reply(confirmBolusRequestBaseNotification("Bolus Error", "Mismatched intent."))
+                        currentBolusToConfirm = null
+                        return
+                    }
+
+                    Timber.w("BolusNotificationBroadcastReceiver performing $intentRequest")
+                    // reply(confirmBolusRequestBaseNotification("Bolus Would Be Performed", "We would perform a ${intentRequest.totalVolume} milliunit bolus for ${intentRequest.bolusID}: $intentRequest"))
+
+                    // sendPumpCommMessage(intentRequestBytes)
+                    reply(confirmBolusRequestBaseNotification("Performing Bolus", "${twoDecimalPlaces(InsulinUnit.from1000To1(intentRequest.totalVolume))}u bolus with ID ${intentRequest.bolusID}"))
+                }
+                else -> {Timber.w("BolusNotificationBroadcastReceiver rejected")
+                    reply(confirmBolusRequestBaseNotification("Bolus Rejected", "The bolus will not be delivered."))
+                    currentBolusToConfirm = null
+                }
+            }
+        }
+
+        private fun reply(builder: NotificationCompat.Builder) {
+            cancelNotif(bolusNotificationId)
+            makeNotif(++bolusNotificationId, builder.build())
+        }
+
+    }
+
+    private fun confirmBolusRequest(request: InitiateBolusRequest) {
+        val units = twoDecimalPlaces(InsulinUnit.from1000To1(request.totalVolume))
+        Timber.i("confirmBolusRequest $units: $request currentBolusToConfirm: $currentBolusToConfirm")
+        currentBolusToConfirm = request
+
+        val builder = confirmBolusRequestBaseNotification("Bolus Request", "$units units. Press Confirm to deliver.")
+
+        val rejectIntent = Intent(this, BolusNotificationBroadcastReceiver::class.java).apply {
+            action = "REJECT"
+            setFlags(FLAG_ACTIVITY_TASK_ON_HOME)
+        }
+        val rejectTaskStack = TaskStackBuilder.create(this)
+        rejectTaskStack.addNextIntent(rejectIntent)
+        val rejectPendingIntent = rejectTaskStack.getPendingIntent(0, PendingIntent.FLAG_UPDATE_CURRENT)
+//        val rejectPendingIntent = PendingIntent.getBroadcast(applicationContext, 2000, rejectIntent, FLAG_IMMUTABLE or FLAG_ONE_SHOT)
+        builder.addAction(R.drawable.decline, "Reject", rejectPendingIntent)
+
+        val confirmIntent = Intent(this, BolusNotificationBroadcastReceiver::class.java).apply {
+            action = "CONFIRM"
+            putExtra("request", PumpMessageSerializer.toBytes(request))
+        }
+
+        val confirmTaskStack = TaskStackBuilder.create(this)
+        confirmTaskStack.addNextIntent(confirmIntent)
+        val confirmPendingIntent = confirmTaskStack.getPendingIntent(0, PendingIntent.FLAG_UPDATE_CURRENT)
+        //val confirmPendingIntent = PendingIntent.getBroadcast(applicationContext, 2001, confirmIntent, FLAG_IMMUTABLE or FLAG_ONE_SHOT)
+        builder.addAction(R.drawable.bolus_icon, "Confirm ${units}u", confirmPendingIntent)
+
+        val notif = builder.build()
+        Timber.i("bolus notification $bolusNotificationId $builder $notif")
+
+        makeNotif(++bolusNotificationId, notif)
+    }
+
+    private fun confirmBolusRequestBaseNotification(title: String, text: String): NotificationCompat.Builder {
+        val notificationChannelId = "Confirm Bolus"
+
+        val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager;
+        val channel = NotificationChannel(
+            notificationChannelId,
+            "Confirm Bolus",
+            NotificationManager.IMPORTANCE_HIGH
+        ).let {
+            it.description = "Confirm Bolus"
+            it
+        }
+        notificationManager.createNotificationChannel(channel)
+
+        //val intent = Intent(this, MainActivity::class.java)
+        //val pendingIntent: PendingIntent = PendingIntent.getActivity(this, 0, intent, FLAG_IMMUTABLE)
+
+        return NotificationCompat.Builder(
+            applicationContext,
+            notificationChannelId
+        )
+            .setContentTitle(title)
+            .setContentText(text)
+            .setSmallIcon(R.drawable.pump)
+            .setTicker(title)
+            .setPriority(Notification.PRIORITY_MAX) // for under android 26 compatibility
+            .setAutoCancel(true)
+
+    }
+
+    private fun makeNotif(id: Int, notif: Notification) {
+        val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager;
+        notificationManager.notify(id, notif)
+    }
+
+    private fun cancelNotif(id: Int) {
+        val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager;
+        notificationManager.cancel(id)
+
+    }
+
     override fun onDestroy() {
         super.onDestroy()
         scope.cancel()
@@ -394,14 +529,12 @@ class WearCommService : WearableListenerService(), GoogleApiClient.ConnectionCal
             NotificationManager.IMPORTANCE_LOW
         ).let {
             it.description = "Endless Service channel"
-            it.vibrationPattern = LongArray(0)
             it
         }
         notificationManager.createNotificationChannel(channel)
 
-        val pendingIntent: PendingIntent = Intent(this, MainActivity::class.java).let { notificationIntent ->
-            PendingIntent.getActivity(this, 0, notificationIntent, FLAG_IMMUTABLE)
-        }
+        val intent = Intent(applicationContext, MainActivity::class.java)
+        val pendingIntent = PendingIntent.getActivity(this, 0, intent, FLAG_IMMUTABLE)
 
         val builder: Notification.Builder = Notification.Builder(
             this,
@@ -416,5 +549,14 @@ class WearCommService : WearableListenerService(), GoogleApiClient.ConnectionCal
             .setTicker("WearX2 is running")
             .setPriority(Notification.PRIORITY_MIN) // for under android 26 compatibility
             .build()
+    }
+
+
+    private fun prefs(context: Context): SharedPreferences? {
+        return context.getSharedPreferences("WearX2", MODE_PRIVATE)
+    }
+
+    private fun isInsulinDeliveryEnabled(): Boolean {
+        return prefs(applicationContext)?.getBoolean("insulinDeliveryEnabled", false) ?: false
     }
 }

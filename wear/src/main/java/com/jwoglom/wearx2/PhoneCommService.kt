@@ -36,7 +36,7 @@ class PhoneCommService : WearableListenerService() {
         when (messageEvent.path) {
             "/to-wear/start-activity" -> {
                 startActivity(
-                    Intent(this, MainActivity::class.java)
+                    Intent(applicationContext, MainActivity::class.java)
                         .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                 )
             }

@@ -4,6 +4,8 @@ import androidx.lifecycle.MutableLiveData
 import com.jwoglom.pumpx2.pump.messages.calculator.BolusCalcCondition
 import com.jwoglom.pumpx2.pump.messages.calculator.BolusCalculatorBuilder
 import com.jwoglom.pumpx2.pump.messages.calculator.BolusParameters
+import com.jwoglom.pumpx2.pump.messages.response.control.BolusPermissionResponse
+import com.jwoglom.pumpx2.pump.messages.response.control.InitiateBolusResponse
 import com.jwoglom.pumpx2.pump.messages.response.currentStatus.BolusCalcDataSnapshotResponse
 import com.jwoglom.pumpx2.pump.messages.response.currentStatus.LastBGResponse
 import timber.log.Timber
@@ -14,7 +16,8 @@ class DataStore {
     val cartridgeRemainingUnits = MutableLiveData<Int>()
     val lastBolusStatus = MutableLiveData<String>()
     val controlIQStatus = MutableLiveData<String>()
-    val basalStatus = MutableLiveData<String>()
+    val basalRate = MutableLiveData<String>()
+    var basalStatus = MutableLiveData<String>()
     val cgmSessionState = MutableLiveData<String>()
     val cgmTransmitterStatus = MutableLiveData<String>()
     val cgmReading = MutableLiveData<Int>()
@@ -26,6 +29,8 @@ class DataStore {
     val bolusCalcLastBG = MutableLiveData<LastBGResponse>()
     val maxBolusAmount = MutableLiveData<Int>()
 
+    var landingBasalDisplayedText = MutableLiveData<String>()
+
     var bolusUnitsDisplayedText = MutableLiveData<String>()
     var bolusBGDisplayedText = MutableLiveData<String>()
 
@@ -34,12 +39,16 @@ class DataStore {
     var bolusFinalParameters = MutableLiveData<BolusParameters>()
     var bolusFinalConditions = MutableLiveData<Set<BolusCalcCondition>>()
 
+    var bolusPermissionResponse = MutableLiveData<BolusPermissionResponse>()
+    var bolusInitiateResponse = MutableLiveData<InitiateBolusResponse>()
+
     init {
         batteryPercent.observeForever { t -> Timber.i("DataStore.batteryPercent=$t") }
         iobUnits.observeForever { t -> Timber.i("DataStore.iobUnits=$t") }
         cartridgeRemainingUnits.observeForever { t -> Timber.i("DataStore.cartridgeRemainingUnits=$t") }
         lastBolusStatus.observeForever { t -> Timber.i("DataStore.lastBolusStatus=$t") }
         controlIQStatus.observeForever { t -> Timber.i("DataStore.controlIQStatus=$t") }
+        basalRate.observeForever { t -> Timber.i("DataStore.basalRate=$t") }
         basalStatus.observeForever { t -> Timber.i("DataStore.basalStatus=$t") }
         cgmSessionState.observeForever { t -> Timber.i("DataStore.cgmSessionState=$t") }
         cgmTransmitterStatus.observeForever { t -> Timber.i("DataStore.cgmTransmitterStatus=$t") }
@@ -52,6 +61,8 @@ class DataStore {
         bolusCalcLastBG.observeForever { t -> Timber.i("DataStore.bolusCalcLastBG=$t") }
         maxBolusAmount.observeForever { t -> Timber.i("DataStore.maxBolusAmount=$t") }
 
+        landingBasalDisplayedText.observeForever { t -> Timber.i("DataStore.landingBasalDisplayedText=$t") }
+
         bolusUnitsDisplayedText.observeForever { t -> Timber.i("DataStore.bolusUnitsDisplayedText=$t") }
         bolusBGDisplayedText.observeForever { t -> Timber.i("DataStore.bolusBGDisplayedText=$t") }
 
@@ -59,5 +70,8 @@ class DataStore {
         bolusCurrentParameters.observeForever { t -> Timber.i("DataStore.bolusCurrentParameters=$t") }
         bolusFinalParameters.observeForever { t -> Timber.i("DataStore.bolusFinalParameters=$t") }
         bolusFinalConditions.observeForever { t -> Timber.i("DataStore.bolusFinalConditions=$t") }
+
+        bolusPermissionResponse.observeForever { t -> Timber.i("DataStore.bolusPermissionResponse=$t") }
+        bolusInitiateResponse.observeForever { t -> Timber.i("DataStore.bolusInitiateResponse=$t") }
     }
 }

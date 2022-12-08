@@ -13,7 +13,11 @@ import com.google.android.gms.wearable.MessageApi
 import com.google.android.gms.wearable.MessageEvent
 import com.google.android.gms.wearable.Wearable
 import com.jwoglom.pumpx2.pump.messages.Message
+import com.jwoglom.pumpx2.pump.messages.calculator.BolusParameters
 import com.jwoglom.pumpx2.pump.messages.models.InsulinUnit
+import com.jwoglom.pumpx2.pump.messages.request.control.InitiateBolusRequest
+import com.jwoglom.pumpx2.pump.messages.response.control.BolusPermissionResponse
+import com.jwoglom.pumpx2.pump.messages.response.control.InitiateBolusResponse
 import com.jwoglom.pumpx2.pump.messages.response.currentStatus.BolusCalcDataSnapshotResponse
 import com.jwoglom.pumpx2.pump.messages.response.currentStatus.CGMStatusResponse
 import com.jwoglom.pumpx2.pump.messages.response.currentStatus.CGMStatusResponse.SessionState
@@ -26,9 +30,11 @@ import com.jwoglom.pumpx2.pump.messages.response.currentStatus.GlobalMaxBolusSet
 import com.jwoglom.pumpx2.pump.messages.response.currentStatus.HomeScreenMirrorResponse
 import com.jwoglom.pumpx2.pump.messages.response.currentStatus.HomeScreenMirrorResponse.ApControlStateIcon
 import com.jwoglom.pumpx2.pump.messages.response.currentStatus.HomeScreenMirrorResponse.CGMAlertIcon
+import com.jwoglom.pumpx2.pump.messages.response.currentStatus.HomeScreenMirrorResponse.BasalStatusIcon
 import com.jwoglom.pumpx2.pump.messages.response.currentStatus.InsulinStatusResponse
 import com.jwoglom.pumpx2.pump.messages.response.currentStatus.LastBGResponse
 import com.jwoglom.pumpx2.pump.messages.response.currentStatus.LastBolusStatusAbstractResponse
+import com.jwoglom.pumpx2.pump.messages.response.historyLog.BolusDeliveryHistoryLog
 import com.jwoglom.wearx2.presentation.DataStore
 import com.jwoglom.wearx2.presentation.WearApp
 import com.jwoglom.wearx2.presentation.navigation.Screen
@@ -36,8 +42,8 @@ import com.jwoglom.wearx2.shared.PumpMessageSerializer
 import com.jwoglom.wearx2.shared.PumpQualifyingEventsSerializer
 import com.jwoglom.wearx2.shared.util.DebugTree
 import com.jwoglom.wearx2.util.SendType
-import com.jwoglom.wearx2.util.shortTime
-import com.jwoglom.wearx2.util.twoDecimalPlaces1000Unit
+import com.jwoglom.wearx2.shared.util.shortTime
+import com.jwoglom.wearx2.shared.util.twoDecimalPlaces1000Unit
 import timber.log.Timber
 
 var dataStore = DataStore()
@@ -55,7 +61,9 @@ class MainActivity : ComponentActivity(), MessageApi.MessageListener, GoogleApiC
         Timber.uprootAll()
         Timber.plant(DebugTree("WA"))
 
-        initialRoute = intent.getStringExtra("route")?: Screen.Landing.route
+        if (intent != null) {
+            initialRoute = intent.getStringExtra("route") ?: Screen.Landing.route
+        }
 
         setContent {
             navController = rememberSwipeDismissableNavController()
@@ -68,10 +76,32 @@ class MainActivity : ComponentActivity(), MessageApi.MessageListener, GoogleApiC
                 this.sendMessage("/to-phone/is-pump-connected", "phone_connection_check".toByteArray())
             }
 
+            val sendPhoneBolusRequest: (Int, BolusParameters) -> Unit = { bolusId, params ->
+                val numUnits = InsulinUnit.from1To1000(params.units)
+                val numCarbs = params.carbsGrams
+                val bgValue = params.glucoseMgdl
+
+                val bolusRequest = InitiateBolusRequest(
+                    numUnits,
+                    bolusId,
+                    BolusDeliveryHistoryLog.BolusType.toBitmask(BolusDeliveryHistoryLog.BolusType.FOOD2),
+                    0L,
+                    0L,
+                    numCarbs,
+                    bgValue,
+                    0
+                )
+
+                Timber.i("sendPhoneBolusRequest: numUnits=$numUnits numCarbs=$numCarbs bgValue=$bgValue bolusRequest=$bolusRequest")
+
+                this.sendMessage("/to-phone/bolus-request", PumpMessageSerializer.toBytes(bolusRequest))
+            }
+
             WearApp(
                 navController = navController,
                 sendPumpCommands = sendPumpCommands,
                 sendPhoneConnectionCheck = sendPhoneConnectionCheck,
+                sendPhoneBolusRequest = sendPhoneBolusRequest,
             )
         }
 
@@ -85,7 +115,7 @@ class MainActivity : ComponentActivity(), MessageApi.MessageListener, GoogleApiC
         mApiClient.connect()
 
         // Start PhoneCommService
-//        Intent(this, PhoneCommService::class.java).also { intent ->
+//        Intent(this, PhoneCommService::class.java).also { intent: Intent? ->
 //            startService(intent)
 //        }
     }
@@ -204,9 +234,20 @@ class MainActivity : ComponentActivity(), MessageApi.MessageListener, GoogleApiC
                     else -> ""
                 }
                 dataStore.cgmDeltaArrow.value = message.cgmTrendIcon.arrow()
+                dataStore.basalStatus.value = when (message.basalStatusIcon) {
+                    BasalStatusIcon.BASAL -> "On"
+                    BasalStatusIcon.ZERO_BASAL -> "Zero"
+                    BasalStatusIcon.TEMP_RATE -> "Temp Rate"
+                    BasalStatusIcon.ZERO_TEMP_RATE -> "Zero Temp Rate"
+                    BasalStatusIcon.SUSPEND -> "Suspended"
+                    BasalStatusIcon.HYPO_SUSPEND_BASAL_IQ -> "Suspended from BG"
+                    BasalStatusIcon.INCREASE_BASAL -> "Increased"
+                    BasalStatusIcon.ATTENUATED_BASAL -> "Reduced"
+                    else -> ""
+                }
             }
             is CurrentBasalStatusResponse -> {
-                dataStore.basalStatus.value = "${twoDecimalPlaces1000Unit(message.currentBasalRate)}u"
+                dataStore.basalRate.value = "${twoDecimalPlaces1000Unit(message.currentBasalRate)}u"
             }
             is CGMStatusResponse -> {
                 dataStore.cgmSessionState.value = when (message.sessionState) {
@@ -238,6 +279,12 @@ class MainActivity : ComponentActivity(), MessageApi.MessageListener, GoogleApiC
             }
             is GlobalMaxBolusSettingsResponse -> {
                 dataStore.maxBolusAmount.value = message.maxBolus
+            }
+            is BolusPermissionResponse -> {
+                dataStore.bolusPermissionResponse.value = message
+            }
+            is InitiateBolusResponse -> {
+                dataStore.bolusInitiateResponse.value = message
             }
         }
     }

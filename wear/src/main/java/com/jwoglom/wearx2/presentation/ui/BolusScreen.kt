@@ -16,6 +16,8 @@ package com.jwoglom.wearx2.presentation.ui
  * limitations under the License.
  */
 
+import android.widget.Toast
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -41,6 +43,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -70,15 +73,19 @@ import com.jwoglom.pumpx2.pump.messages.calculator.BolusCalcCondition.FailedSani
 import com.jwoglom.pumpx2.pump.messages.calculator.BolusCalcDecision
 import com.jwoglom.pumpx2.pump.messages.calculator.BolusCalculatorBuilder
 import com.jwoglom.pumpx2.pump.messages.calculator.BolusParameters
+import com.jwoglom.pumpx2.pump.messages.request.control.BolusPermissionRequest
+import com.jwoglom.pumpx2.pump.messages.request.control.CancelBolusRequest
 import com.jwoglom.pumpx2.pump.messages.request.currentStatus.BolusCalcDataSnapshotRequest
 import com.jwoglom.pumpx2.pump.messages.request.currentStatus.LastBGRequest
+import com.jwoglom.pumpx2.pump.messages.response.control.BolusPermissionResponse
 import com.jwoglom.pumpx2.pump.messages.response.currentStatus.BolusCalcDataSnapshotResponse
 import com.jwoglom.pumpx2.pump.messages.response.currentStatus.LastBGResponse
 import com.jwoglom.wearx2.LocalDataStore
+import com.jwoglom.wearx2.R
 import com.jwoglom.wearx2.presentation.components.LineTextDescription
 import com.jwoglom.wearx2.util.SendType
-import com.jwoglom.wearx2.util.oneDecimalPlace
-import com.jwoglom.wearx2.util.twoDecimalPlaces
+import com.jwoglom.wearx2.shared.util.oneDecimalPlace
+import com.jwoglom.wearx2.shared.util.twoDecimalPlaces
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -97,10 +104,13 @@ fun BolusScreen(
     onClickCarbs: () -> Unit,
     onClickBG: () -> Unit,
     sendPumpCommands: (SendType, List<Message>) -> Unit,
+    sendPhoneBolusRequest: (Int, BolusParameters) -> Unit,
     modifier: Modifier = Modifier
 ) {
+    var showPermissionCheckDialog by remember { mutableStateOf(false) }
     var showConfirmDialog by remember { mutableStateOf(false) }
     var showInProgressDialog by remember { mutableStateOf(false) }
+    var showCancelledDialog by remember { mutableStateOf(false) }
 
     val refreshScope = rememberCoroutineScope()
     var refreshing by remember { mutableStateOf(true) }
@@ -139,8 +149,8 @@ fun BolusScreen(
         val decision = bolusCalc?.build()?.parse()
         return BolusParameters(
             decision?.units?.total,
-            bolusCalc?.carbsValueGrams?.orElse(null),
-            bolusCalc?.glucoseMgdl?.orElse(null)
+            bolusCalc?.carbsValueGrams?.orElse(0),
+            bolusCalc?.glucoseMgdl?.orElse(0)
         )
     }
 
@@ -195,7 +205,9 @@ fun BolusScreen(
 
     val state = rememberPullRefreshState(refreshing, ::refresh)
 
-    sendPumpCommands(SendType.BUST_CACHE, commands)
+    LaunchedEffect (Unit) {
+        sendPumpCommands(SendType.BUST_CACHE, commands)
+    }
 
     LaunchedEffect(refreshing) {
         waitForLoaded()
@@ -324,6 +336,11 @@ fun BolusScreen(
                 )
             }
 
+            fun performPermissionCheck() {
+                showPermissionCheckDialog = true
+                sendPumpCommands(SendType.BUST_CACHE, listOf(BolusPermissionRequest()))
+            }
+
             item {
                 CompactButton(
                     onClick = {
@@ -331,7 +348,7 @@ fun BolusScreen(
                             bolusCalcDecision(dataStore.bolusCalculatorBuilder.value)?.conditions
                         dataStore.bolusFinalParameters.value =
                             bolusCalcParameters(dataStore.bolusCalculatorBuilder.value)
-                        showConfirmDialog = true
+                        performPermissionCheck()
                     },
                     enabled = true
                 ) {
@@ -379,6 +396,38 @@ fun BolusScreen(
         val scrollState = rememberScalingLazyListState()
 
         Dialog(
+            showDialog = showPermissionCheckDialog,
+            onDismissRequest = {
+                showPermissionCheckDialog = false
+            },
+            scrollState = scrollState
+        ) {
+            val bolusFinalParameters = dataStore.bolusFinalParameters.observeAsState()
+
+            IndeterminateProgressIndicator(text = bolusFinalParameters.value?.units?.let { "Requesting permission" } ?: "Invalid request!")
+        }
+
+        val bolusPermissionResponse = dataStore.bolusPermissionResponse.observeAsState()
+
+        LaunchedEffect (bolusPermissionResponse.value) {
+            if (bolusPermissionResponse.value != null && showPermissionCheckDialog) {
+                showConfirmDialog = true
+                showPermissionCheckDialog = false
+            }
+        }
+
+        fun sendBolusRequestToPhone(bolusParameters: BolusParameters?) {
+            if (bolusParameters == null || dataStore.bolusPermissionResponse.value == null) {
+                return
+            }
+
+            val bolusId = dataStore.bolusPermissionResponse.value!!.bolusId
+
+            Timber.i("sending bolus request to phone: $bolusId $bolusParameters")
+            sendPhoneBolusRequest(bolusId, bolusParameters)
+        }
+
+        Dialog(
             showDialog = showConfirmDialog,
             onDismissRequest = {
                 showConfirmDialog = false
@@ -412,33 +461,83 @@ fun BolusScreen(
                     }
                 },
                 positiveButton = {
-                    Button(
-                        onClick = {
-                            // TODO: deliver safely!
-                            showConfirmDialog = false
-                            showInProgressDialog = true
-                        },
-                        colors = ButtonDefaults.primaryButtonColors()
-                    ) {
-                        Icon(
-                            imageVector = Icons.Filled.Check,
-                            contentDescription = "Deliver bolus"
-                        )
+                    bolusPermissionResponse.value?.let {
+                        if (it.status == 0 && it.nackReason == BolusPermissionResponse.NackReason.PERMISSION_GRANTED) {
+                            Button(
+                                onClick = {
+                                    bolusPermissionResponse.value?.let {
+                                        if (it.status == 0 && it.nackReason == BolusPermissionResponse.NackReason.PERMISSION_GRANTED) {
+                                            showConfirmDialog = false
+                                            showInProgressDialog = true
+                                            sendBolusRequestToPhone(dataStore.bolusFinalParameters.value)
+                                        }
+                                    }
+                                },
+                                colors = ButtonDefaults.primaryButtonColors()
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Filled.Check,
+                                    contentDescription = "Deliver bolus"
+                                )
+                            }
+                        }
                     }
                 },
-                scrollState = scrollState
+                icon = { Image(painterResource(R.drawable.bolus_icon), "Bolus icon", Modifier.size(24.dp)) },
+                scrollState = scrollState,
             ) {
                 Text(
-                    text = "Do you want to deliver the bolus? STUB",
+                    text = bolusPermissionResponse.value?.let {
+                        when (it.status) {
+                            0 -> "Do you want to deliver the bolus? Bolus ID: ${it.bolusId}"
+                            else -> "Cannot deliver bolus: ${it.nackReason}"
+                        }
+                    } ?: "Invalid",
                     textAlign = TextAlign.Center,
                     style = MaterialTheme.typography.body2,
                     color = MaterialTheme.colors.onBackground
                 )
             }
         }
+        Dialog(
+            showDialog = showCancelledDialog,
+            onDismissRequest = {
+                showCancelledDialog = false
+            },
+            scrollState = scrollState
+        ) {
+            Alert(
+                title = {
+                    Text(
+                        text = "The bolus was cancelled.",
+                        textAlign = TextAlign.Center,
+                        color = MaterialTheme.colors.onBackground
+                    )
+                },
+                negativeButton = {
+                    Button(
+                        onClick = {
+                            showCancelledDialog = false
+                        },
+                        colors = ButtonDefaults.secondaryButtonColors(),
+                        modifier = Modifier.fillMaxWidth()
+
+                    ) {
+                        Text("OK")
+                    }
+                },
+                positiveButton = {},
+                icon = { Image(painterResource(R.drawable.bolus_icon), "Bolus icon", Modifier.size(24.dp)) },
+                scrollState = scrollState,
+            )
+        }
 
         fun cancelBolus() {
-            Timber.i("todo: bolus would be cancelled!")
+            bolusPermissionResponse.value?.bolusId?.let { bolusId ->
+                sendPumpCommands(SendType.BUST_CACHE, listOf(CancelBolusRequest(bolusId)))
+                showCancelledDialog = true
+
+            }
         }
 
         Dialog(
@@ -475,10 +574,11 @@ fun BolusScreen(
                     }
                 },
                 positiveButton = {},
-                scrollState = scrollState
+                scrollState = scrollState,
+                icon = { Image(painterResource(R.drawable.bolus_icon), "Bolus icon", Modifier.size(24.dp)) }
             ) {
                 Text(
-                    text = "The bolus is being delivered. STUB",
+                    text = "A notification was sent to acknowledge the request.",
                     textAlign = TextAlign.Center,
                     style = MaterialTheme.typography.body2,
                     color = MaterialTheme.colors.onBackground

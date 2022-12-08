@@ -110,7 +110,7 @@ fun LandingScreen(
         dataStore.cartridgeRemainingUnits,
         dataStore.lastBolusStatus,
         dataStore.controlIQStatus,
-        dataStore.basalStatus,
+        dataStore.basalRate,
         dataStore.cgmSessionState,
         dataStore.cgmTransmitterStatus,
         dataStore.cgmReading,
@@ -153,7 +153,9 @@ fun LandingScreen(
 
     val state = rememberPullRefreshState(refreshing, ::refresh)
 
-    fetchDataStoreFields(SendType.BUST_CACHE)
+    LaunchedEffect (Unit) {
+        fetchDataStoreFields(SendType.BUST_CACHE)
+    }
 
     LaunchedEffect (refreshing) {
         waitForLoaded()
@@ -255,17 +257,35 @@ fun LandingScreen(
             }
 
             item {
-                val basalStatus = LocalDataStore.current.basalStatus.observeAsState()
+                val basalRate = dataStore.basalRate.observeAsState()
+                val basalStatus = dataStore.basalStatus.observeAsState()
+                val landingBasalDisplayedText = dataStore.landingBasalDisplayedText.observeAsState()
+
+                LaunchedEffect (basalRate.value, basalStatus.value) {
+                    dataStore.landingBasalDisplayedText.value = when (basalStatus.value) {
+                        "On", "Zero", "Increased", "Reduced" -> "${basalRate.value}"
+                        null -> when (basalRate.value) {
+                            null -> "?"
+                            else -> "${basalRate.value}"
+                        }
+                        else -> when (basalRate.value) {
+                            null -> "${basalStatus.value}"
+                            else -> "${basalStatus.value} (${basalRate.value})"
+                        }
+
+                    }
+                }
                 LineInfoChip(
                     "Basal",
-                    when(basalStatus.value) {
+                    when (landingBasalDisplayedText.value) {
                         null -> "?"
-                        else -> "${basalStatus.value}"
+                        else -> "${landingBasalDisplayedText.value}"
                     }
                 )
             }
             item {
                 val controlIQStatus = LocalDataStore.current.controlIQStatus.observeAsState()
+
                 LineInfoChip(
                     "Control-IQ",
                     when(controlIQStatus.value) {
