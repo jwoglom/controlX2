@@ -1,17 +1,12 @@
 package com.jwoglom.wearx2.presentation.ui
 
 import androidx.compose.foundation.Image
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.wrapContentSize
 import androidx.compose.material.ExperimentalMaterialApi
 import androidx.compose.material.icons.Icons
@@ -342,27 +337,23 @@ fun BolusScreen(
             }
 
             item {
-                Spacer(modifier = Modifier.height(50.dp))
-                Button(
+                CompactButton(
                     onClick = {
                         dataStore.bolusFinalConditions.value =
                             bolusCalcDecision(dataStore.bolusCalculatorBuilder.value)?.conditions
                         dataStore.bolusFinalParameters.value =
                             bolusCalcParameters(dataStore.bolusCalculatorBuilder.value)
                         performPermissionCheck()
-                    }
+                    },
+                    enabled = true
                 ) {
-                    Row() {
-                        Icon(
-                            imageVector = Icons.Filled.Check,
-                            contentDescription = "Bolus",
-                            modifier = Modifier
-                                .size(ButtonDefaults.SmallIconSize)
-                                .wrapContentSize(align = Alignment.Center),
-                        )
-                        Spacer(modifier = Modifier.width(20.dp))
-                        Text("Bolus")
-                    }
+                    Icon(
+                        imageVector = Icons.Filled.Check,
+                        contentDescription = "continue",
+                        modifier = Modifier
+                            .size(ButtonDefaults.SmallIconSize)
+                            .wrapContentSize(align = Alignment.Center),
+                    )
                 }
             }
 
