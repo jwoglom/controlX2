@@ -8,6 +8,7 @@ import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.runtime.compositionLocalOf
+import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.navigation.NavHostController
 import androidx.wear.compose.navigation.rememberSwipeDismissableNavController
 import androidx.wear.remote.interactions.RemoteActivityHelper
@@ -69,7 +70,9 @@ class MainActivity : ComponentActivity(), MessageApi.MessageListener, GoogleApiC
     private lateinit var initialRoute: String
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        installSplashScreen()
         super.onCreate(savedInstanceState)
+        setTheme(R.style.MainTheme) // clean up from splash screen icon
         setupTimber("WA")
 
         if (intent != null) {

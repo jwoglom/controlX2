@@ -281,9 +281,6 @@ fun LandingScreen(
                 val basalRate = dataStore.basalRate.observeAsState()
                 val basalStatus = dataStore.basalStatus.observeAsState()
                 val landingBasalDisplayedText = dataStore.landingBasalDisplayedText.observeAsState()
-                val placeholderState = rememberPlaceholderState {
-                    landingBasalDisplayedText.value != null
-                }
 
                 LaunchedEffect (basalRate.value, basalStatus.value) {
                     dataStore.landingBasalDisplayedText.value = when (basalStatus.value) {
@@ -300,8 +297,10 @@ fun LandingScreen(
 
                 LineInfoChip(
                     "Basal",
-                    "${landingBasalDisplayedText.value}",
-                    placeholderState = placeholderState,
+                    when (landingBasalDisplayedText.value) {
+                        null -> "?"
+                        else -> "${landingBasalDisplayedText.value}"
+                    },
                 )
             }
 
