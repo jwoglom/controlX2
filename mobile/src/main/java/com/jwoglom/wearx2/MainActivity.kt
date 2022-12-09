@@ -9,6 +9,7 @@ import android.content.Context
 import android.content.DialogInterface
 import android.content.Intent
 import android.content.ServiceConnection
+import android.content.SharedPreferences
 import android.content.pm.PackageManager
 import android.location.LocationManager
 import android.os.Build
@@ -48,6 +49,7 @@ import com.jwoglom.pumpx2.pump.messages.response.historyLog.HistoryLogStreamResp
 import com.jwoglom.pumpx2.pump.messages.util.MessageHelpers
 import com.jwoglom.wearx2.shared.PumpMessageSerializer
 import com.jwoglom.wearx2.shared.util.DebugTree
+import com.jwoglom.wearx2.shared.util.setupTimber
 import timber.log.Timber
 import java.lang.reflect.InvocationTargetException
 import java.util.*
@@ -63,6 +65,7 @@ class MainActivity : AppCompatActivity(), GoogleApiClient.ConnectionCallbacks, G
     private lateinit var requestMessageSpinner: Spinner
     private lateinit var requestSendButton: Button
     private lateinit var pairingCodeInput: TextInputEditText
+    private lateinit var enableInsulinDelivery: Button
 
     private var requestedHistoryLogStartId = -1
     private var lastBolusId = -1
@@ -70,8 +73,8 @@ class MainActivity : AppCompatActivity(), GoogleApiClient.ConnectionCallbacks, G
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        Timber.uprootAll()
-        Timber.plant(DebugTree("MA"))
+        setupTimber("MA")
+
         Timber.d("mobile activity onCreate $savedInstanceState")
         setContentView(R.layout.activity_main)
 
@@ -166,6 +169,15 @@ class MainActivity : AppCompatActivity(), GoogleApiClient.ConnectionCallbacks, G
             }
         }
 
+        enableInsulinDelivery = findViewById(R.id.enable_insulin_delivery)
+        enableInsulinDelivery.text = when (getInsulinDeliveryEnabled()) {
+            true -> "Disable Insulin Delivery"
+            false -> "Enable Insulin Delivery"
+        }
+        enableInsulinDelivery.setOnClickListener {
+            enableInsulinDeliveryDialog()
+        }
+
         mApiClient = GoogleApiClient.Builder(this)
             .addApi(Wearable.API)
             .addConnectionCallbacks(this)
@@ -230,10 +242,12 @@ class MainActivity : AppCompatActivity(), GoogleApiClient.ConnectionCallbacks, G
 
     override fun onConnectionSuspended(id: Int) {
         Timber.i("mobile onConnectionSuspended: $id")
+        mApiClient.reconnect()
     }
 
     override fun onConnectionFailed(result: ConnectionResult) {
         Timber.i("mobile onConnectionFailed: $result")
+        mApiClient.reconnect()
     }
 
     // Message received from Wear
@@ -674,6 +688,58 @@ class MainActivity : AppCompatActivity(), GoogleApiClient.ConnectionCallbacks, G
                 }
                 .create()
                 .show()
+        }
+    }
+
+    private fun prefs(context: Context): SharedPreferences? {
+        return context.getSharedPreferences("WearX2", MODE_PRIVATE)
+    }
+
+    private fun getInsulinDeliveryEnabled(): Boolean {
+        return prefs(applicationContext)?.getBoolean("insulinDeliveryEnabled", false) ?: false
+    }
+
+    private fun setInsulinDeliveryEnabled(b: Boolean) {
+        prefs(applicationContext)?.edit()?.putBoolean("insulinDeliveryEnabled", b)?.apply()
+    }
+
+    private fun enableInsulinDeliveryDialog() {
+        if (!getInsulinDeliveryEnabled()) {
+            AlertDialog.Builder(this@MainActivity)
+                .setTitle("HEALTH AND SAFETY WARNING")
+                .setMessage(
+                    """
+                This application is for EXPERIMENTAL USE ONLY and can be used to MODIFY ACTIVE INSULIN DELIVERY ON YOUR INSULIN PUMP.
+                
+                There is NO WARRANTY IMPLIED OR EXPRESSED DUE TO USE OF THIS SOFTWARE. YOU ASSUME ALL RISK FOR ANY MALFUNCTIONS, BUGS, OR INSULIN DELIVERY ACTIONS.
+                
+                Are you sure you want to enable insulin delivery actions?
+                """.trimIndent()
+                )
+                .setPositiveButton(
+                    "Enable Bolus Deliveries"
+                ) { dialog, i ->
+                    dialog.cancel()
+                    setInsulinDeliveryEnabled(true)
+                    Toast.makeText(applicationContext, "Bolus deliveries enabled", Toast.LENGTH_SHORT).show()
+                    enableInsulinDelivery.text = when (getInsulinDeliveryEnabled()) {
+                        true -> "Disable Insulin Delivery"
+                        false -> "Enable Insulin Delivery"
+                    }
+                }
+                .setNegativeButton(
+                    "Cancel"
+                ) { dialog, which -> dialog.cancel() }
+                .setIcon(android.R.drawable.ic_dialog_info)
+                .create()
+                .show()
+        } else {
+            setInsulinDeliveryEnabled(false)
+            Toast.makeText(applicationContext, "Bolus deliveries disabled", Toast.LENGTH_SHORT).show()
+            enableInsulinDelivery.text = when (getInsulinDeliveryEnabled()) {
+                true -> "Disable Insulin Delivery"
+                false -> "Enable Insulin Delivery"
+            }
         }
     }
 }

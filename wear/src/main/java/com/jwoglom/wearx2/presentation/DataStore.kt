@@ -5,6 +5,7 @@ import com.jwoglom.pumpx2.pump.messages.calculator.BolusCalcCondition
 import com.jwoglom.pumpx2.pump.messages.calculator.BolusCalculatorBuilder
 import com.jwoglom.pumpx2.pump.messages.calculator.BolusParameters
 import com.jwoglom.pumpx2.pump.messages.response.control.BolusPermissionResponse
+import com.jwoglom.pumpx2.pump.messages.response.control.CancelBolusResponse
 import com.jwoglom.pumpx2.pump.messages.response.control.InitiateBolusResponse
 import com.jwoglom.pumpx2.pump.messages.response.currentStatus.BolusCalcDataSnapshotResponse
 import com.jwoglom.pumpx2.pump.messages.response.currentStatus.LastBGResponse
@@ -41,6 +42,7 @@ class DataStore {
 
     var bolusPermissionResponse = MutableLiveData<BolusPermissionResponse>()
     var bolusInitiateResponse = MutableLiveData<InitiateBolusResponse>()
+    var bolusCancelResponse = MutableLiveData<CancelBolusResponse>()
 
     init {
         batteryPercent.observeForever { t -> Timber.i("DataStore.batteryPercent=$t") }
@@ -73,5 +75,6 @@ class DataStore {
 
         bolusPermissionResponse.observeForever { t -> Timber.i("DataStore.bolusPermissionResponse=$t") }
         bolusInitiateResponse.observeForever { t -> Timber.i("DataStore.bolusInitiateResponse=$t") }
+        bolusCancelResponse.observeForever { t -> Timber.i("DataStore.bolusCancelResponse=$t") }
     }
 }

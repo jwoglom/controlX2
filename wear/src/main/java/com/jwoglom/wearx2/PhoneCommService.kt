@@ -1,5 +1,8 @@
 package com.jwoglom.wearx2
 
+import android.app.ActivityManager
+import android.app.ActivityManager.RunningAppProcessInfo.IMPORTANCE_FOREGROUND
+import android.app.ActivityManager.RunningAppProcessInfo.IMPORTANCE_VISIBLE
 import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
@@ -16,6 +19,8 @@ import com.google.android.gms.wearable.MessageEvent
 import com.google.android.gms.wearable.Node
 import com.google.android.gms.wearable.Wearable
 import com.google.android.gms.wearable.WearableListenerService
+import com.jwoglom.wearx2.presentation.navigation.Screen
+import com.jwoglom.wearx2.shared.util.setupTimber
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -31,21 +36,39 @@ class PhoneCommService : WearableListenerService() {
 
     private val notificationManagerCompat: NotificationManagerCompat by lazy { NotificationManagerCompat.from(this) }
 
+    override fun onCreate() {
+        super.onCreate()
+        setupTimber("WPC")
+        Timber.d("wear service onCreate")
+    }
+
     override fun onMessageReceived(messageEvent: MessageEvent) {
         Timber.i("wear service onMessageReceived ${messageEvent.path}: ${String(messageEvent.data)}")
         when (messageEvent.path) {
             "/to-wear/start-activity" -> {
                 startActivity(
                     Intent(applicationContext, MainActivity::class.java)
-                        .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                        .addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP)
                 )
             }
-            "/from-pump/pump-connected" -> {
-                currentlyConnected = true
+//            "/from-pump/pump-connected" -> {
+//                currentlyConnected = true
+//            }
+//            "/from-pump/pump-disconnected" -> {
+//                currentlyConnected = false
+//                disconnectedNotification("pump disconnected")
+//            }
+            "/to-wear/blocked-bolus-signature" -> {
+                Timber.w("PhoneCommService: blocked bolus signature")
+                Intent(applicationContext, MainActivity::class.java)
+                    .addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP)
+                    .putExtra("route", Screen.BolusBlocked.route)
             }
-            "/from-pump/pump-disconnected" -> {
-                currentlyConnected = false
-                disconnectedNotification("pump disconnected")
+            "/to-wear/bolus-not-enabled" -> {
+                Timber.w("PhoneCommService: bolus not enabled")
+                Intent(applicationContext, MainActivity::class.java)
+                    .addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP)
+                    .putExtra("route", Screen.BolusNotEnabled.route)
             }
         }
     }
@@ -102,7 +125,7 @@ class PhoneCommService : WearableListenerService() {
         }
         Timber.i("wear sendMessage: $path ${String(message)}")
         Wearable.NodeApi.getConnectedNodes(mApiClient).setResultCallback { nodes ->
-            Timber.i("wear sendMessage nodes: $nodes")
+            Timber.i("wear sendMessage nodes: ${nodes.nodes}")
             nodes.nodes.forEach { node ->
                 Wearable.MessageApi.sendMessage(mApiClient, node.id, path, message)
                     .setResultCallback { result ->
@@ -114,5 +137,13 @@ class PhoneCommService : WearableListenerService() {
                     }
             }
         }
+    }
+
+    private fun isForegrounded(): Boolean {
+        val appProcessInfo = ActivityManager.RunningAppProcessInfo()
+        ActivityManager.getMyMemoryState(appProcessInfo)
+        val isForeground = appProcessInfo.importance == IMPORTANCE_FOREGROUND || appProcessInfo.importance == IMPORTANCE_VISIBLE
+        Timber.i("isForegrounded: $isForeground")
+        return isForeground
     }
 }

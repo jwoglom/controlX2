@@ -10,7 +10,7 @@
         android:id="@+id/text"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="Hello World!"
+        android:text=""
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
@@ -41,6 +41,7 @@
     </RelativeLayout>
 
     <RelativeLayout
+        android:id="@+id/layout2"
         android:layout_height="wrap_content"
         android:layout_width="match_parent"
         android:orientation="vertical"
@@ -60,6 +61,22 @@
             android:layout_height="50dp"
             android:layout_toRightOf="@+id/pairing_code_label"/>
 
+    </RelativeLayout>
+
+    <RelativeLayout
+        android:id="@+id/layout3"
+        android:layout_height="wrap_content"
+        android:layout_width="match_parent"
+        android:orientation="vertical"
+        android:gravity="fill_horizontal"
+        app:layout_constraintTop_toBottomOf="@+id/layout2">
+
+        <Button
+            android:id="@+id/enable_insulin_delivery"
+            android:layout_width="wrap_content"
+            android:layout_height="50dp"
+            android:layout_marginRight="75dp"
+            android:text="Enable Insulin Delivery" />
     </RelativeLayout>
 
 </androidx.constraintlayout.widget.ConstraintLayout>

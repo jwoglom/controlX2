@@ -41,6 +41,7 @@ import androidx.wear.compose.material.MaterialTheme
 import androidx.wear.compose.material.PositionIndicator
 import androidx.wear.compose.material.Scaffold
 import androidx.wear.compose.material.ScalingLazyListState
+import androidx.wear.compose.material.Text
 import androidx.wear.compose.material.Vignette
 import androidx.wear.compose.material.VignettePosition
 import androidx.wear.compose.navigation.SwipeDismissableNavHost
@@ -58,6 +59,7 @@ import com.jwoglom.wearx2.presentation.navigation.DestinationScrollType
 import com.jwoglom.wearx2.presentation.navigation.SCROLL_TYPE_NAV_ARGUMENT
 import com.jwoglom.wearx2.presentation.navigation.Screen
 import com.jwoglom.wearx2.presentation.ui.BolusScreen
+import com.jwoglom.wearx2.presentation.ui.FullScreenText
 import com.jwoglom.wearx2.presentation.ui.IndeterminateProgressIndicator
 import com.jwoglom.wearx2.presentation.ui.LandingScreen
 import com.jwoglom.wearx2.presentation.ui.ScalingLazyListStateViewModel
@@ -261,6 +263,9 @@ fun WearApp(
                         onClickBG = {
                             navController.navigate(Screen.BolusSelectBGScreen.route)
                         },
+                        onClickLanding = {
+                            navController.navigate(Screen.Landing.route)
+                        },
                         sendPumpCommands = sendPumpCommands,
                         sendPhoneBolusRequest = sendPhoneBolusRequest,
                     )
@@ -318,6 +323,13 @@ fun WearApp(
                             bolusBgMgdlUserInput = it
                         }
                     )
+                }
+
+                composable(Screen.BolusBlocked.route) {
+                    FullScreenText("A bolus was blocked which didn't match the units requested. This is either a bug in WearX2 or another actor is attempting to bolus via your phone and/or watch unsuccessfully.")
+                }
+                composable(Screen.BolusNotEnabled.route) {
+                    FullScreenText("A bolus was requested, but actions affecting insulin delivery are not enabled in the phone app settings.")
                 }
             }
         }

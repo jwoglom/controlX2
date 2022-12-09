@@ -1,5 +1,8 @@
 package com.jwoglom.wearx2
 
+import android.content.Context
+import android.content.Intent
+import android.content.SharedPreferences
 import android.os.Bundle
 import android.widget.Toast
 import androidx.activity.ComponentActivity
@@ -13,10 +16,12 @@ import com.google.android.gms.wearable.MessageApi
 import com.google.android.gms.wearable.MessageEvent
 import com.google.android.gms.wearable.Wearable
 import com.jwoglom.pumpx2.pump.messages.Message
+import com.jwoglom.pumpx2.pump.messages.calculator.BolusCalcUnits
 import com.jwoglom.pumpx2.pump.messages.calculator.BolusParameters
 import com.jwoglom.pumpx2.pump.messages.models.InsulinUnit
 import com.jwoglom.pumpx2.pump.messages.request.control.InitiateBolusRequest
 import com.jwoglom.pumpx2.pump.messages.response.control.BolusPermissionResponse
+import com.jwoglom.pumpx2.pump.messages.response.control.CancelBolusResponse
 import com.jwoglom.pumpx2.pump.messages.response.control.InitiateBolusResponse
 import com.jwoglom.pumpx2.pump.messages.response.currentStatus.BolusCalcDataSnapshotResponse
 import com.jwoglom.pumpx2.pump.messages.response.currentStatus.CGMStatusResponse
@@ -38,9 +43,11 @@ import com.jwoglom.pumpx2.pump.messages.response.historyLog.BolusDeliveryHistory
 import com.jwoglom.wearx2.presentation.DataStore
 import com.jwoglom.wearx2.presentation.WearApp
 import com.jwoglom.wearx2.presentation.navigation.Screen
+import com.jwoglom.wearx2.shared.InitiateConfirmedBolusSerializer
 import com.jwoglom.wearx2.shared.PumpMessageSerializer
 import com.jwoglom.wearx2.shared.PumpQualifyingEventsSerializer
 import com.jwoglom.wearx2.shared.util.DebugTree
+import com.jwoglom.wearx2.shared.util.setupTimber
 import com.jwoglom.wearx2.util.SendType
 import com.jwoglom.wearx2.shared.util.shortTime
 import com.jwoglom.wearx2.shared.util.twoDecimalPlaces1000Unit
@@ -58,8 +65,7 @@ class MainActivity : ComponentActivity(), MessageApi.MessageListener, GoogleApiC
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        Timber.uprootAll()
-        Timber.plant(DebugTree("WA"))
+        setupTimber("WA")
 
         if (intent != null) {
             initialRoute = intent.getStringExtra("route") ?: Screen.Landing.route
@@ -115,9 +121,14 @@ class MainActivity : ComponentActivity(), MessageApi.MessageListener, GoogleApiC
         mApiClient.connect()
 
         // Start PhoneCommService
-//        Intent(this, PhoneCommService::class.java).also { intent: Intent? ->
-//            startService(intent)
-//        }
+        Intent(this, PhoneCommService::class.java).also { intent: Intent? ->
+            val started = startService(intent)
+            if (started == null) {
+                Timber.i("when starting PhoneCommService was already running")
+            } else {
+                Timber.i("started PhoneCommService: $started")
+            }
+        }
     }
 
     override fun onResume() {
@@ -133,15 +144,18 @@ class MainActivity : ComponentActivity(), MessageApi.MessageListener, GoogleApiC
     override fun onConnected(bundle: Bundle?) {
         Timber.i("wear onConnected: $bundle")
         sendMessage("/to-phone/connected", "wear_launched".toByteArray())
+        sendMessage("/to-phone/is-pump-connected", "".toByteArray())
         Wearable.MessageApi.addListener(mApiClient, this)
     }
 
     override fun onConnectionSuspended(id: Int) {
         Timber.w("wear connectionSuspended: $id")
+        mApiClient.reconnect()
     }
 
     override fun onConnectionFailed(result: ConnectionResult) {
         Timber.w("wear connectionFailed $result")
+        mApiClient.reconnect()
     }
 
     override fun onStop() {
@@ -161,7 +175,6 @@ class MainActivity : ComponentActivity(), MessageApi.MessageListener, GoogleApiC
         sendMessage("/to-pump/command", PumpMessageSerializer.toBytes(msg))
     }
 
-
     private fun sendPumpCommands(type: SendType, msgs: List<Message>) {
         sendMessage("/to-pump/${type.slug}", PumpMessageSerializer.toBulkBytes(msgs))
     }
@@ -169,7 +182,7 @@ class MainActivity : ComponentActivity(), MessageApi.MessageListener, GoogleApiC
     private fun sendMessage(path: String, message: ByteArray) {
         Timber.i("wear sendMessage: $path ${String(message)}")
         Wearable.NodeApi.getConnectedNodes(mApiClient).setResultCallback { nodes ->
-            Timber.i("wear sendMessage nodes: $nodes")
+            Timber.i("wear sendMessage nodes: ${nodes.nodes}")
             nodes.nodes.forEach { node ->
                 Wearable.MessageApi.sendMessage(mApiClient, node.id, path, message)
                     .setResultCallback { result ->
@@ -286,6 +299,9 @@ class MainActivity : ComponentActivity(), MessageApi.MessageListener, GoogleApiC
             is InitiateBolusResponse -> {
                 dataStore.bolusInitiateResponse.value = message
             }
+            is CancelBolusResponse -> {
+                dataStore.bolusCancelResponse.value = message
+            }
         }
     }
 
@@ -299,6 +315,49 @@ class MainActivity : ComponentActivity(), MessageApi.MessageListener, GoogleApiC
                         navController.navigate(Screen.WaitingToFindPump.route)
                     }
                     sendMessage("/to-phone/is-pump-connected", "".toByteArray())
+                }
+            }
+            "/to-wear/initiate-confirmed-bolus" -> {
+                if (inWaitingState()) {
+                    Timber.e("in invalid state for initiate-confirmed-bolus")
+                    runOnUiThread {
+                        navController.navigate(Screen.BolusBlocked.route)
+                    }
+                    return
+                }
+
+                if (navController.currentDestination?.route != Screen.Bolus.route) {
+                    Timber.e("in non-bolus state for initiate-confirmed-bolus")
+                    runOnUiThread {
+                        navController.navigate(Screen.BolusBlocked.route)
+                    }
+                    return
+                }
+
+                val dataStoreUnits = dataStore.bolusFinalParameters.value?.units
+                val confirmedBolus = InitiateConfirmedBolusSerializer.fromBytes("IGNORED_BY_WEAR", messageEvent.data)
+                val initiateBolusRequest = confirmedBolus.right as InitiateBolusRequest
+                if (initiateBolusRequest.totalVolume != InsulinUnit.from1To1000(dataStoreUnits)) {
+                    Timber.e("blocked bolus with different volume amount $initiateBolusRequest vs $dataStoreUnits")
+                    runOnUiThread {
+                        navController.navigate(Screen.BolusBlocked.route)
+                    }
+                    return
+                }
+
+                Timber.i("sending initiate-confirmed-bolus from wearable to phone")
+                sendMessage("/to-phone/initiate-confirmed-bolus", messageEvent.data)
+            }
+            "/to-wear/blocked-bolus-signature" -> {
+                Timber.w("blocked bolus signature")
+                runOnUiThread {
+                    navController.navigate(Screen.BolusBlocked.route)
+                }
+            }
+            "/to-wear/bolus-not-enabled" -> {
+                Timber.w("bolus not enabled")
+                runOnUiThread {
+                    navController.navigate(Screen.BolusNotEnabled.route)
                 }
             }
             "/from-pump/pump-model" -> {

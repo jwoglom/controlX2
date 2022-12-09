@@ -36,12 +36,19 @@
         </activity>
         <service android:name=".WearCommService"
             android:icon="@drawable/pump"
-            android:exported="true">
+            android:exported="false">
             <intent-filter>
                 <action android:name="com.google.android.gms.wearable.BIND_LISTENER"
                     tools:ignore="WearableBindListener" />
             </intent-filter>
         </service>
+        <receiver android:name=".BolusNotificationBroadcastReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="com.google.android.gms.wearable.BIND_LISTENER"
+                    tools:ignore="WearableBindListener" />
+            </intent-filter>
+        </receiver>
     </application>
 
 </manifest>

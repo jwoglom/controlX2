@@ -16,7 +16,6 @@ package com.jwoglom.wearx2.presentation.ui
  * limitations under the License.
  */
 
-import android.widget.Toast
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Spacer
@@ -65,11 +64,7 @@ import androidx.wear.compose.material.rememberScalingLazyListState
 import com.google.android.horologist.compose.navscaffold.scrollableColumn
 import com.jwoglom.pumpx2.pump.messages.Message
 import com.jwoglom.pumpx2.pump.messages.calculator.BolusCalcCondition
-import com.jwoglom.pumpx2.pump.messages.calculator.BolusCalcCondition.Decision
-import com.jwoglom.pumpx2.pump.messages.calculator.BolusCalcCondition.FailedPrecondition
-import com.jwoglom.pumpx2.pump.messages.calculator.BolusCalcCondition.WaitingOnPrecondition
-import com.jwoglom.pumpx2.pump.messages.calculator.BolusCalcCondition.NonActionDecision
-import com.jwoglom.pumpx2.pump.messages.calculator.BolusCalcCondition.FailedSanityCheck
+import com.jwoglom.pumpx2.pump.messages.calculator.BolusCalcCondition.*
 import com.jwoglom.pumpx2.pump.messages.calculator.BolusCalcDecision
 import com.jwoglom.pumpx2.pump.messages.calculator.BolusCalculatorBuilder
 import com.jwoglom.pumpx2.pump.messages.calculator.BolusParameters
@@ -78,14 +73,15 @@ import com.jwoglom.pumpx2.pump.messages.request.control.CancelBolusRequest
 import com.jwoglom.pumpx2.pump.messages.request.currentStatus.BolusCalcDataSnapshotRequest
 import com.jwoglom.pumpx2.pump.messages.request.currentStatus.LastBGRequest
 import com.jwoglom.pumpx2.pump.messages.response.control.BolusPermissionResponse
+import com.jwoglom.pumpx2.pump.messages.response.control.CancelBolusResponse.CancelStatus
 import com.jwoglom.pumpx2.pump.messages.response.currentStatus.BolusCalcDataSnapshotResponse
 import com.jwoglom.pumpx2.pump.messages.response.currentStatus.LastBGResponse
 import com.jwoglom.wearx2.LocalDataStore
 import com.jwoglom.wearx2.R
 import com.jwoglom.wearx2.presentation.components.LineTextDescription
-import com.jwoglom.wearx2.util.SendType
 import com.jwoglom.wearx2.shared.util.oneDecimalPlace
 import com.jwoglom.wearx2.shared.util.twoDecimalPlaces
+import com.jwoglom.wearx2.util.SendType
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -103,6 +99,7 @@ fun BolusScreen(
     onClickUnits: (Double?) -> Unit,
     onClickCarbs: () -> Unit,
     onClickBG: () -> Unit,
+    onClickLanding: () -> Unit,
     sendPumpCommands: (SendType, List<Message>) -> Unit,
     sendPhoneBolusRequest: (Int, BolusParameters) -> Unit,
     modifier: Modifier = Modifier
@@ -111,6 +108,8 @@ fun BolusScreen(
     var showConfirmDialog by remember { mutableStateOf(false) }
     var showInProgressDialog by remember { mutableStateOf(false) }
     var showCancelledDialog by remember { mutableStateOf(false) }
+    var showCancellingDialog by remember { mutableStateOf(false) }
+    var showApprovedDialog by remember { mutableStateOf(false) }
 
     val refreshScope = rememberCoroutineScope()
     var refreshing by remember { mutableStateOf(true) }
@@ -499,6 +498,17 @@ fun BolusScreen(
                 )
             }
         }
+
+        Dialog(
+            showDialog = showCancellingDialog,
+            onDismissRequest = {
+                showCancellingDialog = false
+            },
+            scrollState = scrollState
+        ) {
+            IndeterminateProgressIndicator(text = "The bolus is being cancelled..")
+        }
+
         Dialog(
             showDialog = showCancelledDialog,
             onDismissRequest = {
@@ -506,10 +516,18 @@ fun BolusScreen(
             },
             scrollState = scrollState
         ) {
+            val bolusCancelResponse = dataStore.bolusCancelResponse.observeAsState()
+
             Alert(
                 title = {
                     Text(
-                        text = "The bolus was cancelled.",
+                        text = when (bolusCancelResponse.value?.status) {
+                            CancelStatus.SUCCESS ->
+                                "The bolus was cancelled."
+                            CancelStatus.FAILED ->
+                                "The bolus could not be cancelled: ${bolusCancelResponse.value?.reason}"
+                            else -> "Please check your pump to confirm whether the bolus was cancelled."
+                        },
                         textAlign = TextAlign.Center,
                         color = MaterialTheme.colors.onBackground
                     )
@@ -517,7 +535,7 @@ fun BolusScreen(
                 negativeButton = {
                     Button(
                         onClick = {
-                            showCancelledDialog = false
+                            onClickLanding()
                         },
                         colors = ButtonDefaults.secondaryButtonColors(),
                         modifier = Modifier.fillMaxWidth()
@@ -533,10 +551,22 @@ fun BolusScreen(
         }
 
         fun cancelBolus() {
-            bolusPermissionResponse.value?.bolusId?.let { bolusId ->
-                sendPumpCommands(SendType.BUST_CACHE, listOf(CancelBolusRequest(bolusId)))
+            fun performCancel() {
+                bolusPermissionResponse.value?.bolusId?.let { bolusId ->
+                    sendPumpCommands(SendType.BUST_CACHE, listOf(CancelBolusRequest(bolusId)))
+                    showCancellingDialog = true
+                }
+            }
+            performCancel()
+            refreshScope.launch {
+                while (dataStore.bolusCancelResponse.value == null) {
+                    withContext(Dispatchers.IO) {
+                        Thread.sleep(1000)
+                    }
+                    performCancel()
+                }
+                showCancellingDialog = false
                 showCancelledDialog = true
-
             }
         }
 
@@ -564,7 +594,7 @@ fun BolusScreen(
                 negativeButton = {
                     Button(
                         onClick = {
-                            showInProgressDialog = false
+                            cancelBolus()
                         },
                         colors = ButtonDefaults.secondaryButtonColors(),
                         modifier = Modifier.fillMaxWidth()
@@ -579,6 +609,52 @@ fun BolusScreen(
             ) {
                 Text(
                     text = "A notification was sent to acknowledge the request.",
+                    textAlign = TextAlign.Center,
+                    style = MaterialTheme.typography.body2,
+                    color = MaterialTheme.colors.onBackground
+                )
+            }
+        }
+
+        Dialog(
+            showDialog = showApprovedDialog,
+            onDismissRequest = {
+                showApprovedDialog = false
+            },
+            scrollState = scrollState
+        ) {
+            val bolusFinalParameters = dataStore.bolusFinalParameters.observeAsState()
+            val bolusInitiateResopnse = dataStore.bolusInitiateResponse.observeAsState()
+
+            Alert(
+                title = {
+                    Text(
+                        text = when (bolusFinalParameters.value) {
+                            null -> ""
+                            else -> "${bolusFinalParameters.value!!.units}u Bolus"
+                        },
+                        textAlign = TextAlign.Center,
+                        color = MaterialTheme.colors.onBackground
+                    )
+                },
+                negativeButton = {
+                    Button(
+                        onClick = {
+                            cancelBolus()
+                        },
+                        colors = ButtonDefaults.secondaryButtonColors(),
+                        modifier = Modifier.fillMaxWidth()
+
+                    ) {
+                        Text("Cancel")
+                    }
+                },
+                positiveButton = {},
+                icon = { Image(painterResource(R.drawable.bolus_icon), "Bolus icon", Modifier.size(24.dp)) },
+                scrollState = scrollState,
+            ) {
+                Text(
+                    text = "The bolus was initiated.",
                     textAlign = TextAlign.Center,
                     style = MaterialTheme.typography.body2,
                     color = MaterialTheme.colors.onBackground
