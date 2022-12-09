@@ -45,7 +45,7 @@ class PhoneCommService : WearableListenerService() {
     override fun onMessageReceived(messageEvent: MessageEvent) {
         Timber.i("wear service onMessageReceived ${messageEvent.path}: ${String(messageEvent.data)}")
         when (messageEvent.path) {
-            "/to-wear/start-activity" -> {
+            "/to-wear/open-activity" -> {
                 startActivity(
                     Intent(applicationContext, MainActivity::class.java)
                         .addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP)

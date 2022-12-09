@@ -10,6 +10,7 @@ import androidx.activity.compose.setContent
 import androidx.compose.runtime.compositionLocalOf
 import androidx.navigation.NavHostController
 import androidx.wear.compose.navigation.rememberSwipeDismissableNavController
+import androidx.wear.remote.interactions.RemoteActivityHelper
 import com.google.android.gms.common.ConnectionResult
 import com.google.android.gms.common.api.GoogleApiClient
 import com.google.android.gms.wearable.MessageApi
@@ -28,6 +29,8 @@ import com.jwoglom.pumpx2.pump.messages.response.currentStatus.CGMStatusResponse
 import com.jwoglom.pumpx2.pump.messages.response.currentStatus.CGMStatusResponse.SessionState
 import com.jwoglom.pumpx2.pump.messages.response.currentStatus.CGMStatusResponse.TransmitterBatteryStatus
 import com.jwoglom.pumpx2.pump.messages.response.currentStatus.ControlIQIOBResponse
+import com.jwoglom.pumpx2.pump.messages.response.currentStatus.ControlIQInfoAbstractResponse
+import com.jwoglom.pumpx2.pump.messages.response.currentStatus.ControlIQInfoAbstractResponse.UserModeType
 import com.jwoglom.pumpx2.pump.messages.response.currentStatus.CurrentBasalStatusResponse
 import com.jwoglom.pumpx2.pump.messages.response.currentStatus.CurrentBatteryAbstractResponse
 import com.jwoglom.pumpx2.pump.messages.response.currentStatus.CurrentEGVGuiDataResponse
@@ -51,6 +54,8 @@ import com.jwoglom.wearx2.shared.util.setupTimber
 import com.jwoglom.wearx2.util.SendType
 import com.jwoglom.wearx2.shared.util.shortTime
 import com.jwoglom.wearx2.shared.util.twoDecimalPlaces1000Unit
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.asExecutor
 import timber.log.Timber
 
 var dataStore = DataStore()
@@ -103,11 +108,22 @@ class MainActivity : ComponentActivity(), MessageApi.MessageListener, GoogleApiC
                 this.sendMessage("/to-phone/bolus-request", PumpMessageSerializer.toBytes(bolusRequest))
             }
 
+            val sendPhoneOpenActivity: () -> Unit = {
+                this.sendMessage("/to-phone/open-activity", "".toByteArray())
+            }
+
+            val sendPhoneOpenTconnect: () -> Unit = {
+                val helper = RemoteActivityHelper(application, Dispatchers.IO.asExecutor())
+                helper.startRemoteActivity(Intent("com.tandemdiabetes.tconnect."))
+            }
+
             WearApp(
                 navController = navController,
                 sendPumpCommands = sendPumpCommands,
                 sendPhoneConnectionCheck = sendPhoneConnectionCheck,
                 sendPhoneBolusRequest = sendPhoneBolusRequest,
+                sendPhoneOpenActivity = sendPhoneOpenActivity,
+                sendPhoneOpenTconnect = sendPhoneOpenTconnect,
             )
         }
 
@@ -216,6 +232,13 @@ class MainActivity : ComponentActivity(), MessageApi.MessageListener, GoogleApiC
             is ControlIQIOBResponse -> {
                 dataStore.iobUnits.value = InsulinUnit.from1000To1(message.pumpDisplayedIOB)
             }
+            is ControlIQInfoAbstractResponse -> {
+                dataStore.controlIQMode.value = when (message.currentUserModeType) {
+                    UserModeType.SLEEP -> "Sleep"
+                    UserModeType.EXERCISE -> "Exercise"
+                    else -> ""
+                }
+            }
             is InsulinStatusResponse -> {
                 dataStore.cartridgeRemainingUnits.value = message.currentInsulinAmount
             }
@@ -264,9 +287,9 @@ class MainActivity : ComponentActivity(), MessageApi.MessageListener, GoogleApiC
             }
             is CGMStatusResponse -> {
                 dataStore.cgmSessionState.value = when (message.sessionState) {
+                    SessionState.SESSION_ACTIVE -> "Active"
                     SessionState.SESSION_STOPPED -> "Stopped"
                     SessionState.SESSION_START_PENDING -> "Starting"
-                    SessionState.SESSION_ACTIVE -> "Active"
                     SessionState.SESSION_STOP_PENDING -> "Stopping"
                     else -> "Unknown"
                 }

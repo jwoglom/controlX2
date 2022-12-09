@@ -75,6 +75,8 @@ fun WearApp(
     sendPumpCommands: (SendType, List<Message>) -> Unit,
     sendPhoneBolusRequest: (Int, BolusParameters) -> Unit,
     sendPhoneConnectionCheck: () -> Unit,
+    sendPhoneOpenActivity: () -> Unit,
+    sendPhoneOpenTconnect: () -> Unit,
 ) {
     var themeColors by remember { mutableStateOf(defaultTheme.colors) }
     WearAppTheme(colors = themeColors) {
@@ -227,6 +229,8 @@ fun WearApp(
                         focusRequester = focusRequester,
                         swipeDismissableNavController = navController,
                         sendPumpCommands = sendPumpCommands,
+                        sendPhoneOpenActivity = sendPhoneOpenActivity,
+                        sendPhoneOpenTconnect = sendPhoneOpenTconnect,
                     )
 
                     RequestFocusOnResume(focusRequester)

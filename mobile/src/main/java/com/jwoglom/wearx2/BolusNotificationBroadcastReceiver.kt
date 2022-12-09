@@ -2,6 +2,7 @@ package com.jwoglom.wearx2
 
 import android.app.Notification
 import android.app.NotificationManager
+import android.app.PendingIntent
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
@@ -14,6 +15,7 @@ import com.google.android.gms.wearable.Wearable
 import com.google.android.gms.wearable.WearableListenerService
 import com.jwoglom.pumpx2.pump.PumpState
 import com.jwoglom.pumpx2.pump.messages.models.InsulinUnit
+import com.jwoglom.pumpx2.pump.messages.request.control.CancelBolusRequest
 import com.jwoglom.pumpx2.pump.messages.request.control.InitiateBolusRequest
 import com.jwoglom.pumpx2.pump.messages.response.control.InitiateBolusResponse
 import com.jwoglom.pumpx2.shared.Hex
@@ -43,7 +45,13 @@ public class BolusNotificationBroadcastReceiver : BroadcastReceiver(),
                         intentRequest
                     )
 
-                    Timber.i("BolusNotificationBroadcastReceiver initiate-confirmed-bolus bytes: ${String(rawBytes)}")
+                    Timber.i(
+                        "BolusNotificationBroadcastReceiver initiate-confirmed-bolus bytes: ${
+                            String(
+                                rawBytes
+                            )
+                        }"
+                    )
 
                     mApiClient = GoogleApiClient.Builder(context!!)
                         .addApi(Wearable.API)
@@ -62,14 +70,18 @@ public class BolusNotificationBroadcastReceiver : BroadcastReceiver(),
                         // The same message will appear on the wearable
                         reply(
                             context, notifId, confirmBolusRequestBaseNotification(
-                                context, "Bolus Not Enabled", "A bolus was requested, but actions affecting insulin delivery are not enabled in the phone app settings."
+                                context,
+                                "Bolus Not Enabled",
+                                "A bolus was requested, but actions affecting insulin delivery are not enabled in the phone app settings."
                             )
                         )
                         return
                     }
                     reply(
                         context, notifId, confirmBolusRequestBaseNotification(
-                            context, "Requesting Bolus", bolusSummaryText(intentRequest)
+                            context,
+                            "Requesting Bolus",
+                            "${bolusSummaryText(intentRequest)} will be delivered"
                         )
                     )
                 }
@@ -107,12 +119,38 @@ public class BolusNotificationBroadcastReceiver : BroadcastReceiver(),
                             return
                         }
 
+                        val cancelIntent =
+                            Intent(context, BolusNotificationBroadcastReceiver::class.java).apply {
+                                putExtra("action", "CANCEL")
+                                putExtra("bolusId", initiateResponse.bolusId)
+                            }
+                        val cancelPendingIntent = PendingIntent.getBroadcast(
+                            context,
+                            2003,
+                            cancelIntent,
+                            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_ONE_SHOT
+                        )
+
                         reply(
                             context, notifId, confirmBolusRequestBaseNotification(
-                                context, "Bolus Requested", bolusSummaryText(initiateRequest)
-                            )
+                                context,
+                                "Bolus Requested",
+                                "The ${bolusSummaryText(initiateRequest)} is being delivered"
+                            ).addAction(R.drawable.decline, "Cancel", cancelPendingIntent)
                         )
                     }
+                }
+            }
+            "CANCEL" -> {
+                val bolusId = intent.getIntExtra("bolusId", 0)
+
+                repeat (5) {
+                    // fall-open on allowing cancellation, and retry several times
+                    sendMessage(
+                        "/to-pump/command",
+                        PumpMessageSerializer.toBytes(CancelBolusRequest(bolusId))
+                    )
+                    Thread.sleep(500)
                 }
             }
             else -> {
@@ -183,7 +221,7 @@ public class BolusNotificationBroadcastReceiver : BroadcastReceiver(),
             twoDecimalPlaces(
                 InsulinUnit.from1000To1(intentRequest.totalVolume)
             )
-        }u bolus with ID ${intentRequest.bolusID}"
+        }u bolus"
     }
 
     private fun getCurrentBolusToConfirm(context: Context?): InitiateBolusRequest? {
@@ -280,7 +318,13 @@ public class BolusNotificationBroadcastReceiver : BroadcastReceiver(),
                         if (result.status.isSuccess) {
                             Timber.i("service message sent: $path ${String(message)} to: $node")
                         } else {
-                            Timber.w("service sendMessage callback: ${result.status} for: $path ${String(message)}")
+                            Timber.w(
+                                "service sendMessage callback: ${result.status} for: $path ${
+                                    String(
+                                        message
+                                    )
+                                }"
+                            )
                         }
                     }
             }

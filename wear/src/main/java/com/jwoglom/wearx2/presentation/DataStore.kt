@@ -17,6 +17,7 @@ class DataStore {
     val cartridgeRemainingUnits = MutableLiveData<Int>()
     val lastBolusStatus = MutableLiveData<String>()
     val controlIQStatus = MutableLiveData<String>()
+    val controlIQMode = MutableLiveData<String>()
     val basalRate = MutableLiveData<String>()
     var basalStatus = MutableLiveData<String>()
     val cgmSessionState = MutableLiveData<String>()
@@ -31,6 +32,7 @@ class DataStore {
     val maxBolusAmount = MutableLiveData<Int>()
 
     var landingBasalDisplayedText = MutableLiveData<String>()
+    var landingControlIQDisplayedText = MutableLiveData<String>()
 
     var bolusUnitsDisplayedText = MutableLiveData<String>()
     var bolusBGDisplayedText = MutableLiveData<String>()
@@ -50,6 +52,7 @@ class DataStore {
         cartridgeRemainingUnits.observeForever { t -> Timber.i("DataStore.cartridgeRemainingUnits=$t") }
         lastBolusStatus.observeForever { t -> Timber.i("DataStore.lastBolusStatus=$t") }
         controlIQStatus.observeForever { t -> Timber.i("DataStore.controlIQStatus=$t") }
+        controlIQMode.observeForever { t -> Timber.i("DataStore.controlIQMode=$t") }
         basalRate.observeForever { t -> Timber.i("DataStore.basalRate=$t") }
         basalStatus.observeForever { t -> Timber.i("DataStore.basalStatus=$t") }
         cgmSessionState.observeForever { t -> Timber.i("DataStore.cgmSessionState=$t") }
@@ -64,6 +67,7 @@ class DataStore {
         maxBolusAmount.observeForever { t -> Timber.i("DataStore.maxBolusAmount=$t") }
 
         landingBasalDisplayedText.observeForever { t -> Timber.i("DataStore.landingBasalDisplayedText=$t") }
+        landingControlIQDisplayedText.observeForever { t -> Timber.i("DataStore.landingControlIQDisplayedText=$t") }
 
         bolusUnitsDisplayedText.observeForever { t -> Timber.i("DataStore.bolusUnitsDisplayedText=$t") }
         bolusBGDisplayedText.observeForever { t -> Timber.i("DataStore.bolusBGDisplayedText=$t") }

@@ -34,18 +34,24 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.zIndex
 import androidx.navigation.NavHostController
 import androidx.wear.compose.material.AutoCenteringParams
+import androidx.wear.compose.material.Button
 import androidx.wear.compose.material.Chip
+import androidx.wear.compose.material.ExperimentalWearMaterialApi
 import androidx.wear.compose.material.ScalingLazyColumn
 import androidx.wear.compose.material.ScalingLazyListState
 import androidx.wear.compose.material.Text
+import androidx.wear.compose.material.placeholderShimmer
+import androidx.wear.compose.material.rememberPlaceholderState
 import com.google.accompanist.flowlayout.FlowRow
 import com.google.android.horologist.compose.navscaffold.scrollableColumn
 import com.jwoglom.pumpx2.pump.PumpState
 import com.jwoglom.pumpx2.pump.messages.Message
+import com.jwoglom.pumpx2.pump.messages.builders.ControlIQInfoRequestBuilder
 import com.jwoglom.pumpx2.pump.messages.builders.CurrentBatteryRequestBuilder
 import com.jwoglom.pumpx2.pump.messages.builders.LastBolusStatusRequestBuilder
 import com.jwoglom.pumpx2.pump.messages.models.ApiVersion
@@ -60,23 +66,28 @@ import com.jwoglom.pumpx2.pump.messages.request.currentStatus.InsulinStatusReque
 import com.jwoglom.wearx2.LocalDataStore
 import com.jwoglom.wearx2.dataStore
 import com.jwoglom.wearx2.presentation.components.FirstRowChip
+import com.jwoglom.wearx2.presentation.components.LifecycleStateObserver
 import com.jwoglom.wearx2.presentation.components.LineInfoChip
+import com.jwoglom.wearx2.presentation.components.intervalOf
 import com.jwoglom.wearx2.presentation.defaultTheme
 import com.jwoglom.wearx2.presentation.greenTheme
 import com.jwoglom.wearx2.presentation.navigation.Screen
 import com.jwoglom.wearx2.presentation.redTheme
 import com.jwoglom.wearx2.util.SendType
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import timber.log.Timber
 
-@OptIn(ExperimentalMaterialApi::class)
+@OptIn(ExperimentalMaterialApi::class, ExperimentalWearMaterialApi::class)
 @Composable
 fun LandingScreen(
     scalingLazyListState: ScalingLazyListState,
     focusRequester: FocusRequester,
     sendPumpCommands: (SendType, List<Message>) -> Unit,
+    sendPhoneOpenActivity: () -> Unit,
+    sendPhoneOpenTconnect: () -> Unit,
     swipeDismissableNavController: NavHostController,
     modifier: Modifier = Modifier,
 ) {
@@ -98,6 +109,7 @@ fun LandingScreen(
         InsulinStatusRequest(),
         LastBolusStatusRequestBuilder.create(apiVersion()),
         HomeScreenMirrorRequest(),
+        ControlIQInfoRequestBuilder.create(apiVersion()),
         CurrentBasalStatusRequest(),
         CGMStatusRequest(),
         CurrentEGVGuiDataRequest(),
@@ -110,6 +122,7 @@ fun LandingScreen(
         dataStore.cartridgeRemainingUnits,
         dataStore.lastBolusStatus,
         dataStore.controlIQStatus,
+        dataStore.controlIQMode,
         dataStore.basalRate,
         dataStore.cgmSessionState,
         dataStore.cgmTransmitterStatus,
@@ -153,7 +166,14 @@ fun LandingScreen(
 
     val state = rememberPullRefreshState(refreshing, ::refresh)
 
-    LaunchedEffect (Unit) {
+    LifecycleStateObserver(lifecycleOwner = LocalLifecycleOwner.current, onStop = {
+        refreshScope.cancel()
+    }) {
+        fetchDataStoreFields(SendType.BUST_CACHE)
+    }
+
+    LaunchedEffect(intervalOf(60)) {
+        Timber.i("reloading LandingPage")
         fetchDataStoreFields(SendType.BUST_CACHE)
     }
 
@@ -231,6 +251,7 @@ fun LandingScreen(
 
             item {
                 val lastBolusStatus = dataStore.lastBolusStatus.observeAsState()
+
                 Chip(
                     onClick = {
                         swipeDismissableNavController.navigate(Screen.Bolus.route)
@@ -260,40 +281,54 @@ fun LandingScreen(
                 val basalRate = dataStore.basalRate.observeAsState()
                 val basalStatus = dataStore.basalStatus.observeAsState()
                 val landingBasalDisplayedText = dataStore.landingBasalDisplayedText.observeAsState()
+                val placeholderState = rememberPlaceholderState {
+                    landingBasalDisplayedText.value != null
+                }
 
                 LaunchedEffect (basalRate.value, basalStatus.value) {
                     dataStore.landingBasalDisplayedText.value = when (basalStatus.value) {
-                        "On", "Zero", "Increased", "Reduced" -> "${basalRate.value}"
-                        null -> when (basalRate.value) {
-                            null -> "?"
+                        "On", "Zero", "Increased", "Reduced", null -> when (basalRate.value) {
+                            null -> null
                             else -> "${basalRate.value}"
                         }
                         else -> when (basalRate.value) {
                             null -> "${basalStatus.value}"
                             else -> "${basalStatus.value} (${basalRate.value})"
                         }
-
                     }
                 }
+
                 LineInfoChip(
                     "Basal",
-                    when (landingBasalDisplayedText.value) {
-                        null -> "?"
-                        else -> "${landingBasalDisplayedText.value}"
-                    }
+                    "${landingBasalDisplayedText.value}",
+                    placeholderState = placeholderState,
                 )
             }
+
             item {
                 val controlIQStatus = LocalDataStore.current.controlIQStatus.observeAsState()
+                val controlIQMode = LocalDataStore.current.controlIQMode.observeAsState()
+                val landingControlIQDisplayedText = dataStore.landingControlIQDisplayedText.observeAsState()
+
+                LaunchedEffect (controlIQStatus.value, controlIQMode.value) {
+                    dataStore.landingControlIQDisplayedText.value = when (controlIQMode.value) {
+                        "Sleep", "Exercise" -> "${controlIQMode.value}"
+                        else -> when (controlIQStatus.value) {
+                            null -> "?"
+                            else -> "${controlIQStatus.value}"
+                        }
+                    }
+                }
 
                 LineInfoChip(
                     "Control-IQ",
-                    when(controlIQStatus.value) {
+                    when(landingControlIQDisplayedText.value) {
                         null -> "?"
-                        else -> "${controlIQStatus.value}"
+                        else -> "${landingControlIQDisplayedText.value}"
                     }
                 )
             }
+
             item {
                 val cgmSensorStatus = LocalDataStore.current.cgmSessionState.observeAsState()
                 LineInfoChip(
@@ -304,6 +339,7 @@ fun LandingScreen(
                     }
                 )
             }
+
             item {
                 val cgmTransmitterStatus = LocalDataStore.current.cgmTransmitterStatus.observeAsState()
                 LineInfoChip(
@@ -314,6 +350,28 @@ fun LandingScreen(
                     }
                 )
             }
+
+//            item {
+//                Button(
+//                    onClick = {
+//                        sendPhoneOpenTconnect()
+//                    }
+//                ) {
+//
+//                    Text("Open t:connect on phone")
+//                }
+//            }
+//
+//            item {
+//                Button(
+//                    onClick = {
+//                        sendPhoneOpenActivity()
+//                    }
+//                ) {
+//
+//                    Text("Open WearX2 on phone")
+//                }
+//            }
         }
     }
 }

@@ -42,6 +42,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -78,7 +79,9 @@ import com.jwoglom.pumpx2.pump.messages.response.currentStatus.BolusCalcDataSnap
 import com.jwoglom.pumpx2.pump.messages.response.currentStatus.LastBGResponse
 import com.jwoglom.wearx2.LocalDataStore
 import com.jwoglom.wearx2.R
+import com.jwoglom.wearx2.presentation.components.LifecycleStateObserver
 import com.jwoglom.wearx2.presentation.components.LineTextDescription
+import com.jwoglom.wearx2.shared.util.snakeCaseToSpace
 import com.jwoglom.wearx2.shared.util.oneDecimalPlace
 import com.jwoglom.wearx2.shared.util.twoDecimalPlaces
 import com.jwoglom.wearx2.util.SendType
@@ -204,7 +207,7 @@ fun BolusScreen(
 
     val state = rememberPullRefreshState(refreshing, ::refresh)
 
-    LaunchedEffect (Unit) {
+    LifecycleStateObserver(lifecycleOwner = LocalLifecycleOwner.current, onStop = {}) {
         sendPumpCommands(SendType.BUST_CACHE, commands)
     }
 
@@ -488,7 +491,7 @@ fun BolusScreen(
                 Text(
                     text = bolusPermissionResponse.value?.let {
                         when (it.status) {
-                            0 -> "Do you want to deliver the bolus? Bolus ID: ${it.bolusId}"
+                            0 -> "Do you want to deliver the bolus?"
                             else -> "Cannot deliver bolus: ${it.nackReason}"
                         }
                     } ?: "Invalid",
@@ -525,7 +528,7 @@ fun BolusScreen(
                             CancelStatus.SUCCESS ->
                                 "The bolus was cancelled."
                             CancelStatus.FAILED ->
-                                "The bolus could not be cancelled: ${bolusCancelResponse.value?.reason}"
+                                "The bolus could not be cancelled: ${snakeCaseToSpace(bolusCancelResponse.value?.reason.toString())}"
                             else -> "Please check your pump to confirm whether the bolus was cancelled."
                         },
                         textAlign = TextAlign.Center,
@@ -561,7 +564,7 @@ fun BolusScreen(
             refreshScope.launch {
                 while (dataStore.bolusCancelResponse.value == null) {
                     withContext(Dispatchers.IO) {
-                        Thread.sleep(1000)
+                        Thread.sleep(500)
                     }
                     performCancel()
                 }
@@ -579,6 +582,20 @@ fun BolusScreen(
             scrollState = scrollState
         ) {
             val bolusFinalParameters = dataStore.bolusFinalParameters.observeAsState()
+            val bolusInitiateResponse = dataStore.bolusInitiateResponse.observeAsState()
+            val bolusCancelResponse = dataStore.bolusCancelResponse.observeAsState()
+
+            LaunchedEffect (bolusInitiateResponse.value) {
+                if (bolusInitiateResponse.value != null) {
+                    showApprovedDialog = true
+                }
+            }
+
+            LaunchedEffect (bolusCancelResponse.value) {
+                if (bolusCancelResponse.value != null) {
+                    showCancelledDialog = true
+                }
+            }
 
             Alert(
                 title = {
@@ -624,14 +641,17 @@ fun BolusScreen(
             scrollState = scrollState
         ) {
             val bolusFinalParameters = dataStore.bolusFinalParameters.observeAsState()
-            val bolusInitiateResopnse = dataStore.bolusInitiateResponse.observeAsState()
+            val bolusInitiateResponse = dataStore.bolusInitiateResponse.observeAsState()
 
             Alert(
                 title = {
                     Text(
-                        text = when (bolusFinalParameters.value) {
-                            null -> ""
-                            else -> "${bolusFinalParameters.value!!.units}u Bolus"
+                        text = when {
+                            bolusInitiateResponse.value != null -> when {
+                                bolusInitiateResponse.value!!.wasBolusInitiated() -> "Bolus Initiated"
+                                else -> "Bolus Rejected by Pump"
+                            }
+                            else -> "Bolus Status Unknown"
                         },
                         textAlign = TextAlign.Center,
                         color = MaterialTheme.colors.onBackground
@@ -654,7 +674,13 @@ fun BolusScreen(
                 scrollState = scrollState,
             ) {
                 Text(
-                    text = "The bolus was initiated.",
+                    text = when {
+                        bolusInitiateResponse.value != null -> when {
+                            bolusInitiateResponse.value!!.wasBolusInitiated() -> "The ${twoDecimalPlaces(bolusFinalParameters.value!!.units)}u bolus was initiated."
+                            else -> "The bolus could not be delivered: ${snakeCaseToSpace(bolusInitiateResponse.value!!.statusType.toString())}"
+                        }
+                        else -> "The bolus status is unknown. Please check your pump to identify the status of the bolus."
+                    },
                     textAlign = TextAlign.Center,
                     style = MaterialTheme.typography.body2,
                     color = MaterialTheme.colors.onBackground

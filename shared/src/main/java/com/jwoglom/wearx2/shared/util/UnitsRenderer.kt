@@ -3,10 +3,7 @@ package com.jwoglom.wearx2.shared.util
 import com.jwoglom.pumpx2.pump.messages.models.InsulinUnit
 import java.time.Duration
 import java.time.Instant
-import java.time.ZoneId
 import java.time.ZoneOffset.UTC
-import java.time.temporal.TemporalField
-import java.time.temporal.TemporalUnit
 
 
 fun shortTimeAgo(time: Instant): String {
@@ -58,4 +55,8 @@ fun twoDecimalPlaces1000Unit(insulin1000Units: Long): String {
 
 fun oneDecimalPlace1000Unit(insulin1000Units: Long): String {
     return oneDecimalPlace(InsulinUnit.from1000To1(insulin1000Units))
+}
+
+fun snakeCaseToSpace(str: String): String {
+    return str.replace("_", " ")
 }

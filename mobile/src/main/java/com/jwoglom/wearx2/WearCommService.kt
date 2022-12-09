@@ -339,10 +339,10 @@ class WearCommService : WearableListenerService(), GoogleApiClient.ConnectionCal
     override fun onMessageReceived(messageEvent: MessageEvent) {
         Timber.i("service messageReceived: ${messageEvent.path} ${String(messageEvent.data)}")
         when (messageEvent.path) {
-            "/to-phone/start-activity" -> {
+            "/to-phone/open-activity" -> {
                 startActivity(
                     Intent(this, MainActivity::class.java)
-                        .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                        .addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP)
                 )
             }
             "/to-phone/is-pump-connected" -> {
