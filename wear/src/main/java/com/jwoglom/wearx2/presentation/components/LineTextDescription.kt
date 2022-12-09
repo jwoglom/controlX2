@@ -60,6 +60,6 @@ internal fun LineTextDescription(
         ),
         modifier = Modifier
             .fillMaxWidth()
-            .height(32.dp)
+            .height(40.dp)
     )
 }

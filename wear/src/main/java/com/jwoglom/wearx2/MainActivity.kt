@@ -54,10 +54,12 @@ import com.jwoglom.wearx2.shared.util.DebugTree
 import com.jwoglom.wearx2.shared.util.setupTimber
 import com.jwoglom.wearx2.util.SendType
 import com.jwoglom.wearx2.shared.util.shortTime
+import com.jwoglom.wearx2.shared.util.shortTimeAgo
 import com.jwoglom.wearx2.shared.util.twoDecimalPlaces1000Unit
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.asExecutor
 import timber.log.Timber
+import java.time.temporal.ChronoUnit
 
 var dataStore = DataStore()
 val LocalDataStore = compositionLocalOf { dataStore }
@@ -290,7 +292,7 @@ class MainActivity : ComponentActivity(), MessageApi.MessageListener, GoogleApiC
             }
             is CGMStatusResponse -> {
                 dataStore.cgmSessionState.value = when (message.sessionState) {
-                    SessionState.SESSION_ACTIVE -> "Active"
+                    SessionState.SESSION_ACTIVE -> "${shortTimeAgo(message.sensorStartedTimestampInstant.plus(10, ChronoUnit.DAYS), noPrefix=true)} left"
                     SessionState.SESSION_STOPPED -> "Stopped"
                     SessionState.SESSION_START_PENDING -> "Starting"
                     SessionState.SESSION_STOP_PENDING -> "Stopping"

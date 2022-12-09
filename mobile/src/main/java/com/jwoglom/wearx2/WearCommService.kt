@@ -604,7 +604,7 @@ fun confirmBolusRequestBaseNotification(context: Context?, title: String, text: 
     )
         .setContentTitle(title)
         .setContentText(text)
-        .setSmallIcon(R.drawable.pump)
+        .setSmallIcon(R.drawable.bolus_icon)
         .setTicker(title)
         .setPriority(Notification.PRIORITY_MAX) // for under android 26 compatibility
         .setAutoCancel(true)

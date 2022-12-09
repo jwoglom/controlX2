@@ -1,28 +1,17 @@
 package com.jwoglom.wearx2.presentation.ui
 
-/*
- * Copyright 2021 The Android Open Source Project
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     https://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
-
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.wrapContentSize
 import androidx.compose.material.ExperimentalMaterialApi
 import androidx.compose.material.icons.Icons
@@ -90,7 +79,6 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import timber.log.Timber
 
-
 @OptIn(ExperimentalMaterialApi::class)
 @Composable
 fun BolusScreen(
@@ -113,6 +101,15 @@ fun BolusScreen(
     var showCancelledDialog by remember { mutableStateOf(false) }
     var showCancellingDialog by remember { mutableStateOf(false) }
     var showApprovedDialog by remember { mutableStateOf(false) }
+
+    fun resetDialogs() {
+        showPermissionCheckDialog = false
+        showConfirmDialog = false
+        showInProgressDialog = false
+        showCancelledDialog = false
+        showCancellingDialog = false
+        showApprovedDialog = false
+    }
 
     val refreshScope = rememberCoroutineScope()
     var refreshing by remember { mutableStateOf(true) }
@@ -207,7 +204,8 @@ fun BolusScreen(
 
     val state = rememberPullRefreshState(refreshing, ::refresh)
 
-    LifecycleStateObserver(lifecycleOwner = LocalLifecycleOwner.current, onStop = {}) {
+    LifecycleStateObserver(lifecycleOwner = LocalLifecycleOwner.current, onStop = {
+    }) {
         sendPumpCommands(SendType.BUST_CACHE, commands)
     }
 
@@ -344,23 +342,27 @@ fun BolusScreen(
             }
 
             item {
-                CompactButton(
+                Spacer(modifier = Modifier.height(50.dp))
+                Button(
                     onClick = {
                         dataStore.bolusFinalConditions.value =
                             bolusCalcDecision(dataStore.bolusCalculatorBuilder.value)?.conditions
                         dataStore.bolusFinalParameters.value =
                             bolusCalcParameters(dataStore.bolusCalculatorBuilder.value)
                         performPermissionCheck()
-                    },
-                    enabled = true
+                    }
                 ) {
-                    Icon(
-                        imageVector = Icons.Filled.Check,
-                        contentDescription = "continue",
-                        modifier = Modifier
-                            .size(ButtonDefaults.SmallIconSize)
-                            .wrapContentSize(align = Alignment.Center),
-                    )
+                    Row() {
+                        Icon(
+                            imageVector = Icons.Filled.Check,
+                            contentDescription = "Bolus",
+                            modifier = Modifier
+                                .size(ButtonDefaults.SmallIconSize)
+                                .wrapContentSize(align = Alignment.Center),
+                        )
+                        Spacer(modifier = Modifier.width(20.dp))
+                        Text("Bolus")
+                    }
                 }
             }
 
@@ -463,24 +465,24 @@ fun BolusScreen(
                     }
                 },
                 positiveButton = {
-                    bolusPermissionResponse.value?.let {
-                        if (it.status == 0 && it.nackReason == BolusPermissionResponse.NackReason.PERMISSION_GRANTED) {
-                            Button(
-                                onClick = {
-                                    bolusPermissionResponse.value?.let {
-                                        if (it.status == 0 && it.nackReason == BolusPermissionResponse.NackReason.PERMISSION_GRANTED) {
+                    bolusFinalParameters.value?.let { finalParameters ->
+                        bolusPermissionResponse.value?.let { permissionResponse ->
+                            if (permissionResponse.status == 0 && permissionResponse.nackReason == BolusPermissionResponse.NackReason.PERMISSION_GRANTED && finalParameters.units >= 0.05) {
+                                Button(
+                                    onClick = {
+                                        if (permissionResponse.status == 0 && permissionResponse.nackReason == BolusPermissionResponse.NackReason.PERMISSION_GRANTED && finalParameters.units >= 0.05) {
                                             showConfirmDialog = false
                                             showInProgressDialog = true
                                             sendBolusRequestToPhone(dataStore.bolusFinalParameters.value)
                                         }
-                                    }
-                                },
-                                colors = ButtonDefaults.primaryButtonColors()
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Filled.Check,
-                                    contentDescription = "Deliver bolus"
-                                )
+                                    },
+                                    colors = ButtonDefaults.primaryButtonColors()
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Filled.Check,
+                                        contentDescription = "Deliver bolus"
+                                    )
+                                }
                             }
                         }
                     }
@@ -490,8 +492,9 @@ fun BolusScreen(
             ) {
                 Text(
                     text = bolusPermissionResponse.value?.let {
-                        when (it.status) {
-                            0 -> "Do you want to deliver the bolus?"
+                        when {
+                            bolusFinalParameters.value?.units == null || bolusFinalParameters.value?.units!! < 0.05 -> "Insulin amount too small."
+                            it.status == 0 -> "Do you want to deliver the bolus?"
                             else -> "Cannot deliver bolus: ${it.nackReason}"
                         }
                     } ?: "Invalid",
@@ -570,6 +573,8 @@ fun BolusScreen(
                 }
                 showCancellingDialog = false
                 showCancelledDialog = true
+                dataStore.bolusFinalConditions.value = null
+                dataStore.bolusFinalParameters.value = null
             }
         }
 

@@ -118,7 +118,6 @@ fun WearApp(
         // TODO: consider moving to ViewModel
         // Display value is passed down to various user input screens, for the slider and stepper
         // components specifically, to demonstrate how they work.
-        var displayValueForUserInput by remember { mutableStateOf(5) }
         var bolusUnitsUserInput by remember { mutableStateOf<Double?>(null) }
         var bolusCarbsGramsUserInput by remember { mutableStateOf<Int?>(null) }
         var bolusBgMgdlUserInput by remember { mutableStateOf<Int?>(null) }

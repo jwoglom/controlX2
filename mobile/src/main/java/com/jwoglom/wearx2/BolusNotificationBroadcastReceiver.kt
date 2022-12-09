@@ -81,7 +81,8 @@ public class BolusNotificationBroadcastReceiver : BroadcastReceiver(),
                         context, notifId, confirmBolusRequestBaseNotification(
                             context,
                             "Requesting Bolus",
-                            "${bolusSummaryText(intentRequest)} will be delivered"
+                            "${bolusSummaryText(intentRequest)} " +
+                                    "will be delivered"
                         )
                     )
                 }
