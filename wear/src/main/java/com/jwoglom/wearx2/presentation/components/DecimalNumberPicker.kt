@@ -69,6 +69,7 @@ fun DecimalNumberPicker(
     rotaryScrollCalc: (Float) -> Float = {weight -> weight},
     labelColors: Colors = MaterialTheme.colors,
 ) {
+    Timber.d("DecimalNumberPicker: defaultNumber=$defaultNumber maxNumber=$maxNumber label=$label")
     // Omit scaling according to Settings > Display > Font size for this screen,
     val typography = MaterialTheme.typography.copy(
         display1 = MaterialTheme.typography.display1.copy(

@@ -241,6 +241,7 @@ fun LandingScreen(
                 Chip(
                     onClick = {
                         swipeDismissableNavController.navigate(Screen.Bolus.route)
+                        resetBolusDataStoreState(dataStore)
                     },
                     label = {
                         Text(

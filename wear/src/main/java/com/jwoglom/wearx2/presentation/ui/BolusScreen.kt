@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.wrapContentSize
 import androidx.compose.material.ExperimentalMaterialApi
@@ -63,6 +64,7 @@ import com.jwoglom.pumpx2.pump.messages.response.currentStatus.BolusCalcDataSnap
 import com.jwoglom.pumpx2.pump.messages.response.currentStatus.LastBGResponse
 import com.jwoglom.wearx2.LocalDataStore
 import com.jwoglom.wearx2.R
+import com.jwoglom.wearx2.presentation.DataStore
 import com.jwoglom.wearx2.presentation.components.LifecycleStateObserver
 import com.jwoglom.wearx2.presentation.components.LineTextDescription
 import com.jwoglom.wearx2.shared.util.snakeCaseToSpace
@@ -250,10 +252,14 @@ fun BolusScreen(
 
             val autofilledBg = dataStore.bolusCalculatorBuilder.value?.glucoseMgdl?.orElse(null)
             dataStore.bolusBGDisplayedText.value = when {
-                bolusBgMgdlUserInput != null -> "$bolusBgMgdlUserInput"
+                bolusBgMgdlUserInput != null -> "Entered: $bolusBgMgdlUserInput"
                 autofilledBg != null -> "From CGM: $autofilledBg"
                 else -> "Not Entered"
             }
+        }
+
+        LaunchedEffect (Unit) {
+            scalingLazyListState.animateScrollToItem(0)
         }
 
         ScalingLazyColumn(
@@ -263,6 +269,9 @@ fun BolusScreen(
         ) {
             item {
                 val bolusUnitsDisplayedText = dataStore.bolusUnitsDisplayedText.observeAsState()
+
+                // Signify we have drawn the content of the first screen
+                ReportFullyDrawn()
 
                 Chip(
                     onClick = {
@@ -285,6 +294,7 @@ fun BolusScreen(
                         )
                     },
                     modifier = Modifier.fillMaxWidth()
+                        .padding(top = 35.dp)
                 )
             }
 
@@ -373,7 +383,7 @@ fun BolusScreen(
                 )
             }
 
-            items(10) { index ->
+            items(5) { index ->
                 val bolusCalculatorBuilder = dataStore.bolusCalculatorBuilder.observeAsState()
                 val conditions = sortConditions(bolusCalculatorBuilder.value?.conditions)
 
@@ -383,7 +393,7 @@ fun BolusScreen(
                         fontSize = 12.sp,
                     )
                 } else {
-                    Spacer(modifier = Modifier.height(1.dp))
+                    Spacer(modifier = Modifier.height(0.dp))
                 }
             }
         }
@@ -734,4 +744,11 @@ fun BolusScreen(
             }
         }
     }
+}
+
+fun resetBolusDataStoreState(dataStore: DataStore) {
+    dataStore.bolusCancelResponse.value = null
+    dataStore.bolusInitiateResponse.value = null
+    dataStore.bolusCalculatorBuilder.value = null
+    dataStore.bolusCurrentParameters.value = null
 }

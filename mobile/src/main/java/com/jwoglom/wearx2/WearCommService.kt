@@ -112,6 +112,13 @@ class WearCommService : WearableListenerService(), GoogleApiClient.ConnectionCal
             centralChallengeResponse: CentralChallengeResponse?
         ) {
             PumpState.getPairingCode(context)?.let {
+                val wait = (250..750).random()
+                Timber.i("Waiting to pair to avoid race condition with tconnect app for ${wait}ms")
+                Thread.sleep(wait.toLong())
+                if (Packetize.txId.get() > 0) {
+                    Timber.w("Not pairing because it looks like the tconnect app has already paired with txId=${Packetize.txId.get()}")
+                    return
+                }
                 Timber.i("Pairing with saved code: $it centralChallenge: $centralChallengeResponse")
                 pair(peripheral, centralChallengeResponse, it)
                 wearCommHandler?.sendMessage(

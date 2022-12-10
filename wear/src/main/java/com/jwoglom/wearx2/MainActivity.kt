@@ -1,8 +1,6 @@
 package com.jwoglom.wearx2
 
-import android.content.Context
 import android.content.Intent
-import android.content.SharedPreferences
 import android.os.Bundle
 import android.widget.Toast
 import androidx.activity.ComponentActivity
@@ -18,7 +16,6 @@ import com.google.android.gms.wearable.MessageApi
 import com.google.android.gms.wearable.MessageEvent
 import com.google.android.gms.wearable.Wearable
 import com.jwoglom.pumpx2.pump.messages.Message
-import com.jwoglom.pumpx2.pump.messages.calculator.BolusCalcUnits
 import com.jwoglom.pumpx2.pump.messages.calculator.BolusParameters
 import com.jwoglom.pumpx2.pump.messages.models.InsulinUnit
 import com.jwoglom.pumpx2.pump.messages.request.control.InitiateBolusRequest
@@ -49,8 +46,6 @@ import com.jwoglom.wearx2.presentation.WearApp
 import com.jwoglom.wearx2.presentation.navigation.Screen
 import com.jwoglom.wearx2.shared.InitiateConfirmedBolusSerializer
 import com.jwoglom.wearx2.shared.PumpMessageSerializer
-import com.jwoglom.wearx2.shared.PumpQualifyingEventsSerializer
-import com.jwoglom.wearx2.shared.util.DebugTree
 import com.jwoglom.wearx2.shared.util.setupTimber
 import com.jwoglom.wearx2.util.SendType
 import com.jwoglom.wearx2.shared.util.shortTime
@@ -272,7 +267,7 @@ class MainActivity : ComponentActivity(), MessageApi.MessageListener, GoogleApiC
                 dataStore.cgmHighLowState.value = when (message.cgmAlertIcon) {
                     CGMAlertIcon.LOW -> "LOW"
                     CGMAlertIcon.HIGH -> "HIGH"
-                    else -> ""
+                    else -> "IN_RANGE"
                 }
                 dataStore.cgmDeltaArrow.value = message.cgmTrendIcon.arrow()
                 dataStore.basalStatus.value = when (message.basalStatusIcon) {
@@ -335,7 +330,7 @@ class MainActivity : ComponentActivity(), MessageApi.MessageListener, GoogleApiC
 
     override fun onMessageReceived(messageEvent: MessageEvent) {
         Timber.i("wear onMessageReceived: ${messageEvent.path} ${String(messageEvent.data)}")
-        var text = ""
+        var connectionStatusText = ""
         when (messageEvent.path) {
             "/to-wear/connected" -> {
                 if (inWaitingState()) {
@@ -344,6 +339,7 @@ class MainActivity : ComponentActivity(), MessageApi.MessageListener, GoogleApiC
                     }
                     sendMessage("/to-phone/is-pump-connected", "".toByteArray())
                 }
+                connectionStatusText = "Waiting to find pump"
             }
             "/to-wear/initiate-confirmed-bolus" -> {
                 if (inWaitingState()) {
@@ -395,7 +391,7 @@ class MainActivity : ComponentActivity(), MessageApi.MessageListener, GoogleApiC
                     }
                     sendMessage("/to-phone/is-pump-connected", "".toByteArray())
                 }
-                text = "Found model ${String(messageEvent.data)}"
+                connectionStatusText = "Connecting to pump"
             }
             "/from-pump/entered-pairing-code" -> {
                 if (inWaitingState()) {
@@ -404,6 +400,7 @@ class MainActivity : ComponentActivity(), MessageApi.MessageListener, GoogleApiC
                     }
                     sendMessage("/to-phone/is-pump-connected", "".toByteArray())
                 }
+                connectionStatusText = "Pairing to pump"
             }
             "/from-pump/missing-pairing-code" -> {
                 if (inWaitingState()) {
@@ -412,6 +409,7 @@ class MainActivity : ComponentActivity(), MessageApi.MessageListener, GoogleApiC
                     }
                     sendMessage("/to-phone/is-pump-connected", "".toByteArray())
                 }
+                connectionStatusText = "Missing pairing code"
             }
             "/from-pump/pump-connected" -> {
                 if (inWaitingState()) {
@@ -419,7 +417,7 @@ class MainActivity : ComponentActivity(), MessageApi.MessageListener, GoogleApiC
                         navController.navigate(initialRoute)
                     }
                 }
-                text = "Connected to ${String(messageEvent.data)}"
+                connectionStatusText = ""
             }
             "/from-pump/pump-disconnected" -> {
                 if (inWaitingState()) {
@@ -431,13 +429,13 @@ class MainActivity : ComponentActivity(), MessageApi.MessageListener, GoogleApiC
                         Toast.makeText(applicationContext, "Disconnected", Toast.LENGTH_SHORT).show()
                     }
                 }
-                text = "Disconnected from ${String(messageEvent.data)}"
+                connectionStatusText = "Reconnecting"
             }
             "/from-pump/pump-critical-error" -> {
-                text = "Error: ${String(messageEvent.data)}"
+                connectionStatusText = "Error: ${String(messageEvent.data)}"
             }
             "/from-pump/receive-qualifying-event" -> {
-                text = "Event: ${PumpQualifyingEventsSerializer.fromBytes(messageEvent.data)}"
+                //bottomText = "Event: ${PumpQualifyingEventsSerializer.fromBytes(messageEvent.data)}"
             }
             "/from-pump/receive-message" -> {
                 if (inWaitingState()) {
@@ -447,7 +445,6 @@ class MainActivity : ComponentActivity(), MessageApi.MessageListener, GoogleApiC
                 }
                 val pumpMessage = PumpMessageSerializer.fromBytes(messageEvent.data)
                 onPumpMessageReceived(pumpMessage, false)
-                text = "${pumpMessage}"
             }
             "/from-pump/receive-cached-message" -> {
                 if (inWaitingState()) {
@@ -457,7 +454,6 @@ class MainActivity : ComponentActivity(), MessageApi.MessageListener, GoogleApiC
                 }
                 val pumpMessage = PumpMessageSerializer.fromBytes(messageEvent.data)
                 onPumpMessageReceived(pumpMessage, true)
-                text = "${pumpMessage}"
             }
             // HACK: we need to forward a command from the phone activity to the phone service
             // and this is the easiest way to do it
@@ -465,8 +461,10 @@ class MainActivity : ComponentActivity(), MessageApi.MessageListener, GoogleApiC
                 Timber.i("forwarding to-pump message from phone to wear to phone ${String(messageEvent.data)}")
                 sendMessage(messageEvent.path, messageEvent.data)
             }
-            else -> text = "? ${String(messageEvent.data)}"
+            else -> {
+                Timber.w("receive? ${String(messageEvent.data)}")
+            }
         }
-        Timber.i("wear text: $text")
+        dataStore.connectionStatus.value = connectionStatusText
     }
 }

@@ -12,6 +12,7 @@ import com.jwoglom.pumpx2.pump.messages.response.currentStatus.LastBGResponse
 import timber.log.Timber
 
 class DataStore {
+    val connectionStatus = MutableLiveData<String>()
     val batteryPercent = MutableLiveData<Int>()
     val iobUnits = MutableLiveData<Double>()
     val cartridgeRemainingUnits = MutableLiveData<Int>()
@@ -47,6 +48,7 @@ class DataStore {
     var bolusCancelResponse = MutableLiveData<CancelBolusResponse>()
 
     init {
+        connectionStatus.observeForever { t -> Timber.i("DataStore.connectionStatus=$t") }
         batteryPercent.observeForever { t -> Timber.i("DataStore.batteryPercent=$t") }
         iobUnits.observeForever { t -> Timber.i("DataStore.iobUnits=$t") }
         cartridgeRemainingUnits.observeForever { t -> Timber.i("DataStore.cartridgeRemainingUnits=$t") }

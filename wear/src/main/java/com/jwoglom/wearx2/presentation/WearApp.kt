@@ -41,20 +41,23 @@ import androidx.wear.compose.material.MaterialTheme
 import androidx.wear.compose.material.PositionIndicator
 import androidx.wear.compose.material.Scaffold
 import androidx.wear.compose.material.ScalingLazyListState
-import androidx.wear.compose.material.Text
 import androidx.wear.compose.material.Vignette
 import androidx.wear.compose.material.VignettePosition
 import androidx.wear.compose.navigation.SwipeDismissableNavHost
 import androidx.wear.compose.navigation.composable
 import androidx.wear.compose.navigation.currentBackStackEntryAsState
 import androidx.wear.compose.navigation.rememberSwipeDismissableNavController
+import com.google.android.horologist.compose.layout.fadeAway
+import com.google.android.horologist.compose.layout.fadeAwayScalingLazyList
 import com.jwoglom.pumpx2.pump.messages.Message
 import com.jwoglom.pumpx2.pump.messages.calculator.BolusParameters
 import com.jwoglom.pumpx2.pump.messages.request.currentStatus.GlobalMaxBolusSettingsRequest
 import com.jwoglom.wearx2.LocalDataStore
+import com.jwoglom.wearx2.presentation.components.BottomText
 import com.jwoglom.wearx2.presentation.components.DecimalNumberPicker
 import com.jwoglom.wearx2.presentation.components.SingleNumberPicker
-import com.jwoglom.wearx2.presentation.components.TopCGMReadingText
+import com.jwoglom.wearx2.presentation.components.CurrentCGMText
+import com.jwoglom.wearx2.presentation.components.TopText
 import com.jwoglom.wearx2.presentation.navigation.DestinationScrollType
 import com.jwoglom.wearx2.presentation.navigation.SCROLL_TYPE_NAV_ARGUMENT
 import com.jwoglom.wearx2.presentation.navigation.Screen
@@ -122,8 +125,6 @@ fun WearApp(
         var bolusCarbsGramsUserInput by remember { mutableStateOf<Int?>(null) }
         var bolusBgMgdlUserInput by remember { mutableStateOf<Int?>(null) }
 
-        var bolusUnitsDefaultNumber by remember { mutableStateOf<Double?>(null) }
-
 
         LaunchedEffect (Unit) {
             navController.navigate(Screen.WaitingForPhone.route)
@@ -138,12 +139,35 @@ fun WearApp(
             timeText = {
                 // Scaffold places time at top of screen to follow Material Design guidelines.
                 // (Time is hidden while scrolling.)
-
-                //key() {
-                key (currentBackStackEntry?.destination?.route) {
-                    if (currentBackStackEntry?.destination?.route == Screen.Landing.route) {
-                        TopCGMReadingText()
+                val timeTextModifier =
+                    when (scrollType) {
+                        DestinationScrollType.SCALING_LAZY_COLUMN_SCROLLING -> {
+                            val scrollViewModel: ScalingLazyListStateViewModel =
+                                viewModel(currentBackStackEntry!!)
+                            Modifier.fadeAwayScalingLazyList {
+                                scrollViewModel.scrollState
+                            }
+                        }
+                        DestinationScrollType.COLUMN_SCROLLING -> {
+                            val viewModel: ScrollStateViewModel =
+                                viewModel(currentBackStackEntry!!)
+                            Modifier.fadeAway {
+                                viewModel.scrollState
+                            }
+                        }
+                        DestinationScrollType.TIME_TEXT_ONLY -> {
+                            Modifier
+                        }
+                        else -> {
+                            null
+                        }
                     }
+
+                key (currentBackStackEntry?.destination?.route) {
+                    TopText(
+                        modifier = timeTextModifier ?: Modifier,
+                        visible = timeTextModifier != null,
+                    )
                 }
             },
             vignette = {
@@ -233,6 +257,7 @@ fun WearApp(
                     )
 
                     RequestFocusOnResume(focusRequester)
+                    BottomText()
                 }
 
                 composable(
@@ -256,8 +281,7 @@ fun WearApp(
                         bolusUnitsUserInput = bolusUnitsUserInput,
                         bolusCarbsGramsUserInput = bolusCarbsGramsUserInput,
                         bolusBgMgdlUserInput = bolusBgMgdlUserInput,
-                        onClickUnits = { default ->
-                            bolusUnitsDefaultNumber = default
+                        onClickUnits = {
                             navController.navigate(Screen.BolusSelectUnitsScreen.route)
                         },
                         onClickCarbs = {
@@ -274,9 +298,11 @@ fun WearApp(
                     )
 
                     RequestFocusOnResume(focusRequester)
+                    BottomText()
                 }
 
                 composable(Screen.BolusSelectUnitsScreen.route) {
+                    val currentUnits = LocalDataStore.current.bolusCalculatorBuilder.value?.insulinUnits?.total
                     val maxBolusAmount = LocalDataStore.current.maxBolusAmount.observeAsState()
                     LaunchedEffect(Unit) {
                         sendPumpCommands(SendType.CACHED, listOf(GlobalMaxBolusSettingsRequest()))
@@ -294,17 +320,23 @@ fun WearApp(
                             null -> 30
                             else -> maxBolusAmount.value!!
                         },
-                        defaultNumber = bolusUnitsDefaultNumber,
+                        defaultNumber = when {
+                            currentUnits != null -> currentUnits
+                            else -> 0.0
+                         },
                     )
+                    BottomText()
                 }
 
                 composable(Screen.BolusSelectCarbsScreen.route) {
+                    val currentCarbs = LocalDataStore.current.bolusCalculatorBuilder.value?.carbsValueGrams?.orElse(null)
                     SingleNumberPicker(
                         label = "Carbs",
                         maxNumber = 100,
-                        defaultNumber = when (bolusCarbsGramsUserInput) {
-                            null -> 0
-                            else -> bolusCarbsGramsUserInput!!
+                        defaultNumber = when {
+                            currentCarbs != null -> currentCarbs
+                            bolusCarbsGramsUserInput != null -> bolusCarbsGramsUserInput!!
+                            else -> 0
                         },
                         rotaryScrollCalc = rotaryExponentialScroll(1.3f),
                         onNumberConfirm = {
@@ -312,27 +344,36 @@ fun WearApp(
                             bolusCarbsGramsUserInput = it
                         }
                     )
+                    BottomText()
                 }
 
                 composable(Screen.BolusSelectBGScreen.route) {
+                    val currentBG = LocalDataStore.current.bolusCalculatorBuilder.value?.glucoseMgdl?.orElse(null)
+
                     SingleNumberPicker(
                         label = "BG",
                         minNumber = 40,
                         maxNumber = 400,
-                        defaultNumber = 120,
+                        defaultNumber = when {
+                            currentBG != null -> currentBG
+                            else -> 120
+                        },
                         rotaryScrollCalc = rotaryExponentialScroll(1.5f),
                         onNumberConfirm = {
                             navController.popBackStack()
                             bolusBgMgdlUserInput = it
                         }
                     )
+                    BottomText()
                 }
 
                 composable(Screen.BolusBlocked.route) {
                     FullScreenText("A bolus was blocked which didn't match the units requested. This is either a bug in WearX2 or another actor is attempting to bolus via your phone and/or watch unsuccessfully.")
+                    BottomText()
                 }
                 composable(Screen.BolusNotEnabled.route) {
                     FullScreenText("A bolus was requested, but actions affecting insulin delivery are not enabled in the phone app settings.")
+                    BottomText()
                 }
             }
         }
