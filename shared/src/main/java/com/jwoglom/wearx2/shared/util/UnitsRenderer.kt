@@ -3,12 +3,15 @@ package com.jwoglom.wearx2.shared.util
 import com.jwoglom.pumpx2.pump.messages.models.InsulinUnit
 import java.time.Duration
 import java.time.Instant
+import java.time.ZoneId
 import java.time.ZoneOffset.UTC
+import java.util.*
 import kotlin.math.abs
 
 
 fun shortTimeAgo(time: Instant, noPrefix: Boolean? = false): String {
-    val now = Instant.now()
+    val offsetSeconds = TimeZone.getDefault().getOffset(Date().time) / 1000
+    val now = Instant.now().plusSeconds(offsetSeconds.toLong())
     val diff = Duration.between(time, now)
     var ret = ""
     if (diff.toDays() != 0L) {

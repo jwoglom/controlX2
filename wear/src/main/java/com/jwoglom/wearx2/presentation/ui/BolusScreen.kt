@@ -399,12 +399,13 @@ fun BolusScreen(
         ) {
             val bolusFinalParameters = dataStore.bolusFinalParameters.observeAsState()
 
-            IndeterminateProgressIndicator(text = bolusFinalParameters.value?.units?.let { "Requesting permission" } ?: "Invalid request!")
+            IndeterminateProgressIndicator(text = bolusFinalParameters.value?.units?.let { "Requesting permission" }
+                ?: "Invalid request!")
         }
 
         val bolusPermissionResponse = dataStore.bolusPermissionResponse.observeAsState()
 
-        LaunchedEffect (bolusPermissionResponse.value) {
+        LaunchedEffect(bolusPermissionResponse.value) {
             if (bolusPermissionResponse.value != null && showPermissionCheckDialog) {
                 showConfirmDialog = true
                 showPermissionCheckDialog = false
@@ -478,13 +479,20 @@ fun BolusScreen(
                         }
                     }
                 },
-                icon = { Image(painterResource(R.drawable.bolus_icon), "Bolus icon", Modifier.size(24.dp)) },
+                icon = {
+                    Image(
+                        painterResource(R.drawable.bolus_icon),
+                        "Bolus icon",
+                        Modifier.size(24.dp)
+                    )
+                },
                 scrollState = scrollState,
             ) {
                 Text(
                     text = bolusPermissionResponse.value?.let {
                         when {
-                            bolusFinalParameters.value?.units == null || bolusFinalParameters.value?.units!! < 0.05 -> "Insulin amount too small."
+                            bolusFinalParameters.value == null || bolusFinalParameters.value?.units == null -> ""
+                            bolusFinalParameters.value?.units!! < 0.05 -> "Insulin amount too small."
                             it.status == 0 -> "Do you want to deliver the bolus?"
                             else -> "Cannot deliver bolus: ${it.nackReason}"
                         }
@@ -503,6 +511,14 @@ fun BolusScreen(
             },
             scrollState = scrollState
         ) {
+            val bolusCancelResponse = dataStore.bolusCancelResponse.observeAsState()
+
+            LaunchedEffect(bolusCancelResponse.value) {
+                if (bolusCancelResponse.value != null) {
+                    showCancelledDialog = true
+                }
+            }
+
             IndeterminateProgressIndicator(text = "The bolus is being cancelled..")
         }
 
@@ -510,6 +526,7 @@ fun BolusScreen(
             showDialog = showCancelledDialog,
             onDismissRequest = {
                 showCancelledDialog = false
+                onClickLanding()
             },
             scrollState = scrollState
         ) {
@@ -522,7 +539,11 @@ fun BolusScreen(
                             CancelStatus.SUCCESS ->
                                 "The bolus was cancelled."
                             CancelStatus.FAILED ->
-                                "The bolus could not be cancelled: ${snakeCaseToSpace(bolusCancelResponse.value?.reason.toString())}"
+                                "The bolus could not be cancelled: ${
+                                    snakeCaseToSpace(
+                                        bolusCancelResponse.value?.reason.toString()
+                                    )
+                                }"
                             else -> "Please check your pump to confirm whether the bolus was cancelled."
                         },
                         textAlign = TextAlign.Center,
@@ -542,7 +563,13 @@ fun BolusScreen(
                     }
                 },
                 positiveButton = {},
-                icon = { Image(painterResource(R.drawable.bolus_icon), "Bolus icon", Modifier.size(24.dp)) },
+                icon = {
+                    Image(
+                        painterResource(R.drawable.bolus_icon),
+                        "Bolus icon",
+                        Modifier.size(24.dp)
+                    )
+                },
                 scrollState = scrollState,
             )
         }
@@ -572,7 +599,6 @@ fun BolusScreen(
         Dialog(
             showDialog = showInProgressDialog,
             onDismissRequest = {
-                cancelBolus()
                 showInProgressDialog = false
             },
             scrollState = scrollState
@@ -581,13 +607,13 @@ fun BolusScreen(
             val bolusInitiateResponse = dataStore.bolusInitiateResponse.observeAsState()
             val bolusCancelResponse = dataStore.bolusCancelResponse.observeAsState()
 
-            LaunchedEffect (bolusInitiateResponse.value) {
+            LaunchedEffect(bolusInitiateResponse.value) {
                 if (bolusInitiateResponse.value != null) {
                     showApprovedDialog = true
                 }
             }
 
-            LaunchedEffect (bolusCancelResponse.value) {
+            LaunchedEffect(bolusCancelResponse.value) {
                 if (bolusCancelResponse.value != null) {
                     showCancelledDialog = true
                 }
@@ -598,7 +624,7 @@ fun BolusScreen(
                     Text(
                         text = when (bolusFinalParameters.value) {
                             null -> ""
-                            else -> "${bolusFinalParameters.value!!.units}u Bolus"
+                            else -> "${bolusFinalParameters.value?.units}u Bolus"
                         },
                         textAlign = TextAlign.Center,
                         color = MaterialTheme.colors.onBackground
@@ -618,7 +644,13 @@ fun BolusScreen(
                 },
                 positiveButton = {},
                 scrollState = scrollState,
-                icon = { Image(painterResource(R.drawable.bolus_icon), "Bolus icon", Modifier.size(24.dp)) }
+                icon = {
+                    Image(
+                        painterResource(R.drawable.bolus_icon),
+                        "Bolus icon",
+                        Modifier.size(24.dp)
+                    )
+                }
             ) {
                 Text(
                     text = "A notification was sent to acknowledge the request.",
@@ -666,14 +698,32 @@ fun BolusScreen(
                     }
                 },
                 positiveButton = {},
-                icon = { Image(painterResource(R.drawable.bolus_icon), "Bolus icon", Modifier.size(24.dp)) },
+                icon = {
+                    Image(
+                        painterResource(R.drawable.bolus_icon),
+                        "Bolus icon",
+                        Modifier.size(24.dp)
+                    )
+                },
                 scrollState = scrollState,
             ) {
                 Text(
                     text = when {
                         bolusInitiateResponse.value != null -> when {
-                            bolusInitiateResponse.value!!.wasBolusInitiated() -> "The ${twoDecimalPlaces(bolusFinalParameters.value!!.units)}u bolus was initiated."
-                            else -> "The bolus could not be delivered: ${snakeCaseToSpace(bolusInitiateResponse.value!!.statusType.toString())}"
+                            bolusInitiateResponse.value!!.wasBolusInitiated() -> "The ${
+                                bolusFinalParameters.value?.let {
+                                    twoDecimalPlaces(
+                                        it.units
+                                    )
+                                }
+                            }u bolus was initiated."
+                            else -> "The bolus could not be delivered: ${
+                                bolusInitiateResponse.value?.let {
+                                    snakeCaseToSpace(
+                                        it.statusType.toString()
+                                    )
+                                }
+                            }"
                         }
                         else -> "The bolus status is unknown. Please check your pump to identify the status of the bolus."
                     },
