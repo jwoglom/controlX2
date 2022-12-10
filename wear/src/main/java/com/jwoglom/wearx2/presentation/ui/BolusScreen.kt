@@ -90,6 +90,7 @@ fun BolusScreen(
     onClickLanding: () -> Unit,
     sendPumpCommands: (SendType, List<Message>) -> Unit,
     sendPhoneBolusRequest: (Int, BolusParameters) -> Unit,
+    resetSavedBolusEnteredState: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     var showPermissionCheckDialog by remember { mutableStateOf(false) }
@@ -446,7 +447,7 @@ fun BolusScreen(
                 title = {
                     Text(
                         text = bolusFinalParameters.value?.units?.let { "${twoDecimalPlaces(it)}u Bolus" }
-                            ?: "Invalid",
+                            ?: "",
                         textAlign = TextAlign.Center,
                         color = MaterialTheme.colors.onBackground
                     )
@@ -506,7 +507,7 @@ fun BolusScreen(
                             it.status == 0 -> "Do you want to deliver the bolus?"
                             else -> "Cannot deliver bolus: ${it.nackReason}"
                         }
-                    } ?: "Invalid",
+                    } ?: "",
                     textAlign = TextAlign.Center,
                     style = MaterialTheme.typography.body2,
                     color = MaterialTheme.colors.onBackground
@@ -537,10 +538,12 @@ fun BolusScreen(
             onDismissRequest = {
                 showCancelledDialog = false
                 onClickLanding()
+                resetBolusDataStoreState(dataStore)
             },
             scrollState = scrollState
         ) {
             val bolusCancelResponse = dataStore.bolusCancelResponse.observeAsState()
+            val bolusInitiateResponse = dataStore.bolusInitiateResponse.observeAsState()
 
             Alert(
                 title = {
@@ -549,11 +552,14 @@ fun BolusScreen(
                             CancelStatus.SUCCESS ->
                                 "The bolus was cancelled."
                             CancelStatus.FAILED ->
-                                "The bolus could not be cancelled: ${
-                                    snakeCaseToSpace(
-                                        bolusCancelResponse.value?.reason.toString()
-                                    )
-                                }"
+                                when (bolusInitiateResponse.value) {
+                                    null -> "A bolus request was not sent to the pump, so there is nothing to cancel."
+                                    else -> "The bolus could not be cancelled: ${
+                                        snakeCaseToSpace(
+                                            bolusCancelResponse.value?.reason.toString()
+                                        )
+                                    }"
+                                }
                             else -> "Please check your pump to confirm whether the bolus was cancelled."
                         },
                         textAlign = TextAlign.Center,
@@ -564,6 +570,7 @@ fun BolusScreen(
                     Button(
                         onClick = {
                             onClickLanding()
+                            resetBolusDataStoreState(dataStore)
                         },
                         colors = ButtonDefaults.secondaryButtonColors(),
                         modifier = Modifier.fillMaxWidth()
@@ -595,7 +602,7 @@ fun BolusScreen(
             refreshScope.launch {
                 while (dataStore.bolusCancelResponse.value == null) {
                     withContext(Dispatchers.IO) {
-                        Thread.sleep(500)
+                        Thread.sleep(250)
                     }
                     performCancel()
                 }
@@ -603,6 +610,7 @@ fun BolusScreen(
                 showCancelledDialog = true
                 dataStore.bolusFinalConditions.value = null
                 dataStore.bolusFinalParameters.value = null
+                resetSavedBolusEnteredState()
             }
         }
 
@@ -675,6 +683,9 @@ fun BolusScreen(
             showDialog = showApprovedDialog,
             onDismissRequest = {
                 showApprovedDialog = false
+                onClickLanding()
+                resetBolusDataStoreState(dataStore)
+                resetSavedBolusEnteredState()
             },
             scrollState = scrollState
         ) {
@@ -747,8 +758,11 @@ fun BolusScreen(
 }
 
 fun resetBolusDataStoreState(dataStore: DataStore) {
+    dataStore.bolusPermissionResponse.value = null
     dataStore.bolusCancelResponse.value = null
     dataStore.bolusInitiateResponse.value = null
     dataStore.bolusCalculatorBuilder.value = null
     dataStore.bolusCurrentParameters.value = null
+    dataStore.bolusFinalParameters.value = null
+    dataStore.bolusFinalConditions.value = null
 }

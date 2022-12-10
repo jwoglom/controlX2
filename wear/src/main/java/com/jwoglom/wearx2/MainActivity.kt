@@ -41,11 +41,13 @@ import com.jwoglom.pumpx2.pump.messages.response.currentStatus.InsulinStatusResp
 import com.jwoglom.pumpx2.pump.messages.response.currentStatus.LastBGResponse
 import com.jwoglom.pumpx2.pump.messages.response.currentStatus.LastBolusStatusAbstractResponse
 import com.jwoglom.pumpx2.pump.messages.response.historyLog.BolusDeliveryHistoryLog
+import com.jwoglom.pumpx2.pump.messages.response.qualifyingEvent.QualifyingEvent
 import com.jwoglom.wearx2.presentation.DataStore
 import com.jwoglom.wearx2.presentation.WearApp
 import com.jwoglom.wearx2.presentation.navigation.Screen
 import com.jwoglom.wearx2.shared.InitiateConfirmedBolusSerializer
 import com.jwoglom.wearx2.shared.PumpMessageSerializer
+import com.jwoglom.wearx2.shared.PumpQualifyingEventsSerializer
 import com.jwoglom.wearx2.shared.util.setupTimber
 import com.jwoglom.wearx2.util.SendType
 import com.jwoglom.wearx2.shared.util.shortTime
@@ -323,7 +325,19 @@ class MainActivity : ComponentActivity(), MessageApi.MessageListener, GoogleApiC
                 dataStore.bolusInitiateResponse.value = message
             }
             is CancelBolusResponse -> {
-                dataStore.bolusCancelResponse.value = message
+                if (dataStore.bolusCancelResponse.value == null || message.wasCancelled()) {
+                    dataStore.bolusCancelResponse.value = message
+                } else {
+                    Timber.w("skipping population of bolusCancelResponse: $message because a successful cancellation already existed in the state: ${dataStore.bolusCancelResponse.value}");
+                }
+            }
+        }
+    }
+
+    private fun onPumpQualifyingEventReceived(events: Set<QualifyingEvent>) {
+        events.forEach { event ->
+            when (event) {
+                else -> {}
             }
         }
     }
@@ -435,7 +449,8 @@ class MainActivity : ComponentActivity(), MessageApi.MessageListener, GoogleApiC
                 connectionStatusText = "Error: ${String(messageEvent.data)}"
             }
             "/from-pump/receive-qualifying-event" -> {
-                //bottomText = "Event: ${PumpQualifyingEventsSerializer.fromBytes(messageEvent.data)}"
+                val pumpEvents = PumpQualifyingEventsSerializer.fromBytes(messageEvent.data)
+                onPumpQualifyingEventReceived(pumpEvents)
             }
             "/from-pump/receive-message" -> {
                 if (inWaitingState()) {

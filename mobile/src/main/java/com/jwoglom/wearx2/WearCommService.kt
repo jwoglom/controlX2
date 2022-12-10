@@ -36,6 +36,7 @@ import com.jwoglom.pumpx2.pump.messages.response.qualifyingEvent.QualifyingEvent
 import com.jwoglom.pumpx2.shared.Hex
 import com.jwoglom.wearx2.shared.InitiateConfirmedBolusSerializer
 import com.jwoglom.wearx2.shared.PumpMessageSerializer
+import com.jwoglom.wearx2.shared.PumpQualifyingEventsSerializer
 import com.jwoglom.wearx2.shared.WearCommServiceCodes
 import com.jwoglom.wearx2.shared.util.DebugTree
 import com.jwoglom.wearx2.shared.util.setupTimber
@@ -104,7 +105,7 @@ class WearCommService : WearableListenerService(), GoogleApiClient.ConnectionCal
                     command(it.get())
                 }
             }
-            //wearCommHandler?.sendMessage("/from-pump/receive-qualifying-event", PumpQualifyingEventsSerializer.toBytes(events))
+            wearCommHandler?.sendMessage("/from-pump/receive-qualifying-event", PumpQualifyingEventsSerializer.toBytes(events))
         }
 
         override fun onWaitingForPairingCode(
@@ -238,7 +239,7 @@ class WearCommService : WearableListenerService(), GoogleApiClient.ConnectionCal
                 WearCommServiceCodes.SEND_PUMP_COMMANDS_BUST_CACHE_BULK.ordinal -> {
                     Timber.i("wearCommHandler send commands bust cache raw: ${String(msg.obj as ByteArray)}")
                     PumpMessageSerializer.fromBulkBytes(msg.obj as ByteArray).forEach {
-                        if (lastResponseMessage.containsKey(Pair(it.characteristic, it.responseOpCode))) {
+                        if (lastResponseMessage.containsKey(Pair(it.characteristic, it.responseOpCode)) && !isBolusCommand(it)) {
                             Timber.i("wearCommHandler busted cache: $it")
                             lastResponseMessage.remove(Pair(it.characteristic, it.responseOpCode))
                         }
@@ -253,11 +254,11 @@ class WearCommService : WearableListenerService(), GoogleApiClient.ConnectionCal
                 WearCommServiceCodes.CACHED_PUMP_COMMANDS_BULK.ordinal -> {
                     Timber.i("wearCommHandler cached pump commands raw: ${String(msg.obj as ByteArray)}")
                     PumpMessageSerializer.fromBulkBytes(msg.obj as ByteArray).forEach {
-                        if (lastResponseMessage.containsKey(Pair(it.characteristic, it.responseOpCode))) {
+                        if (lastResponseMessage.containsKey(Pair(it.characteristic, it.responseOpCode)) && !isBolusCommand(it)) {
                             val response = lastResponseMessage.get(Pair(it.characteristic, it.responseOpCode))
                             Timber.i("wearCommHandler cached hit: $response")
                             wearCommHandler?.sendMessage("/from-pump/receive-cached-message", PumpMessageSerializer.toBytes(response))
-                        } else if (this@WearCommService::pump.isInitialized && pump.isConnected) {
+                        } else if (this@WearCommService::pump.isInitialized && pump.isConnected && !isBolusCommand(it)) {
                             Timber.i("wearCommHandler cached miss: $it")
                             pump.command(it)
                         } else {
@@ -278,11 +279,16 @@ class WearCommService : WearableListenerService(), GoogleApiClient.ConnectionCal
                         sendMessage("/to-wear/bolus-blocked-signature", "WearCommHandler".toByteArray())
                     } else if (this@WearCommService::pump.isInitialized && pump.isConnected && isBolusCommand(pumpMsg)) {
                         Timber.i("wearCommHandler send bolus command with valid signature: $pumpMsg")
+                        if (!isInsulinDeliveryEnabled()) {
+                            Timber.e("No insulin delivery messages enabled -- blocking bolus command $pumpMsg")
+                            sendMessage("/to-wear/bolus-not-enabled", "from_self".toByteArray())
+                            return
+                        }
                         try {
                             pump.command(pumpMsg)
                         } catch (e: Packetize.ActionsAffectingInsulinDeliveryNotEnabledInPumpX2Exception) {
                             Timber.e(e)
-                            sendMessage("/to-wear/bolus-not-enabled", "".toByteArray())
+                            sendMessage("/to-wear/bolus-not-enabled", "from_pumpx2_lib".toByteArray())
                         }
                     } else {
                         Timber.w("wearCommHandler not sending command due to pump state: $pump")

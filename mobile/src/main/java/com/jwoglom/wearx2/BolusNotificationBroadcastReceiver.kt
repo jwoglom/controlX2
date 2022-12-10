@@ -187,18 +187,6 @@ public class BolusNotificationBroadcastReceiver : BroadcastReceiver(),
         val currentBolusToConfirm = getCurrentBolusToConfirm(context)
 
         val intentRequest = PumpMessageSerializer.fromBytes(intentRequestBytes)
-        if (!intentRequest?.cargo.contentEquals(currentBolusToConfirm?.cargo) || intentRequest !is InitiateBolusRequest) {
-            Timber.w("BolusNotificationBroadcastReceiver mismatched intent $intentRequest $currentBolusToConfirm")
-            reply(
-                context,
-                notifId,
-                confirmBolusRequestBaseNotification(context, "Bolus Error", "Mismatched intent.")
-            )
-            resetPrefs(context)
-            return null
-        }
-
-
         if (checkBolusTimeExpired(context)) {
             Timber.e("Bolus expired: $intentRequest")
             reply(
@@ -213,6 +201,18 @@ public class BolusNotificationBroadcastReceiver : BroadcastReceiver(),
             resetPrefs(context)
             return null
         }
+
+        if (!intentRequest?.cargo.contentEquals(currentBolusToConfirm?.cargo) || intentRequest !is InitiateBolusRequest) {
+            Timber.w("BolusNotificationBroadcastReceiver mismatched intent $intentRequest $currentBolusToConfirm")
+            reply(
+                context,
+                notifId,
+                confirmBolusRequestBaseNotification(context, "Bolus Error", "Mismatched intent.")
+            )
+            resetPrefs(context)
+            return null
+        }
+
 
         return intentRequest
     }

@@ -72,6 +72,7 @@ fun LandingScreen(
     sendPumpCommands: (SendType, List<Message>) -> Unit,
     sendPhoneOpenActivity: () -> Unit,
     sendPhoneOpenTconnect: () -> Unit,
+    resetSavedBolusEnteredState: () -> Unit,
     swipeDismissableNavController: NavHostController,
     modifier: Modifier = Modifier,
 ) {
@@ -240,8 +241,9 @@ fun LandingScreen(
 
                 Chip(
                     onClick = {
-                        swipeDismissableNavController.navigate(Screen.Bolus.route)
+                        resetSavedBolusEnteredState()
                         resetBolusDataStoreState(dataStore)
+                        swipeDismissableNavController.navigate(Screen.Bolus.route)
                     },
                     label = {
                         Text(

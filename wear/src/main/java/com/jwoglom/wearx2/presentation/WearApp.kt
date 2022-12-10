@@ -125,6 +125,11 @@ fun WearApp(
         var bolusCarbsGramsUserInput by remember { mutableStateOf<Int?>(null) }
         var bolusBgMgdlUserInput by remember { mutableStateOf<Int?>(null) }
 
+        val resetSavedBolusEnteredState: () -> Unit = {
+            bolusUnitsUserInput = null
+            bolusCarbsGramsUserInput = null
+            bolusBgMgdlUserInput = null
+        }
 
         LaunchedEffect (Unit) {
             navController.navigate(Screen.WaitingForPhone.route)
@@ -254,6 +259,7 @@ fun WearApp(
                         sendPumpCommands = sendPumpCommands,
                         sendPhoneOpenActivity = sendPhoneOpenActivity,
                         sendPhoneOpenTconnect = sendPhoneOpenTconnect,
+                        resetSavedBolusEnteredState = resetSavedBolusEnteredState,
                     )
 
                     RequestFocusOnResume(focusRequester)
@@ -295,6 +301,7 @@ fun WearApp(
                         },
                         sendPumpCommands = sendPumpCommands,
                         sendPhoneBolusRequest = sendPhoneBolusRequest,
+                        resetSavedBolusEnteredState = resetSavedBolusEnteredState,
                     )
 
                     RequestFocusOnResume(focusRequester)
