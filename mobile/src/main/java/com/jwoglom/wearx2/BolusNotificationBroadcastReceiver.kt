@@ -32,6 +32,13 @@ public class BolusNotificationBroadcastReceiver : BroadcastReceiver(),
 
     override fun onReceive(context: Context?, intent: Intent?) {
         Timber.i("BolusNotificationBroadcastReceiver $context $intent")
+
+        mApiClient = GoogleApiClient.Builder(context!!)
+            .addApi(Wearable.API)
+            .addConnectionCallbacks(this@BolusNotificationBroadcastReceiver)
+            .addOnConnectionFailedListener(this@BolusNotificationBroadcastReceiver)
+            .build()
+
         val action = intent?.getStringExtra("action")
         val notifId = getCurrentNotificationId(context)
         when (action) {
@@ -53,18 +60,7 @@ public class BolusNotificationBroadcastReceiver : BroadcastReceiver(),
                         }"
                     )
 
-                    mApiClient = GoogleApiClient.Builder(context!!)
-                        .addApi(Wearable.API)
-                        .addConnectionCallbacks(this@BolusNotificationBroadcastReceiver)
-                        .addOnConnectionFailedListener(this@BolusNotificationBroadcastReceiver)
-                        .build()
-
-                    mApiClient.connect()
-                    while (!mApiClient.isConnected && mApiClient.hasConnectedApi(Wearable.API)) {
-                        Timber.d("BolusNotificationBroadcastReceiver is waiting on mApiClient connection")
-                        Thread.sleep(250)
-                    }
-
+                    waitForApiClient()
                     sendMessage("/to-wear/initiate-confirmed-bolus", rawBytes)
                     if (!PumpState.actionsAffectingInsulinDeliveryEnabled()) {
                         // The same message will appear on the wearable
@@ -77,13 +73,26 @@ public class BolusNotificationBroadcastReceiver : BroadcastReceiver(),
                         )
                         return
                     }
+
+                    val cancelIntent =
+                        Intent(context, BolusNotificationBroadcastReceiver::class.java).apply {
+                            putExtra("action", "CANCEL")
+                            putExtra("bolusId", intentRequest.bolusID)
+                        }
+                    val cancelPendingIntent = PendingIntent.getBroadcast(
+                        context,
+                        2003,
+                        cancelIntent,
+                        PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_ONE_SHOT
+                    )
+
                     reply(
                         context, notifId, confirmBolusRequestBaseNotification(
                             context,
                             "Requesting Bolus",
                             "${bolusSummaryText(intentRequest)} " +
                                     "will be delivered"
-                        )
+                        ).addAction(R.drawable.decline, "Cancel", cancelPendingIntent)
                     )
                 }
             }
@@ -101,7 +110,7 @@ public class BolusNotificationBroadcastReceiver : BroadcastReceiver(),
                                     "The pump reported that it could not initiate the bolus: ${initiateResponse.statusType}"
                                 )
                             )
-                            resetPrefs(context)
+                            resetBolusPrefs(context)
                             return
                         }
 
@@ -116,7 +125,7 @@ public class BolusNotificationBroadcastReceiver : BroadcastReceiver(),
                                     "Please check your pump to see if the bolus was delivered."
                                 )
                             )
-                            resetPrefs(context)
+                            resetBolusPrefs(context)
                             return
                         }
 
@@ -142,6 +151,18 @@ public class BolusNotificationBroadcastReceiver : BroadcastReceiver(),
                     }
                 }
             }
+            "REJECT" -> {
+                reply(
+                    context, notifId, confirmBolusRequestBaseNotification(
+                        context,
+                        "Bolus Rejected By Phone",
+                        "The bolus will not be completed."
+                    )
+                )
+                resetBolusPrefs(context)
+                waitForApiClient()
+                sendMessage("/to-wear/bolus-rejected", "from_phone".toByteArray())
+            }
             "CANCEL" -> {
                 val bolusId = intent.getIntExtra("bolusId", 0)
 
@@ -152,20 +173,21 @@ public class BolusNotificationBroadcastReceiver : BroadcastReceiver(),
                         PumpMessageSerializer.toBytes(CancelBolusRequest(bolusId))
                     )
                     Thread.sleep(500)
+                    waitForApiClient()
                 }
             }
             else -> {
-                Timber.w("BolusNotificationBroadcastReceiver rejected action: $action ${intent?.extras}")
+                Timber.w("BolusNotificationBroadcastReceiver request invalid: $action ${intent?.extras}")
                 reply(
                     context,
                     notifId,
                     confirmBolusRequestBaseNotification(
                         context,
-                        "Bolus Rejected",
+                        "Bolus Receiver Request Invalid",
                         "The bolus will not be delivered."
                     )
                 )
-                resetPrefs(context)
+                resetBolusPrefs(context)
             }
         }
     }
@@ -180,7 +202,7 @@ public class BolusNotificationBroadcastReceiver : BroadcastReceiver(),
                 notifId,
                 confirmBolusRequestBaseNotification(context, "Bolus Error", "Invalid intent.")
             )
-            resetPrefs(context)
+            resetBolusPrefs(context)
             return null
         }
 
@@ -198,7 +220,22 @@ public class BolusNotificationBroadcastReceiver : BroadcastReceiver(),
                     "The bolus request expired: $intentRequest"
                 )
             )
-            resetPrefs(context)
+            resetBolusPrefs(context)
+            return null
+        }
+
+        if (currentBolusToConfirm == null) {
+            Timber.e("No current bolus to confirm, bolus request invalid: $intentRequest")
+            reply(
+                context,
+                notifId,
+                confirmBolusRequestBaseNotification(
+                    context,
+                    "Bolus Request Invalid",
+                    "The bolus request was invalid: $intentRequest"
+                )
+            )
+            resetBolusPrefs(context)
             return null
         }
 
@@ -209,7 +246,7 @@ public class BolusNotificationBroadcastReceiver : BroadcastReceiver(),
                 notifId,
                 confirmBolusRequestBaseNotification(context, "Bolus Error", "Mismatched intent.")
             )
-            resetPrefs(context)
+            resetBolusPrefs(context)
             return null
         }
 
@@ -262,8 +299,11 @@ public class BolusNotificationBroadcastReceiver : BroadcastReceiver(),
         return PumpMessageSerializer.fromBytes(intentResponseBytes) as InitiateBolusResponse
     }
 
-    private fun resetPrefs(context: Context?) {
-        prefs(context)?.edit()?.remove("initiateBolusRequest")?.apply()
+    private fun resetBolusPrefs(context: Context?) {
+        prefs(context)?.edit()
+            ?.remove("initiateBolusRequest")
+            ?.remove("initiateBolusTime")
+            ?.apply()
     }
 
     private fun getCurrentNotificationId(context: Context?): Int {
@@ -307,6 +347,14 @@ public class BolusNotificationBroadcastReceiver : BroadcastReceiver(),
     override fun onConnectionFailed(result: ConnectionResult) {
         Timber.i("broadcastReceiver onConnectionFailed: $result")
         mApiClient.connect()
+    }
+
+    private fun waitForApiClient() {
+        mApiClient.connect()
+        while (!mApiClient.isConnected && mApiClient.hasConnectedApi(Wearable.API)) {
+            Timber.d("BolusNotificationBroadcastReceiver is waiting on mApiClient connection")
+            Thread.sleep(100)
+        }
     }
 
     fun sendMessage(path: String, message: ByteArray) {

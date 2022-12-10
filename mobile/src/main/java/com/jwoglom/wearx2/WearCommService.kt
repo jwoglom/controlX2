@@ -113,13 +113,6 @@ class WearCommService : WearableListenerService(), GoogleApiClient.ConnectionCal
             centralChallengeResponse: CentralChallengeResponse?
         ) {
             PumpState.getPairingCode(context)?.let {
-                val wait = (250..750).random()
-                Timber.i("Waiting to pair to avoid race condition with tconnect app for ${wait}ms")
-                Thread.sleep(wait.toLong())
-                if (Packetize.txId.get() > 0) {
-                    Timber.w("Not pairing because it looks like the tconnect app has already paired with txId=${Packetize.txId.get()}")
-                    return
-                }
                 Timber.i("Pairing with saved code: $it centralChallenge: $centralChallengeResponse")
                 pair(peripheral, centralChallengeResponse, it)
                 wearCommHandler?.sendMessage(
@@ -133,8 +126,15 @@ class WearCommService : WearableListenerService(), GoogleApiClient.ConnectionCal
         }
 
         override fun onInitialPumpConnection(peripheral: BluetoothPeripheral?) {
-            super.onInitialPumpConnection(peripheral)
             lastPeripheral = peripheral
+            val wait = (250..750).random()
+            Timber.i("Waiting to pair onInitialPumpConnection to avoid race condition with tconnect app for ${wait}ms")
+            Thread.sleep(wait.toLong())
+            if (Packetize.txId.get() > 0) {
+                Timber.w("Not pairing in onInitialPumpConnection because it looks like the tconnect app has already paired with txId=${Packetize.txId.get()}")
+                return
+            }
+            super.onInitialPumpConnection(peripheral)
         }
 
         override fun onPumpConnected(peripheral: BluetoothPeripheral?) {
@@ -374,6 +374,10 @@ class WearCommService : WearableListenerService(), GoogleApiClient.ConnectionCal
                     Timber.e("pump not initialized")
                 }
             }
+            "/to-phone/bolus-cancel" -> {
+                Timber.i("bolus state cancelled")
+                resetBolusPrefs(this)
+            }
             "/to-phone/initiate-confirmed-bolus" -> {
                 if (this::pump.isInitialized && pump.isConnected && pump.lastPeripheral != null) {
                     val secretKey = prefs(this)?.getString("initiateBolusSecret", "") ?: ""
@@ -516,7 +520,7 @@ class WearCommService : WearableListenerService(), GoogleApiClient.ConnectionCal
             putExtra("action", "INITIATE_RESPONSE")
             putExtra("response", PumpMessageSerializer.toBytes(response))
         }
-        startService(intent)
+        applicationContext.startService(intent)
     }
 
     private fun makeNotif(id: Int, notif: Notification) {
@@ -585,6 +589,13 @@ class WearCommService : WearableListenerService(), GoogleApiClient.ConnectionCal
 
     private fun prefs(context: Context): SharedPreferences? {
         return context.getSharedPreferences("WearX2", MODE_PRIVATE)
+    }
+
+    private fun resetBolusPrefs(context: Context) {
+        prefs(context)?.edit()
+            ?.remove("initiateBolusRequest")
+            ?.remove("initiateBolusTime")
+            ?.apply()
     }
 
     private fun isInsulinDeliveryEnabled(): Boolean {

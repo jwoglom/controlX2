@@ -42,5 +42,6 @@ sealed class Screen(
     object BolusSelectBGScreen : Screen("BolusSelectBG")
     object BolusBlocked : Screen("BolusBlocked")
     object BolusNotEnabled : Screen("BolusNotEnabled")
+    object BolusRejectedOnPhone : Screen("BolusRejectedOnPhone")
 
 }

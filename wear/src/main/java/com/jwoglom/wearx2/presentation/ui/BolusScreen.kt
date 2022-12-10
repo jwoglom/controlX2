@@ -91,6 +91,7 @@ fun BolusScreen(
     sendPumpCommands: (SendType, List<Message>) -> Unit,
     sendPhoneBolusRequest: (Int, BolusParameters) -> Unit,
     resetSavedBolusEnteredState: () -> Unit,
+    sendPhoneBolusCancel: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     var showPermissionCheckDialog by remember { mutableStateOf(false) }
@@ -611,6 +612,7 @@ fun BolusScreen(
                 dataStore.bolusFinalConditions.value = null
                 dataStore.bolusFinalParameters.value = null
                 resetSavedBolusEnteredState()
+                sendPhoneBolusCancel()
             }
         }
 

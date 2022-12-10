@@ -2,6 +2,7 @@ package com.jwoglom.wearx2
 
 import android.content.Intent
 import android.os.Bundle
+import android.view.WindowManager
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -45,6 +46,7 @@ import com.jwoglom.pumpx2.pump.messages.response.qualifyingEvent.QualifyingEvent
 import com.jwoglom.wearx2.presentation.DataStore
 import com.jwoglom.wearx2.presentation.WearApp
 import com.jwoglom.wearx2.presentation.navigation.Screen
+import com.jwoglom.wearx2.presentation.ui.resetBolusDataStoreState
 import com.jwoglom.wearx2.shared.InitiateConfirmedBolusSerializer
 import com.jwoglom.wearx2.shared.PumpMessageSerializer
 import com.jwoglom.wearx2.shared.PumpQualifyingEventsSerializer
@@ -110,6 +112,10 @@ class MainActivity : ComponentActivity(), MessageApi.MessageListener, GoogleApiC
                 this.sendMessage("/to-phone/bolus-request", PumpMessageSerializer.toBytes(bolusRequest))
             }
 
+            val sendPhoneBolusCancel: () -> Unit = {
+                this.sendMessage("/to-phone/bolus-cancel", "".toByteArray())
+            }
+
             val sendPhoneOpenActivity: () -> Unit = {
                 this.sendMessage("/to-phone/open-activity", "".toByteArray())
             }
@@ -124,6 +130,7 @@ class MainActivity : ComponentActivity(), MessageApi.MessageListener, GoogleApiC
                 sendPumpCommands = sendPumpCommands,
                 sendPhoneConnectionCheck = sendPhoneConnectionCheck,
                 sendPhoneBolusRequest = sendPhoneBolusRequest,
+                sendPhoneBolusCancel = sendPhoneBolusCancel,
                 sendPhoneOpenActivity = sendPhoneOpenActivity,
                 sendPhoneOpenTconnect = sendPhoneOpenTconnect,
             )
@@ -398,6 +405,13 @@ class MainActivity : ComponentActivity(), MessageApi.MessageListener, GoogleApiC
                     navController.navigate(Screen.BolusNotEnabled.route)
                 }
             }
+            "/to-wear/bolus-rejected" -> {
+                Timber.w("bolus rejected")
+                runOnUiThread {
+                    navController.navigate(Screen.BolusRejectedOnPhone.route)
+                    resetBolusDataStoreState(dataStore)
+                }
+            }
             "/from-pump/pump-model" -> {
                 if (inWaitingState()) {
                     runOnUiThread {
@@ -428,6 +442,7 @@ class MainActivity : ComponentActivity(), MessageApi.MessageListener, GoogleApiC
             "/from-pump/pump-connected" -> {
                 if (inWaitingState()) {
                     runOnUiThread {
+                        setTurnScreenOn(true)
                         navController.navigate(initialRoute)
                     }
                 }

@@ -16,8 +16,11 @@ package com.jwoglom.wearx2.presentation
  * limitations under the License.
  */
 
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -30,6 +33,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.platform.LocalLifecycleOwner
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.repeatOnLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -37,12 +43,16 @@ import androidx.navigation.NavBackStackEntry
 import androidx.navigation.NavHostController
 import androidx.navigation.NavType
 import androidx.navigation.navArgument
+import androidx.wear.compose.material.Button
+import androidx.wear.compose.material.ButtonDefaults
 import androidx.wear.compose.material.MaterialTheme
 import androidx.wear.compose.material.PositionIndicator
 import androidx.wear.compose.material.Scaffold
 import androidx.wear.compose.material.ScalingLazyListState
+import androidx.wear.compose.material.Text
 import androidx.wear.compose.material.Vignette
 import androidx.wear.compose.material.VignettePosition
+import androidx.wear.compose.material.dialog.Alert
 import androidx.wear.compose.navigation.SwipeDismissableNavHost
 import androidx.wear.compose.navigation.composable
 import androidx.wear.compose.navigation.currentBackStackEntryAsState
@@ -53,6 +63,7 @@ import com.jwoglom.pumpx2.pump.messages.Message
 import com.jwoglom.pumpx2.pump.messages.calculator.BolusParameters
 import com.jwoglom.pumpx2.pump.messages.request.currentStatus.GlobalMaxBolusSettingsRequest
 import com.jwoglom.wearx2.LocalDataStore
+import com.jwoglom.wearx2.R
 import com.jwoglom.wearx2.presentation.components.BottomText
 import com.jwoglom.wearx2.presentation.components.DecimalNumberPicker
 import com.jwoglom.wearx2.presentation.components.SingleNumberPicker
@@ -67,6 +78,8 @@ import com.jwoglom.wearx2.presentation.ui.IndeterminateProgressIndicator
 import com.jwoglom.wearx2.presentation.ui.LandingScreen
 import com.jwoglom.wearx2.presentation.ui.ScalingLazyListStateViewModel
 import com.jwoglom.wearx2.presentation.ui.ScrollStateViewModel
+import com.jwoglom.wearx2.shared.util.snakeCaseToSpace
+import com.jwoglom.wearx2.shared.util.twoDecimalPlaces
 import com.jwoglom.wearx2.util.SendType
 import kotlin.math.abs
 import kotlin.math.pow
@@ -77,6 +90,7 @@ fun WearApp(
     navController: NavHostController = rememberSwipeDismissableNavController(),
     sendPumpCommands: (SendType, List<Message>) -> Unit,
     sendPhoneBolusRequest: (Int, BolusParameters) -> Unit,
+    sendPhoneBolusCancel: () -> Unit,
     sendPhoneConnectionCheck: () -> Unit,
     sendPhoneOpenActivity: () -> Unit,
     sendPhoneOpenTconnect: () -> Unit,
@@ -301,6 +315,7 @@ fun WearApp(
                         },
                         sendPumpCommands = sendPumpCommands,
                         sendPhoneBolusRequest = sendPhoneBolusRequest,
+                        sendPhoneBolusCancel = sendPhoneBolusCancel,
                         resetSavedBolusEnteredState = resetSavedBolusEnteredState,
                     )
 
@@ -380,6 +395,45 @@ fun WearApp(
                 }
                 composable(Screen.BolusNotEnabled.route) {
                     FullScreenText("A bolus was requested, but actions affecting insulin delivery are not enabled in the phone app settings.")
+                    BottomText()
+                }
+                composable(Screen.BolusRejectedOnPhone.route) {
+                    Alert(
+                        title = {
+                            Text(
+                                text = "Bolus Rejected on Phone",
+                                textAlign = TextAlign.Center,
+                                color = MaterialTheme.colors.onBackground
+                            )
+                        },
+                        negativeButton = {
+                            Button(
+                                onClick = {
+                                    navController.navigate(Screen.Landing.route)
+                                },
+                                colors = ButtonDefaults.secondaryButtonColors(),
+                                modifier = Modifier.fillMaxWidth()
+
+                            ) {
+                                Text("Cancel")
+                            }
+                        },
+                        positiveButton = {},
+                        icon = {
+                            Image(
+                                painterResource(R.drawable.bolus_icon),
+                                "Bolus icon",
+                                Modifier.size(24.dp)
+                            )
+                        },
+                    ) {
+                        Text(
+                            text = "The bolus request was rejected by the connected phone.",
+                            textAlign = TextAlign.Center,
+                            style = MaterialTheme.typography.body2,
+                            color = MaterialTheme.colors.onBackground
+                        )
+                    }
                     BottomText()
                 }
             }

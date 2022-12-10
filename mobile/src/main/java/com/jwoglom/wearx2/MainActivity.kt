@@ -48,7 +48,6 @@ import com.jwoglom.pumpx2.pump.messages.response.historyLog.BolusDeliveryHistory
 import com.jwoglom.pumpx2.pump.messages.response.historyLog.HistoryLogStreamResponse
 import com.jwoglom.pumpx2.pump.messages.util.MessageHelpers
 import com.jwoglom.wearx2.shared.PumpMessageSerializer
-import com.jwoglom.wearx2.shared.util.DebugTree
 import com.jwoglom.wearx2.shared.util.setupTimber
 import timber.log.Timber
 import java.lang.reflect.InvocationTargetException
@@ -713,7 +712,7 @@ class MainActivity : AppCompatActivity(), GoogleApiClient.ConnectionCallbacks, G
                 
                 There is NO WARRANTY IMPLIED OR EXPRESSED DUE TO USE OF THIS SOFTWARE. YOU ASSUME ALL RISK FOR ANY MALFUNCTIONS, BUGS, OR INSULIN DELIVERY ACTIONS.
                 
-                Are you sure you want to enable insulin delivery actions?
+                Are you sure you want to enable insulin delivery actions? The app will be restarted after enabling this setting.
                 """.trimIndent()
                 )
                 .setPositiveButton(
@@ -726,6 +725,8 @@ class MainActivity : AppCompatActivity(), GoogleApiClient.ConnectionCallbacks, G
                         true -> "Disable Insulin Delivery"
                         false -> "Enable Insulin Delivery"
                     }
+                    Thread.sleep(500)
+                    triggerAppReload(applicationContext)
                 }
                 .setNegativeButton(
                     "Cancel"
@@ -741,5 +742,14 @@ class MainActivity : AppCompatActivity(), GoogleApiClient.ConnectionCallbacks, G
                 false -> "Enable Insulin Delivery"
             }
         }
+    }
+
+    fun triggerAppReload(context: Context) {
+        val packageManager = context.packageManager
+        val intent = packageManager.getLaunchIntentForPackage(context.packageName)
+        val componentName = intent!!.component
+        val mainIntent = Intent.makeRestartActivityTask(componentName)
+        context.startActivity(mainIntent)
+        Runtime.getRuntime().exit(0)
     }
 }
