@@ -127,7 +127,7 @@ class WearCommService : WearableListenerService(), GoogleApiClient.ConnectionCal
 
         override fun onInitialPumpConnection(peripheral: BluetoothPeripheral?) {
             lastPeripheral = peripheral
-            val wait = (250..750).random()
+            val wait = (500..1000).random()
             Timber.i("Waiting to pair onInitialPumpConnection to avoid race condition with tconnect app for ${wait}ms")
             Thread.sleep(wait.toLong())
             if (Packetize.txId.get() > 0) {
@@ -140,7 +140,9 @@ class WearCommService : WearableListenerService(), GoogleApiClient.ConnectionCal
         override fun onPumpConnected(peripheral: BluetoothPeripheral?) {
             super.onPumpConnected(peripheral)
             lastPeripheral = peripheral
-            Timber.i("service onPumpConnected")
+            val wait = (100..250).random()
+            Timber.i("service onPumpConnected -- waiting for ${wait}ms to avoid race conditions")
+            Thread.sleep(wait.toLong())
             isConnected = true
             wearCommHandler?.sendMessage("/from-pump/pump-connected",
                 peripheral?.name!!.toByteArray()
@@ -191,6 +193,10 @@ class WearCommService : WearableListenerService(), GoogleApiClient.ConnectionCal
             Timber.i("Pump send command: $message")
             sendCommand(lastPeripheral, message)
             Thread.sleep(20) // artificially limit the rate at which we send requests to the pump (50rps)
+        }
+
+        override fun toString(): String {
+            return "Pump(isConnected=$isConnected, lastPeripheral=$lastPeripheral)"
         }
 
     }
@@ -357,6 +363,10 @@ class WearCommService : WearableListenerService(), GoogleApiClient.ConnectionCal
                     Intent(this, MainActivity::class.java)
                         .addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP)
                 )
+            }
+            "/to-phone/force-reload" -> {
+                Timber.i("force-reload")
+                triggerAppReload(applicationContext)
             }
             "/to-phone/is-pump-connected" -> {
                 if (this::pump.isInitialized && pump.isConnected && pump.lastPeripheral != null) {
@@ -600,6 +610,15 @@ class WearCommService : WearableListenerService(), GoogleApiClient.ConnectionCal
 
     private fun isInsulinDeliveryEnabled(): Boolean {
         return prefs(applicationContext)?.getBoolean("insulinDeliveryEnabled", false) ?: false
+    }
+
+    private fun triggerAppReload(context: Context) {
+        val packageManager = context.packageManager
+        val intent = packageManager.getLaunchIntentForPackage(context.packageName)
+        val componentName = intent!!.component
+        val mainIntent = Intent.makeRestartActivityTask(componentName)
+        context.startActivity(mainIntent)
+        Runtime.getRuntime().exit(0)
     }
 }
 

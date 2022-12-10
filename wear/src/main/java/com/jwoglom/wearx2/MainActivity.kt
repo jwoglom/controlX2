@@ -125,14 +125,17 @@ class MainActivity : ComponentActivity(), MessageApi.MessageListener, GoogleApiC
                 helper.startRemoteActivity(Intent("com.tandemdiabetes.tconnect."))
             }
 
+            val sendPhoneCommand: (String) -> Unit = {cmd ->
+                this.sendMessage("/to-phone/$cmd", "".toByteArray())
+            }
+
             WearApp(
                 navController = navController,
                 sendPumpCommands = sendPumpCommands,
                 sendPhoneConnectionCheck = sendPhoneConnectionCheck,
                 sendPhoneBolusRequest = sendPhoneBolusRequest,
                 sendPhoneBolusCancel = sendPhoneBolusCancel,
-                sendPhoneOpenActivity = sendPhoneOpenActivity,
-                sendPhoneOpenTconnect = sendPhoneOpenTconnect,
+                sendPhoneCommand = sendPhoneCommand,
             )
         }
 

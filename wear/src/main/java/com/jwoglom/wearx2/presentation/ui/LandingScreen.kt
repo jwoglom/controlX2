@@ -1,8 +1,12 @@
 package com.jwoglom.wearx2.presentation.ui
 
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
 import androidx.compose.material.ExperimentalMaterialApi
 import androidx.compose.material.pullrefresh.PullRefreshIndicator
 import androidx.compose.material.pullrefresh.pullRefresh
@@ -20,6 +24,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
 import androidx.navigation.NavHostController
 import androidx.wear.compose.material.AutoCenteringParams
@@ -52,6 +57,7 @@ import com.jwoglom.wearx2.dataStore
 import com.jwoglom.wearx2.presentation.components.FirstRowChip
 import com.jwoglom.wearx2.presentation.components.LifecycleStateObserver
 import com.jwoglom.wearx2.presentation.components.LineInfoChip
+import com.jwoglom.wearx2.presentation.components.MiniChip
 import com.jwoglom.wearx2.presentation.components.intervalOf
 import com.jwoglom.wearx2.presentation.defaultTheme
 import com.jwoglom.wearx2.presentation.greenTheme
@@ -70,8 +76,7 @@ fun LandingScreen(
     scalingLazyListState: ScalingLazyListState,
     focusRequester: FocusRequester,
     sendPumpCommands: (SendType, List<Message>) -> Unit,
-    sendPhoneOpenActivity: () -> Unit,
-    sendPhoneOpenTconnect: () -> Unit,
+    sendPhoneCommand: (String) -> Unit,
     resetSavedBolusEnteredState: () -> Unit,
     swipeDismissableNavController: NavHostController,
     modifier: Modifier = Modifier,
@@ -336,6 +341,16 @@ fun LandingScreen(
                         null -> "?"
                         else -> "${cgmTransmitterStatus.value}"
                     }
+                )
+            }
+
+            item {
+                MiniChip(
+                    onClick = {
+                        sendPhoneCommand("force-reload")
+                    },
+                    modifier = Modifier.padding(top = 25.dp),
+                    label = "Force service reload"
                 )
             }
 
