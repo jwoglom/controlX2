@@ -355,8 +355,6 @@ class WearCommService : WearableListenerService(), GoogleApiClient.ConnectionCal
             serviceLooper = looper
             wearCommHandler = WearCommHandler(looper)
 
-            var notification = createNotification()
-            startForeground(1, notification)
         // }
     }
 
@@ -435,6 +433,9 @@ class WearCommService : WearableListenerService(), GoogleApiClient.ConnectionCal
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         Timber.i("WearCommService onStartCommand $intent $flags $startId")
         Toast.makeText(this, "WearX2 service starting", Toast.LENGTH_SHORT).show()
+
+        var notification = createNotification()
+        startForeground(1, notification)
 
         // For each start request, send a message to start a job and deliver the
         // start ID so we know which request we're stopping when we finish the job
@@ -581,8 +582,11 @@ class WearCommService : WearableListenerService(), GoogleApiClient.ConnectionCal
         }
         notificationManager.createNotificationChannel(channel)
 
-        val intent = Intent(applicationContext, MainActivity::class.java)
-        val pendingIntent = PendingIntent.getActivity(this, 0, intent, FLAG_IMMUTABLE)
+        val pendingIntent: PendingIntent =
+            Intent(this, MainActivity::class.java).let { notificationIntent ->
+                PendingIntent.getActivity(this, 0, notificationIntent,
+                    PendingIntent.FLAG_IMMUTABLE)
+            }
 
         val builder: Notification.Builder = Notification.Builder(
             this,
