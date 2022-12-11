@@ -1,28 +1,25 @@
 package com.jwoglom.wearx2.presentation.components
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.TopAppBarDefaults
-import androidx.compose.material3.rememberTopAppBarState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.livedata.observeAsState
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.wear.compose.foundation.CurvedModifier
+import androidx.wear.compose.foundation.CurvedScope
+import androidx.wear.compose.foundation.CurvedTextStyle
+import androidx.wear.compose.foundation.background
 import androidx.wear.compose.material.LocalTextStyle
 import androidx.wear.compose.material.MaterialTheme
 import androidx.wear.compose.material.Text
+import androidx.wear.compose.material.curvedText
 import com.google.common.base.Strings
 import com.jwoglom.wearx2.LocalDataStore
+import com.jwoglom.wearx2.presentation.DataStore
+import com.jwoglom.wearx2.presentation.defaultTheme
 import com.jwoglom.wearx2.presentation.redTheme
 
 @Composable
@@ -60,5 +57,40 @@ fun CurrentCGMText(
         color = primaryColor,
         text = displayText,
         style = textStyle ?: LocalTextStyle.current,
+    )
+}
+
+
+fun CurvedScope.currentCGMTextCurved(
+    textStyle: CurvedTextStyle? = null,
+    cgmSessionState: String?,
+    cgmStatusText: String?,
+    cgmReading: Int?,
+    cgmDeltaArrow: String?,
+    cgmHighLowState: String?,
+) {
+    val displayText = when (cgmSessionState) {
+        "Starting", "Stopped", "Stopping", "Unknown" -> cgmStatusText
+        else -> when {
+            !Strings.isNullOrEmpty(cgmStatusText) -> cgmStatusText
+            else -> when {
+                cgmReading != null && cgmDeltaArrow != null -> "${cgmReading} ${cgmDeltaArrow}"
+                cgmReading != null -> "${cgmReading}"
+                else -> ""
+            }
+        }
+    }
+    val primaryColor = when (cgmHighLowState) {
+        "HIGH" -> redTheme.colors.secondary
+        "LOW" -> redTheme.colors.primary
+        else -> defaultTheme.colors.primary
+    }
+
+    curvedText(
+        modifier = CurvedModifier
+            .background(Color.Transparent),
+        color = primaryColor,
+        text = displayText ?: "",
+        style = textStyle ?: CurvedTextStyle(),
     )
 }
