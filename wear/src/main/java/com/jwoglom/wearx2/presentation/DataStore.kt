@@ -8,6 +8,7 @@ import com.jwoglom.pumpx2.pump.messages.response.control.BolusPermissionResponse
 import com.jwoglom.pumpx2.pump.messages.response.control.CancelBolusResponse
 import com.jwoglom.pumpx2.pump.messages.response.control.InitiateBolusResponse
 import com.jwoglom.pumpx2.pump.messages.response.currentStatus.BolusCalcDataSnapshotResponse
+import com.jwoglom.pumpx2.pump.messages.response.currentStatus.CurrentBolusStatusResponse
 import com.jwoglom.pumpx2.pump.messages.response.currentStatus.LastBGResponse
 import timber.log.Timber
 
@@ -46,6 +47,7 @@ class DataStore {
     var bolusPermissionResponse = MutableLiveData<BolusPermissionResponse>()
     var bolusInitiateResponse = MutableLiveData<InitiateBolusResponse>()
     var bolusCancelResponse = MutableLiveData<CancelBolusResponse>()
+    var bolusCurrentResponse = MutableLiveData<CurrentBolusStatusResponse>()
 
     init {
         connectionStatus.observeForever { t -> Timber.i("DataStore.connectionStatus=$t") }
@@ -82,5 +84,6 @@ class DataStore {
         bolusPermissionResponse.observeForever { t -> Timber.i("DataStore.bolusPermissionResponse=$t") }
         bolusInitiateResponse.observeForever { t -> Timber.i("DataStore.bolusInitiateResponse=$t") }
         bolusCancelResponse.observeForever { t -> Timber.i("DataStore.bolusCancelResponse=$t") }
+        bolusCurrentResponse.observeForever { t -> Timber.i("DataStore.bolusCurrentResponse=$t") }
     }
 }

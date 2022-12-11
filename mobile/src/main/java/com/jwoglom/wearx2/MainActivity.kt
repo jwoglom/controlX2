@@ -185,6 +185,21 @@ class MainActivity : AppCompatActivity(), GoogleApiClient.ConnectionCallbacks, G
 
         mApiClient.connect()
 
+        startWearCommService()
+    }
+
+
+    override fun onResume() {
+        if (!mApiClient.isConnected && !mApiClient.isConnecting) {
+            mApiClient.connect()
+        }
+
+        startBTPermissionsCheck()
+        startWearCommService()
+        super.onResume()
+    }
+
+    private fun startWearCommService() {
         // Start WearCommService
         val intent = Intent(applicationContext, WearCommService::class.java)
 
@@ -200,16 +215,6 @@ class MainActivity : AppCompatActivity(), GoogleApiClient.ConnectionCallbacks, G
                 Timber.i("WearCommService onServiceDisconnected")
             }
         }, BIND_AUTO_CREATE)
-    }
-
-
-    override fun onResume() {
-        if (!mApiClient.isConnected && !mApiClient.isConnecting) {
-            mApiClient.connect()
-        }
-
-        startBTPermissionsCheck()
-        super.onResume()
     }
 
     private fun sendMessage(path: String, message: ByteArray) {

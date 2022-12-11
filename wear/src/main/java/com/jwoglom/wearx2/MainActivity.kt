@@ -33,6 +33,7 @@ import com.jwoglom.pumpx2.pump.messages.response.currentStatus.ControlIQInfoAbst
 import com.jwoglom.pumpx2.pump.messages.response.currentStatus.ControlIQInfoAbstractResponse.UserModeType
 import com.jwoglom.pumpx2.pump.messages.response.currentStatus.CurrentBasalStatusResponse
 import com.jwoglom.pumpx2.pump.messages.response.currentStatus.CurrentBatteryAbstractResponse
+import com.jwoglom.pumpx2.pump.messages.response.currentStatus.CurrentBolusStatusResponse
 import com.jwoglom.pumpx2.pump.messages.response.currentStatus.CurrentEGVGuiDataResponse
 import com.jwoglom.pumpx2.pump.messages.response.currentStatus.GlobalMaxBolusSettingsResponse
 import com.jwoglom.pumpx2.pump.messages.response.currentStatus.HomeScreenMirrorResponse
@@ -125,7 +126,7 @@ class MainActivity : ComponentActivity(), MessageApi.MessageListener, GoogleApiC
 
             val sendPhoneOpenTconnect: () -> Unit = {
                 val helper = RemoteActivityHelper(application, Dispatchers.IO.asExecutor())
-                helper.startRemoteActivity(Intent("com.tandemdiabetes.tconnect."))
+                helper.startRemoteActivity(Intent("com.tandemdiabetes.tconnect"))
             }
 
             val sendPhoneCommand: (String) -> Unit = {cmd ->
@@ -366,6 +367,9 @@ class MainActivity : ComponentActivity(), MessageApi.MessageListener, GoogleApiC
                 } else {
                     Timber.w("skipping population of bolusCancelResponse: $message because a successful cancellation already existed in the state: ${dataStore.bolusCancelResponse.value}");
                 }
+            }
+            is CurrentBolusStatusResponse -> {
+                dataStore.bolusCurrentResponse.value = message
             }
         }
     }

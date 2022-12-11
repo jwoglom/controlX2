@@ -82,12 +82,12 @@ class PhoneCommService : WearableListenerService() {
         }
     }
 
-    override fun onPeerDisconnected(node: Node) {
-        Timber.i("onPeerDisconnected $node")
-        super.onPeerDisconnected(node)
-        currentlyConnected = false
-        disconnectedNotification("phone disconnected")
-    }
+//    override fun onPeerDisconnected(node: Node) {
+//        Timber.i("onPeerDisconnected $node")
+//        super.onPeerDisconnected(node)
+//        currentlyConnected = false
+//        disconnectedNotification("phone disconnected")
+//    }
 
     private fun disconnectedNotification(reason: String) {
         Thread {

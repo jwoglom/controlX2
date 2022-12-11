@@ -196,7 +196,7 @@ public class BolusNotificationBroadcastReceiver : BroadcastReceiver(),
         val intentRequestBytes = intent?.getByteArrayExtra("request")
         val notifId = getCurrentNotificationId(context)
         if (intentRequestBytes == null) {
-            Timber.w("BolusNotificationBroadcastReceiver invalid intent")
+            Timber.w("BolusNotificationBroadcastReceiver invalid intent: $intentRequestBytes ${intent?.extras}")
             reply(
                 context,
                 notifId,

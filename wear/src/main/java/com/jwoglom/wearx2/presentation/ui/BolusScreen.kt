@@ -57,10 +57,13 @@ import com.jwoglom.pumpx2.pump.messages.calculator.BolusParameters
 import com.jwoglom.pumpx2.pump.messages.request.control.BolusPermissionRequest
 import com.jwoglom.pumpx2.pump.messages.request.control.CancelBolusRequest
 import com.jwoglom.pumpx2.pump.messages.request.currentStatus.BolusCalcDataSnapshotRequest
+import com.jwoglom.pumpx2.pump.messages.request.currentStatus.CurrentBolusStatusRequest
 import com.jwoglom.pumpx2.pump.messages.request.currentStatus.LastBGRequest
 import com.jwoglom.pumpx2.pump.messages.response.control.BolusPermissionResponse
 import com.jwoglom.pumpx2.pump.messages.response.control.CancelBolusResponse.CancelStatus
 import com.jwoglom.pumpx2.pump.messages.response.currentStatus.BolusCalcDataSnapshotResponse
+import com.jwoglom.pumpx2.pump.messages.response.currentStatus.CurrentBolusStatusResponse
+import com.jwoglom.pumpx2.pump.messages.response.currentStatus.CurrentBolusStatusResponse.CurrentBolusStatus
 import com.jwoglom.pumpx2.pump.messages.response.currentStatus.LastBGResponse
 import com.jwoglom.wearx2.LocalDataStore
 import com.jwoglom.wearx2.R
@@ -261,7 +264,7 @@ fun BolusScreen(
             }
         }
 
-        LaunchedEffect (Unit) {
+        LaunchedEffect(Unit) {
             scalingLazyListState.animateScrollToItem(0)
         }
 
@@ -296,7 +299,8 @@ fun BolusScreen(
                             text = "${bolusUnitsDisplayedText.value}",
                         )
                     },
-                    modifier = Modifier.fillMaxWidth()
+                    modifier = Modifier
+                        .fillMaxWidth()
                         .padding(top = 35.dp)
                 )
             }
@@ -694,6 +698,7 @@ fun BolusScreen(
         ) {
             val bolusFinalParameters = dataStore.bolusFinalParameters.observeAsState()
             val bolusInitiateResponse = dataStore.bolusInitiateResponse.observeAsState()
+            val bolusCurrentResponse = dataStore.bolusCurrentResponse.observeAsState()
 
             Alert(
                 title = {
@@ -731,6 +736,20 @@ fun BolusScreen(
                 },
                 scrollState = scrollState,
             ) {
+                LaunchedEffect(Unit) {
+                    sendPumpCommands(SendType.BUST_CACHE, listOf(CurrentBolusStatusRequest()))
+                }
+
+                // When bolusCurrentResponse is updated, re-request it
+                LaunchedEffect(bolusCurrentResponse.value) {
+                    Timber.i("bolusCurrentResponse: ${bolusCurrentResponse.value}")
+                    // when a bolusId=0 is returned, the current bolus session has ended so the message
+                    // no longer contains any useful data.
+                    if (bolusCurrentResponse.value?.bolusId != 0) {
+                        sendPumpCommands(SendType.BUST_CACHE, listOf(CurrentBolusStatusRequest()))
+                    }
+                }
+
                 Text(
                     text = when {
                         bolusInitiateResponse.value != null -> when {
@@ -740,7 +759,16 @@ fun BolusScreen(
                                         it.units
                                     )
                                 }
-                            }u bolus was initiated."
+                            }u bolus ${
+                                when (bolusCurrentResponse.value) {
+                                    null -> "was initiated."
+                                    else -> when (bolusCurrentResponse.value!!.status) {
+                                        CurrentBolusStatus.REQUESTING -> "is being requested."
+                                        CurrentBolusStatus.DELIVERING -> "is being delivered."
+                                        else -> "was delivered."
+                                    }
+                                }
+                            }"
                             else -> "The bolus could not be delivered: ${
                                 bolusInitiateResponse.value?.let {
                                     snakeCaseToSpace(
