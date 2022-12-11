@@ -204,22 +204,36 @@ class WearCommService : WearableListenerService(), GoogleApiClient.ConnectionCal
     // Handler that receives messages from the thread
     private inner class WearCommHandler(looper: Looper) : Handler(looper) {
         override fun handleMessage(msg: Message) {
+            val handler = Handler(looper)
             when (msg.what) {
                 WearCommServiceCodes.INIT_PUMP_COMM.ordinal -> {
-                    Timber.i("wearCommHandler init pump class")
+                    Timber.i("wearCommHandler: init pump class")
                     pump = Pump()
                     tandemBTHandler = TandemBluetoothHandler.getInstance(applicationContext, pump, null)
                     while (true) {
                         try {
-                            Timber.i("Starting scan...")
+                            Timber.i("wearCommHandler: Starting scan...")
                             tandemBTHandler.startScan()
+                            break
                         } catch (e: SecurityException) {
-                            Timber.e("Waiting for BT permissions $e")
+                            Timber.e("wearCommHandler: Waiting for BT permissions $e")
                             Thread.sleep(500)
-                            continue
                         }
-                        break
                     }
+                    var postHandler: () -> Unit = {}
+                    val checkAndRerun: () -> Unit = {
+                        if (pump.isConnected) {
+                            Timber.i("wearCommHandler: pump connected")
+                        } else {
+                            Timber.i("wearCommHandler: Scan timed out. Retrying")
+                            tandemBTHandler.startScan()
+                            postHandler()
+                        }
+                    }
+                    postHandler = {
+                        handler.postDelayed(checkAndRerun, 10_000)
+                    }
+                    postHandler()
                 }
                 WearCommServiceCodes.SEND_PUMP_COMMAND.ordinal -> {
                     Timber.i("wearCommHandler send command raw: ${String(msg.obj as ByteArray)}")
