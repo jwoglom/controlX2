@@ -738,6 +738,15 @@ fun BolusScreen(
             ) {
                 LaunchedEffect(Unit) {
                     sendPumpCommands(SendType.BUST_CACHE, listOf(CurrentBolusStatusRequest()))
+                    refreshScope.launch {
+                        repeat(5) {
+                            Thread.sleep(1000)
+                            sendPumpCommands(
+                                SendType.BUST_CACHE,
+                                listOf(CurrentBolusStatusRequest())
+                            )
+                        }
+                    }
                 }
 
                 // When bolusCurrentResponse is updated, re-request it
@@ -747,6 +756,15 @@ fun BolusScreen(
                     // no longer contains any useful data.
                     if (bolusCurrentResponse.value?.bolusId != 0) {
                         sendPumpCommands(SendType.BUST_CACHE, listOf(CurrentBolusStatusRequest()))
+                        refreshScope.launch {
+                            repeat(5) {
+                                Thread.sleep(1000)
+                                sendPumpCommands(
+                                    SendType.BUST_CACHE,
+                                    listOf(CurrentBolusStatusRequest())
+                                )
+                            }
+                        }
                     }
                 }
 
