@@ -23,6 +23,8 @@ class DataStore {
     val basalRate = MutableLiveData<String>()
     var basalStatus = MutableLiveData<String>()
     val cgmSessionState = MutableLiveData<String>()
+    val cgmSessionExpireRelative = MutableLiveData<String>()
+    val cgmSessionExpireExact = MutableLiveData<String>()
     val cgmTransmitterStatus = MutableLiveData<String>()
     val cgmReading = MutableLiveData<Int>()
     val cgmDelta = MutableLiveData<Int>()
@@ -60,6 +62,8 @@ class DataStore {
         basalRate.observeForever { t -> Timber.i("DataStore.basalRate=$t") }
         basalStatus.observeForever { t -> Timber.i("DataStore.basalStatus=$t") }
         cgmSessionState.observeForever { t -> Timber.i("DataStore.cgmSessionState=$t") }
+        cgmSessionExpireExact.observeForever { t -> Timber.i("DataStore.cgmSessionExpireExact=$t") }
+        cgmSessionExpireRelative.observeForever { t -> Timber.i("DataStore.cgmSessionExpireRelative=$t") }
         cgmTransmitterStatus.observeForever { t -> Timber.i("DataStore.cgmTransmitterStatus=$t") }
         cgmReading.observeForever { t -> Timber.i("DataStore.cgmLastReading=$t") }
         cgmDelta.observeForever { t -> Timber.i("DataStore.cgmDelta=$t") }

@@ -1,11 +1,8 @@
 package com.jwoglom.wearx2.presentation.ui
 
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.ExperimentalMaterialApi
 import androidx.compose.material.pullrefresh.PullRefreshIndicator
@@ -28,14 +25,11 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
 import androidx.navigation.NavHostController
 import androidx.wear.compose.material.AutoCenteringParams
-import androidx.wear.compose.material.Button
 import androidx.wear.compose.material.Chip
 import androidx.wear.compose.material.ExperimentalWearMaterialApi
 import androidx.wear.compose.material.ScalingLazyColumn
 import androidx.wear.compose.material.ScalingLazyListState
 import androidx.wear.compose.material.Text
-import androidx.wear.compose.material.placeholderShimmer
-import androidx.wear.compose.material.rememberPlaceholderState
 import com.google.accompanist.flowlayout.FlowRow
 import com.google.android.horologist.compose.navscaffold.scrollableColumn
 import com.jwoglom.pumpx2.pump.PumpState
@@ -323,12 +317,22 @@ fun LandingScreen(
             }
 
             item {
-                val cgmSensorStatus = LocalDataStore.current.cgmSessionState.observeAsState()
+                var showExact by remember { mutableStateOf(false) }
+                val cgmSessionState = LocalDataStore.current.cgmSessionState.observeAsState()
+                val cgmSessionExpireRelative = LocalDataStore.current.cgmSessionExpireRelative.observeAsState()
+                val cgmSessionExpireExact = LocalDataStore.current.cgmSessionExpireExact.observeAsState()
                 LineInfoChip(
                     "CGM Sensor",
-                    when(cgmSensorStatus.value) {
+                    when (cgmSessionState.value) {
                         null -> "?"
-                        else -> "${cgmSensorStatus.value}"
+                        "Active" -> when (showExact) {
+                            true -> "${cgmSessionExpireExact.value}"
+                            false -> "${cgmSessionExpireRelative.value}"
+                        }
+                        else -> "${cgmSessionState.value}"
+                    },
+                    onClick = {
+                        showExact = !showExact
                     }
                 )
             }

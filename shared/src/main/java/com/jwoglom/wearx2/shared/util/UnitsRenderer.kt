@@ -5,11 +5,18 @@ import java.time.Duration
 import java.time.Instant
 import java.time.ZoneId
 import java.time.ZoneOffset.UTC
+import java.time.temporal.ChronoField
+import java.time.temporal.TemporalField
 import java.util.*
 import kotlin.math.abs
+import kotlin.time.DurationUnit
 
 
-fun shortTimeAgo(time: Instant, noPrefix: Boolean? = false): String {
+fun shortTimeAgo(
+    time: Instant,
+    prefix: String = "in",
+    suffix: String = "ago",
+): String {
     val offsetSeconds = TimeZone.getDefault().getOffset(Date().time) / 1000
     val now = Instant.now().plusSeconds(offsetSeconds.toLong())
     val diff = Duration.between(time, now)
@@ -26,26 +33,38 @@ fun shortTimeAgo(time: Instant, noPrefix: Boolean? = false): String {
     if (diff.getSeconds() < 60 && diff.getSeconds() > -60) {
         return "now"
     } else if (time.isBefore(now)) {
-        return "$ret ago"
+        return "$ret $suffix"
     } else {
-        if (noPrefix == true) {
-            return ret
-        }
-        return "in $ret"
+        return "$prefix $ret"
     }
 }
 
 fun shortTime(time: Instant): String {
     val zoned = time.atZone(UTC) // UTC, not the system timezone, for some reason. Perhaps TZ information is already encoded in the Tandem timestamps?
-    val hr = when(zoned.hour) {
+
+    val offsetSeconds = TimeZone.getDefault().getOffset(Date().time) / 1000
+    val now = Instant.now().plusSeconds(offsetSeconds.toLong())
+    val diff = Duration.between(time, now)
+
+    val date = when (diff.toDays() >= 1 || diff.toDays() <= -1) {
+        true -> "${zoned.month.value}/${zoned.dayOfMonth} "
+        else -> ""
+    }
+
+    val m = when (date.length) {
+        0 -> "m"
+        else -> ""
+    }
+
+    val hr = when (zoned.hour) {
         0, 12 -> 12
         else -> zoned.hour % 12
     }
-    val ampm = when(zoned.hour < 12) {
-        true -> "am"
-        false -> "pm"
+    val ampm = when (zoned.hour < 12) {
+        true -> "a${m}"
+        false -> "p${m}"
     }
-    return "${hr}:${String.format("%02d", zoned.minute)}${ampm}"
+    return "${date}${hr}:${String.format("%02d", zoned.minute)}${ampm}"
 }
 
 fun twoDecimalPlaces(decimal: Double): String {

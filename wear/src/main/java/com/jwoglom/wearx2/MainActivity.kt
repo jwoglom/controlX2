@@ -326,11 +326,19 @@ class MainActivity : ComponentActivity(), MessageApi.MessageListener, GoogleApiC
             }
             is CGMStatusResponse -> {
                 dataStore.cgmSessionState.value = when (message.sessionState) {
-                    SessionState.SESSION_ACTIVE -> "${shortTimeAgo(message.sensorStartedTimestampInstant.plus(10, ChronoUnit.DAYS), noPrefix=true)} left"
+                    SessionState.SESSION_ACTIVE -> "Active"
                     SessionState.SESSION_STOPPED -> "Stopped"
                     SessionState.SESSION_START_PENDING -> "Starting"
                     SessionState.SESSION_STOP_PENDING -> "Stopping"
                     else -> "Unknown"
+                }
+                dataStore.cgmSessionExpireRelative.value = when (message.sessionState) {
+                    SessionState.SESSION_ACTIVE -> shortTimeAgo(message.sensorStartedTimestampInstant.plus(10, ChronoUnit.DAYS), suffix = "left")
+                    else -> ""
+                }
+                dataStore.cgmSessionExpireExact.value = when (message.sessionState) {
+                    SessionState.SESSION_ACTIVE -> shortTime(message.sensorStartedTimestampInstant.plus(10, ChronoUnit.DAYS))
+                    else -> ""
                 }
                 dataStore.cgmTransmitterStatus.value = when (message.transmitterBatteryStatus) {
                     TransmitterBatteryStatus.ERROR -> "Error"
