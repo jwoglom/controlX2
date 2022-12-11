@@ -8,6 +8,7 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.runtime.compositionLocalOf
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
+import androidx.navigation.NavController
 import androidx.navigation.NavHostController
 import androidx.wear.compose.navigation.rememberSwipeDismissableNavController
 import androidx.wear.remote.interactions.RemoteActivityHelper
@@ -187,7 +188,7 @@ class MainActivity : ComponentActivity(), MessageApi.MessageListener, GoogleApiC
             initialRoute = newRoute
             if (!inWaitingState()) {
                 runOnUiThread {
-                    navController.navigate(newRoute)
+                    navController.navigateClearBackStack(newRoute)
                 }
             }
         }
@@ -384,7 +385,7 @@ class MainActivity : ComponentActivity(), MessageApi.MessageListener, GoogleApiC
             "/to-wear/connected" -> {
                 if (inWaitingState()) {
                     runOnUiThread {
-                        navController.navigate(Screen.WaitingToFindPump.route)
+                        navController.navigateClearBackStack(Screen.WaitingToFindPump.route)
                     }
                     sendMessage("/to-phone/is-pump-connected", "".toByteArray())
                 }
@@ -443,7 +444,7 @@ class MainActivity : ComponentActivity(), MessageApi.MessageListener, GoogleApiC
             "/from-pump/pump-model" -> {
                 if (inWaitingState()) {
                     runOnUiThread {
-                        navController.navigate(Screen.ConnectingToPump.route)
+                        navController.navigateClearBackStack(Screen.ConnectingToPump.route)
                     }
                     sendMessage("/to-phone/is-pump-connected", "".toByteArray())
                 }
@@ -452,7 +453,7 @@ class MainActivity : ComponentActivity(), MessageApi.MessageListener, GoogleApiC
             "/from-pump/entered-pairing-code" -> {
                 if (inWaitingState()) {
                     runOnUiThread {
-                        navController.navigate(Screen.PairingToPump.route)
+                        navController.navigateClearBackStack(Screen.PairingToPump.route)
                     }
                     sendMessage("/to-phone/is-pump-connected", "".toByteArray())
                 }
@@ -461,7 +462,7 @@ class MainActivity : ComponentActivity(), MessageApi.MessageListener, GoogleApiC
             "/from-pump/missing-pairing-code" -> {
                 if (inWaitingState()) {
                     runOnUiThread {
-                        navController.navigate(Screen.MissingPairingCode.route)
+                        navController.navigateClearBackStack(Screen.MissingPairingCode.route)
                     }
                     sendMessage("/to-phone/is-pump-connected", "".toByteArray())
                 }
@@ -471,7 +472,7 @@ class MainActivity : ComponentActivity(), MessageApi.MessageListener, GoogleApiC
                 if (inWaitingState()) {
                     runOnUiThread {
                         setTurnScreenOn(true)
-                        navController.navigate(initialRoute)
+                        navController.navigateClearBackStack(initialRoute)
                     }
                 }
                 connectionStatusText = ""
@@ -479,7 +480,7 @@ class MainActivity : ComponentActivity(), MessageApi.MessageListener, GoogleApiC
             "/from-pump/pump-disconnected" -> {
                 if (inWaitingState()) {
                     runOnUiThread {
-                        navController.navigate(Screen.PumpDisconnectedReconnecting.route)
+                        navController.navigateClearBackStack(Screen.PumpDisconnectedReconnecting.route)
                     }
                 } else {
                     runOnUiThread {
@@ -498,7 +499,7 @@ class MainActivity : ComponentActivity(), MessageApi.MessageListener, GoogleApiC
             "/from-pump/receive-message" -> {
                 if (inWaitingState()) {
                     runOnUiThread {
-                        navController.navigate(initialRoute)
+                        navController.navigateClearBackStack(initialRoute)
                     }
                 }
                 val pumpMessage = PumpMessageSerializer.fromBytes(messageEvent.data)
@@ -507,7 +508,7 @@ class MainActivity : ComponentActivity(), MessageApi.MessageListener, GoogleApiC
             "/from-pump/receive-cached-message" -> {
                 if (inWaitingState()) {
                     runOnUiThread {
-                        navController.navigate(initialRoute)
+                        navController.navigateClearBackStack(initialRoute)
                     }
                 }
                 val pumpMessage = PumpMessageSerializer.fromBytes(messageEvent.data)
@@ -525,4 +526,9 @@ class MainActivity : ComponentActivity(), MessageApi.MessageListener, GoogleApiC
         }
         dataStore.connectionStatus.value = connectionStatusText
     }
+}
+
+private fun NavController.navigateClearBackStack(route: String) {
+    navigate(route)
+    currentBackStackEntry?.id?.let { clearBackStack(it) }
 }
