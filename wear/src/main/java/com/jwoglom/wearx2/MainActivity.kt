@@ -80,6 +80,8 @@ class MainActivity : ComponentActivity(), MessageApi.MessageListener, GoogleApiC
             initialRoute = intent.getStringExtra("route") ?: Screen.Landing.route
         }
 
+        Timber.i("activity onCreate $initialRoute $savedInstanceState")
+
         setContent {
             navController = rememberSwipeDismissableNavController()
 
@@ -149,24 +151,47 @@ class MainActivity : ComponentActivity(), MessageApi.MessageListener, GoogleApiC
         mApiClient.connect()
 
         // Start PhoneCommService
-        Intent(this, PhoneCommService::class.java).also { intent: Intent? ->
-            val started = startService(intent)
-            if (started == null) {
-                Timber.i("when starting PhoneCommService was already running")
-            } else {
-                Timber.i("started PhoneCommService: $started")
+        try {
+            Intent(this, PhoneCommService::class.java).also { intent: Intent? ->
+                val started = startService(intent)
+                if (started == null) {
+                    Timber.i("when starting PhoneCommService was already running")
+                } else {
+                    Timber.i("started PhoneCommService: $started")
+                }
             }
+        } catch (e: Exception) {
+            Timber.e("could not start PhoneCommService: $e")
+            Timber.e(e)
         }
     }
 
     override fun onResume() {
         super.onResume()
-        Timber.d("resume: mApiClient: $mApiClient")
+        Timber.d("activity onResume: mApiClient: $mApiClient")
         if (!mApiClient.isConnected && !mApiClient.isConnecting) {
             mApiClient.connect()
         }
 
         sendMessage("/to-phone/is-pump-connected", "".toByteArray())
+    }
+
+    override fun onNewIntent(intent: Intent?) {
+        var newRoute = initialRoute
+        if (intent != null) {
+            newRoute = intent.getStringExtra("route") ?: Screen.Landing.route
+        }
+
+        Timber.i("activity onNewIntent newRoute: $newRoute initialRoute: $initialRoute")
+        if (newRoute != initialRoute) {
+            initialRoute = newRoute
+            if (!inWaitingState()) {
+                runOnUiThread {
+                    navController.navigate(newRoute)
+                }
+            }
+        }
+        super.onNewIntent(intent)
     }
 
     override fun onConnected(bundle: Bundle?) {

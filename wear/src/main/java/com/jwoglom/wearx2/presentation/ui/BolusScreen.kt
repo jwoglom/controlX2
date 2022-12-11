@@ -67,6 +67,7 @@ import com.jwoglom.wearx2.R
 import com.jwoglom.wearx2.presentation.DataStore
 import com.jwoglom.wearx2.presentation.components.LifecycleStateObserver
 import com.jwoglom.wearx2.presentation.components.LineTextDescription
+import com.jwoglom.wearx2.shared.util.firstLetterCapitalized
 import com.jwoglom.wearx2.shared.util.snakeCaseToSpace
 import com.jwoglom.wearx2.shared.util.oneDecimalPlace
 import com.jwoglom.wearx2.shared.util.twoDecimalPlaces
@@ -391,7 +392,7 @@ fun BolusScreen(
 
                 if (index < conditions.size) {
                     LineTextDescription(
-                        labelText = conditions[index].msg,
+                        labelText = firstLetterCapitalized(conditions[index].msg),
                         fontSize = 12.sp,
                     )
                 } else {

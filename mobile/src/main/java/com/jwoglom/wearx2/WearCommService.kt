@@ -444,11 +444,7 @@ class WearCommService : WearableListenerService(), GoogleApiClient.ConnectionCal
     override fun onTaskRemoved(rootIntent: Intent?) {
         super.onTaskRemoved(rootIntent)
         Timber.w("WearCommService onTaskRemoved")
-        val restartServiceIntent = Intent(
-            applicationContext, this.javaClass
-        )
-        restartServiceIntent.setPackage(packageName)
-        startService(restartServiceIntent)
+        triggerAppReload(applicationContext)
         Toast.makeText(this, "WearX2 service removed", Toast.LENGTH_SHORT).show()
         stopSelf()
     }

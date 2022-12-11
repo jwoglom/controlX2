@@ -67,3 +67,7 @@ fun oneDecimalPlace1000Unit(insulin1000Units: Long): String {
 fun snakeCaseToSpace(str: String): String {
     return str.replace("_", " ")
 }
+
+fun firstLetterCapitalized(str: String): String {
+    return "${str.substring(0, 1).toUpperCase()}${str.substring(1)}"
+}
