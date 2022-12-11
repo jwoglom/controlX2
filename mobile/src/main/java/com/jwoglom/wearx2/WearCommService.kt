@@ -168,7 +168,7 @@ class WearCommService : WearableListenerService(), GoogleApiClient.ConnectionCal
             peripheral: BluetoothPeripheral?,
             status: HciStatus?
         ): Boolean {
-            Timber.i("service onPumpDisconnected")
+            Timber.i("service onPumpDisconnected: isConnected=false")
             lastPeripheral = null
             isConnected = false
             wearCommHandler?.sendMessage("/from-pump/pump-disconnected",
@@ -199,7 +199,6 @@ class WearCommService : WearableListenerService(), GoogleApiClient.ConnectionCal
 
             Timber.i("Pump send command: $message")
             sendCommand(lastPeripheral, message)
-            Thread.sleep(20) // artificially limit the rate at which we send requests to the pump (50rps)
         }
 
         override fun toString(): String {
@@ -211,7 +210,6 @@ class WearCommService : WearableListenerService(), GoogleApiClient.ConnectionCal
     // Handler that receives messages from the thread
     private inner class WearCommHandler(looper: Looper) : Handler(looper) {
         override fun handleMessage(msg: Message) {
-            val handler = Handler(looper)
             when (msg.what) {
                 WearCommServiceCodes.INIT_PUMP_COMM.ordinal -> {
                     Timber.i("wearCommHandler: init pump class")
@@ -382,6 +380,7 @@ class WearCommService : WearableListenerService(), GoogleApiClient.ConnectionCal
                     )
                 } else {
                     Timber.e("pump not initialized")
+                    wearCommHandler?.sendMessage("/from-pump/pump-disconnected", "".toByteArray())
                 }
             }
             "/to-phone/bolus-request" -> {

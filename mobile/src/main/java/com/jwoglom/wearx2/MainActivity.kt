@@ -190,12 +190,12 @@ class MainActivity : AppCompatActivity(), GoogleApiClient.ConnectionCallbacks, G
 
 
     override fun onResume() {
+        Timber.i("activity onResume")
         if (!mApiClient.isConnected && !mApiClient.isConnecting) {
             mApiClient.connect()
         }
 
         startBTPermissionsCheck()
-        startWearCommService()
         super.onResume()
     }
 

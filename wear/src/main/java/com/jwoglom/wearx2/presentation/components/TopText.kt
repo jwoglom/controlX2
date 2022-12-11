@@ -4,12 +4,16 @@ import android.content.res.Configuration
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.livedata.observeAsState
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.tooling.preview.Devices
 import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.unit.dp
+import androidx.wear.compose.foundation.CurvedAlignment
 import androidx.wear.compose.foundation.CurvedTextStyle
+import androidx.wear.compose.foundation.curvedComposable
 import androidx.wear.compose.material.Text
 import androidx.wear.compose.material.TimeText
 import androidx.wear.compose.material.TimeTextDefaults
@@ -67,15 +71,17 @@ fun TopText(
             } else null,
             // Trailing text is against Wear UX guidance
             endCurvedContent = {
-
-                // This is required to have the text actually curve rather than be a rectangular composable angled
-                currentCGMTextCurved(
+                currentCGMTextCurvedExcludingDeltaArrow(
                     CurvedTextStyle(textStyle),
                     cgmSessionState.value,
                     cgmStatusText.value,
                     cgmReading.value,
                     cgmDeltaArrow.value,
-                    cgmHighLowState.value)
+                    cgmHighLowState.value
+                )
+                curvedComposable (radialAlignment = CurvedAlignment.Radial.Outer) {
+                    CurrentCGMTextDeltaArrow(textStyle, modifier = Modifier.padding(start = 2.dp))
+                }
             },
             endLinearContent = {
                 CurrentCGMText()

@@ -7,7 +7,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.unit.sp
 import androidx.wear.compose.foundation.CurvedModifier
 import androidx.wear.compose.foundation.CurvedScope
 import androidx.wear.compose.foundation.CurvedTextStyle
@@ -18,7 +17,6 @@ import androidx.wear.compose.material.Text
 import androidx.wear.compose.material.curvedText
 import com.google.common.base.Strings
 import com.jwoglom.wearx2.LocalDataStore
-import com.jwoglom.wearx2.presentation.DataStore
 import com.jwoglom.wearx2.presentation.defaultTheme
 import com.jwoglom.wearx2.presentation.redTheme
 
@@ -60,8 +58,46 @@ fun CurrentCGMText(
     )
 }
 
+@Composable
+fun CurrentCGMTextDeltaArrow(
+    textStyle: TextStyle? = null,
+    modifier: Modifier = Modifier,
+) {
+    val ds = LocalDataStore.current
+    val cgmSessionState = ds.cgmSessionState.observeAsState()
+    val cgmReading = ds.cgmReading.observeAsState()
+    val cgmDelta = ds.cgmDelta.observeAsState()
+    val cgmStatusText = ds.cgmStatusText.observeAsState()
+    val cgmHighLowState = ds.cgmHighLowState.observeAsState()
+    val cgmDeltaArrow = ds.cgmDeltaArrow.observeAsState()
+    val displayText = when (cgmSessionState.value) {
+        "Starting", "Stopped", "Stopping", "Unknown" -> ""
+        else -> when {
+            !Strings.isNullOrEmpty(cgmStatusText.value) -> ""
+            else -> when {
+                cgmDeltaArrow.value != null -> "${cgmDeltaArrow.value}"
+                else -> ""
+            }
+        }
+    }
+    val primaryColor = when (cgmHighLowState.value) {
+        "HIGH" -> redTheme.colors.secondary
+        "LOW" -> redTheme.colors.primary
+        else -> defaultTheme.colors.primary
+    }
 
-fun CurvedScope.currentCGMTextCurved(
+    Text(
+        modifier = modifier
+            .background(Color.Transparent),
+        textAlign = TextAlign.Center,
+        color = primaryColor,
+        text = displayText,
+        style = textStyle ?: LocalTextStyle.current,
+    )
+}
+
+
+fun CurvedScope.currentCGMTextCurvedExcludingDeltaArrow(
     textStyle: CurvedTextStyle? = null,
     cgmSessionState: String?,
     cgmStatusText: String?,
@@ -74,7 +110,7 @@ fun CurvedScope.currentCGMTextCurved(
         else -> when {
             !Strings.isNullOrEmpty(cgmStatusText) -> cgmStatusText
             else -> when {
-                cgmReading != null && cgmDeltaArrow != null -> "${cgmReading} ${cgmDeltaArrow}"
+                cgmReading != null && cgmDeltaArrow != null -> "${cgmReading}"
                 cgmReading != null -> "${cgmReading}"
                 else -> ""
             }
