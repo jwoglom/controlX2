@@ -138,12 +138,19 @@ class WearCommService : WearableListenerService(), GoogleApiClient.ConnectionCal
         }
 
         override fun onPumpConnected(peripheral: BluetoothPeripheral?) {
-            super.onPumpConnected(peripheral)
             lastPeripheral = peripheral
-            val wait = (100..250).random()
-            Timber.i("service onPumpConnected -- waiting for ${wait}ms to avoid race conditions")
-            Thread.sleep(wait.toLong())
+            var numResponses = -99999
+            while (PumpState.processedResponseMessages != numResponses) {
+                numResponses = PumpState.processedResponseMessages
+                val wait = (250..500).random()
+                Timber.i("service onPumpConnected -- waiting for ${wait}ms to avoid race conditions: (processedResponseMessages: ${PumpState.processedResponseMessages})")
+                Thread.sleep(wait.toLong())
+            }
+            Timber.i("service onPumpConnected -- running super (processedResponseMessages: ${PumpState.processedResponseMessages})")
+            super.onPumpConnected(peripheral)
+            Thread.sleep(250)
             isConnected = true
+            Timber.i("service onPumpConnected: $this")
             wearCommHandler?.sendMessage("/from-pump/pump-connected",
                 peripheral?.name!!.toByteArray()
             )
@@ -220,20 +227,6 @@ class WearCommService : WearableListenerService(), GoogleApiClient.ConnectionCal
                             Thread.sleep(500)
                         }
                     }
-                    var postHandler: () -> Unit = {}
-                    val checkAndRerun: () -> Unit = {
-                        if (pump.isConnected) {
-                            Timber.i("wearCommHandler: pump connected")
-                        } else {
-                            Timber.i("wearCommHandler: Scan timed out. Retrying")
-                            tandemBTHandler.startScan()
-                            postHandler()
-                        }
-                    }
-                    postHandler = {
-                        handler.postDelayed(checkAndRerun, 10_000)
-                    }
-                    postHandler()
                 }
                 WearCommServiceCodes.SEND_PUMP_COMMAND.ordinal -> {
                     Timber.i("wearCommHandler send command raw: ${String(msg.obj as ByteArray)}")
