@@ -2,6 +2,7 @@ package com.jwoglom.wearx2.presentation
 
 import androidx.lifecycle.MutableLiveData
 import com.jwoglom.pumpx2.pump.messages.calculator.BolusCalcCondition
+import com.jwoglom.pumpx2.pump.messages.calculator.BolusCalcUnits
 import com.jwoglom.pumpx2.pump.messages.calculator.BolusCalculatorBuilder
 import com.jwoglom.pumpx2.pump.messages.calculator.BolusParameters
 import com.jwoglom.pumpx2.pump.messages.response.control.BolusPermissionResponse
@@ -45,6 +46,7 @@ class DataStore {
     var bolusCalculatorBuilder = MutableLiveData<BolusCalculatorBuilder>()
     var bolusCurrentParameters = MutableLiveData<BolusParameters>()
     var bolusFinalParameters = MutableLiveData<BolusParameters>()
+    var bolusFinalCalcUnits = MutableLiveData<BolusCalcUnits>()
     var bolusFinalConditions = MutableLiveData<Set<BolusCalcCondition>>()
 
     var bolusPermissionResponse = MutableLiveData<BolusPermissionResponse>()
@@ -85,6 +87,7 @@ class DataStore {
         bolusCalculatorBuilder.observeForever { t -> Timber.i("DataStore.bolusCalculatorBuilder=$t") }
         bolusCurrentParameters.observeForever { t -> Timber.i("DataStore.bolusCurrentParameters=$t") }
         bolusFinalParameters.observeForever { t -> Timber.i("DataStore.bolusFinalParameters=$t") }
+        bolusFinalCalcUnits.observeForever { t -> Timber.i("DataStore.bolusFinalCalcUnits=$t") }
         bolusFinalConditions.observeForever { t -> Timber.i("DataStore.bolusFinalConditions=$t") }
 
         bolusPermissionResponse.observeForever { t -> Timber.i("DataStore.bolusPermissionResponse=$t") }

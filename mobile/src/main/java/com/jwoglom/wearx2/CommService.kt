@@ -34,6 +34,8 @@ import com.jwoglom.pumpx2.pump.messages.helpers.Bytes
 import com.jwoglom.pumpx2.pump.messages.models.InsulinUnit
 import com.jwoglom.pumpx2.pump.messages.request.control.InitiateBolusRequest
 import com.jwoglom.pumpx2.pump.messages.request.control.RemoteCarbEntryRequest
+import com.jwoglom.pumpx2.pump.messages.request.currentStatus.ApiVersionRequest
+import com.jwoglom.pumpx2.pump.messages.request.currentStatus.TimeSinceResetRequest
 import com.jwoglom.pumpx2.pump.messages.response.authentication.CentralChallengeResponse
 import com.jwoglom.pumpx2.pump.messages.response.control.InitiateBolusResponse
 import com.jwoglom.pumpx2.pump.messages.response.currentStatus.TimeSinceResetResponse
@@ -152,8 +154,16 @@ class CommService : WearableListenerService(), GoogleApiClient.ConnectionCallbac
                 Timber.i("service onPumpConnected -- waiting for ${wait}ms to avoid race conditions: (processedResponseMessages: ${PumpState.processedResponseMessages})")
                 Thread.sleep(wait.toLong())
             }
-            Timber.i("service onPumpConnected -- running super (processedResponseMessages: ${PumpState.processedResponseMessages})")
-            super.onPumpConnected(peripheral)
+            Timber.i("service onPumpConnected -- checking for base messages (processedResponseMessages: ${PumpState.processedResponseMessages})")
+            if (!lastResponseMessage.containsKey(Pair(Characteristic.CURRENT_STATUS, ApiVersionRequest().opCode()))) {
+                Timber.i("service onPumpConnected -- sending ApiVersionRequest")
+                this.sendCommand(peripheral, ApiVersionRequest())
+            }
+
+            if (!lastResponseMessage.containsKey(Pair(Characteristic.CURRENT_STATUS, TimeSinceResetResponse().opCode()))) {
+                Timber.i("service onPumpConnected -- sending TimeSinceResetResponse")
+                this.sendCommand(peripheral, TimeSinceResetRequest())
+            }
             Thread.sleep(250)
             isConnected = true
             Timber.i("service onPumpConnected: $this")
@@ -331,18 +341,18 @@ class CommService : WearableListenerService(), GoogleApiClient.ConnectionCallbac
                 Wearable.MessageApi.sendMessage(mApiClient, node.id, path, message)
                     .setResultCallback { result ->
                         if (result.status.isSuccess) {
-                            Timber.i("service message sent: $path ${String(message)} to: $node")
+                            Timber.d("service message sent: $path ${String(message)} to: $node")
                         } else {
                             Timber.w("service sendMessage callback: ${result.status} for: $path ${String(message)}")
                         }
                     }
             }
             Wearable.NodeApi.getLocalNode(mApiClient).setResultCallback { nodes ->
-                Timber.i("service sendMessage to local node: ${nodes.node}")
+                Timber.d("service sendMessage to local node: ${nodes.node}")
                 inner(nodes.node)
             }
             Wearable.NodeApi.getConnectedNodes(mApiClient).setResultCallback { nodes ->
-                Timber.i("service sendMessage nodes: ${nodes.nodes}")
+                Timber.d("service sendMessage nodes: ${nodes.nodes}")
                 nodes.nodes.forEach { node ->
                     inner(node)
                 }
@@ -441,20 +451,36 @@ class CommService : WearableListenerService(), GoogleApiClient.ConnectionCallbac
                 triggerAppReload(applicationContext)
             }
             "/to-phone/is-pump-connected" -> {
-                if (this::pump.isInitialized && pump.isConnected && pump.lastPeripheral != null) {
+                if (!this::pump.isInitialized) {
+                    Timber.e("pump not initialized")
+                    wearCommHandler?.sendMessage("/from-pump/pump-disconnected", "not_initialized".toByteArray())
+                } else if (!pump.isConnected) {
+                    Timber.e("pump not connected")
+                    wearCommHandler?.sendMessage("/from-pump/pump-disconnected", "not_connected".toByteArray())
+                } else if (pump.lastPeripheral == null) {
+                    Timber.e("pump not saved peripheral")
+                    wearCommHandler?.sendMessage("/from-pump/pump-disconnected", "null_peripheral".toByteArray())
+                } else {
                     wearCommHandler?.sendMessage("/from-pump/pump-connected",
                         pump.lastPeripheral?.name!!.toByteArray()
                     )
-                } else {
-                    Timber.e("pump not initialized")
-                    wearCommHandler?.sendMessage("/from-pump/pump-disconnected", "".toByteArray())
                 }
             }
             "/to-phone/bolus-request" -> {
-                if (this::pump.isInitialized && pump.isConnected && pump.lastPeripheral != null) {
-                    confirmBolusRequest(PumpMessageSerializer.fromBytes(messageEvent.data) as InitiateBolusRequest)
-                } else {
+                if (!this::pump.isInitialized) {
                     Timber.e("pump not initialized")
+                    wearCommHandler?.sendMessage("/from-pump/pump-disconnected", "not_initialized".toByteArray())
+                } else if (!pump.isConnected) {
+                    Timber.e("pump not connected")
+                    wearCommHandler?.sendMessage("/from-pump/pump-disconnected", "not_connected".toByteArray())
+                } else if (pump.lastPeripheral == null) {
+                    Timber.e("pump not saved peripheral")
+                    wearCommHandler?.sendMessage(
+                        "/from-pump/pump-disconnected",
+                        "null_peripheral".toByteArray()
+                    )
+                } else {
+                    confirmBolusRequest(PumpMessageSerializer.fromBytes(messageEvent.data) as InitiateBolusRequest)
                 }
             }
             "/to-phone/bolus-cancel" -> {
@@ -462,7 +488,19 @@ class CommService : WearableListenerService(), GoogleApiClient.ConnectionCallbac
                 resetBolusPrefs(this)
             }
             "/to-phone/initiate-confirmed-bolus" -> {
-                if (this::pump.isInitialized && pump.isConnected && pump.lastPeripheral != null) {
+                if (!this::pump.isInitialized) {
+                    Timber.e("pump not initialized")
+                    wearCommHandler?.sendMessage("/from-pump/pump-disconnected", "not_initialized".toByteArray())
+                } else if (!pump.isConnected) {
+                    Timber.e("pump not connected")
+                    wearCommHandler?.sendMessage("/from-pump/pump-disconnected", "not_connected".toByteArray())
+                } else if (pump.lastPeripheral == null) {
+                    Timber.e("pump not saved peripheral")
+                    wearCommHandler?.sendMessage(
+                        "/from-pump/pump-disconnected",
+                        "null_peripheral".toByteArray()
+                    )
+                } else {
                     val secretKey = prefs(this)?.getString("initiateBolusSecret", "") ?: ""
                     val confirmedBolus =
                         InitiateConfirmedBolusSerializer.fromBytes(secretKey, messageEvent.data)
@@ -479,9 +517,6 @@ class CommService : WearableListenerService(), GoogleApiClient.ConnectionCallbac
 
                     Timber.i("sending confirmed bolus request: $initiateMessage")
                     sendPumpCommBolusMessage(messageEvent.data)
-
-                } else {
-                    Timber.e("pump not initialized")
                 }
             }
             "/to-pump/command" -> {

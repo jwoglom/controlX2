@@ -52,8 +52,10 @@ import com.jwoglom.pumpx2.pump.messages.Message
 import com.jwoglom.pumpx2.pump.messages.calculator.BolusCalcCondition
 import com.jwoglom.pumpx2.pump.messages.calculator.BolusCalcCondition.*
 import com.jwoglom.pumpx2.pump.messages.calculator.BolusCalcDecision
+import com.jwoglom.pumpx2.pump.messages.calculator.BolusCalcUnits
 import com.jwoglom.pumpx2.pump.messages.calculator.BolusCalculatorBuilder
 import com.jwoglom.pumpx2.pump.messages.calculator.BolusParameters
+import com.jwoglom.pumpx2.pump.messages.models.InsulinUnit
 import com.jwoglom.pumpx2.pump.messages.request.control.BolusPermissionRequest
 import com.jwoglom.pumpx2.pump.messages.request.control.CancelBolusRequest
 import com.jwoglom.pumpx2.pump.messages.request.currentStatus.BolusCalcDataSnapshotRequest
@@ -63,7 +65,6 @@ import com.jwoglom.pumpx2.pump.messages.request.currentStatus.TimeSinceResetRequ
 import com.jwoglom.pumpx2.pump.messages.response.control.BolusPermissionResponse
 import com.jwoglom.pumpx2.pump.messages.response.control.CancelBolusResponse.CancelStatus
 import com.jwoglom.pumpx2.pump.messages.response.currentStatus.BolusCalcDataSnapshotResponse
-import com.jwoglom.pumpx2.pump.messages.response.currentStatus.CurrentBolusStatusResponse
 import com.jwoglom.pumpx2.pump.messages.response.currentStatus.CurrentBolusStatusResponse.CurrentBolusStatus
 import com.jwoglom.pumpx2.pump.messages.response.currentStatus.LastBGResponse
 import com.jwoglom.wearx2.LocalDataStore
@@ -94,7 +95,7 @@ fun BolusScreen(
     onClickBG: () -> Unit,
     onClickLanding: () -> Unit,
     sendPumpCommands: (SendType, List<Message>) -> Unit,
-    sendPhoneBolusRequest: (Int, BolusParameters) -> Unit,
+    sendPhoneBolusRequest: (Int, BolusParameters, BolusCalcUnits, Double) -> Unit,
     resetSavedBolusEnteredState: () -> Unit,
     sendPhoneBolusCancel: () -> Unit,
     modifier: Modifier = Modifier
@@ -148,13 +149,15 @@ fun BolusScreen(
         return decision
     }
 
-    fun bolusCalcParameters(bolusCalc: BolusCalculatorBuilder?): BolusParameters {
+    fun bolusCalcParameters(bolusCalc: BolusCalculatorBuilder?): Pair<BolusParameters, BolusCalcUnits> {
         val decision = bolusCalc?.build()?.parse()
-        return BolusParameters(
-            decision?.units?.total,
-            bolusCalc?.carbsValueGrams?.orElse(0),
-            bolusCalc?.glucoseMgdl?.orElse(0)
-        )
+        return Pair(
+            BolusParameters(
+                decision?.units?.total,
+                bolusCalc?.carbsValueGrams?.orElse(0),
+                bolusCalc?.glucoseMgdl?.orElse(0)
+            ),
+            decision!!.units!!)
     }
 
     val commands = listOf(
@@ -248,7 +251,7 @@ fun BolusScreen(
                 bolusBgMgdlUserInput
             )
             dataStore.bolusCurrentParameters.value =
-                bolusCalcParameters(dataStore.bolusCalculatorBuilder.value)
+                bolusCalcParameters(dataStore.bolusCalculatorBuilder.value).first
 
             dataStore.bolusUnitsDisplayedText.value = when (bolusUnitsUserInput) {
                 null -> when (dataStore.bolusCurrentParameters.value) {
@@ -360,8 +363,10 @@ fun BolusScreen(
                     onClick = {
                         dataStore.bolusFinalConditions.value =
                             bolusCalcDecision(dataStore.bolusCalculatorBuilder.value)?.conditions
-                        dataStore.bolusFinalParameters.value =
-                            bolusCalcParameters(dataStore.bolusCalculatorBuilder.value)
+
+                        val pair = bolusCalcParameters(dataStore.bolusCalculatorBuilder.value)
+                        dataStore.bolusFinalParameters.value = pair.first
+                        dataStore.bolusFinalCalcUnits.value = pair.second
                         performPermissionCheck()
                     },
                     enabled = true
@@ -431,15 +436,17 @@ fun BolusScreen(
             }
         }
 
-        fun sendBolusRequestToPhone(bolusParameters: BolusParameters?) {
-            if (bolusParameters == null || dataStore.bolusPermissionResponse.value == null) {
+        fun sendBolusRequestToPhone(bolusParameters: BolusParameters?, unitBreakdown: BolusCalcUnits?) {
+            if (bolusParameters == null || dataStore.bolusPermissionResponse.value == null || dataStore.bolusCalcDataSnapshot.value == null || unitBreakdown == null) {
+                Timber.w("sendBolusRequestToPhone: null parameters")
                 return
             }
 
             val bolusId = dataStore.bolusPermissionResponse.value!!.bolusId
+            val iobUnits = InsulinUnit.from1000To1(dataStore.bolusCalcDataSnapshot.value!!.iob)
 
-            Timber.i("sending bolus request to phone: $bolusId $bolusParameters")
-            sendPhoneBolusRequest(bolusId, bolusParameters)
+            Timber.i("sendBolusRequestToPhone: sending bolus request to phone: bolusId=$bolusId bolusParameters=$bolusParameters unitBreakdown=$unitBreakdown")
+            sendPhoneBolusRequest(bolusId, bolusParameters, unitBreakdown, iobUnits)
         }
 
         Dialog(
@@ -484,7 +491,7 @@ fun BolusScreen(
                                         if (permissionResponse.status == 0 && permissionResponse.nackReason == BolusPermissionResponse.NackReason.PERMISSION_GRANTED && finalParameters.units >= 0.05) {
                                             showConfirmDialog = false
                                             showInProgressDialog = true
-                                            sendBolusRequestToPhone(dataStore.bolusFinalParameters.value)
+                                            sendBolusRequestToPhone(dataStore.bolusFinalParameters.value, dataStore.bolusFinalCalcUnits.value)
                                         }
                                     },
                                     colors = ButtonDefaults.primaryButtonColors()
@@ -781,11 +788,11 @@ fun BolusScreen(
                                 }
                             }u bolus ${
                                 when (bolusCurrentResponse.value) {
-                                    null -> "was initiated."
+                                    null -> "was requested."
                                     else -> when (bolusCurrentResponse.value!!.status) {
-                                        CurrentBolusStatus.REQUESTING -> "is being requested."
+                                        CurrentBolusStatus.REQUESTING -> "is being prepared."
                                         CurrentBolusStatus.DELIVERING -> "is being delivered."
-                                        else -> "was delivered."
+                                        else -> "was completed."
                                     }
                                 }
                             }"

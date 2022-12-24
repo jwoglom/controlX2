@@ -60,6 +60,7 @@ import androidx.wear.compose.navigation.rememberSwipeDismissableNavController
 import com.google.android.horologist.compose.layout.fadeAway
 import com.google.android.horologist.compose.layout.fadeAwayScalingLazyList
 import com.jwoglom.pumpx2.pump.messages.Message
+import com.jwoglom.pumpx2.pump.messages.calculator.BolusCalcUnits
 import com.jwoglom.pumpx2.pump.messages.calculator.BolusParameters
 import com.jwoglom.pumpx2.pump.messages.request.currentStatus.GlobalMaxBolusSettingsRequest
 import com.jwoglom.wearx2.LocalDataStore
@@ -89,7 +90,7 @@ fun WearApp(
     modifier: Modifier = Modifier,
     navController: NavHostController = rememberSwipeDismissableNavController(),
     sendPumpCommands: (SendType, List<Message>) -> Unit,
-    sendPhoneBolusRequest: (Int, BolusParameters) -> Unit,
+    sendPhoneBolusRequest: (Int, BolusParameters, BolusCalcUnits, Double) -> Unit,
     sendPhoneBolusCancel: () -> Unit,
     sendPhoneConnectionCheck: () -> Unit,
     sendPhoneCommand: (String) -> Unit,

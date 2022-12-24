@@ -19,6 +19,7 @@ import com.google.android.gms.wearable.MessageEvent
 import com.google.android.gms.wearable.Node
 import com.google.android.gms.wearable.Wearable
 import com.jwoglom.pumpx2.pump.messages.Message
+import com.jwoglom.pumpx2.pump.messages.calculator.BolusCalcUnits
 import com.jwoglom.pumpx2.pump.messages.calculator.BolusParameters
 import com.jwoglom.pumpx2.pump.messages.models.InsulinUnit
 import com.jwoglom.pumpx2.pump.messages.request.control.InitiateBolusRequest
@@ -98,29 +99,37 @@ class MainActivity : ComponentActivity(), MessageApi.MessageListener, GoogleApiC
                 this.sendMessage("/to-phone/is-pump-connected", "phone_connection_check".toByteArray())
             }
 
-            val sendPhoneBolusRequest: (Int, BolusParameters) -> Unit = { bolusId, params ->
+            val sendPhoneBolusRequest: (Int, BolusParameters, BolusCalcUnits, Double) -> Unit = { bolusId, params, unitBreakdown, currentIob ->
                 val numUnits = InsulinUnit.from1To1000(params.units)
                 val numCarbs = params.carbsGrams
                 val bgValue = params.glucoseMgdl
 
                 var bolusTypes = mutableListOf(BolusDeliveryHistoryLog.BolusType.FOOD2)
-                if (numCarbs > 0) {
+
+                val foodVolume = InsulinUnit.from1To1000(unitBreakdown.fromCarbs)
+                if (foodVolume > 0) {
                     bolusTypes.add(BolusDeliveryHistoryLog.BolusType.FOOD1)
                 }
+
+                val corrVolume = InsulinUnit.from1To1000(unitBreakdown.fromBG) + InsulinUnit.from1To1000(unitBreakdown.fromIOB)
+                if (corrVolume > 0) {
+                    bolusTypes.add(BolusDeliveryHistoryLog.BolusType.CORRECTION)
+                }
+
+                val iobUnits = InsulinUnit.from1To1000(currentIob)
 
                 val bolusRequest = InitiateBolusRequest(
                     numUnits,
                     bolusId,
                     BolusDeliveryHistoryLog.BolusType.toBitmask(*bolusTypes.toTypedArray()),
-                    0L,
-                    0L,
+                    foodVolume,
+                    corrVolume,
                     numCarbs,
                     bgValue,
-                    0
+                    iobUnits
                 )
 
-                Timber.i("sendPhoneBolusRequest: numUnits=$numUnits numCarbs=$numCarbs bgValue=$bgValue bolusRequest=$bolusRequest")
-
+                Timber.i("sendPhoneBolusRequest: numUnits=$numUnits numCarbs=$numCarbs bgValue=$bgValue foodVolume=$foodVolume corrVolume=$corrVolume iobUnits=$iobUnits: bolusRequest=$bolusRequest")
                 this.sendMessage("/to-phone/bolus-request", PumpMessageSerializer.toBytes(bolusRequest))
             }
 
