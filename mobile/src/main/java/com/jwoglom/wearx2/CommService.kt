@@ -6,8 +6,10 @@ import android.app.NotificationManager
 import android.app.PendingIntent
 import android.app.PendingIntent.FLAG_IMMUTABLE
 import android.app.PendingIntent.FLAG_ONE_SHOT
+import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
 import android.content.SharedPreferences
 import android.media.RingtoneManager
 import android.os.Bundle
@@ -37,8 +39,7 @@ import com.jwoglom.pumpx2.shared.Hex
 import com.jwoglom.wearx2.shared.InitiateConfirmedBolusSerializer
 import com.jwoglom.wearx2.shared.PumpMessageSerializer
 import com.jwoglom.wearx2.shared.PumpQualifyingEventsSerializer
-import com.jwoglom.wearx2.shared.WearCommServiceCodes
-import com.jwoglom.wearx2.shared.util.DebugTree
+import com.jwoglom.wearx2.shared.CommServiceCodes
 import com.jwoglom.wearx2.shared.util.setupTimber
 import com.jwoglom.wearx2.shared.util.twoDecimalPlaces
 import com.welie.blessed.BluetoothPeripheral
@@ -51,7 +52,7 @@ import timber.log.Timber
 import java.time.Instant
 
 
-class WearCommService : WearableListenerService(), GoogleApiClient.ConnectionCallbacks, GoogleApiClient.OnConnectionFailedListener {
+class CommService : WearableListenerService(), GoogleApiClient.ConnectionCallbacks, GoogleApiClient.OnConnectionFailedListener {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
 
     private var serviceLooper: Looper? = null
@@ -211,7 +212,7 @@ class WearCommService : WearableListenerService(), GoogleApiClient.ConnectionCal
     private inner class WearCommHandler(looper: Looper) : Handler(looper) {
         override fun handleMessage(msg: Message) {
             when (msg.what) {
-                WearCommServiceCodes.INIT_PUMP_COMM.ordinal -> {
+                CommServiceCodes.INIT_PUMP_COMM.ordinal -> {
                     Timber.i("wearCommHandler: init pump class")
                     pump = Pump()
                     tandemBTHandler = TandemBluetoothHandler.getInstance(applicationContext, pump, null)
@@ -226,20 +227,20 @@ class WearCommService : WearableListenerService(), GoogleApiClient.ConnectionCal
                         }
                     }
                 }
-                WearCommServiceCodes.SEND_PUMP_COMMAND.ordinal -> {
+                CommServiceCodes.SEND_PUMP_COMMAND.ordinal -> {
                     Timber.i("wearCommHandler send command raw: ${String(msg.obj as ByteArray)}")
                     val pumpMsg = PumpMessageSerializer.fromBytes(msg.obj as ByteArray)
-                    if (this@WearCommService::pump.isInitialized && pump.isConnected && !isBolusCommand(pumpMsg)) {
+                    if (this@CommService::pump.isInitialized && pump.isConnected && !isBolusCommand(pumpMsg)) {
                         Timber.i("wearCommHandler send command: $pumpMsg")
                         pump.command(pumpMsg)
                     } else {
                         Timber.w("wearCommHandler not sending command due to pump state: $pump $pumpMsg")
                     }
                 }
-                WearCommServiceCodes.SEND_PUMP_COMMANDS_BULK.ordinal -> {
+                CommServiceCodes.SEND_PUMP_COMMANDS_BULK.ordinal -> {
                     Timber.i("wearCommHandler send commands raw: ${String(msg.obj as ByteArray)}")
                     PumpMessageSerializer.fromBulkBytes(msg.obj as ByteArray).forEach {
-                        if (this@WearCommService::pump.isInitialized && pump.isConnected && !isBolusCommand(it)) {
+                        if (this@CommService::pump.isInitialized && pump.isConnected && !isBolusCommand(it)) {
                             Timber.i("wearCommHandler send command: $it")
                             pump.command(it)
                         } else {
@@ -247,14 +248,14 @@ class WearCommService : WearableListenerService(), GoogleApiClient.ConnectionCal
                         }
                     }
                 }
-                WearCommServiceCodes.SEND_PUMP_COMMANDS_BUST_CACHE_BULK.ordinal -> {
+                CommServiceCodes.SEND_PUMP_COMMANDS_BUST_CACHE_BULK.ordinal -> {
                     Timber.i("wearCommHandler send commands bust cache raw: ${String(msg.obj as ByteArray)}")
                     PumpMessageSerializer.fromBulkBytes(msg.obj as ByteArray).forEach {
                         if (lastResponseMessage.containsKey(Pair(it.characteristic, it.responseOpCode)) && !isBolusCommand(it)) {
                             Timber.i("wearCommHandler busted cache: $it")
                             lastResponseMessage.remove(Pair(it.characteristic, it.responseOpCode))
                         }
-                        if (this@WearCommService::pump.isInitialized && pump.isConnected && !isBolusCommand(it)) {
+                        if (this@CommService::pump.isInitialized && pump.isConnected && !isBolusCommand(it)) {
                             Timber.i("wearCommHandler send command bust cache: $it")
                             pump.command(it)
                         } else {
@@ -262,14 +263,14 @@ class WearCommService : WearableListenerService(), GoogleApiClient.ConnectionCal
                         }
                     }
                 }
-                WearCommServiceCodes.CACHED_PUMP_COMMANDS_BULK.ordinal -> {
+                CommServiceCodes.CACHED_PUMP_COMMANDS_BULK.ordinal -> {
                     Timber.i("wearCommHandler cached pump commands raw: ${String(msg.obj as ByteArray)}")
                     PumpMessageSerializer.fromBulkBytes(msg.obj as ByteArray).forEach {
                         if (lastResponseMessage.containsKey(Pair(it.characteristic, it.responseOpCode)) && !isBolusCommand(it)) {
                             val response = lastResponseMessage.get(Pair(it.characteristic, it.responseOpCode))
                             Timber.i("wearCommHandler cached hit: $response")
                             wearCommHandler?.sendMessage("/from-pump/receive-cached-message", PumpMessageSerializer.toBytes(response))
-                        } else if (this@WearCommService::pump.isInitialized && pump.isConnected && !isBolusCommand(it)) {
+                        } else if (this@CommService::pump.isInitialized && pump.isConnected && !isBolusCommand(it)) {
                             Timber.i("wearCommHandler cached miss: $it")
                             pump.command(it)
                         } else {
@@ -277,7 +278,7 @@ class WearCommService : WearableListenerService(), GoogleApiClient.ConnectionCal
                         }
                     }
                 }
-                WearCommServiceCodes.SEND_PUMP_COMMAND_BOLUS.ordinal -> {
+                CommServiceCodes.SEND_PUMP_COMMAND_BOLUS.ordinal -> {
                     Timber.i("wearCommHandler send bolus raw: ${String(msg.obj as ByteArray)}")
                     val secretKey = prefs(applicationContext)?.getString("initiateBolusSecret", "") ?: ""
                     val confirmedBolus =
@@ -288,7 +289,7 @@ class WearCommService : WearableListenerService(), GoogleApiClient.ConnectionCal
                     if (!messageOk) {
                         Timber.w("wearCommHandler bolus invalid signature")
                         sendMessage("/to-wear/bolus-blocked-signature", "WearCommHandler".toByteArray())
-                    } else if (this@WearCommService::pump.isInitialized && pump.isConnected && isBolusCommand(pumpMsg)) {
+                    } else if (this@CommService::pump.isInitialized && pump.isConnected && isBolusCommand(pumpMsg)) {
                         Timber.i("wearCommHandler send bolus command with valid signature: $pumpMsg")
                         if (!isInsulinDeliveryEnabled()) {
                             Timber.e("No insulin delivery messages enabled -- blocking bolus command $pumpMsg")
@@ -330,10 +331,55 @@ class WearCommService : WearableListenerService(), GoogleApiClient.ConnectionCal
         }
     }
 
+    enum class BondState(val id: Int) {
+        NOT_BONDED(10),
+        BONDING(11),
+        BONDED(12),
+        ;
+        companion object {
+            private val map = BondState.values().associateBy(BondState::id)
+            fun fromId(type: Int) = map[type]
+        }
+    }
+    private var bleChangeReceiver = BleChangeReceiver()
+    inner class BleChangeReceiver: BroadcastReceiver() {
+
+        override fun onReceive(context: Context?, intent: Intent?) {
+            when (intent?.action) {
+                "android.bluetooth.device.action.BOND_STATE_CHANGED" -> {
+                    val bondState = BondState.fromId(intent.getIntExtra(
+                        "android.bluetooth.device.extra.BOND_STATE",
+                        Int.MIN_VALUE
+                    ))
+                    Timber.i("BleChangeReceiver BOND_STATE_CHANGED: $bondState")
+                }
+                "android.bluetooth.adapter.action.STATE_CHANGED" -> {
+                    when (intent.getIntExtra("android.bluetooth.adapter.extra.STATE", Int.MIN_VALUE)) {
+                        10, 13 -> {
+                            // Turned off
+                            Timber.i("BleChangeReceiver STATE_CHANGED: off")
+                        }
+                        12 -> {
+                            // Turned on
+                            Timber.i("BleChangeReceiver STATE_CHANGED: on")
+                        }
+                    }
+                }
+            }
+        }
+
+    }
+
     override fun onCreate() {
         super.onCreate()
         setupTimber("MWC")
         Timber.d("service onCreate")
+
+        // Listen to BLE state changes
+        val intentFilter = IntentFilter()
+        intentFilter.addAction("android.bluetooth.adapter.action.STATE_CHANGED")
+        intentFilter.addAction("android.bluetooth.device.action.BOND_STATE_CHANGED")
+        registerReceiver(this.bleChangeReceiver, intentFilter)
 
         // Start up the thread running the service.  Note that we create a
         // separate thread because the service normally runs in the process's
@@ -345,8 +391,8 @@ class WearCommService : WearableListenerService(), GoogleApiClient.ConnectionCal
 
             mApiClient = GoogleApiClient.Builder(applicationContext)
                 .addApi(Wearable.API)
-                .addConnectionCallbacks(this@WearCommService)
-                .addOnConnectionFailedListener(this@WearCommService)
+                .addConnectionCallbacks(this@CommService)
+                .addOnConnectionFailedListener(this@CommService)
                 .build()
 
             mApiClient.connect()
@@ -403,7 +449,7 @@ class WearCommService : WearableListenerService(), GoogleApiClient.ConnectionCal
                     if (!messageOk) {
                         Timber.e("invalid message -- blocked signature $messageOk $initiateMessage")
                         wearCommHandler?.sendMessage("/to-wear/blocked-bolus-signature",
-                            "WearCommService".toByteArray()
+                            "CommService".toByteArray()
                         )
                         return
                     }
@@ -431,7 +477,7 @@ class WearCommService : WearableListenerService(), GoogleApiClient.ConnectionCal
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        Timber.i("WearCommService onStartCommand $intent $flags $startId")
+        Timber.i("CommService onStartCommand $intent $flags $startId")
         Toast.makeText(this, "WearX2 service starting", Toast.LENGTH_SHORT).show()
 
         var notification = createNotification()
@@ -440,7 +486,7 @@ class WearCommService : WearableListenerService(), GoogleApiClient.ConnectionCal
         // For each start request, send a message to start a job and deliver the
         // start ID so we know which request we're stopping when we finish the job
         wearCommHandler?.obtainMessage()?.also { msg ->
-            msg.what = WearCommServiceCodes.INIT_PUMP_COMM.ordinal
+            msg.what = CommServiceCodes.INIT_PUMP_COMM.ordinal
             wearCommHandler?.sendMessage(msg)
         }
 
@@ -450,7 +496,7 @@ class WearCommService : WearableListenerService(), GoogleApiClient.ConnectionCal
 
     override fun onTaskRemoved(rootIntent: Intent?) {
         super.onTaskRemoved(rootIntent)
-        Timber.w("WearCommService onTaskRemoved")
+        Timber.w("CommService onTaskRemoved")
         triggerAppReload(applicationContext)
         Toast.makeText(this, "WearX2 service removed", Toast.LENGTH_SHORT).show()
         stopSelf()
@@ -458,35 +504,35 @@ class WearCommService : WearableListenerService(), GoogleApiClient.ConnectionCal
 
     private fun sendPumpCommMessage(pumpMsgBytes: ByteArray) {
         wearCommHandler?.obtainMessage()?.also { msg ->
-            msg.what = WearCommServiceCodes.SEND_PUMP_COMMAND.ordinal
+            msg.what = CommServiceCodes.SEND_PUMP_COMMAND.ordinal
             msg.obj = pumpMsgBytes
             wearCommHandler?.sendMessage(msg)
         }
     }
     private fun sendPumpCommMessages(pumpMsgBytes: ByteArray) {
         wearCommHandler?.obtainMessage()?.also { msg ->
-            msg.what = WearCommServiceCodes.SEND_PUMP_COMMANDS_BULK.ordinal
+            msg.what = CommServiceCodes.SEND_PUMP_COMMANDS_BULK.ordinal
             msg.obj = pumpMsgBytes
             wearCommHandler?.sendMessage(msg)
         }
     }
     private fun sendPumpCommMessagesBustCache(pumpMsgBytes: ByteArray) {
         wearCommHandler?.obtainMessage()?.also { msg ->
-            msg.what = WearCommServiceCodes.SEND_PUMP_COMMANDS_BUST_CACHE_BULK.ordinal
+            msg.what = CommServiceCodes.SEND_PUMP_COMMANDS_BUST_CACHE_BULK.ordinal
             msg.obj = pumpMsgBytes
             wearCommHandler?.sendMessage(msg)
         }
     }
     private fun handleCachedCommandsRequest(rawBytes: ByteArray) {
         wearCommHandler?.obtainMessage()?.also { msg ->
-            msg.what = WearCommServiceCodes.CACHED_PUMP_COMMANDS_BULK.ordinal
+            msg.what = CommServiceCodes.CACHED_PUMP_COMMANDS_BULK.ordinal
             msg.obj = rawBytes
             wearCommHandler?.sendMessage(msg)
         }
     }
     private fun sendPumpCommBolusMessage(initiateConfirmedBolusBytes: ByteArray) {
         wearCommHandler?.obtainMessage()?.also { msg ->
-            msg.what = WearCommServiceCodes.SEND_PUMP_COMMAND_BOLUS.ordinal
+            msg.what = CommServiceCodes.SEND_PUMP_COMMAND_BOLUS.ordinal
             msg.obj = initiateConfirmedBolusBytes
             wearCommHandler?.sendMessage(msg)
         }
@@ -575,9 +621,12 @@ class WearCommService : WearableListenerService(), GoogleApiClient.ConnectionCal
         val channel = NotificationChannel(
             notificationChannelId,
             "Endless Service notifications channel",
-            NotificationManager.IMPORTANCE_LOW
+            NotificationManager.IMPORTANCE_NONE
         ).let {
             it.description = "Endless Service channel"
+            it.setShowBadge(false)
+            it.lockscreenVisibility = 0
+
             it
         }
         notificationManager.createNotificationChannel(channel)
@@ -599,7 +648,7 @@ class WearCommService : WearableListenerService(), GoogleApiClient.ConnectionCal
             .setContentIntent(pendingIntent)
             .setSmallIcon(R.drawable.pump)
             .setTicker("WearX2 is running")
-            .setPriority(Notification.PRIORITY_MIN) // for under android 26 compatibility
+            .setPriority(Notification.PRIORITY_MAX) // for under android 26 compatibility
             .build()
     }
 

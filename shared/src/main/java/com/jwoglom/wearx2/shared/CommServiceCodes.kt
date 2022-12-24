@@ -1,6 +1,6 @@
 package com.jwoglom.wearx2.shared
 
-enum class WearCommServiceCodes {
+enum class CommServiceCodes {
     INIT_PUMP_COMM,
     SEND_PUMP_COMMAND,
     SEND_PUMP_COMMANDS_BULK,

@@ -185,7 +185,7 @@ class MainActivity : AppCompatActivity(), GoogleApiClient.ConnectionCallbacks, G
 
         mApiClient.connect()
 
-        startWearCommService()
+        startCommService()
     }
 
 
@@ -199,20 +199,24 @@ class MainActivity : AppCompatActivity(), GoogleApiClient.ConnectionCallbacks, G
         super.onResume()
     }
 
-    private fun startWearCommService() {
-        // Start WearCommService
-        val intent = Intent(applicationContext, WearCommService::class.java)
+    private fun startCommService() {
+        // Start CommService
+        val intent = Intent(applicationContext, CommService::class.java)
 
-        applicationContext.startForegroundService(intent)
+        if (Build.VERSION.SDK_INT >= 26) {
+            applicationContext.startForegroundService(intent)
+        } else {
+            applicationContext.startService(intent)
+        }
         applicationContext.bindService(intent, object : ServiceConnection {
             override fun onServiceConnected(name: ComponentName, service: IBinder) {
                 //retrieve an instance of the service here from the IBinder returned
                 //from the onBind method to communicate with
-                Timber.i("WearCommService onServiceConnected")
+                Timber.i("CommService onServiceConnected")
             }
 
             override fun onServiceDisconnected(name: ComponentName) {
-                Timber.i("WearCommService onServiceDisconnected")
+                Timber.i("CommService onServiceDisconnected")
             }
         }, BIND_AUTO_CREATE)
     }
