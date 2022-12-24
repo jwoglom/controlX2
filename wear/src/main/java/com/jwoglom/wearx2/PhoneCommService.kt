@@ -78,7 +78,7 @@ class PhoneCommService : WearableListenerService() {
         super.onConnectedNodes(nodes)
         if (nodes.size == 0) {
             currentlyConnected = false
-            disconnectedNotification("phone disconnected")
+            // disconnectedNotification("phone disconnected")
         }
     }
 
@@ -124,17 +124,24 @@ class PhoneCommService : WearableListenerService() {
             Thread.sleep(100)
         }
         Timber.i("wear sendMessage: $path ${String(message)}")
+        fun inner(node: Node) {
+            Wearable.MessageApi.sendMessage(mApiClient, node.id, path, message)
+                .setResultCallback { result ->
+                    if (result.status.isSuccess) {
+                        Timber.i("Wear message sent: $path ${String(message)}")
+                    } else {
+                        Timber.w("wear sendMessage callback: ${result.status}")
+                    }
+                }
+        }
+        Wearable.NodeApi.getLocalNode(mApiClient).setResultCallback { nodes ->
+            Timber.i("wear sendMessage local: ${nodes.node}")
+            inner(nodes.node)
+        }
         Wearable.NodeApi.getConnectedNodes(mApiClient).setResultCallback { nodes ->
             Timber.i("wear sendMessage nodes: ${nodes.nodes}")
             nodes.nodes.forEach { node ->
-                Wearable.MessageApi.sendMessage(mApiClient, node.id, path, message)
-                    .setResultCallback { result ->
-                        if (result.status.isSuccess) {
-                            Timber.i("Wear message sent: $path ${String(message)}")
-                        } else {
-                            Timber.w("wear sendMessage callback: ${result.status}")
-                        }
-                    }
+                inner(node)
             }
         }
     }

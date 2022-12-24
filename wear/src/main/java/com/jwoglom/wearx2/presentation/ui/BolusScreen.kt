@@ -59,6 +59,7 @@ import com.jwoglom.pumpx2.pump.messages.request.control.CancelBolusRequest
 import com.jwoglom.pumpx2.pump.messages.request.currentStatus.BolusCalcDataSnapshotRequest
 import com.jwoglom.pumpx2.pump.messages.request.currentStatus.CurrentBolusStatusRequest
 import com.jwoglom.pumpx2.pump.messages.request.currentStatus.LastBGRequest
+import com.jwoglom.pumpx2.pump.messages.request.currentStatus.TimeSinceResetRequest
 import com.jwoglom.pumpx2.pump.messages.response.control.BolusPermissionResponse
 import com.jwoglom.pumpx2.pump.messages.response.control.CancelBolusResponse.CancelStatus
 import com.jwoglom.pumpx2.pump.messages.response.currentStatus.BolusCalcDataSnapshotResponse
@@ -158,7 +159,8 @@ fun BolusScreen(
 
     val commands = listOf(
         BolusCalcDataSnapshotRequest(),
-        LastBGRequest()
+        LastBGRequest(),
+        TimeSinceResetRequest(),
     )
 
     val baseFields = listOf(
@@ -543,8 +545,8 @@ fun BolusScreen(
             showDialog = showCancelledDialog,
             onDismissRequest = {
                 showCancelledDialog = false
-                onClickLanding()
                 resetBolusDataStoreState(dataStore)
+                onClickLanding()
             },
             scrollState = scrollState
         ) {
@@ -690,9 +692,9 @@ fun BolusScreen(
             showDialog = showApprovedDialog,
             onDismissRequest = {
                 showApprovedDialog = false
-                onClickLanding()
                 resetBolusDataStoreState(dataStore)
                 resetSavedBolusEnteredState()
+                onClickLanding()
             },
             scrollState = scrollState
         ) {

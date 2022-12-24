@@ -16,14 +16,17 @@ import com.google.android.gms.common.ConnectionResult
 import com.google.android.gms.common.api.GoogleApiClient
 import com.google.android.gms.wearable.MessageApi
 import com.google.android.gms.wearable.MessageEvent
+import com.google.android.gms.wearable.Node
 import com.google.android.gms.wearable.Wearable
 import com.jwoglom.pumpx2.pump.messages.Message
 import com.jwoglom.pumpx2.pump.messages.calculator.BolusParameters
 import com.jwoglom.pumpx2.pump.messages.models.InsulinUnit
 import com.jwoglom.pumpx2.pump.messages.request.control.InitiateBolusRequest
+import com.jwoglom.pumpx2.pump.messages.request.control.RemoteCarbEntryRequest
 import com.jwoglom.pumpx2.pump.messages.response.control.BolusPermissionResponse
 import com.jwoglom.pumpx2.pump.messages.response.control.CancelBolusResponse
 import com.jwoglom.pumpx2.pump.messages.response.control.InitiateBolusResponse
+import com.jwoglom.pumpx2.pump.messages.response.control.RemoteCarbEntryResponse
 import com.jwoglom.pumpx2.pump.messages.response.currentStatus.BolusCalcDataSnapshotResponse
 import com.jwoglom.pumpx2.pump.messages.response.currentStatus.CGMStatusResponse
 import com.jwoglom.pumpx2.pump.messages.response.currentStatus.CGMStatusResponse.SessionState
@@ -100,10 +103,15 @@ class MainActivity : ComponentActivity(), MessageApi.MessageListener, GoogleApiC
                 val numCarbs = params.carbsGrams
                 val bgValue = params.glucoseMgdl
 
+                var bolusTypes = mutableListOf(BolusDeliveryHistoryLog.BolusType.FOOD2)
+                if (numCarbs > 0) {
+                    bolusTypes.add(BolusDeliveryHistoryLog.BolusType.FOOD1)
+                }
+
                 val bolusRequest = InitiateBolusRequest(
                     numUnits,
                     bolusId,
-                    BolusDeliveryHistoryLog.BolusType.toBitmask(BolusDeliveryHistoryLog.BolusType.FOOD2),
+                    BolusDeliveryHistoryLog.BolusType.toBitmask(*bolusTypes.toTypedArray()),
                     0L,
                     0L,
                     numCarbs,
@@ -236,17 +244,25 @@ class MainActivity : ComponentActivity(), MessageApi.MessageListener, GoogleApiC
 
     private fun sendMessage(path: String, message: ByteArray) {
         Timber.i("wear sendMessage: $path ${String(message)}")
+
+        fun inner(node: Node) {
+            Wearable.MessageApi.sendMessage(mApiClient, node.id, path, message)
+                .setResultCallback { result ->
+                    if (result.status.isSuccess) {
+                        Timber.i("Wear message sent: ${path} ${String(message)}")
+                    } else {
+                        Timber.w("wear sendMessage callback: ${result.status}")
+                    }
+                }
+        }
+        Wearable.NodeApi.getLocalNode(mApiClient).setResultCallback { nodes ->
+            Timber.i("wear sendMessage local: ${nodes.node}")
+            inner(nodes.node)
+        }
         Wearable.NodeApi.getConnectedNodes(mApiClient).setResultCallback { nodes ->
             Timber.i("wear sendMessage nodes: ${nodes.nodes}")
             nodes.nodes.forEach { node ->
-                Wearable.MessageApi.sendMessage(mApiClient, node.id, path, message)
-                    .setResultCallback { result ->
-                        if (result.status.isSuccess) {
-                            Timber.i("Wear message sent: ${path} ${String(message)}")
-                        } else {
-                            Timber.w("wear sendMessage callback: ${result.status}")
-                        }
-                    }
+                inner(node)
             }
         }
     }
@@ -366,6 +382,9 @@ class MainActivity : ComponentActivity(), MessageApi.MessageListener, GoogleApiC
             is BolusPermissionResponse -> {
                 dataStore.bolusPermissionResponse.value = message
             }
+            is RemoteCarbEntryResponse -> {
+                dataStore.bolusCarbEntryResponse.value = message
+            }
             is InitiateBolusResponse -> {
                 dataStore.bolusInitiateResponse.value = message
             }
@@ -449,8 +468,8 @@ class MainActivity : ComponentActivity(), MessageApi.MessageListener, GoogleApiC
             "/to-wear/bolus-rejected" -> {
                 Timber.w("bolus rejected")
                 runOnUiThread {
-                    navController.navigate(Screen.BolusRejectedOnPhone.route)
                     resetBolusDataStoreState(dataStore)
+                    navController.navigate(Screen.BolusRejectedOnPhone.route)
                 }
             }
             "/from-pump/pump-model" -> {
@@ -525,12 +544,6 @@ class MainActivity : ComponentActivity(), MessageApi.MessageListener, GoogleApiC
                 }
                 val pumpMessage = PumpMessageSerializer.fromBytes(messageEvent.data)
                 onPumpMessageReceived(pumpMessage, true)
-            }
-            // HACK: we need to forward a command from the phone activity to the phone service
-            // and this is the easiest way to do it
-            "/to-pump/command" -> {
-                Timber.i("forwarding to-pump message from phone to wear to phone ${String(messageEvent.data)}")
-                sendMessage(messageEvent.path, messageEvent.data)
             }
             else -> {
                 Timber.w("receive? ${String(messageEvent.data)}")

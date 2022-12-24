@@ -21,6 +21,7 @@ import androidx.core.app.NotificationCompat
 import com.google.android.gms.common.ConnectionResult
 import com.google.android.gms.common.api.GoogleApiClient
 import com.google.android.gms.wearable.MessageEvent
+import com.google.android.gms.wearable.Node
 import com.google.android.gms.wearable.Wearable
 import com.google.android.gms.wearable.WearableListenerService
 import com.jwoglom.pumpx2.pump.PumpState
@@ -32,8 +33,10 @@ import com.jwoglom.pumpx2.pump.messages.bluetooth.Characteristic
 import com.jwoglom.pumpx2.pump.messages.helpers.Bytes
 import com.jwoglom.pumpx2.pump.messages.models.InsulinUnit
 import com.jwoglom.pumpx2.pump.messages.request.control.InitiateBolusRequest
+import com.jwoglom.pumpx2.pump.messages.request.control.RemoteCarbEntryRequest
 import com.jwoglom.pumpx2.pump.messages.response.authentication.CentralChallengeResponse
 import com.jwoglom.pumpx2.pump.messages.response.control.InitiateBolusResponse
+import com.jwoglom.pumpx2.pump.messages.response.currentStatus.TimeSinceResetResponse
 import com.jwoglom.pumpx2.pump.messages.response.qualifyingEvent.QualifyingEvent
 import com.jwoglom.pumpx2.shared.Hex
 import com.jwoglom.wearx2.shared.InitiateConfirmedBolusSerializer
@@ -63,6 +66,7 @@ class CommService : WearableListenerService(), GoogleApiClient.ConnectionCallbac
     private lateinit var tandemBTHandler: TandemBluetoothHandler
 
     private var lastResponseMessage: MutableMap<Pair<Characteristic, Byte>, com.jwoglom.pumpx2.pump.messages.Message> = mutableMapOf()
+    private var lastTimeSinceReset: TimeSinceResetResponse? = null
 
     private inner class Pump() : TandemPump(applicationContext) {
         var lastPeripheral: BluetoothPeripheral? = null
@@ -91,6 +95,7 @@ class CommService : WearableListenerService(), GoogleApiClient.ConnectionCallbac
 
             // Callbacks handled by this service itself
             when (message) {
+                is TimeSinceResetResponse -> onReceiveTimeSinceResetResponse(message)
                 is InitiateBolusResponse -> onReceiveInitiateBolusResponse(message)
             }
         }
@@ -297,6 +302,17 @@ class CommService : WearableListenerService(), GoogleApiClient.ConnectionCallbac
                             return
                         }
                         try {
+                            val bolusReq = pumpMsg as InitiateBolusRequest
+                            if (bolusReq.bolusCarbs > 0 && lastTimeSinceReset != null) {
+                                pump.command(
+                                    RemoteCarbEntryRequest(
+                                        bolusReq.bolusCarbs,
+                                        lastTimeSinceReset!!.currentTime,
+                                        bolusReq.bolusID
+                                    )
+                                )
+                            }
+
                             pump.command(pumpMsg)
                         } catch (e: Packetize.ActionsAffectingInsulinDeliveryNotEnabledInPumpX2Exception) {
                             Timber.e(e)
@@ -311,17 +327,24 @@ class CommService : WearableListenerService(), GoogleApiClient.ConnectionCallbac
 
         fun sendMessage(path: String, message: ByteArray) {
             Timber.i("service sendMessage: $path ${String(message)}")
+            fun inner(node: Node) {
+                Wearable.MessageApi.sendMessage(mApiClient, node.id, path, message)
+                    .setResultCallback { result ->
+                        if (result.status.isSuccess) {
+                            Timber.i("service message sent: $path ${String(message)} to: $node")
+                        } else {
+                            Timber.w("service sendMessage callback: ${result.status} for: $path ${String(message)}")
+                        }
+                    }
+            }
+            Wearable.NodeApi.getLocalNode(mApiClient).setResultCallback { nodes ->
+                Timber.i("service sendMessage to local node: ${nodes.node}")
+                inner(nodes.node)
+            }
             Wearable.NodeApi.getConnectedNodes(mApiClient).setResultCallback { nodes ->
                 Timber.i("service sendMessage nodes: ${nodes.nodes}")
                 nodes.nodes.forEach { node ->
-                    Wearable.MessageApi.sendMessage(mApiClient, node.id, path, message)
-                        .setResultCallback { result ->
-                            if (result.status.isSuccess) {
-                                Timber.i("service message sent: $path ${String(message)} to: $node")
-                            } else {
-                                Timber.w("service sendMessage callback: ${result.status} for: $path ${String(message)}")
-                            }
-                        }
+                    inner(node)
                 }
             }
         }
@@ -580,6 +603,11 @@ class CommService : WearableListenerService(), GoogleApiClient.ConnectionCallbac
             putExtra("response", PumpMessageSerializer.toBytes(response))
         }
         applicationContext.startService(intent)
+    }
+
+    private fun onReceiveTimeSinceResetResponse(response: TimeSinceResetResponse?) {
+        Timber.i("lastTimeSinceReset = $response")
+        lastTimeSinceReset = response
     }
 
     private fun makeNotif(id: Int, notif: Notification) {

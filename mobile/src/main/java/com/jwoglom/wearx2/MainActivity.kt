@@ -30,6 +30,7 @@ import com.google.android.gms.common.ConnectionResult
 import com.google.android.gms.common.api.GoogleApiClient
 import com.google.android.gms.wearable.MessageApi
 import com.google.android.gms.wearable.MessageEvent
+import com.google.android.gms.wearable.Node
 import com.google.android.gms.wearable.Wearable
 import com.google.android.material.textfield.TextInputEditText
 import com.jwoglom.pumpx2.pump.PumpState
@@ -199,6 +200,18 @@ class MainActivity : AppCompatActivity(), GoogleApiClient.ConnectionCallbacks, G
         super.onResume()
     }
 
+    private val commServiceConnection = object : ServiceConnection {
+        override fun onServiceConnected(name: ComponentName, service: IBinder) {
+            //retrieve an instance of the service here from the IBinder returned
+            //from the onBind method to communicate with
+            Timber.i("CommService onServiceConnected")
+        }
+
+        override fun onServiceDisconnected(name: ComponentName) {
+            Timber.i("CommService onServiceDisconnected")
+        }
+    }
+
     private fun startCommService() {
         // Start CommService
         val intent = Intent(applicationContext, CommService::class.java)
@@ -208,32 +221,29 @@ class MainActivity : AppCompatActivity(), GoogleApiClient.ConnectionCallbacks, G
         } else {
             applicationContext.startService(intent)
         }
-        applicationContext.bindService(intent, object : ServiceConnection {
-            override fun onServiceConnected(name: ComponentName, service: IBinder) {
-                //retrieve an instance of the service here from the IBinder returned
-                //from the onBind method to communicate with
-                Timber.i("CommService onServiceConnected")
-            }
-
-            override fun onServiceDisconnected(name: ComponentName) {
-                Timber.i("CommService onServiceDisconnected")
-            }
-        }, BIND_AUTO_CREATE)
+        applicationContext.bindService(intent, commServiceConnection, BIND_AUTO_CREATE)
     }
 
     private fun sendMessage(path: String, message: ByteArray) {
         Timber.i("mobile sendMessage: $path ${String(message)}")
+        fun inner(node: Node) {
+            Wearable.MessageApi.sendMessage(mApiClient, node.id, path, message)
+                .setResultCallback { result ->
+                    if (result.status.isSuccess) {
+                        Timber.i("Message sent: ${path} ${String(message)}")
+                    } else {
+                        Timber.e("mobile sendMessage callback: ${result}")
+                    }
+                }
+        }
+        Wearable.NodeApi.getLocalNode(mApiClient).setResultCallback { nodes ->
+            Timber.i("mobile sendMessage local: ${nodes.node}")
+            inner(nodes.node)
+        }
         Wearable.NodeApi.getConnectedNodes(mApiClient).setResultCallback { nodes ->
             Timber.i("mobile sendMessage nodes: $nodes")
             nodes.nodes.forEach { node ->
-                Wearable.MessageApi.sendMessage(mApiClient, node.id, path, message)
-                    .setResultCallback { result ->
-                        if (result.status.isSuccess) {
-                            Timber.i("Message sent: ${path} ${String(message)}")
-                        } else {
-                            Timber.e("mobile sendMessage callback: ${result}")
-                        }
-                    }
+                inner(node)
             }
         }
     }

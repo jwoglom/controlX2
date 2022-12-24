@@ -7,6 +7,7 @@ import com.jwoglom.pumpx2.pump.messages.calculator.BolusParameters
 import com.jwoglom.pumpx2.pump.messages.response.control.BolusPermissionResponse
 import com.jwoglom.pumpx2.pump.messages.response.control.CancelBolusResponse
 import com.jwoglom.pumpx2.pump.messages.response.control.InitiateBolusResponse
+import com.jwoglom.pumpx2.pump.messages.response.control.RemoteCarbEntryResponse
 import com.jwoglom.pumpx2.pump.messages.response.currentStatus.BolusCalcDataSnapshotResponse
 import com.jwoglom.pumpx2.pump.messages.response.currentStatus.CurrentBolusStatusResponse
 import com.jwoglom.pumpx2.pump.messages.response.currentStatus.LastBGResponse
@@ -47,6 +48,7 @@ class DataStore {
     var bolusFinalConditions = MutableLiveData<Set<BolusCalcCondition>>()
 
     var bolusPermissionResponse = MutableLiveData<BolusPermissionResponse>()
+    var bolusCarbEntryResponse = MutableLiveData<RemoteCarbEntryResponse>()
     var bolusInitiateResponse = MutableLiveData<InitiateBolusResponse>()
     var bolusCancelResponse = MutableLiveData<CancelBolusResponse>()
     var bolusCurrentResponse = MutableLiveData<CurrentBolusStatusResponse>()
@@ -86,6 +88,7 @@ class DataStore {
         bolusFinalConditions.observeForever { t -> Timber.i("DataStore.bolusFinalConditions=$t") }
 
         bolusPermissionResponse.observeForever { t -> Timber.i("DataStore.bolusPermissionResponse=$t") }
+        bolusCarbEntryResponse.observeForever { t -> Timber.i("DataStore.bolusCarbEntryResponse=$t") }
         bolusInitiateResponse.observeForever { t -> Timber.i("DataStore.bolusInitiateResponse=$t") }
         bolusCancelResponse.observeForever { t -> Timber.i("DataStore.bolusCancelResponse=$t") }
         bolusCurrentResponse.observeForever { t -> Timber.i("DataStore.bolusCurrentResponse=$t") }

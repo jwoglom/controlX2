@@ -11,6 +11,7 @@ import android.os.Bundle
 import androidx.core.app.NotificationCompat
 import com.google.android.gms.common.ConnectionResult
 import com.google.android.gms.common.api.GoogleApiClient
+import com.google.android.gms.wearable.Node
 import com.google.android.gms.wearable.Wearable
 import com.google.android.gms.wearable.WearableListenerService
 import com.jwoglom.pumpx2.pump.PumpState
@@ -359,23 +360,30 @@ public class BolusNotificationBroadcastReceiver : BroadcastReceiver(),
 
     fun sendMessage(path: String, message: ByteArray) {
         Timber.i("service sendMessage: $path ${String(message)}")
+        fun inner(node: Node) {
+            Wearable.MessageApi.sendMessage(mApiClient, node.id, path, message)
+                .setResultCallback { result ->
+                    if (result.status.isSuccess) {
+                        Timber.i("service message sent: $path ${String(message)} to: $node")
+                    } else {
+                        Timber.w(
+                            "service sendMessage callback: ${result.status} for: $path ${
+                                String(
+                                    message
+                                )
+                            }"
+                        )
+                    }
+                }
+        }
+        Wearable.NodeApi.getLocalNode(mApiClient).setResultCallback { nodes ->
+            Timber.i("service sendMessage local: ${nodes.node}")
+            inner(nodes.node)
+        }
         Wearable.NodeApi.getConnectedNodes(mApiClient).setResultCallback { nodes ->
             Timber.i("service sendMessage nodes: ${nodes.nodes}")
             nodes.nodes.forEach { node ->
-                Wearable.MessageApi.sendMessage(mApiClient, node.id, path, message)
-                    .setResultCallback { result ->
-                        if (result.status.isSuccess) {
-                            Timber.i("service message sent: $path ${String(message)} to: $node")
-                        } else {
-                            Timber.w(
-                                "service sendMessage callback: ${result.status} for: $path ${
-                                    String(
-                                        message
-                                    )
-                                }"
-                            )
-                        }
-                    }
+                inner(node)
             }
         }
     }
