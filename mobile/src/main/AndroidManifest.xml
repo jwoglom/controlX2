@@ -23,10 +23,10 @@
         tools:ignore="HardcodedDebugMode"
         tools:targetApi="31">
         <activity
-            android:name=".UIActivity"
+            android:name=".MainActivity"
             android:exported="true"
-            android:label="@string/title_activity_uiactivity"
-            android:theme="@style/Theme.WearX2">
+            android:label="WearX2"
+            android:icon="@drawable/pump">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
 
@@ -38,9 +38,10 @@
                 android:value="" />
         </activity>
         <activity
-            android:name=".MainActivity"
+            android:name=".UIActivity"
             android:exported="true"
-            android:icon="@drawable/pump">
+            android:label="WearX2UI"
+            android:theme="@style/Theme.WearX2">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
 
