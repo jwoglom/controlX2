@@ -1,4 +1,4 @@
-package com.jwoglom.wearx2.ui.theme
+package com.jwoglom.wearx2.presentation.theme
 
 import androidx.compose.ui.graphics.Color
 

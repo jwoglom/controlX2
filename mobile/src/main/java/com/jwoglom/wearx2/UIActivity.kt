@@ -10,34 +10,21 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.tooling.preview.Preview
-import com.jwoglom.wearx2.ui.theme.WearX2Theme
+import com.jwoglom.wearx2.presentation.MobileApp
+import com.jwoglom.wearx2.presentation.navigation.Screen
+import com.jwoglom.wearx2.presentation.theme.WearX2Theme
 
 class UIActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContent {
-            WearX2Theme {
-                // A surface container using the 'background' color from the theme
-                Surface(
-                    modifier = Modifier.fillMaxSize(),
-                    color = MaterialTheme.colorScheme.background
-                ) {
-                    Greeting("Android")
-                }
-            }
+            MobileApp(
+                startDestination = determineStartDestination()
+            )
         }
     }
 }
 
-@Composable
-fun Greeting(name: String) {
-    Text(text = "Hello $name!")
-}
-
-@Preview(showBackground = true)
-@Composable
-fun DefaultPreview() {
-    WearX2Theme {
-        Greeting("Android")
-    }
+fun determineStartDestination(): String {
+    return Screen.FirstLaunch.route
 }

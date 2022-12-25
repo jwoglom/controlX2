@@ -1,4 +1,4 @@
-package com.jwoglom.wearx2.ui.theme
+package com.jwoglom.wearx2.presentation.theme
 
 import androidx.compose.material3.Typography
 import androidx.compose.ui.text.TextStyle
