@@ -347,9 +347,11 @@ class CommService : WearableListenerService(), GoogleApiClient.ConnectionCallbac
                         }
                     }
             }
-            Wearable.NodeApi.getLocalNode(mApiClient).setResultCallback { nodes ->
-                Timber.d("service sendMessage to local node: ${nodes.node}")
-                inner(nodes.node)
+            if (!path.startsWith("/to-wear")) {
+                Wearable.NodeApi.getLocalNode(mApiClient).setResultCallback { nodes ->
+                    Timber.d("service sendMessage to local node: ${nodes.node}")
+                    inner(nodes.node)
+                }
             }
             Wearable.NodeApi.getConnectedNodes(mApiClient).setResultCallback { nodes ->
                 Timber.d("service sendMessage nodes: ${nodes.nodes}")

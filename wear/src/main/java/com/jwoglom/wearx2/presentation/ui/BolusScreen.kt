@@ -445,7 +445,7 @@ fun BolusScreen(
             val bolusId = dataStore.bolusPermissionResponse.value!!.bolusId
             val iobUnits = InsulinUnit.from1000To1(dataStore.bolusCalcDataSnapshot.value!!.iob)
 
-            Timber.i("sendBolusRequestToPhone: sending bolus request to phone: bolusId=$bolusId bolusParameters=$bolusParameters unitBreakdown=$unitBreakdown")
+            Timber.i("sendBolusRequestToPhone: sending bolus request to phone: bolusId=$bolusId bolusParameters=$bolusParameters unitBreakdown=$unitBreakdown iobUnits=$iobUnits")
             sendPhoneBolusRequest(bolusId, bolusParameters, unitBreakdown, iobUnits)
         }
 

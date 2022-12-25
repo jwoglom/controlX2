@@ -128,18 +128,20 @@ class PhoneCommService : WearableListenerService() {
             Wearable.MessageApi.sendMessage(mApiClient, node.id, path, message)
                 .setResultCallback { result ->
                     if (result.status.isSuccess) {
-                        Timber.i("Wear message sent: $path ${String(message)}")
+                        Timber.i("Wear message sent: $path ${String(message)} to ${node.displayName}")
                     } else {
-                        Timber.w("wear sendMessage callback: ${result.status}")
+                        Timber.w("wear sendMessage callback: ${result.status} to ${node.displayName}")
                     }
                 }
         }
-        Wearable.NodeApi.getLocalNode(mApiClient).setResultCallback { nodes ->
-            Timber.i("wear sendMessage local: ${nodes.node}")
-            inner(nodes.node)
+        if (path.startsWith("/to-wear")) {
+            Wearable.NodeApi.getLocalNode(mApiClient).setResultCallback { nodes ->
+                Timber.d("wear sendMessage local: ${nodes.node}")
+                inner(nodes.node)
+            }
         }
         Wearable.NodeApi.getConnectedNodes(mApiClient).setResultCallback { nodes ->
-            Timber.i("wear sendMessage nodes: ${nodes.nodes}")
+            Timber.d("wear sendMessage nodes: ${nodes.nodes}")
             nodes.nodes.forEach { node ->
                 inner(node)
             }

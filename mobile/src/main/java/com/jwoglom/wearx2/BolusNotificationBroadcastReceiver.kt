@@ -376,9 +376,11 @@ public class BolusNotificationBroadcastReceiver : BroadcastReceiver(),
                     }
                 }
         }
-        Wearable.NodeApi.getLocalNode(mApiClient).setResultCallback { nodes ->
-            Timber.i("service sendMessage local: ${nodes.node}")
-            inner(nodes.node)
+        if (!path.startsWith("/to-wear")) {
+            Wearable.NodeApi.getLocalNode(mApiClient).setResultCallback { nodes ->
+                Timber.i("service sendMessage local: ${nodes.node}")
+                inner(nodes.node)
+            }
         }
         Wearable.NodeApi.getConnectedNodes(mApiClient).setResultCallback { nodes ->
             Timber.i("service sendMessage nodes: ${nodes.nodes}")

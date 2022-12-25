@@ -236,9 +236,11 @@ class MainActivity : AppCompatActivity(), GoogleApiClient.ConnectionCallbacks, G
                     }
                 }
         }
-        Wearable.NodeApi.getLocalNode(mApiClient).setResultCallback { nodes ->
-            Timber.i("mobile sendMessage local: ${nodes.node}")
-            inner(nodes.node)
+        if (!path.startsWith("/to-wear")) {
+            Wearable.NodeApi.getLocalNode(mApiClient).setResultCallback { nodes ->
+                Timber.i("mobile sendMessage local: ${nodes.node}")
+                inner(nodes.node)
+            }
         }
         Wearable.NodeApi.getConnectedNodes(mApiClient).setResultCallback { nodes ->
             Timber.i("mobile sendMessage nodes: $nodes")

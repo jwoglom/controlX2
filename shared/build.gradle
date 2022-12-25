@@ -61,6 +61,5 @@ dependencies {
     implementation files("${project.m2_repository}/com/jwoglom/pumpx2/pumpx2-messages/${project.pumpx2_version}/pumpx2-messages-${project.pumpx2_version}.jar")
     implementation files("${project.m2_repository}/com/jwoglom/pumpx2/pumpx2-shared/${project.pumpx2_version}/pumpx2-shared-${project.pumpx2_version}.jar")
 
-
     testImplementation 'org.json:json:20180813'
 }

@@ -86,7 +86,7 @@ class MainActivity : ComponentActivity(), MessageApi.MessageListener, GoogleApiC
             initialRoute = intent.getStringExtra("route") ?: Screen.Landing.route
         }
 
-        Timber.i("activity onCreate $initialRoute $savedInstanceState")
+        Timber.i("activity onCreate initialRoute=$initialRoute savedInstanceState=$savedInstanceState")
 
         setContent {
             navController = rememberSwipeDismissableNavController()
@@ -111,9 +111,11 @@ class MainActivity : ComponentActivity(), MessageApi.MessageListener, GoogleApiC
                     bolusTypes.add(BolusDeliveryHistoryLog.BolusType.FOOD1)
                 }
 
-                val corrVolume = InsulinUnit.from1To1000(unitBreakdown.fromBG) + InsulinUnit.from1To1000(unitBreakdown.fromIOB)
+                var corrVolume = InsulinUnit.from1To1000(unitBreakdown.fromBG) + InsulinUnit.from1To1000(unitBreakdown.fromIOB)
                 if (corrVolume > 0) {
                     bolusTypes.add(BolusDeliveryHistoryLog.BolusType.CORRECTION)
+                } else {
+                    corrVolume = 0 // negative correction volume is not passed through
                 }
 
                 val iobUnits = InsulinUnit.from1To1000(currentIob)
@@ -192,7 +194,7 @@ class MainActivity : ComponentActivity(), MessageApi.MessageListener, GoogleApiC
             mApiClient.connect()
         }
 
-        sendMessage("/to-phone/is-pump-connected", "".toByteArray())
+        sendMessage("/to-phone/is-pump-connected", "onResume".toByteArray())
     }
 
     override fun onNewIntent(intent: Intent?) {
@@ -216,7 +218,7 @@ class MainActivity : ComponentActivity(), MessageApi.MessageListener, GoogleApiC
     override fun onConnected(bundle: Bundle?) {
         Timber.i("wear onConnected: $bundle")
         sendMessage("/to-phone/connected", "wear_launched".toByteArray())
-        sendMessage("/to-phone/is-pump-connected", "".toByteArray())
+        sendMessage("/to-phone/is-pump-connected", "onConnected".toByteArray())
         Wearable.MessageApi.addListener(mApiClient, this)
     }
 
@@ -258,18 +260,20 @@ class MainActivity : ComponentActivity(), MessageApi.MessageListener, GoogleApiC
             Wearable.MessageApi.sendMessage(mApiClient, node.id, path, message)
                 .setResultCallback { result ->
                     if (result.status.isSuccess) {
-                        Timber.i("Wear message sent: ${path} ${String(message)}")
+                        Timber.i("Wear message sent: ${path} ${String(message)} to ${node.displayName}")
                     } else {
                         Timber.w("wear sendMessage callback: ${result.status}")
                     }
                 }
         }
-        Wearable.NodeApi.getLocalNode(mApiClient).setResultCallback { nodes ->
-            Timber.i("wear sendMessage local: ${nodes.node}")
-            inner(nodes.node)
+        if (path.startsWith("/to-wear")) {
+            Wearable.NodeApi.getLocalNode(mApiClient).setResultCallback { nodes ->
+                Timber.d("wear sendMessage local: ${nodes.node}")
+                inner(nodes.node)
+            }
         }
         Wearable.NodeApi.getConnectedNodes(mApiClient).setResultCallback { nodes ->
-            Timber.i("wear sendMessage nodes: ${nodes.nodes}")
+            Timber.d("wear sendMessage nodes: ${nodes.nodes}")
             nodes.nodes.forEach { node ->
                 inner(node)
             }
@@ -427,7 +431,7 @@ class MainActivity : ComponentActivity(), MessageApi.MessageListener, GoogleApiC
                     runOnUiThread {
                         navController.navigateClearBackStack(Screen.WaitingToFindPump.route)
                     }
-                    sendMessage("/to-phone/is-pump-connected", "".toByteArray())
+                    sendMessage("/to-phone/is-pump-connected", "on-phone-connected".toByteArray())
                 }
                 connectionStatusText = "Waiting to find pump"
             }
@@ -486,7 +490,7 @@ class MainActivity : ComponentActivity(), MessageApi.MessageListener, GoogleApiC
                     runOnUiThread {
                         navController.navigateClearBackStack(Screen.ConnectingToPump.route)
                     }
-                    sendMessage("/to-phone/is-pump-connected", "".toByteArray())
+                    sendMessage("/to-phone/is-pump-connected", "on-pump-model".toByteArray())
                 }
                 connectionStatusText = "Connecting to pump"
             }
@@ -495,7 +499,7 @@ class MainActivity : ComponentActivity(), MessageApi.MessageListener, GoogleApiC
                     runOnUiThread {
                         navController.navigateClearBackStack(Screen.PairingToPump.route)
                     }
-                    sendMessage("/to-phone/is-pump-connected", "".toByteArray())
+                    sendMessage("/to-phone/is-pump-connected", "on-entered-pairing-code".toByteArray())
                 }
                 connectionStatusText = "Pairing to pump"
             }
@@ -504,7 +508,7 @@ class MainActivity : ComponentActivity(), MessageApi.MessageListener, GoogleApiC
                     runOnUiThread {
                         navController.navigateClearBackStack(Screen.MissingPairingCode.route)
                     }
-                    sendMessage("/to-phone/is-pump-connected", "".toByteArray())
+                    sendMessage("/to-phone/is-pump-connected", "on-missing-pairing-code".toByteArray())
                 }
                 connectionStatusText = "Missing pairing code"
             }
@@ -555,7 +559,7 @@ class MainActivity : ComponentActivity(), MessageApi.MessageListener, GoogleApiC
                 onPumpMessageReceived(pumpMessage, true)
             }
             else -> {
-                Timber.w("receive? ${String(messageEvent.data)}")
+                Timber.w("wear activity unhandled receive: ${messageEvent.path} ${String(messageEvent.data)}")
             }
         }
         dataStore.connectionStatus.value = connectionStatusText
