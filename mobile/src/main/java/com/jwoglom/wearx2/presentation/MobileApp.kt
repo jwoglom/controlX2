@@ -15,6 +15,7 @@ import com.jwoglom.wearx2.presentation.theme.WearX2Theme
 fun MobileApp(
     navController: NavHostController = rememberNavController(),
     startDestination: String = Screen.FirstLaunch.route,
+    sendMessage: (String, ByteArray) -> Unit,
 ) {
     WearX2Theme {
         NavHost(
@@ -22,11 +23,17 @@ fun MobileApp(
             startDestination = startDestination,
         ) {
             composable(Screen.FirstLaunch.route) {
-                FirstLaunch(navController = navController)
+                FirstLaunch(
+                    navController = navController,
+                    sendMessage = sendMessage,
+                )
             }
 
             composable(Screen.InitialSetup.route) {
-                InitialSetup(navController = navController)
+                InitialSetup(
+                    navController = navController,
+                    sendMessage = sendMessage,
+                )
             }
         }
     }
@@ -37,5 +44,6 @@ fun MobileApp(
 fun DefaultPreview() {
     MobileApp(
         startDestination = Screen.FirstLaunch.route,
+        sendMessage = {_, _ -> },
     )
 }

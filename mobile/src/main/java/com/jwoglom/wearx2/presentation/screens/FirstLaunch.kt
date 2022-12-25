@@ -17,7 +17,8 @@ import com.jwoglom.wearx2.presentation.theme.WearX2Theme
 
 @Composable
 fun FirstLaunch(
-    navController: NavHostController? = null
+    navController: NavHostController? = null,
+    sendMessage: (String, ByteArray) -> Unit,
 ) {
     DialogScreen(
         "Health and Safety Warning",
@@ -29,6 +30,7 @@ fun FirstLaunch(
             }
             Button(
                 onClick = {
+                    sendMessage("/to-phone/start-comm", "".toByteArray())
                     navController?.navigate(Screen.InitialSetup.route)
                 }
             ) {
@@ -60,7 +62,9 @@ private fun DefaultPreview() {
             modifier = Modifier.fillMaxSize(),
             color = Color.White,
         ) {
-            FirstLaunch()
+            FirstLaunch(
+                sendMessage = {_, _ -> },
+            )
         }
     }
 }

@@ -6,6 +6,7 @@ import android.app.NotificationManager
 import android.app.PendingIntent
 import android.app.PendingIntent.FLAG_IMMUTABLE
 import android.app.PendingIntent.FLAG_ONE_SHOT
+import android.bluetooth.le.ScanResult
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
@@ -116,10 +117,21 @@ class CommService : WearableListenerService(), GoogleApiClient.ConnectionCallbac
             wearCommHandler?.sendMessage("/from-pump/receive-qualifying-event", PumpQualifyingEventsSerializer.toBytes(events))
         }
 
+        var pairingCodeCentralChallenge: CentralChallengeResponse? = null
         override fun onWaitingForPairingCode(
             peripheral: BluetoothPeripheral?,
             centralChallengeResponse: CentralChallengeResponse?
         ) {
+            pairingCodeCentralChallenge = centralChallengeResponse
+            performPairing(peripheral, centralChallengeResponse, false)
+        }
+
+        fun performPairing(
+            peripheral: BluetoothPeripheral?,
+            centralChallengeResponse: CentralChallengeResponse?,
+            manuallyTriggered: Boolean
+        ) {
+            Timber.i("performPairing manuallyTriggered=$manuallyTriggered")
             PumpState.getPairingCode(context)?.let {
                 Timber.i("Pairing with saved code: $it centralChallenge: $centralChallengeResponse")
                 pair(peripheral, centralChallengeResponse, it)
@@ -133,11 +145,22 @@ class CommService : WearableListenerService(), GoogleApiClient.ConnectionCallbac
             }
         }
 
+        override fun onPumpDiscovered(
+            peripheral: BluetoothPeripheral?,
+            scanResult: ScanResult?
+        ): Boolean {
+            wearCommHandler?.sendMessage("/from-pump/pump-discovered", "${peripheral?.name}".toByteArray())
+            return super.onPumpDiscovered(peripheral, scanResult)
+        }
+
         override fun onInitialPumpConnection(peripheral: BluetoothPeripheral?) {
             lastPeripheral = peripheral
             val wait = (500..1000).random()
             Timber.i("Waiting to pair onInitialPumpConnection to avoid race condition with tconnect app for ${wait}ms")
             Thread.sleep(wait.toLong())
+
+            wearCommHandler?.sendMessage("/from-pump/initial-pump-connection", "${peripheral?.name}".toByteArray())
+
             if (Packetize.txId.get() > 0) {
                 Timber.w("Not pairing in onInitialPumpConnection because it looks like the tconnect app has already paired with txId=${Packetize.txId.get()}")
                 return
@@ -242,6 +265,14 @@ class CommService : WearableListenerService(), GoogleApiClient.ConnectionCallbac
                         }
                     }
                 }
+                CommServiceCodes.SEND_PUMP_PAIRING_MESSAGE.ordinal -> {
+                    if (pump.lastPeripheral != null && pump.pairingCodeCentralChallenge != null) {
+                        Timber.i("wearCommHandler send pump pairing message")
+                        pump.performPairing(pump.lastPeripheral, pump.pairingCodeCentralChallenge, true)
+                    } else {
+                        Timber.w("wearCommHandler cannot send pump pairing message: lastPeripheral=${pump.lastPeripheral} pairingCodeCentralChallenge=${pump.pairingCodeCentralChallenge}")
+                    }
+                }
                 CommServiceCodes.SEND_PUMP_COMMAND.ordinal -> {
                     Timber.i("wearCommHandler send command raw: ${String(msg.obj as ByteArray)}")
                     val pumpMsg = PumpMessageSerializer.fromBytes(msg.obj as ByteArray)
@@ -336,33 +367,37 @@ class CommService : WearableListenerService(), GoogleApiClient.ConnectionCallbac
         }
 
         fun sendMessage(path: String, message: ByteArray) {
-            Timber.i("service sendMessage: $path ${String(message)}")
-            fun inner(node: Node) {
-                Wearable.MessageApi.sendMessage(mApiClient, node.id, path, message)
-                    .setResultCallback { result ->
-                        if (result.status.isSuccess) {
-                            Timber.d("service message sent: $path ${String(message)} to: $node")
-                        } else {
-                            Timber.w("service sendMessage callback: ${result.status} for: $path ${String(message)}")
-                        }
-                    }
-            }
-            if (!path.startsWith("/to-wear")) {
-                Wearable.NodeApi.getLocalNode(mApiClient).setResultCallback { nodes ->
-                    Timber.d("service sendMessage to local node: ${nodes.node}")
-                    inner(nodes.node)
-                }
-            }
-            Wearable.NodeApi.getConnectedNodes(mApiClient).setResultCallback { nodes ->
-                Timber.d("service sendMessage nodes: ${nodes.nodes}")
-                nodes.nodes.forEach { node ->
-                    inner(node)
-                }
-            }
+            sendWearCommMessage(path, message)
         }
 
         private fun isBolusCommand(message: com.jwoglom.pumpx2.pump.messages.Message): Boolean {
             return (message is InitiateBolusRequest) || message.opCode() == InitiateBolusRequest().opCode()
+        }
+    }
+
+    fun sendWearCommMessage(path: String, message: ByteArray) {
+        Timber.i("service sendMessage: $path ${String(message)}")
+        fun inner(node: Node) {
+            Wearable.MessageApi.sendMessage(mApiClient, node.id, path, message)
+                .setResultCallback { result ->
+                    if (result.status.isSuccess) {
+                        Timber.d("service message sent: $path ${String(message)} to: $node")
+                    } else {
+                        Timber.w("service sendMessage callback: ${result.status} for: $path ${String(message)}")
+                    }
+                }
+        }
+        if (!path.startsWith("/to-wear")) {
+            Wearable.NodeApi.getLocalNode(mApiClient).setResultCallback { nodes ->
+                Timber.d("service sendMessage to local node: ${nodes.node}")
+                inner(nodes.node)
+            }
+        }
+        Wearable.NodeApi.getConnectedNodes(mApiClient).setResultCallback { nodes ->
+            Timber.d("service sendMessage nodes: ${nodes.nodes}")
+            nodes.nodes.forEach { node ->
+                inner(node)
+            }
         }
     }
 
@@ -436,6 +471,16 @@ class CommService : WearableListenerService(), GoogleApiClient.ConnectionCallbac
             serviceLooper = looper
             wearCommHandler = WearCommHandler(looper)
 
+
+            Thread {
+                while (!mApiClient.isConnected) {
+                    Timber.d("waiting for mApiClient in CommService")
+                    Thread.sleep(100)
+                }
+
+                sendWearCommMessage("/to-phone/comm-started", "".toByteArray())
+            }.start()
+
         // }
     }
 
@@ -466,6 +511,20 @@ class CommService : WearableListenerService(), GoogleApiClient.ConnectionCallbac
                     wearCommHandler?.sendMessage("/from-pump/pump-connected",
                         pump.lastPeripheral?.name!!.toByteArray()
                     )
+                }
+            }
+            "/to-phone/pair" -> {
+                if (!this::pump.isInitialized) {
+                    Timber.e("pump not initialized")
+                    wearCommHandler?.sendMessage("/from-pump/pump-disconnected", "not_initialized".toByteArray())
+                } else if (!pump.isConnected) {
+                    Timber.e("pump not connected")
+                    wearCommHandler?.sendMessage("/from-pump/pump-disconnected", "not_connected".toByteArray())
+                } else if (pump.lastPeripheral == null) {
+                    Timber.e("pump not saved peripheral")
+                    wearCommHandler?.sendMessage("/from-pump/pump-disconnected", "null_peripheral".toByteArray())
+                } else {
+                    sendPumpPairingMessage()
                 }
             }
             "/to-phone/bolus-request" -> {
@@ -562,6 +621,12 @@ class CommService : WearableListenerService(), GoogleApiClient.ConnectionCallbac
         stopSelf()
     }
 
+    private fun sendPumpPairingMessage() {
+        wearCommHandler?.obtainMessage()?.also { msg ->
+            msg.what = CommServiceCodes.SEND_PUMP_PAIRING_MESSAGE.ordinal
+            wearCommHandler?.sendMessage(msg)
+        }
+    }
     private fun sendPumpCommMessage(pumpMsgBytes: ByteArray) {
         wearCommHandler?.obtainMessage()?.also { msg ->
             msg.what = CommServiceCodes.SEND_PUMP_COMMAND.ordinal
