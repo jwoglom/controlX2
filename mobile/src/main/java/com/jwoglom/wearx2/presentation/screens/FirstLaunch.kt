@@ -10,11 +10,15 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.tooling.preview.Preview
+import androidx.navigation.NavHostController
 import com.jwoglom.wearx2.presentation.components.DialogScreen
+import com.jwoglom.wearx2.presentation.navigation.Screen
 import com.jwoglom.wearx2.presentation.theme.WearX2Theme
 
 @Composable
-fun FirstLaunch() {
+fun FirstLaunch(
+    navController: NavHostController? = null
+) {
     DialogScreen(
         "Health and Safety Warning",
         buttonContent = {
@@ -24,7 +28,9 @@ fun FirstLaunch() {
                 Text("Cancel")
             }
             Button(
-                onClick = {}
+                onClick = {
+                    navController?.navigate(Screen.InitialSetup.route)
+                }
             ) {
                 Text("Agree")
             }

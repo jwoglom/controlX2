@@ -22,11 +22,11 @@ fun MobileApp(
             startDestination = startDestination,
         ) {
             composable(Screen.FirstLaunch.route) {
-                FirstLaunch()
+                FirstLaunch(navController = navController)
             }
 
             composable(Screen.InitialSetup.route) {
-                InitialSetup()
+                InitialSetup(navController = navController)
             }
         }
     }
