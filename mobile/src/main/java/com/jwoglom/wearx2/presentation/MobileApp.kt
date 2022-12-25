@@ -8,6 +8,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import com.jwoglom.wearx2.presentation.navigation.Screen
 import com.jwoglom.wearx2.presentation.screens.FirstLaunch
+import com.jwoglom.wearx2.presentation.screens.InitialSetup
 import com.jwoglom.wearx2.presentation.theme.WearX2Theme
 
 @Composable
@@ -16,13 +17,16 @@ fun MobileApp(
     startDestination: String = Screen.FirstLaunch.route,
 ) {
     WearX2Theme {
-
         NavHost(
             navController = navController,
             startDestination = startDestination,
         ) {
             composable(Screen.FirstLaunch.route) {
                 FirstLaunch()
+            }
+
+            composable(Screen.InitialSetup.route) {
+                InitialSetup()
             }
         }
     }

@@ -37,23 +37,23 @@ class DataStore {
     val bolusCalcLastBG = MutableLiveData<LastBGResponse>()
     val maxBolusAmount = MutableLiveData<Int>()
 
-    var landingBasalDisplayedText = MutableLiveData<String>()
-    var landingControlIQDisplayedText = MutableLiveData<String>()
+    val landingBasalDisplayedText = MutableLiveData<String>()
+    val landingControlIQDisplayedText = MutableLiveData<String>()
 
-    var bolusUnitsDisplayedText = MutableLiveData<String>()
-    var bolusBGDisplayedText = MutableLiveData<String>()
+    val bolusUnitsDisplayedText = MutableLiveData<String>()
+    val bolusBGDisplayedText = MutableLiveData<String>()
 
-    var bolusCalculatorBuilder = MutableLiveData<BolusCalculatorBuilder>()
-    var bolusCurrentParameters = MutableLiveData<BolusParameters>()
-    var bolusFinalParameters = MutableLiveData<BolusParameters>()
-    var bolusFinalCalcUnits = MutableLiveData<BolusCalcUnits>()
-    var bolusFinalConditions = MutableLiveData<Set<BolusCalcCondition>>()
+    val bolusCalculatorBuilder = MutableLiveData<BolusCalculatorBuilder>()
+    val bolusCurrentParameters = MutableLiveData<BolusParameters>()
+    val bolusFinalParameters = MutableLiveData<BolusParameters>()
+    val bolusFinalCalcUnits = MutableLiveData<BolusCalcUnits>()
+    val bolusFinalConditions = MutableLiveData<Set<BolusCalcCondition>>()
 
-    var bolusPermissionResponse = MutableLiveData<BolusPermissionResponse>()
-    var bolusCarbEntryResponse = MutableLiveData<RemoteCarbEntryResponse>()
-    var bolusInitiateResponse = MutableLiveData<InitiateBolusResponse>()
-    var bolusCancelResponse = MutableLiveData<CancelBolusResponse>()
-    var bolusCurrentResponse = MutableLiveData<CurrentBolusStatusResponse>()
+    val bolusPermissionResponse = MutableLiveData<BolusPermissionResponse>()
+    val bolusCarbEntryResponse = MutableLiveData<RemoteCarbEntryResponse>()
+    val bolusInitiateResponse = MutableLiveData<InitiateBolusResponse>()
+    val bolusCancelResponse = MutableLiveData<CancelBolusResponse>()
+    val bolusCurrentResponse = MutableLiveData<CurrentBolusStatusResponse>()
 
     init {
         connectionStatus.observeForever { t -> Timber.i("DataStore.connectionStatus=$t") }

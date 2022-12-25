@@ -4,4 +4,5 @@ sealed class Screen(
     val route: String
 ) {
     object FirstLaunch : Screen("FirstLaunch")
+    object InitialSetup : Screen("InitialSetup")
 }
