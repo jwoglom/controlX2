@@ -14,18 +14,19 @@
     <application
         android:allowBackup="true"
         android:dataExtractionRules="@xml/data_extraction_rules"
+        android:debuggable="true"
         android:fullBackupContent="@xml/backup_rules"
         android:icon="@drawable/pump"
         android:label="@string/app_name"
         android:supportsRtl="true"
         android:theme="@style/Theme.WearX2"
-        tools:targetApi="31"
-        android:debuggable="true"
-        tools:ignore="HardcodedDebugMode">
+        tools:ignore="HardcodedDebugMode"
+        tools:targetApi="31">
         <activity
-            android:name=".MainActivity"
-            android:icon="@drawable/pump"
-            android:exported="true">
+            android:name=".UIActivity"
+            android:exported="true"
+            android:label="@string/title_activity_uiactivity"
+            android:theme="@style/Theme.WearX2">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
 
@@ -36,26 +37,41 @@
                 android:name="android.app.lib_name"
                 android:value="" />
         </activity>
-        <service android:name=".CommService"
-            android:icon="@drawable/pump"
-            android:exported="false">
+        <activity
+            android:name=".MainActivity"
+            android:exported="true"
+            android:icon="@drawable/pump">
             <intent-filter>
-                <action android:name="com.google.android.gms.wearable.BIND_LISTENER"
+                <action android:name="android.intent.action.MAIN" />
+
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+
+            <meta-data
+                android:name="android.app.lib_name"
+                android:value="" />
+        </activity>
+
+        <service
+            android:name=".CommService"
+            android:exported="false"
+            android:icon="@drawable/pump">
+            <intent-filter>
+                <action
+                    android:name="com.google.android.gms.wearable.BIND_LISTENER"
                     tools:ignore="WearableBindListener" />
             </intent-filter>
         </service>
-        <receiver android:name=".BolusNotificationBroadcastReceiver"
+
+        <receiver
+            android:name=".BolusNotificationBroadcastReceiver"
             android:exported="false">
             <intent-filter>
-                <action android:name="com.google.android.gms.wearable.BIND_LISTENER"
+                <action
+                    android:name="com.google.android.gms.wearable.BIND_LISTENER"
                     tools:ignore="WearableBindListener" />
             </intent-filter>
         </receiver>
-        <!--receiver android:name=".LaunchCommServiceBroadcastReceiver">
-            <intent-filter>
-                <action android:name="android.intent.action.BOOT_COMPLETED" />
-            </intent-filter>
-        </receiver-->
     </application>
 
 </manifest>
