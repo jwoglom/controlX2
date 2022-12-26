@@ -9,29 +9,37 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.navigation.NavHostController
+import com.jwoglom.wearx2.Prefs
 import com.jwoglom.wearx2.presentation.components.DialogScreen
 import com.jwoglom.wearx2.presentation.navigation.Screen
 import com.jwoglom.wearx2.presentation.theme.WearX2Theme
+import kotlin.system.exitProcess
 
 @Composable
 fun FirstLaunch(
     navController: NavHostController? = null,
     sendMessage: (String, ByteArray) -> Unit,
 ) {
+    val context = LocalContext.current
+
     DialogScreen(
         "Health and Safety Warning",
         buttonContent = {
             Button(
-                onClick = {}
+                onClick = {
+                    Prefs(context).setTosAccepted(false)
+                    exitProcess(0)
+                }
             ) {
                 Text("Cancel")
             }
             Button(
                 onClick = {
-                    sendMessage("/to-phone/start-comm", "".toByteArray())
-                    navController?.navigate(Screen.InitialSetup.route)
+                    navController?.navigate(Screen.PumpSetup.route)
+                    Prefs(context).setTosAccepted(true)
                 }
             ) {
                 Text("Agree")

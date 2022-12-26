@@ -25,8 +25,8 @@
         <activity
             android:name=".MainActivity"
             android:exported="true"
-            android:label="WearX2"
-            android:icon="@drawable/pump">
+            android:label="WearX2UI"
+            android:theme="@style/Theme.WearX2">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
 
@@ -38,10 +38,10 @@
                 android:value="" />
         </activity>
         <activity
-            android:name=".UIActivity"
+            android:name=".LegacyMainActivity"
             android:exported="true"
-            android:label="WearX2UI"
-            android:theme="@style/Theme.WearX2">
+            android:label="WearX2-Legacy"
+            android:icon="@drawable/pump">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
 
