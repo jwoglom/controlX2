@@ -4,6 +4,7 @@ package com.jwoglom.wearx2.presentation
 
 import androidx.compose.material.ExperimentalMaterialApi
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
@@ -51,13 +52,17 @@ fun MobileApp(
                 )
             }
 
-            composable(Screen.AppSetup.route) {
+            composable(Screen.Landing.route) {
                 Landing(
                     navController = navController,
                     sendMessage = sendMessage,
                     sendPumpCommands = sendPumpCommands,
                 )
             }
+        }
+
+        LaunchedEffect (Unit) {
+            navController.navigate(startDestination)
         }
     }
 }

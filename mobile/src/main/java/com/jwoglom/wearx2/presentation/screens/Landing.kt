@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.BottomSheetScaffold
 import androidx.compose.material.BottomSheetState
@@ -74,10 +75,13 @@ import com.jwoglom.wearx2.R
 import com.jwoglom.wearx2.dataStore
 import com.jwoglom.wearx2.presentation.DataStore
 import com.jwoglom.wearx2.presentation.components.Line
+import com.jwoglom.wearx2.presentation.navigation.Screen
 import com.jwoglom.wearx2.presentation.theme.Colors
 import com.jwoglom.wearx2.presentation.theme.WearX2Theme
 import com.jwoglom.wearx2.shared.util.SendType
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 @Composable
 fun Landing(
@@ -142,6 +146,7 @@ fun Landing(
                         Icon(imageVector = Icons.Filled.Warning, contentDescription = "Disconnected")
                         Text("Disconnected, reconnecting...", modifier = Modifier.padding(start = 32.dp))
                     } else {
+                        //Icon(painterResource(R.drawable.pump), "Pump icon", modifier = Modifier.width(32.dp))
                         Text("${deviceName.value}")
                     }
                 },
@@ -321,7 +326,13 @@ fun Landing(
                                     Button(
                                         onClick = {
                                             Prefs(context).setPumpSetupComplete(false)
-                                            sendMessage("/to-phone/app-reload", "".toByteArray())
+                                            coroutineScope.launch {
+                                                sendMessage(
+                                                    "/to-phone/app-reload",
+                                                    "".toByteArray()
+                                                )
+                                            }
+                                            navController?.navigate(Screen.PumpSetup.route)
                                         }
                                     ) {
                                         Text("Reconfigure pump")
@@ -332,7 +343,7 @@ fun Landing(
                                     Button(
                                         onClick = {
                                             Prefs(context).setAppSetupComplete(false)
-                                            sendMessage("/to-phone/app-reload", "".toByteArray())
+                                            navController?.navigate(Screen.AppSetup.route)
                                         }
                                     ) {
                                         Text("Reconfigure app")

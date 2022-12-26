@@ -1,11 +1,13 @@
 package com.jwoglom.wearx2.presentation.screens
 
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.selection.toggleable
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.Button
 import androidx.compose.material3.Surface
@@ -15,6 +17,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.livedata.observeAsState
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -34,12 +37,14 @@ import com.jwoglom.wearx2.presentation.components.DialogScreen
 import com.jwoglom.wearx2.presentation.components.Line
 import com.jwoglom.wearx2.presentation.navigation.Screen
 import com.jwoglom.wearx2.presentation.theme.WearX2Theme
+import kotlinx.coroutines.launch
 
 @Composable
 fun AppSetup(
     navController: NavHostController? = null,
     sendMessage: (String, ByteArray) -> Unit,
 ) {
+    val coroutineScope = rememberCoroutineScope()
     val context = LocalContext.current
     val ds = LocalDataStore.current
 
@@ -65,6 +70,12 @@ fun AppSetup(
                         onClick = {
                             navController?.navigate(Screen.Landing.route)
                             Prefs(context).setAppSetupComplete(true)
+                            coroutineScope.launch {
+                                sendMessage(
+                                    "/to-phone/app-reload",
+                                    "".toByteArray()
+                                )
+                            }
                         }
                     ) {
                         Text("Continue")
@@ -84,6 +95,12 @@ fun AppSetup(
                         onValueChange = {
                             insulinDeliveryActions = !insulinDeliveryActions
                             Prefs(context).setInsulinDeliveryActions(insulinDeliveryActions)
+                            coroutineScope.launch {
+                                sendMessage(
+                                    "/to-phone/app-reload",
+                                    "".toByteArray()
+                                )
+                            }
                         },
                         role = Role.Checkbox
                     )
@@ -99,10 +116,11 @@ fun AppSetup(
                     bold = true,
                     modifier = Modifier.padding(start = 16.dp))
             }
+            Line("Enabling insulin delivery actions allows you to perform remote boluses. This is an optional setting. The application will reload after enabling or disabling this option.")
+            Spacer(Modifier.height(16.dp))
             Line(buildAnnotatedString {
-                append("Enabling insulin delivery actions allows you to perform remote boluses. This is an optional setting. ")
                 withStyle(style = SpanStyle(color = Color.Red, fontWeight = FontWeight.Bold)) {
-                    append("WARNING: THIS SOFTWARE IS EXPERIMENTAL. VERIFY BOLUS OPERATIONS ON YOUR PUMP.")
+                    append("WARNING: THIS SOFTWARE IS UNOFFICIAL AND EXPERIMENTAL. ENABLING INSULIN DELIVERY ACTIONS WILL ALLOW YOUR PHONE OR WATCH TO REMOTELY SEND BOLUSES TO YOUR PUMP. BE AWARE OF THE SECURITY AND SAFETY IMPLICATIONS OF ENABLING THIS SETTING. FOR SAFETY, VERIFY BOLUS OPERATIONS ON YOUR PUMP. THE PUMP WILL BEEP WHEN A BOLUS COMMAND IS SENT.")
                 }
             })
         }

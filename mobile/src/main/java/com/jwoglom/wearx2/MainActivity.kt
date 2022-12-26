@@ -71,9 +71,12 @@ class MainActivity : ComponentActivity(), GoogleApiClient.ConnectionCallbacks, G
         Timber.d("mobile UIActivity onCreate $savedInstanceState")
         super.onCreate(savedInstanceState)
         setupTimber("MUA")
+        val startDestination = determineStartDestination()
+        Timber.d("startDestination=%s", startDestination)
+
         setContent {
             MobileApp(
-                startDestination = determineStartDestination(),
+                startDestination = startDestination,
                 sendMessage = {path, message -> sendMessage(path, message) },
                 sendPumpCommands = {type, messages -> sendPumpCommands(type, messages) },
             )
