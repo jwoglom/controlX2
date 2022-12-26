@@ -56,6 +56,7 @@ import com.jwoglom.wearx2.shared.PumpMessageSerializer
 import com.jwoglom.wearx2.shared.PumpQualifyingEventsSerializer
 import com.jwoglom.wearx2.shared.util.setupTimber
 import com.jwoglom.wearx2.shared.util.SendType
+import com.jwoglom.wearx2.shared.util.pumpTimeToLocalTz
 import com.jwoglom.wearx2.shared.util.shortTime
 import com.jwoglom.wearx2.shared.util.shortTimeAgo
 import com.jwoglom.wearx2.shared.util.twoDecimalPlaces1000Unit
@@ -309,7 +310,7 @@ class MainActivity : ComponentActivity(), MessageApi.MessageListener, GoogleApiC
                 dataStore.cartridgeRemainingUnits.value = message.currentInsulinAmount
             }
             is LastBolusStatusAbstractResponse -> {
-                dataStore.lastBolusStatus.value = "${twoDecimalPlaces1000Unit(message.deliveredVolume)}u at ${shortTime(message.timestampInstant)}"
+                dataStore.lastBolusStatus.value = "${twoDecimalPlaces1000Unit(message.deliveredVolume)}u at ${shortTime(pumpTimeToLocalTz(message.timestampInstant))}"
             }
             is HomeScreenMirrorResponse -> {
                 dataStore.controlIQStatus.value = when (message.apControlStateIcon) {
@@ -360,11 +361,16 @@ class MainActivity : ComponentActivity(), MessageApi.MessageListener, GoogleApiC
                     else -> "Unknown"
                 }
                 dataStore.cgmSessionExpireRelative.value = when (message.sessionState) {
-                    SessionState.SESSION_ACTIVE -> shortTimeAgo(message.sensorStartedTimestampInstant.plus(10, ChronoUnit.DAYS), suffix = "left")
+                    SessionState.SESSION_ACTIVE -> shortTimeAgo(
+                        pumpTimeToLocalTz(message.sensorStartedTimestampInstant)
+                            .plus(10, ChronoUnit.DAYS),
+                        suffix = "left")
                     else -> ""
                 }
                 dataStore.cgmSessionExpireExact.value = when (message.sessionState) {
-                    SessionState.SESSION_ACTIVE -> shortTime(message.sensorStartedTimestampInstant.plus(10, ChronoUnit.DAYS))
+                    SessionState.SESSION_ACTIVE -> shortTime(
+                        pumpTimeToLocalTz(message.sensorStartedTimestampInstant)
+                            .plus(10, ChronoUnit.DAYS))
                     else -> ""
                 }
                 dataStore.cgmTransmitterStatus.value = when (message.transmitterBatteryStatus) {

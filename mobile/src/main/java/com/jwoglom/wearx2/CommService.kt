@@ -69,7 +69,7 @@ class CommService : WearableListenerService(), GoogleApiClient.ConnectionCallbac
     private lateinit var pump: Pump
     private lateinit var tandemBTHandler: TandemBluetoothHandler
 
-    private var lastResponseMessage: MutableMap<Pair<Characteristic, Byte>, com.jwoglom.pumpx2.pump.messages.Message> = mutableMapOf()
+    private var lastResponseMessage: MutableMap<Pair<Characteristic, Byte>, Pair<com.jwoglom.pumpx2.pump.messages.Message, Instant>> = mutableMapOf()
     private var lastTimeSinceReset: TimeSinceResetResponse? = null
 
     private inner class Pump() : TandemPump(applicationContext) {
@@ -94,7 +94,7 @@ class CommService : WearableListenerService(), GoogleApiClient.ConnectionCallbac
             peripheral: BluetoothPeripheral?,
             message: com.jwoglom.pumpx2.pump.messages.Message?
         ) {
-            message?.let { lastResponseMessage.put(Pair(it.characteristic, it.opCode()), it) }
+            message?.let { lastResponseMessage.put(Pair(it.characteristic, it.opCode()), Pair(it, Instant.now())) }
             wearCommHandler?.sendMessage("/from-pump/receive-message", PumpMessageSerializer.toBytes(message))
 
             // Callbacks handled by this service itself
@@ -295,6 +295,7 @@ class CommService : WearableListenerService(), GoogleApiClient.ConnectionCallbac
                         pump.command(pumpMsg)
                     } else {
                         Timber.w("wearCommHandler not sending command due to pump state: $pump $pumpMsg")
+                        wearCommHandler?.sendMessage("/from-pump/pump-disconnected", "from_pump_command".toByteArray())
                     }
                 }
                 CommServiceCodes.SEND_PUMP_COMMANDS_BULK.ordinal -> {
@@ -305,6 +306,7 @@ class CommService : WearableListenerService(), GoogleApiClient.ConnectionCallbac
                             pump.command(it)
                         } else {
                             Timber.w("wearCommHandler not sending command due to pump state: $pump $it")
+                            wearCommHandler?.sendMessage("/from-pump/pump-disconnected", "from_pump_command".toByteArray())
                         }
                     }
                 }
@@ -320,6 +322,7 @@ class CommService : WearableListenerService(), GoogleApiClient.ConnectionCallbac
                             pump.command(it)
                         } else {
                             Timber.w("wearCommHandler not sending command due to pump state: $pump $it")
+                            wearCommHandler?.sendMessage("/from-pump/pump-disconnected", "from_pump_command".toByteArray())
                         }
                     }
                 }
@@ -329,12 +332,13 @@ class CommService : WearableListenerService(), GoogleApiClient.ConnectionCallbac
                         if (lastResponseMessage.containsKey(Pair(it.characteristic, it.responseOpCode)) && !isBolusCommand(it)) {
                             val response = lastResponseMessage.get(Pair(it.characteristic, it.responseOpCode))
                             Timber.i("wearCommHandler cached hit: $response")
-                            wearCommHandler?.sendMessage("/from-pump/receive-cached-message", PumpMessageSerializer.toBytes(response))
+                            wearCommHandler?.sendMessage("/from-pump/receive-cached-message", PumpMessageSerializer.toBytes(response?.first))
                         } else if (this@CommService::pump.isInitialized && pump.isConnected && !isBolusCommand(it)) {
                             Timber.i("wearCommHandler cached miss: $it")
                             pump.command(it)
                         } else {
                             Timber.w("wearCommHandler not sending cached send command due to pump state: $pump $it")
+                            wearCommHandler?.sendMessage("/from-pump/pump-disconnected", "from_pump_command".toByteArray())
                         }
                     }
                 }
@@ -375,7 +379,12 @@ class CommService : WearableListenerService(), GoogleApiClient.ConnectionCallbac
                         }
                     } else {
                         Timber.w("wearCommHandler not sending command due to pump state: $pump")
+                        wearCommHandler?.sendMessage("/from-pump/pump-disconnected", "from_pump_command".toByteArray())
                     }
+                }
+                CommServiceCodes.DEBUG_GET_MESSAGE_CACHE.ordinal -> {
+                    Timber.i("wearCommHandler debug get message cache: $lastResponseMessage")
+                    wearCommHandler?.sendMessage("/from-pump/debug-message-cache", PumpMessageSerializer.toDebugMessageCacheBytes(lastResponseMessage.values))
                 }
             }
         }

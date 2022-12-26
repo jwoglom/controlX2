@@ -11,14 +11,18 @@ import java.util.*
 import kotlin.math.abs
 import kotlin.time.DurationUnit
 
+fun pumpTimeToLocalTz(time: Instant): Instant {
+    val offsetSeconds = TimeZone.getDefault().getOffset(Date().time) / 1000
+    return time.minusSeconds(offsetSeconds.toLong())
+}
 
 fun shortTimeAgo(
     time: Instant,
     prefix: String = "in",
     suffix: String = "ago",
+    nowThresholdSeconds: Int = 60,
 ): String {
-    val offsetSeconds = TimeZone.getDefault().getOffset(Date().time) / 1000
-    val now = Instant.now().plusSeconds(offsetSeconds.toLong())
+    val now = Instant.now()
     val diff = Duration.between(time, now)
     var ret = ""
     if (diff.toDays() != 0L) {
@@ -30,20 +34,26 @@ fun shortTimeAgo(
     if (diff.toMinutes() % 60 != 0L && diff.toDays() == 0L) {
         ret += "${String.format("%d", abs(diff.toMinutes())%60)}m"
     }
-    if (diff.getSeconds() < 60 && diff.getSeconds() > -60) {
+    if (diff.seconds < nowThresholdSeconds && diff.seconds > (-1 * nowThresholdSeconds)) {
         return "now"
-    } else if (time.isBefore(now)) {
-        return "$ret $suffix"
+    } else if (diff.toMinutes() == 0L) {
+        ret += "${String.format("%d", abs(diff.seconds))}s"
+    }
+
+    return if (time.isBefore(now)) {
+        "$ret $suffix"
     } else {
-        return "$prefix $ret"
+        "$prefix $ret"
     }
 }
 
 fun shortTime(time: Instant): String {
-    val zoned = time.atZone(UTC) // UTC, not the system timezone, for some reason. Perhaps TZ information is already encoded in the Tandem timestamps?
-
-    val offsetSeconds = TimeZone.getDefault().getOffset(Date().time) / 1000
-    val now = Instant.now().plusSeconds(offsetSeconds.toLong())
+//    val zoned = time.atZone(UTC) // UTC, not the system timezone, for some reason. Perhaps TZ information is already encoded in the Tandem timestamps?
+//
+//    val offsetSeconds = TimeZone.getDefault().getOffset(Date().time) / 1000
+//    val now = Instant.now().plusSeconds(offsetSeconds.toLong())
+    val zoned = time.atZone(ZoneId.systemDefault())
+    val now = Instant.now()
     val diff = Duration.between(time, now)
 
     val date = when (diff.toDays() >= 1 || diff.toDays() <= -1) {

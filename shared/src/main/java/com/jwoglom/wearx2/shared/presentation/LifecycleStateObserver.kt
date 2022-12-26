@@ -1,4 +1,4 @@
-package com.jwoglom.wearx2.presentation.components
+package com.jwoglom.wearx2.shared.presentation
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect

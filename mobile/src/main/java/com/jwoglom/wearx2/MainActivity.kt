@@ -6,6 +6,7 @@ import android.bluetooth.BluetoothAdapter
 import android.bluetooth.BluetoothManager
 import android.content.ComponentName
 import android.content.Context
+import android.content.DialogInterface
 import android.content.Intent
 import android.content.ServiceConnection
 import android.content.pm.PackageManager
@@ -17,7 +18,6 @@ import android.provider.Settings
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
-import androidx.activity.result.ActivityResultLauncher
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.runtime.compositionLocalOf
 import androidx.core.app.ActivityCompat
@@ -30,17 +30,12 @@ import com.google.android.gms.wearable.Wearable
 import com.jwoglom.pumpx2.pump.PumpState
 import com.jwoglom.pumpx2.pump.messages.Message
 import com.jwoglom.pumpx2.pump.messages.models.InsulinUnit
-import com.jwoglom.pumpx2.pump.messages.response.control.BolusPermissionResponse
-import com.jwoglom.pumpx2.pump.messages.response.control.CancelBolusResponse
-import com.jwoglom.pumpx2.pump.messages.response.control.InitiateBolusResponse
-import com.jwoglom.pumpx2.pump.messages.response.control.RemoteCarbEntryResponse
 import com.jwoglom.pumpx2.pump.messages.response.currentStatus.BolusCalcDataSnapshotResponse
 import com.jwoglom.pumpx2.pump.messages.response.currentStatus.CGMStatusResponse
 import com.jwoglom.pumpx2.pump.messages.response.currentStatus.ControlIQIOBResponse
 import com.jwoglom.pumpx2.pump.messages.response.currentStatus.ControlIQInfoAbstractResponse
 import com.jwoglom.pumpx2.pump.messages.response.currentStatus.CurrentBasalStatusResponse
 import com.jwoglom.pumpx2.pump.messages.response.currentStatus.CurrentBatteryAbstractResponse
-import com.jwoglom.pumpx2.pump.messages.response.currentStatus.CurrentBolusStatusResponse
 import com.jwoglom.pumpx2.pump.messages.response.currentStatus.CurrentEGVGuiDataResponse
 import com.jwoglom.pumpx2.pump.messages.response.currentStatus.GlobalMaxBolusSettingsResponse
 import com.jwoglom.pumpx2.pump.messages.response.currentStatus.HomeScreenMirrorResponse
@@ -53,6 +48,7 @@ import com.jwoglom.wearx2.presentation.navigation.Screen
 import com.jwoglom.wearx2.presentation.screens.PumpSetupStage
 import com.jwoglom.wearx2.shared.PumpMessageSerializer
 import com.jwoglom.wearx2.shared.util.SendType
+import com.jwoglom.wearx2.shared.util.pumpTimeToLocalTz
 import com.jwoglom.wearx2.shared.util.setupTimber
 import com.jwoglom.wearx2.shared.util.shortTime
 import com.jwoglom.wearx2.shared.util.shortTimeAgo
@@ -193,6 +189,14 @@ class MainActivity : ComponentActivity(), GoogleApiClient.ConnectionCallbacks, G
     }
 
     private fun sendPumpCommands(type: SendType, msgs: List<Message>) {
+        if (type == SendType.DEBUG_PROMPT) {
+            synchronized (dataStore.debugPromptAwaitingResponses) {
+                val awaiting = dataStore.debugPromptAwaitingResponses.value ?: mutableSetOf()
+                awaiting.addAll(msgs.map { it.responseClass.name })
+                dataStore.debugPromptAwaitingResponses.value = awaiting
+                Timber.d("added %s to debugPromptAwaitingResponses = %s", msgs, dataStore.debugPromptAwaitingResponses.value)
+            }
+        }
         sendMessage("/to-pump/${type.slug}", PumpMessageSerializer.toBulkBytes(msgs))
     }
 
@@ -300,6 +304,18 @@ class MainActivity : ComponentActivity(), GoogleApiClient.ConnectionCallbacks, G
     }
 
     private fun onPumpMessageReceived(message: Message, cached: Boolean) {
+        if (dataStore.debugPromptAwaitingResponses.value?.contains(message.javaClass.name) == true) {
+            synchronized (dataStore.debugPromptAwaitingResponses) {
+                val awaiting = dataStore.debugPromptAwaitingResponses.value ?: mutableSetOf()
+                awaiting.remove(message.javaClass.name)
+                dataStore.debugPromptAwaitingResponses.value = awaiting
+                Timber.d("removed %s from debugPromptAwaitingResponses = %s", message.javaClass.name, dataStore.debugPromptAwaitingResponses.value)
+            }
+            AlertDialog.Builder(this)
+                .setMessage(message.verboseToString().replace("com.jwoglom.pumpx2.pump.messages.", ""))
+                .setPositiveButton("OK", DialogInterface.OnClickListener { dialog, which -> dialog.cancel() })
+                .show()
+        }
         when (message) {
             is CurrentBatteryAbstractResponse -> {
                 dataStore.batteryPercent.value = message.batteryPercent
@@ -318,7 +334,7 @@ class MainActivity : ComponentActivity(), GoogleApiClient.ConnectionCallbacks, G
                 dataStore.cartridgeRemainingUnits.value = message.currentInsulinAmount
             }
             is LastBolusStatusAbstractResponse -> {
-                dataStore.lastBolusStatus.value = "${twoDecimalPlaces1000Unit(message.deliveredVolume)}u at ${shortTime(message.timestampInstant)}"
+                dataStore.lastBolusStatus.value = "${twoDecimalPlaces1000Unit(message.deliveredVolume)}u at ${shortTime(pumpTimeToLocalTz(message.timestampInstant))}"
             }
             is HomeScreenMirrorResponse -> {
                 dataStore.controlIQStatus.value = when (message.apControlStateIcon) {
@@ -369,11 +385,16 @@ class MainActivity : ComponentActivity(), GoogleApiClient.ConnectionCallbacks, G
                     else -> "Unknown"
                 }
                 dataStore.cgmSessionExpireRelative.value = when (message.sessionState) {
-                    CGMStatusResponse.SessionState.SESSION_ACTIVE -> shortTimeAgo(message.sensorStartedTimestampInstant.plus(10, ChronoUnit.DAYS), suffix = "left")
+                    CGMStatusResponse.SessionState.SESSION_ACTIVE -> shortTimeAgo(
+                            pumpTimeToLocalTz(message.sensorStartedTimestampInstant)
+                                .plus(10, ChronoUnit.DAYS),
+                        suffix = "left")
                     else -> ""
                 }
                 dataStore.cgmSessionExpireExact.value = when (message.sessionState) {
-                    CGMStatusResponse.SessionState.SESSION_ACTIVE -> shortTime(message.sensorStartedTimestampInstant.plus(10, ChronoUnit.DAYS))
+                    CGMStatusResponse.SessionState.SESSION_ACTIVE -> shortTime(
+                        pumpTimeToLocalTz(message.sensorStartedTimestampInstant)
+                            .plus(10, ChronoUnit.DAYS))
                     else -> ""
                 }
                 dataStore.cgmTransmitterStatus.value = when (message.transmitterBatteryStatus) {

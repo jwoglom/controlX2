@@ -49,10 +49,10 @@ import com.jwoglom.pumpx2.pump.messages.request.currentStatus.InsulinStatusReque
 import com.jwoglom.wearx2.LocalDataStore
 import com.jwoglom.wearx2.dataStore
 import com.jwoglom.wearx2.presentation.components.FirstRowChip
-import com.jwoglom.wearx2.presentation.components.LifecycleStateObserver
+import com.jwoglom.wearx2.shared.presentation.LifecycleStateObserver
 import com.jwoglom.wearx2.presentation.components.LineInfoChip
 import com.jwoglom.wearx2.presentation.components.MiniChip
-import com.jwoglom.wearx2.presentation.components.intervalOf
+import com.jwoglom.wearx2.shared.presentation.intervalOf
 import com.jwoglom.wearx2.presentation.defaultTheme
 import com.jwoglom.wearx2.presentation.greenTheme
 import com.jwoglom.wearx2.presentation.navigation.Screen
@@ -111,6 +111,7 @@ fun LandingScreen(
         dataStore.cgmSessionState,
         dataStore.cgmTransmitterStatus,
         dataStore.cgmReading,
+        dataStore.cgmDeltaArrow,
     )
 
     fun fetchDataStoreFields(type: SendType) {

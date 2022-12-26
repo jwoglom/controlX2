@@ -70,7 +70,7 @@ import com.jwoglom.pumpx2.pump.messages.response.currentStatus.LastBGResponse
 import com.jwoglom.wearx2.LocalDataStore
 import com.jwoglom.wearx2.R
 import com.jwoglom.wearx2.presentation.DataStore
-import com.jwoglom.wearx2.presentation.components.LifecycleStateObserver
+import com.jwoglom.wearx2.shared.presentation.LifecycleStateObserver
 import com.jwoglom.wearx2.presentation.components.LineTextDescription
 import com.jwoglom.wearx2.shared.util.firstLetterCapitalized
 import com.jwoglom.wearx2.shared.util.snakeCaseToSpace

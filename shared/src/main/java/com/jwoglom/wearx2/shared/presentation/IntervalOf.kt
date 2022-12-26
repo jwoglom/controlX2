@@ -1,4 +1,4 @@
-package com.jwoglom.wearx2.presentation.components
+package com.jwoglom.wearx2.shared.presentation
 
 import android.os.Handler
 import android.os.Looper

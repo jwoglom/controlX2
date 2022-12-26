@@ -7,13 +7,18 @@ import com.jwoglom.pumpx2.pump.messages.helpers.Bytes;
 import com.jwoglom.pumpx2.shared.Hex;
 
 import org.apache.commons.codec.DecoderException;
+import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 
 import java.nio.charset.StandardCharsets;
+import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
+import java.util.Objects;
 
+import kotlin.Pair;
 import timber.log.Timber;
 
 public class PumpMessageSerializer {
@@ -63,5 +68,39 @@ public class PumpMessageSerializer {
             messages.add(fromBytes(m.getBytes()));
         }
         return messages;
+    }
+
+    public static byte[] toDebugMessageCacheBytes(Collection<Pair<Message, Instant>> messages) {
+        try {
+            JSONArray array = new JSONArray();
+            for (Pair<Message, Instant> pair : messages) {
+                JSONObject obj = new JSONObject();
+                obj.put("message", Hex.encodeHexString(Objects.requireNonNull(toBytes(pair.getFirst()))));
+                obj.put("instant", pair.getSecond().toEpochMilli());
+                array.put(obj);
+            }
+            return array.toString().getBytes();
+        } catch (JSONException e) {
+            Timber.e(e);
+            return null;
+        }
+    }
+
+    public static List<Pair<Message, Instant>> fromDebugMessageCacheBytes(byte[] bytes) {
+        List<Pair<Message, Instant>> ret = new ArrayList<>();
+        JSONArray array = null;
+        try {
+            array = new JSONArray(new String(bytes));
+            for (int i=0; i < array.length(); i++) {
+                JSONObject obj = array.getJSONObject(i);
+                Message msg = fromBytes(Hex.decodeHex(obj.getString("message")));
+                Instant instant = Instant.ofEpochMilli(obj.getLong("instant"));
+                ret.add(new Pair<>(msg, instant));
+            }
+            return ret;
+        } catch (JSONException | DecoderException e) {
+            Timber.e(e);
+            return null;
+        }
     }
 }

@@ -1,6 +1,7 @@
 package com.jwoglom.wearx2.presentation
 
 import androidx.lifecycle.MutableLiveData
+import com.jwoglom.pumpx2.pump.messages.Message
 import com.jwoglom.pumpx2.pump.messages.response.currentStatus.BolusCalcDataSnapshotResponse
 import com.jwoglom.pumpx2.pump.messages.response.currentStatus.LastBGResponse
 import com.jwoglom.wearx2.presentation.screens.PumpSetupStage
@@ -41,6 +42,9 @@ class DataStore {
     val landingBasalDisplayedText = MutableLiveData<String>()
     val landingControlIQDisplayedText = MutableLiveData<String>()
 
+    val debugMessageCache = MutableLiveData<List<Pair<Message, Instant>>>()
+    val debugPromptAwaitingResponses = MutableLiveData<MutableSet<String>>()
+
     init {
         pumpConnected.observeForever { t -> Timber.i("DataStore.pumpConnected=$t") }
         pumpLastConnectionTimestamp.observeForever { t -> Timber.i("DataStore.pumpLastConnectionTimestamp=$t") }
@@ -74,6 +78,9 @@ class DataStore {
 
         landingBasalDisplayedText.observeForever { t -> Timber.i("DataStore.landingBasalDisplayedText=$t") }
         landingControlIQDisplayedText.observeForever { t -> Timber.i("DataStore.landingControlIQDisplayedText=$t") }
+
+        debugMessageCache.observeForever { t -> Timber.i("DataStore.debugMessageCache=$t") }
+        debugPromptAwaitingResponses.observeForever { t -> Timber.i("DataStore.debugPromptAwaitingResponses=$t") }
     }
 
 
