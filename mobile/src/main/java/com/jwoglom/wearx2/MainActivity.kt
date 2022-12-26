@@ -16,6 +16,8 @@ import android.provider.Settings
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.activity.result.ActivityResultLauncher
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.runtime.compositionLocalOf
 import androidx.core.app.ActivityCompat
 import com.google.android.gms.common.ConnectionResult
@@ -71,7 +73,11 @@ class MainActivity : ComponentActivity(), GoogleApiClient.ConnectionCallbacks, G
             mApiClient.connect()
         }
 
-        startBTPermissionsCheck()
+        if (Prefs(applicationContext).tosAccepted()) {
+            startBTPermissionsCheck()
+        } else {
+            Timber.i("BTPermissionsCheck not started because TOS not accepted")
+        }
         super.onResume()
     }
 
@@ -160,10 +166,31 @@ class MainActivity : ComponentActivity(), GoogleApiClient.ConnectionCallbacks, G
     override fun onMessageReceived(messageEvent: MessageEvent) {
         Timber.i("phone messageReceived: ${messageEvent.path}: ${String(messageEvent.data)}")
         when (messageEvent.path) {
-            "/to-phone/first-launch-accept" -> {
-                Prefs(applicationContext).setTosAccepted(true)
-                startCommService()
-                dataStore.pumpSetupStage.value = dataStore.pumpSetupStage.value?.nextStage(PumpSetupStage.WAITING_PUMPX2_INIT)
+            "/to-phone/start-comm" -> {
+                when (String(messageEvent.data)) {
+                    "skip_notif_permission" -> {
+                        startBTPermissionsCheck()
+                        startCommService()
+                        dataStore.pumpSetupStage.value =
+                            dataStore.pumpSetupStage.value?.nextStage(PumpSetupStage.WAITING_PUMPX2_INIT)
+                    }
+                    else -> {
+                        requestNotificationCallback = { isGranted ->
+                            if (isGranted) {
+                                startBTPermissionsCheck()
+                                startCommService()
+                                dataStore.pumpSetupStage.value =
+                                    dataStore.pumpSetupStage.value?.nextStage(PumpSetupStage.WAITING_PUMPX2_INIT)
+                            } else {
+                                dataStore.pumpSetupStage.value =
+                                    dataStore.pumpSetupStage.value?.nextStage(PumpSetupStage.PERMISSIONS_NOT_GRANTED)
+                            }
+                        }
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                            requestNotificationPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
+                        }
+                    }
+                }
             }
 
             "/to-phone/comm-started" -> {
@@ -203,6 +230,7 @@ class MainActivity : ComponentActivity(), GoogleApiClient.ConnectionCallbacks, G
             }
 
             "/from-pump/invalid-pairing-code" -> {
+                Timber.w("invalid-pairing-code with code: ${PumpState.getPairingCode(applicationContext)}")
                 dataStore.pumpSetupStage.value = dataStore.pumpSetupStage.value?.nextStage(PumpSetupStage.PUMPX2_INVALID_PAIRING_CODE)
             }
 
@@ -379,6 +407,16 @@ class MainActivity : ComponentActivity(), GoogleApiClient.ConnectionCallbacks, G
                 .create()
                 .show()
         }
+    }
+
+    /**
+     * Notification permission
+     */
+    private var requestNotificationCallback: (Boolean) -> Unit = {}
+    private val requestNotificationPermission = registerForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { isGranted: Boolean ->
+        requestNotificationCallback(isGranted)
     }
 
     private fun determineStartDestination(): String {

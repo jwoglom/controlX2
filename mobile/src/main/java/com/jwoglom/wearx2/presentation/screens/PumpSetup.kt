@@ -33,15 +33,19 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavHostController
+import com.jwoglom.pumpx2.pump.PumpState
 import com.jwoglom.pumpx2.pump.messages.builders.PumpChallengeRequestBuilder
 import com.jwoglom.wearx2.LocalDataStore
 import com.jwoglom.wearx2.Prefs
@@ -49,6 +53,7 @@ import com.jwoglom.wearx2.presentation.components.DialogScreen
 import com.jwoglom.wearx2.presentation.components.Line
 import com.jwoglom.wearx2.presentation.navigation.Screen
 import com.jwoglom.wearx2.presentation.theme.WearX2Theme
+import org.apache.commons.lang3.text.FormattableUtils.append
 import timber.log.Timber
 
 @Composable
@@ -67,7 +72,7 @@ fun PumpSetup(
         animationSpec = ProgressIndicatorDefaults.ProgressAnimationSpec
     )
 
-    var pairingCodeText by remember { mutableStateOf("") }
+    var pairingCodeText by remember { mutableStateOf(PumpState.getPairingCode(context)) }
 
     LaunchedEffect (setupStage.value) {
         progress = ((1.0 * (setupStage.value?.step ?: 0)) / PumpSetupStage.PUMPX2_PUMP_CONNECTED.step).toFloat()
@@ -76,35 +81,58 @@ fun PumpSetup(
     DialogScreen(
         "Pump Setup",
         buttonContent = {
-            Button(
-                onClick = {
-                    when (ds.pumpSetupStage.value) {
-                        PumpSetupStage.WAITING_PUMPX2_INIT -> {
-                            if (navController?.popBackStack() == false) {
-                                navController.navigate(Screen.FirstLaunch.route)
-                            }
-                            Prefs(context).setPumpSetupComplete(false)
+            when (setupStage.value) {
+                PumpSetupStage.PERMISSIONS_NOT_GRANTED -> {
+                    Button(
+                        onClick = {
+                            sendMessage("/to-phone/start-comm", "skip_notif_permission".toByteArray())
                         }
-                        else -> {
-                            ds.pumpSetupStage.value = PumpSetupStage.values()[setupStage.value!!.ordinal - 1]
-                        }
+                    ) {
+                        Text("Continue Without Permission")
                     }
                 }
-            ) {
-                Text("Back")
+                else -> {
+                    Button(
+                        onClick = {
+                            when (ds.pumpSetupStage.value) {
+                                PumpSetupStage.WAITING_PUMPX2_INIT -> {
+                                    if (navController?.popBackStack() == false) {
+                                        navController.navigate(Screen.FirstLaunch.route)
+                                    }
+                                    Prefs(context).setPumpSetupComplete(false)
+                                }
+                                else -> {
+                                    ds.pumpSetupStage.value =
+                                        PumpSetupStage.values()[setupStage.value!!.ordinal - 1]
+                                }
+                            }
+                        }
+                    ) {
+                        Text("Back")
+                    }
+                }
             }
             when (setupStage.value) {
-                PumpSetupStage.PUMPX2_WAITING_FOR_PAIRING_CODE -> {
+                PumpSetupStage.PERMISSIONS_NOT_GRANTED -> {
+                    Button(
+                        onClick = {
+                            sendMessage("/to-phone/start-comm", "".toByteArray())
+                        }
+                    ) {
+                        Text("Retry")
+                    }
+                }
+                PumpSetupStage.PUMPX2_WAITING_FOR_PAIRING_CODE, PumpSetupStage.PUMPX2_INVALID_PAIRING_CODE -> {
                     Button(
                         onClick = {
                             try {
                                 val code = PumpChallengeRequestBuilder.processPairingCode(pairingCodeText)
                                 PumpChallengeRequestBuilder.create(0, code, ByteArray(0))
                                 sendMessage("/to-phone/set-pairing-code", code.toByteArray())
+                                ds.pumpSetupStage.value = setupStage.value!!.nextStage(PumpSetupStage.PUMPX2_WAITING_TO_PAIR)
                             } catch (e: Exception) {
                                 Timber.w("pairingCodeInput: $e")
                             }
-                            ds.pumpSetupStage.value = PumpSetupStage.values()[setupStage.value!!.ordinal + 1]
                         }
                     ) {
                         Text("Pair")
@@ -152,6 +180,9 @@ fun PumpSetup(
             val setupDeviceName = ds.setupDeviceName.observeAsState()
             val setupDeviceModel = ds.setupDeviceModel.observeAsState()
             when (setupStage.value) {
+                PumpSetupStage.PERMISSIONS_NOT_GRANTED -> {
+                    Line("Notification permissions weren't granted, which are needed to make remote boluses.")
+                }
                 PumpSetupStage.WAITING_PUMPX2_INIT -> {
                     Line("Waiting for library initialization...")
                 }
@@ -164,30 +195,44 @@ fun PumpSetup(
                 PumpSetupStage.PUMPX2_PUMP_DISCONNECTED -> {
                     Line("Disconnected from '${setupDeviceName.value}', reconnecting...")
                     Spacer(Modifier.height(16.dp))
-                    Line("If the t:connect Android application is open, force-stop it.")
+                    Line("Troubleshooting Steps:", bold = true)
+                    Line("1. Toggle Bluetooth on and off.")
+                    Line("2. If the t:connect Android application is open, force-stop it: long-press the app, select App Info, then 'Force Stop'")
+                    Line("3. Open your pump and select:")
+                    Line("Options > Device Settings > Bluetooth Settings", bold = true)
+                    Line("Disable and then re-enable 'Mobile Connection', then press 'Pair Device.' If already paired, press 'Unpair Device' first.")
                 }
                 PumpSetupStage.PUMPX2_PUMP_DISCOVERED -> {
-                    Line("Connecting to '${setupDeviceName.value}'")
+                    Line("Connecting to ${setupDeviceName.value}")
                 }
                 PumpSetupStage.PUMPX2_PUMP_MODEL_METADATA -> {
-                    Line("Connecting to '${setupDeviceName.value}' (t:slim ${setupDeviceModel.value})")
+                    Line("Connecting to ${setupDeviceName.value} (t:slim ${setupDeviceModel.value})")
                 }
                 PumpSetupStage.PUMPX2_INITIAL_PUMP_CONNECTION -> {
-                    Line("Initial connection made to '${setupDeviceName.value}'")
+                    Line("Initial connection made to ${setupDeviceName.value}")
                 }
                 PumpSetupStage.PUMPX2_WAITING_FOR_PAIRING_CODE, PumpSetupStage.PUMPX2_INVALID_PAIRING_CODE -> {
-                    Line("Initial connection made to '${setupDeviceName.value}'")
+                    val focusRequester = remember { FocusRequester() }
+                    val focusManager = LocalFocusManager.current
+
+                    if (setupStage.value == PumpSetupStage.PUMPX2_INVALID_PAIRING_CODE) {
+                        LaunchedEffect(Unit) {
+                            pairingCodeText = ""
+                        }
+                        Line(buildAnnotatedString {
+                            withStyle(style = SpanStyle(color = Color.Red, fontWeight = FontWeight.Bold)) {
+                                append("The pairing code was invalid. ")
+                            }
+                            append("The code was either entered incorrectly or timed out. Make sure the 'Pair Device' dialog is open on your pump.")
+                        })
+                    } else {
+                        Line("Initial connection made to '${setupDeviceName.value}'")
+                    }
                     Spacer(Modifier.height(16.dp))
                     Line("Please enter the pairing code displayed at:")
                     Line("Bluetooth Settings > Pair Device", bold = true)
-                    if (setupStage.value == PumpSetupStage.PUMPX2_INVALID_PAIRING_CODE) {
-                        Spacer(Modifier.height(16.dp))
-                        Line("The pairing code was invalid.", bold = true)
-                        Line("The code was either entered incorrectly or timed out. Make sure the 'Pair Device' dialog is open on your pump.")
-                    }
+
                     Spacer(Modifier.height(32.dp))
-                    val focusRequester = remember { FocusRequester() }
-                    val focusManager = LocalFocusManager.current
 
                     LaunchedEffect (Unit) {
                         if (pairingCodeText.isEmpty()) {
@@ -219,6 +264,8 @@ fun PumpSetup(
                             capitalization = KeyboardCapitalization.None,
                             keyboardType = KeyboardType.Ascii,
                         ),
+                        modifier = Modifier
+                            .focusRequester(focusRequester),
                         decorationBox = {
                             Row(
                                 horizontalArrangement = Arrangement.Center,
@@ -261,11 +308,18 @@ fun PumpSetup(
                                 }
                             }
                         }
-
                     )
+
+                    LaunchedEffect(Unit) {
+                        focusRequester.requestFocus()
+                    }
+                }
+                PumpSetupStage.PUMPX2_WAITING_TO_PAIR -> {
+                    Line("Pairing with ${setupDeviceName.value}...")
                 }
                 PumpSetupStage.PUMPX2_PUMP_CONNECTED -> {
-                    Line("Connected to '${setupDeviceName.value}'!", bold = true)
+                    Line("Connected to ${setupDeviceName.value}!", bold = true)
+                    Spacer(modifier = Modifier.height(16.dp))
                     Line("Press 'Next' to continue.")
                 }
                 else -> {}
@@ -275,6 +329,7 @@ fun PumpSetup(
 }
 
 enum class PumpSetupStage(val step: Int, val description: String) {
+    PERMISSIONS_NOT_GRANTED(0, "Permissions not granted"),
     WAITING_PUMPX2_INIT(1, "Waiting for PumpX2 init"),
     PUMPX2_SEARCHING_FOR_PUMP(1, "Searching for pump"),
     PUMPX2_PUMP_DISCONNECTED(2, "Pump disconnected, reconnecting"),
@@ -283,13 +338,28 @@ enum class PumpSetupStage(val step: Int, val description: String) {
     PUMPX2_INITIAL_PUMP_CONNECTION(3, "Initial connection established"),
     PUMPX2_WAITING_FOR_PAIRING_CODE(4, "Waiting for pairing code"),
     PUMPX2_INVALID_PAIRING_CODE(4, "Invalid pairing code"),
+    PUMPX2_WAITING_TO_PAIR(4, "Waiting to pair"),
     PUMPX2_PUMP_CONNECTED(5, "Pairing code accepted"),
     ;
 
     fun nextStage(stage: PumpSetupStage): PumpSetupStage {
+        Timber.d("PumpSetupStage.nextStage(%s) from %s", stage, this)
+        if (stage == PUMPX2_INVALID_PAIRING_CODE) {
+            return stage
+        }
+
+        if (this == PUMPX2_INVALID_PAIRING_CODE && stage.ordinal < PUMPX2_INVALID_PAIRING_CODE.ordinal) {
+            return this
+        }
+
+        if (stage == PUMPX2_PUMP_DISCONNECTED) {
+            return stage
+        }
+
         if (ordinal < stage.ordinal) {
             return stage
         }
+
         return this
     }
 }

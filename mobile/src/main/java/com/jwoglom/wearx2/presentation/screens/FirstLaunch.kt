@@ -40,6 +40,7 @@ fun FirstLaunch(
                 onClick = {
                     navController?.navigate(Screen.PumpSetup.route)
                     Prefs(context).setTosAccepted(true)
+                    sendMessage("/to-phone/start-comm", "".toByteArray())
                 }
             ) {
                 Text("Agree")

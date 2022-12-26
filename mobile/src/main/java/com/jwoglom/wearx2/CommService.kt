@@ -38,6 +38,7 @@ import com.jwoglom.pumpx2.pump.messages.request.control.RemoteCarbEntryRequest
 import com.jwoglom.pumpx2.pump.messages.request.currentStatus.ApiVersionRequest
 import com.jwoglom.pumpx2.pump.messages.request.currentStatus.TimeSinceResetRequest
 import com.jwoglom.pumpx2.pump.messages.response.authentication.CentralChallengeResponse
+import com.jwoglom.pumpx2.pump.messages.response.authentication.PumpChallengeResponse
 import com.jwoglom.pumpx2.pump.messages.response.control.InitiateBolusResponse
 import com.jwoglom.pumpx2.pump.messages.response.currentStatus.TimeSinceResetResponse
 import com.jwoglom.pumpx2.pump.messages.response.qualifyingEvent.QualifyingEvent
@@ -80,7 +81,7 @@ class CommService : WearableListenerService(), GoogleApiClient.ConnectionCallbac
             enableSendSharedConnectionResponseMessages()
             // before adding relyOnConnectionSharingForAuthentication(), callback issues need to be resolved
 
-            if (isInsulinDeliveryEnabled()) {
+            if (Prefs(applicationContext).insulinDeliveryActions()) {
                 Timber.i("ACTIONS AFFECTING INSULIN DELIVERY ENABLED")
                 enableActionsAffectingInsulinDelivery()
             } else {
@@ -124,6 +125,14 @@ class CommService : WearableListenerService(), GoogleApiClient.ConnectionCallbac
         ) {
             pairingCodeCentralChallenge = centralChallengeResponse
             performPairing(peripheral, centralChallengeResponse, false)
+        }
+
+        override fun onInvalidPairingCode(
+            peripheral: BluetoothPeripheral?,
+            resp: PumpChallengeResponse?
+        ) {
+            wearCommHandler?.sendMessage("/from-pump/invalid-pairing-code", "".toByteArray())
+            super.onInvalidPairingCode(peripheral, resp)
         }
 
         fun performPairing(
@@ -340,7 +349,7 @@ class CommService : WearableListenerService(), GoogleApiClient.ConnectionCallbac
                         sendMessage("/to-wear/bolus-blocked-signature", "WearCommHandler".toByteArray())
                     } else if (this@CommService::pump.isInitialized && pump.isConnected && isBolusCommand(pumpMsg)) {
                         Timber.i("wearCommHandler send bolus command with valid signature: $pumpMsg")
-                        if (!isInsulinDeliveryEnabled()) {
+                        if (!Prefs(applicationContext).insulinDeliveryActions()) {
                             Timber.e("No insulin delivery messages enabled -- blocking bolus command $pumpMsg")
                             sendMessage("/to-wear/bolus-not-enabled", "from_self".toByteArray())
                             return
@@ -794,10 +803,6 @@ class CommService : WearableListenerService(), GoogleApiClient.ConnectionCallbac
             ?.remove("initiateBolusRequest")
             ?.remove("initiateBolusTime")
             ?.apply()
-    }
-
-    private fun isInsulinDeliveryEnabled(): Boolean {
-        return prefs(applicationContext)?.getBoolean("insulinDeliveryEnabled", false) ?: false
     }
 
     private fun triggerAppReload(context: Context) {
