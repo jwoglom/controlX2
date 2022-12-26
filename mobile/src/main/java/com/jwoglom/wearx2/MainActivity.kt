@@ -237,11 +237,13 @@ class MainActivity : ComponentActivity(), GoogleApiClient.ConnectionCallbacks, G
             "/from-pump/pump-connected" -> {
                 dataStore.pumpSetupStage.value = dataStore.pumpSetupStage.value?.nextStage(PumpSetupStage.PUMPX2_PUMP_CONNECTED)
                 dataStore.setupDeviceName.value = String(messageEvent.data)
+                dataStore.pumpConnected.value = true
             }
 
             "/from-pump/pump-disconnected" -> {
                 dataStore.pumpSetupStage.value = dataStore.pumpSetupStage.value?.nextStage(PumpSetupStage.PUMPX2_PUMP_DISCONNECTED)
                 dataStore.setupDeviceModel.value = String(messageEvent.data)
+                dataStore.pumpConnected.value = false
             }
         }
     }

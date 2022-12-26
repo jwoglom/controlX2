@@ -5,6 +5,7 @@ import com.jwoglom.wearx2.presentation.screens.PumpSetupStage
 import timber.log.Timber
 
 class DataStore {
+    val pumpConnected = MutableLiveData<Boolean>()
     val watchConnected = MutableLiveData<Boolean>()
 
     val pumpSetupStage = MutableLiveData<PumpSetupStage>(PumpSetupStage.WAITING_PUMPX2_INIT)
@@ -12,6 +13,7 @@ class DataStore {
     val setupDeviceModel = MutableLiveData<String>()
 
     init {
+        pumpConnected.observeForever { t -> Timber.i("DataStore.pumpConnected=$t") }
         watchConnected.observeForever { t -> Timber.i("DataStore.watchConnected=$t") }
 
         pumpSetupStage.observeForever { t -> Timber.i("DataStore.setupStage=$t") }
