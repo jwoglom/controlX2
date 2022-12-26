@@ -68,7 +68,6 @@ fun AppSetup(
                 setupComplete -> {
                     Button(
                         onClick = {
-                            navController?.navigate(Screen.Landing.route)
                             Prefs(context).setAppSetupComplete(true)
                             coroutineScope.launch {
                                 sendMessage(
@@ -76,6 +75,7 @@ fun AppSetup(
                                     "".toByteArray()
                                 )
                             }
+                            navController?.navigate(Screen.Landing.route)
                         }
                     ) {
                         Text("Continue")

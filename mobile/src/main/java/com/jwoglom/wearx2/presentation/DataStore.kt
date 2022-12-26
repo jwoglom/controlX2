@@ -5,9 +5,12 @@ import com.jwoglom.pumpx2.pump.messages.response.currentStatus.BolusCalcDataSnap
 import com.jwoglom.pumpx2.pump.messages.response.currentStatus.LastBGResponse
 import com.jwoglom.wearx2.presentation.screens.PumpSetupStage
 import timber.log.Timber
+import java.time.Instant
 
 class DataStore {
     val pumpConnected = MutableLiveData<Boolean>()
+    val pumpLastConnectionTimestamp = MutableLiveData<Instant>()
+    val pumpLastMessageTimestamp = MutableLiveData<Instant>()
     val watchConnected = MutableLiveData<Boolean>()
 
     val pumpSetupStage = MutableLiveData<PumpSetupStage>(PumpSetupStage.WAITING_PUMPX2_INIT)
@@ -40,6 +43,8 @@ class DataStore {
 
     init {
         pumpConnected.observeForever { t -> Timber.i("DataStore.pumpConnected=$t") }
+        pumpLastConnectionTimestamp.observeForever { t -> Timber.i("DataStore.pumpLastConnectionTimestamp=$t") }
+        pumpLastMessageTimestamp.observeForever { t -> Timber.i("DataStore.pumpLastMessageTimestamp=$t") }
         watchConnected.observeForever { t -> Timber.i("DataStore.watchConnected=$t") }
 
         pumpSetupStage.observeForever { t -> Timber.i("DataStore.setupStage=$t") }

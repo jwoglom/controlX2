@@ -221,6 +221,8 @@ class CommService : WearableListenerService(), GoogleApiClient.ConnectionCallbac
         ): Boolean {
             Timber.i("service onPumpDisconnected: isConnected=false")
             lastPeripheral = null
+            lastResponseMessage.clear()
+            lastTimeSinceReset = null
             isConnected = false
             wearCommHandler?.sendMessage("/from-pump/pump-disconnected",
                 peripheral?.name!!.toByteArray()

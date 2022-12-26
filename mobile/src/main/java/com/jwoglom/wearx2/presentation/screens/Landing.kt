@@ -79,9 +79,12 @@ import com.jwoglom.wearx2.presentation.navigation.Screen
 import com.jwoglom.wearx2.presentation.theme.Colors
 import com.jwoglom.wearx2.presentation.theme.WearX2Theme
 import com.jwoglom.wearx2.shared.util.SendType
+import com.jwoglom.wearx2.shared.util.shortTimeAgo
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import timber.log.Timber
+import java.time.Instant
 
 @Composable
 fun Landing(
@@ -97,6 +100,8 @@ fun Landing(
 
     val setupStage = ds.pumpSetupStage.observeAsState()
     val pumpConnected = ds.pumpConnected.observeAsState()
+    val pumpLastConnectionTimestamp = ds.pumpLastConnectionTimestamp.observeAsState()
+    val pumpLastMessageTimestamp = ds.pumpLastMessageTimestamp.observeAsState()
     val deviceName = ds.setupDeviceName.observeAsState()
 
     var selectedItem by remember { mutableStateOf(sectionState) }
@@ -201,9 +206,14 @@ fun Landing(
                                 item {
                                     if (pumpConnected.value == false) {
                                         Line("Connecting: ${setupStage.value}", bold = true)
+                                    } else if (pumpLastMessageTimestamp.value != null) {
+                                        if (pumpLastMessageTimestamp.value!!.isBefore(Instant.now().minusSeconds(30))) {
+                                            Line("Last updated: ${shortTimeAgo(pumpLastMessageTimestamp.value!!)}")
+                                        }
                                     }
 
-                                    LaunchedEffect(pumpConnected.value) {
+                                    LaunchedEffect(pumpLastConnectionTimestamp.value) {
+                                        Timber.d("pumpLastConnectionTimestamp effect: ${pumpLastConnectionTimestamp.value}")
                                         sendPumpCommands(SendType.CACHED, commands)
                                     }
                                 }
@@ -212,7 +222,11 @@ fun Landing(
                                     val cgmReading = ds.cgmReading.observeAsState()
                                     val cgmDeltaArrow = ds.cgmDeltaArrow.observeAsState()
                                     Line(
-                                        "${cgmReading.value ?: ""} ${cgmDeltaArrow.value ?: ""}",
+                                        "${when (cgmReading.value) {
+                                            0 -> "CGM Value Unknown"
+                                            null -> ""
+                                            else -> cgmReading.value
+                                        }} ${cgmDeltaArrow.value ?: ""}",
                                         style = MaterialTheme.typography.headlineLarge,
                                     )
                                 }

@@ -58,6 +58,7 @@ import com.jwoglom.wearx2.shared.util.shortTime
 import com.jwoglom.wearx2.shared.util.shortTimeAgo
 import com.jwoglom.wearx2.shared.util.twoDecimalPlaces1000Unit
 import timber.log.Timber
+import java.time.Instant
 import java.time.temporal.ChronoUnit
 import java.util.*
 
@@ -276,6 +277,7 @@ class MainActivity : ComponentActivity(), GoogleApiClient.ConnectionCallbacks, G
                 dataStore.pumpSetupStage.value = dataStore.pumpSetupStage.value?.nextStage(PumpSetupStage.PUMPX2_PUMP_CONNECTED)
                 dataStore.setupDeviceName.value = String(messageEvent.data)
                 dataStore.pumpConnected.value = true
+                dataStore.pumpLastConnectionTimestamp.value = Instant.now()
             }
 
             "/from-pump/pump-disconnected" -> {
@@ -287,10 +289,12 @@ class MainActivity : ComponentActivity(), GoogleApiClient.ConnectionCallbacks, G
             "/from-pump/receive-message" -> {
                 val pumpMessage = PumpMessageSerializer.fromBytes(messageEvent.data)
                 onPumpMessageReceived(pumpMessage, false)
+                dataStore.pumpLastMessageTimestamp.value = Instant.now()
             }
             "/from-pump/receive-cached-message" -> {
                 val pumpMessage = PumpMessageSerializer.fromBytes(messageEvent.data)
                 onPumpMessageReceived(pumpMessage, true)
+                dataStore.pumpLastMessageTimestamp.value = Instant.now()
             }
         }
     }
