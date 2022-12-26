@@ -1,4 +1,4 @@
-package com.jwoglom.wearx2.util
+package com.jwoglom.wearx2.shared.util
 
 enum class SendType(val slug: String) {
     STANDARD("commands"),

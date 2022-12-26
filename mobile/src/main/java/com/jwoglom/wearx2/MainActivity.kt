@@ -5,6 +5,7 @@ import android.app.AlertDialog
 import android.bluetooth.BluetoothAdapter
 import android.bluetooth.BluetoothManager
 import android.content.ComponentName
+import android.content.Context
 import android.content.Intent
 import android.content.ServiceConnection
 import android.content.pm.PackageManager
@@ -27,12 +28,37 @@ import com.google.android.gms.wearable.MessageEvent
 import com.google.android.gms.wearable.Node
 import com.google.android.gms.wearable.Wearable
 import com.jwoglom.pumpx2.pump.PumpState
+import com.jwoglom.pumpx2.pump.messages.Message
+import com.jwoglom.pumpx2.pump.messages.models.InsulinUnit
+import com.jwoglom.pumpx2.pump.messages.response.control.BolusPermissionResponse
+import com.jwoglom.pumpx2.pump.messages.response.control.CancelBolusResponse
+import com.jwoglom.pumpx2.pump.messages.response.control.InitiateBolusResponse
+import com.jwoglom.pumpx2.pump.messages.response.control.RemoteCarbEntryResponse
+import com.jwoglom.pumpx2.pump.messages.response.currentStatus.BolusCalcDataSnapshotResponse
+import com.jwoglom.pumpx2.pump.messages.response.currentStatus.CGMStatusResponse
+import com.jwoglom.pumpx2.pump.messages.response.currentStatus.ControlIQIOBResponse
+import com.jwoglom.pumpx2.pump.messages.response.currentStatus.ControlIQInfoAbstractResponse
+import com.jwoglom.pumpx2.pump.messages.response.currentStatus.CurrentBasalStatusResponse
+import com.jwoglom.pumpx2.pump.messages.response.currentStatus.CurrentBatteryAbstractResponse
+import com.jwoglom.pumpx2.pump.messages.response.currentStatus.CurrentBolusStatusResponse
+import com.jwoglom.pumpx2.pump.messages.response.currentStatus.CurrentEGVGuiDataResponse
+import com.jwoglom.pumpx2.pump.messages.response.currentStatus.GlobalMaxBolusSettingsResponse
+import com.jwoglom.pumpx2.pump.messages.response.currentStatus.HomeScreenMirrorResponse
+import com.jwoglom.pumpx2.pump.messages.response.currentStatus.InsulinStatusResponse
+import com.jwoglom.pumpx2.pump.messages.response.currentStatus.LastBGResponse
+import com.jwoglom.pumpx2.pump.messages.response.currentStatus.LastBolusStatusAbstractResponse
 import com.jwoglom.wearx2.presentation.DataStore
 import com.jwoglom.wearx2.presentation.MobileApp
 import com.jwoglom.wearx2.presentation.navigation.Screen
 import com.jwoglom.wearx2.presentation.screens.PumpSetupStage
+import com.jwoglom.wearx2.shared.PumpMessageSerializer
+import com.jwoglom.wearx2.shared.util.SendType
 import com.jwoglom.wearx2.shared.util.setupTimber
+import com.jwoglom.wearx2.shared.util.shortTime
+import com.jwoglom.wearx2.shared.util.shortTimeAgo
+import com.jwoglom.wearx2.shared.util.twoDecimalPlaces1000Unit
 import timber.log.Timber
+import java.time.temporal.ChronoUnit
 import java.util.*
 
 var dataStore = DataStore()
@@ -49,6 +75,7 @@ class MainActivity : ComponentActivity(), GoogleApiClient.ConnectionCallbacks, G
             MobileApp(
                 startDestination = determineStartDestination(),
                 sendMessage = {path, message -> sendMessage(path, message) },
+                sendPumpCommands = {type, messages -> sendPumpCommands(type, messages) },
             )
         }
 
@@ -161,8 +188,12 @@ class MainActivity : ComponentActivity(), GoogleApiClient.ConnectionCallbacks, G
         }
     }
 
+    private fun sendPumpCommands(type: SendType, msgs: List<Message>) {
+        sendMessage("/to-pump/${type.slug}", PumpMessageSerializer.toBulkBytes(msgs))
+    }
 
-    // Message received from Wear
+
+    // Message received from Wear or CommService
     override fun onMessageReceived(messageEvent: MessageEvent) {
         Timber.i("phone messageReceived: ${messageEvent.path}: ${String(messageEvent.data)}")
         when (messageEvent.path) {
@@ -206,6 +237,10 @@ class MainActivity : ComponentActivity(), GoogleApiClient.ConnectionCallbacks, G
                 }
             }
 
+            "/to-phone/app-reload" -> {
+                triggerAppReload(applicationContext)
+            }
+
             "/to-phone/connected" -> {
                 dataStore.watchConnected.value = true
             }
@@ -245,9 +280,121 @@ class MainActivity : ComponentActivity(), GoogleApiClient.ConnectionCallbacks, G
                 dataStore.setupDeviceModel.value = String(messageEvent.data)
                 dataStore.pumpConnected.value = false
             }
+
+            "/from-pump/receive-message" -> {
+                val pumpMessage = PumpMessageSerializer.fromBytes(messageEvent.data)
+                onPumpMessageReceived(pumpMessage, false)
+            }
+            "/from-pump/receive-cached-message" -> {
+                val pumpMessage = PumpMessageSerializer.fromBytes(messageEvent.data)
+                onPumpMessageReceived(pumpMessage, true)
+            }
         }
     }
 
+    private fun onPumpMessageReceived(message: Message, cached: Boolean) {
+        when (message) {
+            is CurrentBatteryAbstractResponse -> {
+                dataStore.batteryPercent.value = message.batteryPercent
+            }
+            is ControlIQIOBResponse -> {
+                dataStore.iobUnits.value = InsulinUnit.from1000To1(message.pumpDisplayedIOB)
+            }
+            is ControlIQInfoAbstractResponse -> {
+                dataStore.controlIQMode.value = when (message.currentUserModeType) {
+                    ControlIQInfoAbstractResponse.UserModeType.SLEEP -> "Sleep"
+                    ControlIQInfoAbstractResponse.UserModeType.EXERCISE -> "Exercise"
+                    else -> ""
+                }
+            }
+            is InsulinStatusResponse -> {
+                dataStore.cartridgeRemainingUnits.value = message.currentInsulinAmount
+            }
+            is LastBolusStatusAbstractResponse -> {
+                dataStore.lastBolusStatus.value = "${twoDecimalPlaces1000Unit(message.deliveredVolume)}u at ${shortTime(message.timestampInstant)}"
+            }
+            is HomeScreenMirrorResponse -> {
+                dataStore.controlIQStatus.value = when (message.apControlStateIcon) {
+                    HomeScreenMirrorResponse.ApControlStateIcon.STATE_GRAY -> "On"
+                    HomeScreenMirrorResponse.ApControlStateIcon.STATE_GRAY_RED_BIQ_CIQ_BASAL_SUSPENDED -> "Suspended"
+                    HomeScreenMirrorResponse.ApControlStateIcon.STATE_GRAY_BLUE_CIQ_INCREASE_BASAL -> "Increase"
+                    HomeScreenMirrorResponse.ApControlStateIcon.STATE_GRAY_ORANGE_CIQ_ATTENUATION_BASAL -> "Reduced"
+                    else -> "Off"
+                }
+                dataStore.cgmStatusText.value = when (message.cgmAlertIcon) {
+                    HomeScreenMirrorResponse.CGMAlertIcon.STARTUP_1, HomeScreenMirrorResponse.CGMAlertIcon.STARTUP_2, HomeScreenMirrorResponse.CGMAlertIcon.STARTUP_3, HomeScreenMirrorResponse.CGMAlertIcon.STARTUP_4 -> "Starting up"
+                    HomeScreenMirrorResponse.CGMAlertIcon.CALIBRATE, HomeScreenMirrorResponse.CGMAlertIcon.STARTUP_CALIBRATE, HomeScreenMirrorResponse.CGMAlertIcon.CHECKMARK_BLOOD_DROP -> "Calibration Needed"
+                    HomeScreenMirrorResponse.CGMAlertIcon.ERROR_HIGH_WEDGE, HomeScreenMirrorResponse.CGMAlertIcon.ERROR_LOW_WEDGE -> "Error"
+                    HomeScreenMirrorResponse.CGMAlertIcon.REPLACE_SENSOR -> "Replace Sensor"
+                    HomeScreenMirrorResponse.CGMAlertIcon.REPLACE_TRANSMITTER -> "Replace Transmitter"
+                    HomeScreenMirrorResponse.CGMAlertIcon.OUT_OF_RANGE -> "Out Of Range"
+                    HomeScreenMirrorResponse.CGMAlertIcon.FAILED_SENSOR -> "Sensor Failed"
+                    HomeScreenMirrorResponse.CGMAlertIcon.TRIPLE_DASHES -> "---"
+                    else -> ""
+                }
+                dataStore.cgmHighLowState.value = when (message.cgmAlertIcon) {
+                    HomeScreenMirrorResponse.CGMAlertIcon.LOW -> "LOW"
+                    HomeScreenMirrorResponse.CGMAlertIcon.HIGH -> "HIGH"
+                    else -> "IN_RANGE"
+                }
+                dataStore.cgmDeltaArrow.value = message.cgmTrendIcon.arrow()
+                dataStore.basalStatus.value = when (message.basalStatusIcon) {
+                    HomeScreenMirrorResponse.BasalStatusIcon.BASAL -> "On"
+                    HomeScreenMirrorResponse.BasalStatusIcon.ZERO_BASAL -> "Zero"
+                    HomeScreenMirrorResponse.BasalStatusIcon.TEMP_RATE -> "Temp Rate"
+                    HomeScreenMirrorResponse.BasalStatusIcon.ZERO_TEMP_RATE -> "Zero Temp Rate"
+                    HomeScreenMirrorResponse.BasalStatusIcon.SUSPEND -> "Suspended"
+                    HomeScreenMirrorResponse.BasalStatusIcon.HYPO_SUSPEND_BASAL_IQ -> "Suspended from BG"
+                    HomeScreenMirrorResponse.BasalStatusIcon.INCREASE_BASAL -> "Increased"
+                    HomeScreenMirrorResponse.BasalStatusIcon.ATTENUATED_BASAL -> "Reduced"
+                    else -> ""
+                }
+            }
+            is CurrentBasalStatusResponse -> {
+                dataStore.basalRate.value = "${twoDecimalPlaces1000Unit(message.currentBasalRate)}u"
+            }
+            is CGMStatusResponse -> {
+                dataStore.cgmSessionState.value = when (message.sessionState) {
+                    CGMStatusResponse.SessionState.SESSION_ACTIVE -> "Active"
+                    CGMStatusResponse.SessionState.SESSION_STOPPED -> "Stopped"
+                    CGMStatusResponse.SessionState.SESSION_START_PENDING -> "Starting"
+                    CGMStatusResponse.SessionState.SESSION_STOP_PENDING -> "Stopping"
+                    else -> "Unknown"
+                }
+                dataStore.cgmSessionExpireRelative.value = when (message.sessionState) {
+                    CGMStatusResponse.SessionState.SESSION_ACTIVE -> shortTimeAgo(message.sensorStartedTimestampInstant.plus(10, ChronoUnit.DAYS), suffix = "left")
+                    else -> ""
+                }
+                dataStore.cgmSessionExpireExact.value = when (message.sessionState) {
+                    CGMStatusResponse.SessionState.SESSION_ACTIVE -> shortTime(message.sensorStartedTimestampInstant.plus(10, ChronoUnit.DAYS))
+                    else -> ""
+                }
+                dataStore.cgmTransmitterStatus.value = when (message.transmitterBatteryStatus) {
+                    CGMStatusResponse.TransmitterBatteryStatus.ERROR -> "Error"
+                    CGMStatusResponse.TransmitterBatteryStatus.EXPIRED -> "Expired"
+                    CGMStatusResponse.TransmitterBatteryStatus.OK -> "OK"
+                    CGMStatusResponse.TransmitterBatteryStatus.OUT_OF_RANGE -> "OOR"
+                    else -> "Unknown"
+                }
+            }
+            is CurrentEGVGuiDataResponse -> {
+                dataStore.cgmReading.value = message.cgmReading
+                dataStore.cgmDelta.value = message.trendRate
+            }
+            is BolusCalcDataSnapshotResponse -> {
+                if (!cached) {
+                    dataStore.bolusCalcDataSnapshot.value = message
+                }
+            }
+            is LastBGResponse -> {
+                dataStore.bolusCalcLastBG.value = message
+            }
+            is GlobalMaxBolusSettingsResponse -> {
+                dataStore.maxBolusAmount.value = message.maxBolus
+            }
+            // TODO: bolus
+        }
+    }
 
     /**
      * BT permissions
@@ -419,6 +566,16 @@ class MainActivity : ComponentActivity(), GoogleApiClient.ConnectionCallbacks, G
         ActivityResultContracts.RequestPermission()
     ) { isGranted: Boolean ->
         requestNotificationCallback(isGranted)
+    }
+
+
+    private fun triggerAppReload(context: Context) {
+        val packageManager = context.packageManager
+        val intent = packageManager.getLaunchIntentForPackage(context.packageName)
+        val componentName = intent!!.component
+        val mainIntent = Intent.makeRestartActivityTask(componentName)
+        context.startActivity(mainIntent)
+        Runtime.getRuntime().exit(0)
     }
 
     private fun determineStartDestination(): String {

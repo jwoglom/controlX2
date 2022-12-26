@@ -68,7 +68,6 @@ import com.jwoglom.wearx2.R
 import com.jwoglom.wearx2.presentation.components.BottomText
 import com.jwoglom.wearx2.presentation.components.DecimalNumberPicker
 import com.jwoglom.wearx2.presentation.components.SingleNumberPicker
-import com.jwoglom.wearx2.presentation.components.CurrentCGMText
 import com.jwoglom.wearx2.presentation.components.TopText
 import com.jwoglom.wearx2.presentation.navigation.DestinationScrollType
 import com.jwoglom.wearx2.presentation.navigation.SCROLL_TYPE_NAV_ARGUMENT
@@ -79,9 +78,7 @@ import com.jwoglom.wearx2.presentation.ui.IndeterminateProgressIndicator
 import com.jwoglom.wearx2.presentation.ui.LandingScreen
 import com.jwoglom.wearx2.presentation.ui.ScalingLazyListStateViewModel
 import com.jwoglom.wearx2.presentation.ui.ScrollStateViewModel
-import com.jwoglom.wearx2.shared.util.snakeCaseToSpace
-import com.jwoglom.wearx2.shared.util.twoDecimalPlaces
-import com.jwoglom.wearx2.util.SendType
+import com.jwoglom.wearx2.shared.util.SendType
 import kotlin.math.abs
 import kotlin.math.pow
 

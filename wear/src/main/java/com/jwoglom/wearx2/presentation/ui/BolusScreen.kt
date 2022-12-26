@@ -76,7 +76,7 @@ import com.jwoglom.wearx2.shared.util.firstLetterCapitalized
 import com.jwoglom.wearx2.shared.util.snakeCaseToSpace
 import com.jwoglom.wearx2.shared.util.oneDecimalPlace
 import com.jwoglom.wearx2.shared.util.twoDecimalPlaces
-import com.jwoglom.wearx2.util.SendType
+import com.jwoglom.wearx2.shared.util.SendType
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext

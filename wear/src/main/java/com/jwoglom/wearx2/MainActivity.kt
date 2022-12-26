@@ -2,7 +2,6 @@ package com.jwoglom.wearx2
 
 import android.content.Intent
 import android.os.Bundle
-import android.view.WindowManager
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -23,7 +22,6 @@ import com.jwoglom.pumpx2.pump.messages.calculator.BolusCalcUnits
 import com.jwoglom.pumpx2.pump.messages.calculator.BolusParameters
 import com.jwoglom.pumpx2.pump.messages.models.InsulinUnit
 import com.jwoglom.pumpx2.pump.messages.request.control.InitiateBolusRequest
-import com.jwoglom.pumpx2.pump.messages.request.control.RemoteCarbEntryRequest
 import com.jwoglom.pumpx2.pump.messages.response.control.BolusPermissionResponse
 import com.jwoglom.pumpx2.pump.messages.response.control.CancelBolusResponse
 import com.jwoglom.pumpx2.pump.messages.response.control.InitiateBolusResponse
@@ -57,7 +55,7 @@ import com.jwoglom.wearx2.shared.InitiateConfirmedBolusSerializer
 import com.jwoglom.wearx2.shared.PumpMessageSerializer
 import com.jwoglom.wearx2.shared.PumpQualifyingEventsSerializer
 import com.jwoglom.wearx2.shared.util.setupTimber
-import com.jwoglom.wearx2.util.SendType
+import com.jwoglom.wearx2.shared.util.SendType
 import com.jwoglom.wearx2.shared.util.shortTime
 import com.jwoglom.wearx2.shared.util.shortTimeAgo
 import com.jwoglom.wearx2.shared.util.twoDecimalPlaces1000Unit
@@ -424,7 +422,6 @@ class MainActivity : ComponentActivity(), MessageApi.MessageListener, GoogleApiC
 
     override fun onMessageReceived(messageEvent: MessageEvent) {
         Timber.i("wear onMessageReceived: ${messageEvent.path} ${String(messageEvent.data)}")
-        var connectionStatusText = ""
         when (messageEvent.path) {
             "/to-wear/connected" -> {
                 if (inWaitingState()) {
@@ -433,7 +430,7 @@ class MainActivity : ComponentActivity(), MessageApi.MessageListener, GoogleApiC
                     }
                     sendMessage("/to-phone/is-pump-connected", "on-phone-connected".toByteArray())
                 }
-                connectionStatusText = "Waiting to find pump"
+                dataStore.connectionStatus.value = "Waiting to find pump"
             }
             "/to-wear/initiate-confirmed-bolus" -> {
                 if (inWaitingState()) {
@@ -492,7 +489,7 @@ class MainActivity : ComponentActivity(), MessageApi.MessageListener, GoogleApiC
                     }
                     sendMessage("/to-phone/is-pump-connected", "on-pump-model".toByteArray())
                 }
-                connectionStatusText = "Connecting to pump"
+                dataStore.connectionStatus.value = "Connecting to pump"
             }
             "/from-pump/entered-pairing-code" -> {
                 if (inWaitingState()) {
@@ -501,7 +498,7 @@ class MainActivity : ComponentActivity(), MessageApi.MessageListener, GoogleApiC
                     }
                     sendMessage("/to-phone/is-pump-connected", "on-entered-pairing-code".toByteArray())
                 }
-                connectionStatusText = "Pairing to pump"
+                dataStore.connectionStatus.value = "Pairing to pump"
             }
             "/from-pump/missing-pairing-code" -> {
                 if (inWaitingState()) {
@@ -510,7 +507,7 @@ class MainActivity : ComponentActivity(), MessageApi.MessageListener, GoogleApiC
                     }
                     sendMessage("/to-phone/is-pump-connected", "on-missing-pairing-code".toByteArray())
                 }
-                connectionStatusText = "Missing pairing code"
+                dataStore.connectionStatus.value = "Missing pairing code"
             }
             "/from-pump/pump-connected" -> {
                 if (inWaitingState()) {
@@ -519,7 +516,7 @@ class MainActivity : ComponentActivity(), MessageApi.MessageListener, GoogleApiC
                         navController.navigateClearBackStack(initialRoute)
                     }
                 }
-                connectionStatusText = ""
+                dataStore.connectionStatus.value = ""
             }
             "/from-pump/pump-disconnected" -> {
                 if (inWaitingState()) {
@@ -531,10 +528,10 @@ class MainActivity : ComponentActivity(), MessageApi.MessageListener, GoogleApiC
                         Toast.makeText(applicationContext, "Disconnected", Toast.LENGTH_SHORT).show()
                     }
                 }
-                connectionStatusText = "Reconnecting"
+                dataStore.connectionStatus.value = "Reconnecting"
             }
             "/from-pump/pump-critical-error" -> {
-                connectionStatusText = "Error: ${String(messageEvent.data)}"
+                dataStore.connectionStatus.value = "Error: ${String(messageEvent.data)}"
             }
             "/from-pump/receive-qualifying-event" -> {
                 val pumpEvents = PumpQualifyingEventsSerializer.fromBytes(messageEvent.data)
@@ -562,7 +559,6 @@ class MainActivity : ComponentActivity(), MessageApi.MessageListener, GoogleApiC
                 Timber.w("wear activity unhandled receive: ${messageEvent.path} ${String(messageEvent.data)}")
             }
         }
-        dataStore.connectionStatus.value = connectionStatusText
     }
 }
 

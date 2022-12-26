@@ -57,7 +57,7 @@ import com.jwoglom.wearx2.presentation.defaultTheme
 import com.jwoglom.wearx2.presentation.greenTheme
 import com.jwoglom.wearx2.presentation.navigation.Screen
 import com.jwoglom.wearx2.presentation.redTheme
-import com.jwoglom.wearx2.util.SendType
+import com.jwoglom.wearx2.shared.util.SendType
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
