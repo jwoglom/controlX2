@@ -63,8 +63,11 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import timber.log.Timber
+import java.time.Duration
 import java.time.Instant
 
+
+const val CacheSeconds = 30
 
 class CommService : WearableListenerService(), GoogleApiClient.ConnectionCallbacks, GoogleApiClient.OnConnectionFailedListener {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
@@ -386,8 +389,19 @@ class CommService : WearableListenerService(), GoogleApiClient.ConnectionCallbac
                     PumpMessageSerializer.fromBulkBytes(msg.obj as ByteArray).forEach {
                         if (lastResponseMessage.containsKey(Pair(it.characteristic, it.responseOpCode)) && !isBolusCommand(it)) {
                             val response = lastResponseMessage.get(Pair(it.characteristic, it.responseOpCode))
-                            Timber.i("pumpCommHandler cached hit: $response")
-                            sendWearCommMessage("/from-pump/receive-cached-message", PumpMessageSerializer.toBytes(response?.first))
+                            val ageSeconds = Duration.between(Instant.now(), response?.second).seconds
+                            if (ageSeconds <= CacheSeconds) {
+                                Timber.i("pumpCommHandler cached hit: $response")
+                                sendWearCommMessage(
+                                    "/from-pump/receive-cached-message",
+                                    PumpMessageSerializer.toBytes(response?.first)
+                                )
+                            } else {
+                                Timber.i("pumpCommHandler expired cache hit $ageSeconds sec: $response")
+                                if (!isBolusCommand(it) && pumpConnectedPrecondition()) {
+                                    pump.command(it)
+                                }
+                            }
                         } else if (isBolusCommand(it)) {
                             Timber.e("CACHED_PUMP_COMMANDS_BULK blocked bolus command")
                         } else if (pumpConnectedPrecondition()) {

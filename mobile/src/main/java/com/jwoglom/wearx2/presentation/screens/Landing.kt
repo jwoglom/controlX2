@@ -61,6 +61,7 @@ import com.jwoglom.wearx2.R
 import com.jwoglom.wearx2.presentation.DataStore
 import com.jwoglom.wearx2.presentation.components.Line
 import com.jwoglom.wearx2.presentation.navigation.Screen
+import com.jwoglom.wearx2.presentation.screens.sections.BolusWindow
 import com.jwoglom.wearx2.presentation.screens.sections.Dashboard
 import com.jwoglom.wearx2.presentation.screens.sections.Debug
 import com.jwoglom.wearx2.presentation.screens.sections.Settings
@@ -148,7 +149,9 @@ fun Landing(
                             .fillMaxHeight(0.5F),
                         content = {
                             item {
-                                Line("Bolus window")
+                                if (displayBolusWindow.bottomSheetState.isExpanded || displayBolusWindow.bottomSheetState.isAnimationRunning) {
+                                    BolusWindow()
+                                }
                             }
                             item {
                                 Spacer(

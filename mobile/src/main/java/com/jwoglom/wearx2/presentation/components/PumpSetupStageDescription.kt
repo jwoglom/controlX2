@@ -34,17 +34,17 @@ fun PumpSetupStageDescription(
     val setupDeviceName = ds.setupDeviceName.observeAsState()
     val setupDeviceModel = ds.setupDeviceModel.observeAsState()
 
-    var secondsWaitingToConnect by remember { mutableStateOf(0) }
+    var pumpConnectionWaitingSeconds by remember { mutableStateOf(0) }
 
     LaunchedEffect (intervalOf(1)) {
         if (setupStage.value == PumpSetupStage.PUMPX2_PUMP_CONNECTED) {
-            if (secondsWaitingToConnect > 0) {
-                Timber.d("PumpSetupStageProgress secondsWaitingToConnect=$secondsWaitingToConnect")
-                secondsWaitingToConnect = 0
+            if (pumpConnectionWaitingSeconds > 0) {
+                Timber.d("PumpSetupStageProgress pumpConnectionWaitingSeconds=$pumpConnectionWaitingSeconds")
+                pumpConnectionWaitingSeconds = 0
             }
         } else {
-            secondsWaitingToConnect += 1
-            Timber.d("PumpSetupStageProgress secondsWaitingToConnect=$secondsWaitingToConnect")
+            pumpConnectionWaitingSeconds += 1
+            Timber.d("PumpSetupStageProgress pumpConnectionWaitingSeconds=$pumpConnectionWaitingSeconds")
         }
     }
 
@@ -116,7 +116,7 @@ fun PumpSetupStageDescription(
     }
 
     if (!initialSetup && setupStage.value != PumpSetupStage.PUMPX2_PUMP_CONNECTED) {
-        if (secondsWaitingToConnect > TroubleshootingStepsThresholdSeconds) {
+        if (pumpConnectionWaitingSeconds > TroubleshootingStepsThresholdSeconds) {
             Spacer(Modifier.height(16.dp))
             Line("Troubleshooting Steps:", bold = true)
             Line("1. Toggle Bluetooth on and off.")
