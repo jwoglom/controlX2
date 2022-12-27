@@ -15,7 +15,6 @@ import androidx.wear.watchface.complications.data.CountUpTimeReference
 import androidx.wear.watchface.complications.data.MonochromaticImage
 import androidx.wear.watchface.complications.data.PlainComplicationText
 import androidx.wear.watchface.complications.data.RangedValueComplicationData
-import androidx.wear.watchface.complications.data.ShortTextComplicationData
 import androidx.wear.watchface.complications.data.TimeDifferenceComplicationText
 import androidx.wear.watchface.complications.data.TimeDifferenceStyle
 import androidx.wear.watchface.complications.datasource.ComplicationDataSourceService
@@ -27,70 +26,40 @@ import com.jwoglom.wearx2.util.StatePrefs
 import java.time.Duration
 import java.time.Instant
 
-/**
- * A complication provider that supports only [ComplicationType.RANGED_VALUE] and cycles
- * through the possible configurations on tap. The value is randomised on each update.
- *
- * Note: This subclasses [SuspendingComplicationDataSourceService] instead of [ComplicationDataSourceService] to support
- * coroutines, so data operations (specifically, calls to [DataStore]) can be supported directly in the
- * [onComplicationRequest].
- *
- * If you don't perform any suspending operations to update your complications, you can subclass
- * [ComplicationDataSourceService] and override [onComplicationRequest] directly.
- * (see [NoDataDataSourceService] for an example)
- */
 @SuppressLint("LogNotTimber")
-class PumpBatteryComplicationDataSourceService : SuspendingComplicationDataSourceService() {
-    val tag = "WearX2:Compl:PumpBattery"
+class PumpIOBComplicationDataSourceService : SuspendingComplicationDataSourceService() {
+    val tag = "WearX2:Compl:PumpIOB"
     val OldDataThresholdSeconds = 600 // shows icon instead of recency
 
     override suspend fun onComplicationRequest(request: ComplicationRequest): ComplicationData? {
         Log.i(tag, "onComplicationRequest(${request.complicationType}, ${request.complicationInstanceId}, ${request.immediateResponseRequired})")
+        if (request.complicationType != ComplicationType.RANGED_VALUE) {
+            return null
+        }
 
         val tapIntent = PendingIntent.getActivity(this, 0, Intent(this, MainActivity::class.java), PendingIntent.FLAG_IMMUTABLE)
+        // Suspending function to retrieve the complication's state
         val pumpBattery = StatePrefs(this).pumpBattery
 
-        return getComplicationDataForType(
-            request.complicationType,
-            buildDataFields(pumpBattery = pumpBattery),
-            tapIntent,
+        return getComplicationData(
+            tapAction = tapIntent,
+            pumpBattery = pumpBattery,
         )
     }
 
-    private fun getComplicationDataForType(
-        type: ComplicationType,
-        data: DataFields,
-        tapAction: PendingIntent?,
-    ): ComplicationData? {
-        Log.i(tag, "getComplicationDataForType($type, $data, $tapAction)")
-        return when (type) {
-            ComplicationType.RANGED_VALUE -> rangedValueComplication(data, tapAction)
-            ComplicationType.SHORT_TEXT -> shortTextComplication(data, tapAction)
-            else -> null
-        }
-    }
-
-    override fun getPreviewData(type: ComplicationType): ComplicationData? {
-        val data = buildDataFields(
+    override fun getPreviewData(type: ComplicationType): ComplicationData? =
+        getComplicationData(
+            tapAction = null,
             pumpBattery = Pair("50", Instant.now().minusSeconds(601))
         )
-        return getComplicationDataForType(type, data, null)
-    }
 
-    data class DataFields(
-        val percentValue: Float,
-        val contentDescription: ComplicationText,
-        val text: ComplicationText,
-        val monochromaticImage: MonochromaticImage?,
-        val title: ComplicationText?
-    )
-
-    private fun buildDataFields(
+    private fun getComplicationData(
+        tapAction: PendingIntent?,
         pumpBattery: Pair<String, Instant>?,
-    ): DataFields {
-        Log.i(tag, "buildDataFields($pumpBattery)")
+    ): ComplicationData {
+        Log.i(tag, "getComplicationData($pumpBattery)")
 
-        val text: ComplicationText
+        val text: ComplicationText?
         val monochromaticImage: MonochromaticImage?
         val title: ComplicationText?
 
@@ -137,10 +106,7 @@ class PumpBatteryComplicationDataSourceService : SuspendingComplicationDataSourc
             }
         }
 
-        Log.i(
-            tag,
-            "complicationData: $displayType $pumpBattery $duration $percentLabel $percentValue"
-        )
+        Log.i(tag, "complicationData: $displayType $pumpBattery $duration $percentLabel $percentValue")
 
         val caseContentDescription = "Pump Battery ($displayType)"
 
@@ -149,24 +115,11 @@ class PumpBatteryComplicationDataSourceService : SuspendingComplicationDataSourc
             text = "${caseContentDescription}: $percentLabel"
         ).build()
 
-        return DataFields(
-            percentValue = percentValue,
-            contentDescription = contentDescription,
-            text = text,
-            monochromaticImage = monochromaticImage,
-            title = title,
-        )
-    }
-
-    private fun rangedValueComplication(
-        data: DataFields,
-        tapAction: PendingIntent?
-    ): ComplicationData {
         return RangedValueComplicationData.Builder(
-            value = data.percentValue,
+            value = percentValue,
             min = 0f,
             max = 100f,
-            contentDescription = data.contentDescription
+            contentDescription = contentDescription
         )
             .setColorRamp(ColorRamp(
                 colors = arrayOf(
@@ -177,23 +130,9 @@ class PumpBatteryComplicationDataSourceService : SuspendingComplicationDataSourc
                 ).toIntArray(),
                 interpolated = false,
             ))
-            .setText(data.text)
-            .setMonochromaticImage(data.monochromaticImage)
-            .setTitle(data.title)
-            .setTapAction(tapAction)
-            .build()
-    }
-
-    private fun shortTextComplication(
-        data: DataFields,
-        tapAction: PendingIntent?
-    ): ComplicationData {
-        return ShortTextComplicationData.Builder(
-            text = data.text,
-            contentDescription = data.contentDescription,
-        )
-            .setMonochromaticImage(data.monochromaticImage)
-            .setTitle(data.title)
+            .setText(text)
+            .setMonochromaticImage(monochromaticImage)
+            .setTitle(title)
             .setTapAction(tapAction)
             .build()
     }
