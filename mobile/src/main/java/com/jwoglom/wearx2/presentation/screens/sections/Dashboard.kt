@@ -46,6 +46,7 @@ import com.jwoglom.pumpx2.pump.messages.request.currentStatus.HomeScreenMirrorRe
 import com.jwoglom.pumpx2.pump.messages.request.currentStatus.InsulinStatusRequest
 import com.jwoglom.wearx2.LocalDataStore
 import com.jwoglom.wearx2.dataStore
+import com.jwoglom.wearx2.presentation.components.LastConnectionUpdatedTimestamp
 import com.jwoglom.wearx2.presentation.components.Line
 import com.jwoglom.wearx2.presentation.screens.setUpPreviewState
 import com.jwoglom.wearx2.presentation.theme.WearX2Theme
@@ -151,28 +152,7 @@ fun Dashboard(
                 .padding(horizontal = 16.dp),
             content = {
                 item {
-                    var pumpLastMessageTimestampRelative: String? by remember { mutableStateOf(null) }
-                    LaunchedEffect (pumpConnected.value, pumpLastMessageTimestamp.value, intervalOf(10)) {
-                        refreshScope.launch {
-                            pumpLastMessageTimestampRelative = pumpLastMessageTimestamp.value?.let {
-                                shortTimeAgo(it, nowThresholdSeconds = 1)
-                            }
-                            Timber.d("set pumpLastMessageTimestampRelative=%s", pumpLastMessageTimestampRelative)
-                        }
-                    }
-                    Line(
-                        when {
-                            pumpConnected.value == false -> "Connecting: ${setupStage.value}\nLast connected: $pumpLastMessageTimestampRelative"
-                            pumpLastMessageTimestamp.value == null -> ""
-                            pumpLastMessageTimestampRelative == null -> ""
-//                            pumpLastMessageTimestamp.value!!.isBefore(
-//                                Instant.now().minusSeconds(10)
-//                            ) ->
-                            else ->
-                                "Last updated: ${pumpLastMessageTimestampRelative}"
-
-                        }, bold = true
-                    )
+                    LastConnectionUpdatedTimestamp()
 
                     LaunchedEffect(pumpLastConnectionTimestamp.value) {
                         Timber.d("pumpLastConnectionTimestamp effect: ${pumpLastConnectionTimestamp.value}")

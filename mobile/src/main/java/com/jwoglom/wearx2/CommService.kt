@@ -861,10 +861,10 @@ class CommService : WearableListenerService(), GoogleApiClient.ConnectionCallbac
 
         var contentText = ""
         if (currentPumpData.batteryPercent != null) {
-            contentText += "Battery: ${currentPumpData.batteryPercent}%   "
+            contentText += "Battery: ${currentPumpData.batteryPercent}%\u00A0\u00A0\u00A0"
         }
         if (currentPumpData.iobUnits != null) {
-            contentText += "IOB: ${currentPumpData.iobUnits}u   "
+            contentText += "IOB: ${currentPumpData.iobUnits}u\u00A0\u00A0\u00A0"
         }
         if (currentPumpData.cartridgeRemainingUnits != null) {
             contentText += "Cartridge: ${currentPumpData.cartridgeRemainingUnits}u"

@@ -8,12 +8,13 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import timber.log.Timber
 
 @Composable
 fun intervalOf(seconds: Int): Int {
     var value by remember { mutableStateOf(0) }
 
-    DisposableEffect(Unit) {
+    DisposableEffect(value) {
         val handler = Handler(Looper.getMainLooper())
 
         val runnable = {
