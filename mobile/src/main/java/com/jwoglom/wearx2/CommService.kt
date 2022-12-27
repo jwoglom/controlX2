@@ -512,7 +512,7 @@ class CommService : WearableListenerService(), GoogleApiClient.ConnectionCallbac
         when (messageEvent.path) {
             "/to-phone/open-activity" -> {
                 startActivity(
-                    Intent(this, LegacyMainActivity::class.java)
+                    Intent(this, MainActivity::class.java)
                         .addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP)
                 )
             }
@@ -785,7 +785,7 @@ class CommService : WearableListenerService(), GoogleApiClient.ConnectionCallbac
         notificationManager.createNotificationChannel(channel)
 
         val pendingIntent: PendingIntent =
-            Intent(this, LegacyMainActivity::class.java).let { notificationIntent ->
+            Intent(this, MainActivity::class.java).let { notificationIntent ->
                 PendingIntent.getActivity(this, 0, notificationIntent,
                     PendingIntent.FLAG_IMMUTABLE)
             }
