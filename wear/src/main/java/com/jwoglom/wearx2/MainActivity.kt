@@ -61,10 +61,12 @@ import com.jwoglom.wearx2.shared.util.pumpTimeToLocalTz
 import com.jwoglom.wearx2.shared.util.shortTime
 import com.jwoglom.wearx2.shared.util.shortTimeAgo
 import com.jwoglom.wearx2.shared.util.twoDecimalPlaces1000Unit
+import com.jwoglom.wearx2.util.StatePrefs
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.asExecutor
 import kotlinx.coroutines.guava.await
 import timber.log.Timber
+import java.time.Instant
 import java.time.temporal.ChronoUnit
 
 var dataStore = DataStore()
@@ -310,6 +312,7 @@ class MainActivity : ComponentActivity(), MessageApi.MessageListener, GoogleApiC
         when (message) {
             is CurrentBatteryAbstractResponse -> {
                 dataStore.batteryPercent.value = message.batteryPercent
+                StatePrefs(this).pumpBattery = Pair("${message.batteryPercent}", Instant.now())
             }
             is ControlIQIOBResponse -> {
                 dataStore.iobUnits.value = InsulinUnit.from1000To1(message.pumpDisplayedIOB)

@@ -15,9 +15,11 @@ package com.jwoglom.wearx2.complications
  * limitations under the License.
  */
 
+import android.annotation.SuppressLint
 import android.app.PendingIntent
 import android.content.ComponentName
 import android.graphics.drawable.Icon
+import android.util.Log
 import androidx.datastore.core.DataStore
 import androidx.wear.watchface.complications.data.ComplicationData
 import androidx.wear.watchface.complications.data.ComplicationText
@@ -33,8 +35,6 @@ import com.jwoglom.wearx2.complications.internal.Complication
 import com.jwoglom.wearx2.complications.internal.ComplicationToggleArgs
 import com.jwoglom.wearx2.complications.internal.ComplicationToggleReceiver
 import com.jwoglom.wearx2.complications.internal.getPumpBatteryState
-import com.jwoglom.wearx2.shared.util.setupTimber
-import timber.log.Timber
 
 /**
  * A complication provider that supports only [ComplicationType.RANGED_VALUE] and cycles
@@ -48,15 +48,12 @@ import timber.log.Timber
  * [ComplicationDataSourceService] and override [onComplicationRequest] directly.
  * (see [NoDataDataSourceService] for an example)
  */
+@SuppressLint("LogNotTimber")
 class RangedValueDataSourceService : SuspendingComplicationDataSourceService() {
-
-    override fun onCreate() {
-        setupTimber("RVDS")
-        super.onCreate()
-    }
+    val tag = "WearX2:RangedValueDataSourceService"
 
     override suspend fun onComplicationRequest(request: ComplicationRequest): ComplicationData? {
-        Timber.i("RangedValueDataSourceService.onComplicationRequest($request)")
+        Log.i(tag, "RangedValueDataSourceService.onComplicationRequest($request)")
         if (request.complicationType != ComplicationType.RANGED_VALUE) {
             return null
         }
@@ -97,7 +94,7 @@ class RangedValueDataSourceService : SuspendingComplicationDataSourceService() {
         case: Case,
         percentValue: Double,
     ): ComplicationData {
-        Timber.i("RangedValueDataSourceService.getComplicationData($case, $percentValue)")
+        Log.i(tag, "RangedValueDataSourceService.getComplicationData($case, $percentValue)")
 
         val text: ComplicationText?
         val monochromaticImage: MonochromaticImage?

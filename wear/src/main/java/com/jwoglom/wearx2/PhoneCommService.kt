@@ -71,6 +71,7 @@ class PhoneCommService : WearableListenerService() {
     }
 
     private fun onPumpMessageReceived(message: Message, cached: Boolean) {
+        Timber.i("phoneComm onPumpMessageReceived($message)")
         when (message) {
             is CurrentBatteryAbstractResponse -> {
                 StatePrefs(this).pumpBattery = Pair("${message.batteryPercent}", Instant.now())

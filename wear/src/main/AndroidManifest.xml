@@ -71,7 +71,7 @@
                 android:value="RANGED_VALUE" />
             <meta-data
                 android:name="android.support.wearable.complications.UPDATE_PERIOD_SECONDS"
-                android:value="0" />
+                android:value="600" /> <!-- 10 minutes -->
         </service>
     </application>
 
