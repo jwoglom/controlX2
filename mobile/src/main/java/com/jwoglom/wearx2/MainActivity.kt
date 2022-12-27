@@ -67,7 +67,7 @@ class MainActivity : ComponentActivity(), GoogleApiClient.ConnectionCallbacks, G
     override fun onCreate(savedInstanceState: Bundle?) {
         Timber.d("mobile UIActivity onCreate $savedInstanceState")
         super.onCreate(savedInstanceState)
-        setupTimber("MUA")
+        setupTimber("MUA", writeCharacteristicFailedCallback = { writeCharacteristicFailedCallback() })
         val startDestination = determineStartDestination()
         Timber.d("startDestination=%s", startDestination)
 
@@ -92,6 +92,10 @@ class MainActivity : ComponentActivity(), GoogleApiClient.ConnectionCallbacks, G
         } else {
             Timber.i("commService not started because first TOS not accepted")
         }
+    }
+
+    private fun writeCharacteristicFailedCallback() {
+        sendMessage("/to-phone/write-characteristic-failed-callback", "".toByteArray())
     }
 
     override fun onResume() {

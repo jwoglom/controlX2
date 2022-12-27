@@ -474,7 +474,7 @@ class CommService : WearableListenerService(), GoogleApiClient.ConnectionCallbac
 
     override fun onCreate() {
         super.onCreate()
-        setupTimber("MWC")
+        setupTimber("MWC", writeCharacteristicFailedCallback = { writeCharacteristicFailedCallback() })
         Timber.d("service onCreate")
 
         // Listen to BLE state changes
@@ -612,6 +612,10 @@ class CommService : WearableListenerService(), GoogleApiClient.ConnectionCallbac
                     sendPumpCommBolusMessage(messageEvent.data)
                 }
             }
+            "/to-phone/write-characteristic-failed-callback" -> {
+                Timber.i("writeCharacteristicFailedCallback from message")
+                writeCharacteristicFailedCallback()
+            }
             "/to-pump/command" -> {
                 sendPumpCommMessage(messageEvent.data)
             }
@@ -658,6 +662,20 @@ class CommService : WearableListenerService(), GoogleApiClient.ConnectionCallbac
         triggerAppReload(applicationContext)
         Toast.makeText(this, "WearX2 service removed", Toast.LENGTH_SHORT).show()
         stopSelf()
+    }
+
+    private fun writeCharacteristicFailedCallback() {
+        Timber.i("writeCharacteristicFailedCallback")
+        if (!this::pump.isInitialized) {
+            Timber.e("writeCharacteristicFailedCallback: pump not initialized")
+        } else if (pump.isConnected) {
+            Timber.e("writeCharacteristicFailedCallback: pump already connected")
+        } else if (pump.lastPeripheral == null) {
+            Timber.e("writeCharacteristicFailedCallback: pump not saved peripheral")
+        } else {
+            Timber.e("writeCharacteristicFailedCallback: calling onPumpConnected pump=$pump")
+            pump.onPumpConnected(pump.lastPeripheral)
+        }
     }
 
     private data class DisplayablePumpData(

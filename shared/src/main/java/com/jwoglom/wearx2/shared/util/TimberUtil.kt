@@ -7,9 +7,12 @@ import timber.log.Timber
 import java.util.function.BiConsumer
 import java.util.function.Consumer
 
-fun setupTimber(prefix: String) {
+fun setupTimber(
+    prefix: String,
+    writeCharacteristicFailedCallback: () -> Unit = {},
+) {
     if (Timber.treeCount == 0) {
-        Timber.plant(DebugTree(prefix))
+        Timber.plant(DebugTree(prefix, writeCharacteristicFailedCallback))
     }
     L.getPrintln = Consumer {  }
     L.getTimberDebug = TriConsumer { tag: String?, message: String?, args: String? ->
