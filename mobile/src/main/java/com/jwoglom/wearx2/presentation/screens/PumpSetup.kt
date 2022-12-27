@@ -66,7 +66,10 @@ fun PumpSetup(
 
     val setupStage = ds.pumpSetupStage.observeAsState()
 
-    var pairingCodeText by remember { mutableStateOf(PumpState.getPairingCode(context)) }
+    var pairingCodeText by remember { mutableStateOf(when (PumpState.getPairingCode(context)) {
+        null -> ""
+        else -> PumpState.getPairingCode(context)
+    }) }
     DialogScreen(
         "Pump Setup",
         buttonContent = {
