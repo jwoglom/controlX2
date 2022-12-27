@@ -57,10 +57,10 @@
 
 
         <service
-            android:name=".complications.RangedValueDataSourceService"
+            android:name=".complications.PumpBatteryComplicationDataSourceService"
             android:exported="true"
             android:icon="@drawable/pump"
-            android:label="WearX2 RangedValue"
+            android:label="WearX2 Pump Battery"
             android:permission="com.google.android.wearable.permission.BIND_COMPLICATION_PROVIDER">
             <intent-filter>
                 <action android:name="android.support.wearable.complications.ACTION_COMPLICATION_UPDATE_REQUEST" />

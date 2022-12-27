@@ -1,26 +1,9 @@
 package com.jwoglom.wearx2.complications
-/*
- * Copyright 2021 The Android Open Source Project
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     https://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
 
 import android.annotation.SuppressLint
 import android.app.PendingIntent
-import android.content.ComponentName
 import android.content.Intent
 import android.graphics.drawable.Icon
-import android.support.wearable.complications.TimeDifferenceText
 import android.util.Log
 import androidx.compose.ui.graphics.Color
 import androidx.datastore.core.DataStore
@@ -39,11 +22,6 @@ import androidx.wear.watchface.complications.datasource.ComplicationRequest
 import androidx.wear.watchface.complications.datasource.SuspendingComplicationDataSourceService
 import com.jwoglom.wearx2.MainActivity
 import com.jwoglom.wearx2.R
-import com.jwoglom.wearx2.complications.internal.Complication
-import com.jwoglom.wearx2.complications.internal.ComplicationToggleArgs
-import com.jwoglom.wearx2.complications.internal.ComplicationToggleReceiver
-import com.jwoglom.wearx2.complications.internal.getPumpBatteryState
-import com.jwoglom.wearx2.shared.util.shortTimeAgo
 import com.jwoglom.wearx2.util.StatePrefs
 import java.time.Duration
 import java.time.Instant
@@ -61,25 +39,15 @@ import java.time.Instant
  * (see [NoDataDataSourceService] for an example)
  */
 @SuppressLint("LogNotTimber")
-class RangedValueDataSourceService : SuspendingComplicationDataSourceService() {
-    val tag = "WearX2:Compl:RangedValueDataSourceService"
+class PumpBatteryComplicationDataSourceService : SuspendingComplicationDataSourceService() {
+    val tag = "WearX2:Compl:PumpBattery"
     val OldDataThresholdSeconds = 1200 // 20 minutes
 
     override suspend fun onComplicationRequest(request: ComplicationRequest): ComplicationData? {
-        Log.i(tag, "RangedValueDataSourceService.onComplicationRequest(${request.complicationType}, ${request.complicationInstanceId}, ${request.immediateResponseRequired})")
+        Log.i(tag, "onComplicationRequest(${request.complicationType}, ${request.complicationInstanceId}, ${request.immediateResponseRequired})")
         if (request.complicationType != ComplicationType.RANGED_VALUE) {
             return null
         }
-        val args = ComplicationToggleArgs(
-            providerComponent = ComponentName(this, javaClass),
-            complication = Complication.RANGED_VALUE,
-            complicationInstanceId = request.complicationInstanceId
-        )
-//        val complicationTogglePendingIntent =
-//            ComplicationToggleReceiver.getComplicationToggleIntent(
-//                context = this,
-//                args = args
-//            )
 
         val tapIntent = PendingIntent.getActivity(this, 0, Intent(this, MainActivity::class.java), PendingIntent.FLAG_IMMUTABLE)
         // Suspending function to retrieve the complication's state
@@ -101,7 +69,7 @@ class RangedValueDataSourceService : SuspendingComplicationDataSourceService() {
         tapAction: PendingIntent?,
         pumpBattery: Pair<String, Instant>?,
     ): ComplicationData {
-        Log.i(tag, "RangedValueDataSourceService.getComplicationData($pumpBattery)")
+        Log.i(tag, "getComplicationData($pumpBattery)")
 
         val text: ComplicationText?
         val monochromaticImage: MonochromaticImage?

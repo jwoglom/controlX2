@@ -36,6 +36,16 @@ class ComplicationToggleReceiver : BroadcastReceiver() {
     val tag = "WearX2:ComplicationToggleReceiver"
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
 
+//    val args = ComplicationToggleArgs(
+//        providerComponent = ComponentName(this, javaClass),
+//        complication = Complication.RANGED_VALUE,
+//        complicationInstanceId = request.complicationInstanceId
+//    )
+//    val complicationTogglePendingIntent =
+//        ComplicationToggleReceiver.getComplicationToggleIntent(
+//            context = this,
+//            args = args
+//        )
     override fun onReceive(context: Context, intent: Intent) {
         val args = intent.getArgs()
         Log.i(tag, "ComplicationToggleReceiver: onReceive($context, $intent, $args)")
