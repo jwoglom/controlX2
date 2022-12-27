@@ -18,23 +18,35 @@ package com.jwoglom.wearx2.complications
 import android.annotation.SuppressLint
 import android.app.PendingIntent
 import android.content.ComponentName
+import android.content.Intent
 import android.graphics.drawable.Icon
+import android.support.wearable.complications.TimeDifferenceText
 import android.util.Log
+import androidx.compose.ui.graphics.Color
 import androidx.datastore.core.DataStore
+import androidx.wear.watchface.complications.data.ColorRamp
 import androidx.wear.watchface.complications.data.ComplicationData
 import androidx.wear.watchface.complications.data.ComplicationText
 import androidx.wear.watchface.complications.data.ComplicationType
+import androidx.wear.watchface.complications.data.CountUpTimeReference
 import androidx.wear.watchface.complications.data.MonochromaticImage
 import androidx.wear.watchface.complications.data.PlainComplicationText
 import androidx.wear.watchface.complications.data.RangedValueComplicationData
+import androidx.wear.watchface.complications.data.TimeDifferenceComplicationText
+import androidx.wear.watchface.complications.data.TimeDifferenceStyle
 import androidx.wear.watchface.complications.datasource.ComplicationDataSourceService
 import androidx.wear.watchface.complications.datasource.ComplicationRequest
 import androidx.wear.watchface.complications.datasource.SuspendingComplicationDataSourceService
+import com.jwoglom.wearx2.MainActivity
 import com.jwoglom.wearx2.R
 import com.jwoglom.wearx2.complications.internal.Complication
 import com.jwoglom.wearx2.complications.internal.ComplicationToggleArgs
 import com.jwoglom.wearx2.complications.internal.ComplicationToggleReceiver
 import com.jwoglom.wearx2.complications.internal.getPumpBatteryState
+import com.jwoglom.wearx2.shared.util.shortTimeAgo
+import com.jwoglom.wearx2.util.StatePrefs
+import java.time.Duration
+import java.time.Instant
 
 /**
  * A complication provider that supports only [ComplicationType.RANGED_VALUE] and cycles
@@ -50,10 +62,11 @@ import com.jwoglom.wearx2.complications.internal.getPumpBatteryState
  */
 @SuppressLint("LogNotTimber")
 class RangedValueDataSourceService : SuspendingComplicationDataSourceService() {
-    val tag = "WearX2:RangedValueDataSourceService"
+    val tag = "WearX2:Compl:RangedValueDataSourceService"
+    val OldDataThresholdSeconds = 1200 // 20 minutes
 
     override suspend fun onComplicationRequest(request: ComplicationRequest): ComplicationData? {
-        Log.i(tag, "RangedValueDataSourceService.onComplicationRequest($request)")
+        Log.i(tag, "RangedValueDataSourceService.onComplicationRequest(${request.complicationType}, ${request.complicationInstanceId}, ${request.immediateResponseRequired})")
         if (request.complicationType != ComplicationType.RANGED_VALUE) {
             return null
         }
@@ -62,110 +75,100 @@ class RangedValueDataSourceService : SuspendingComplicationDataSourceService() {
             complication = Complication.RANGED_VALUE,
             complicationInstanceId = request.complicationInstanceId
         )
-        val complicationTogglePendingIntent =
-            ComplicationToggleReceiver.getComplicationToggleIntent(
-                context = this,
-                args = args
-            )
+//        val complicationTogglePendingIntent =
+//            ComplicationToggleReceiver.getComplicationToggleIntent(
+//                context = this,
+//                args = args
+//            )
+
+        val tapIntent = PendingIntent.getActivity(this, 0, Intent(this, MainActivity::class.java), PendingIntent.FLAG_IMMUTABLE)
         // Suspending function to retrieve the complication's state
-        var state = args.getPumpBatteryState(this)
-        if (state == null) {
-            state = 0
-        }
-        // val case = Case.values()[state.mod(Case.values().size)]
-        val case = Case.TEXT_WITH_ICON
+        val pumpBattery = StatePrefs(this).pumpBattery
 
         return getComplicationData(
-            tapAction = complicationTogglePendingIntent,
-            case = case,
-            percentValue = state.toDouble(),
+            tapAction = tapIntent,
+            pumpBattery = pumpBattery,
         )
     }
 
     override fun getPreviewData(type: ComplicationType): ComplicationData? =
         getComplicationData(
             tapAction = null,
-            case = Case.TEXT_WITH_ICON,
-            percentValue = 75.0,
+            pumpBattery = Pair("50", Instant.now())
         )
 
     private fun getComplicationData(
         tapAction: PendingIntent?,
-        case: Case,
-        percentValue: Double,
+        pumpBattery: Pair<String, Instant>?,
     ): ComplicationData {
-        Log.i(tag, "RangedValueDataSourceService.getComplicationData($case, $percentValue)")
+        Log.i(tag, "RangedValueDataSourceService.getComplicationData($pumpBattery)")
 
         val text: ComplicationText?
         val monochromaticImage: MonochromaticImage?
         val title: ComplicationText?
-        val caseContentDescription: String
 
-        val minValue = case.minValue
-        val maxValue = case.maxValue
+        val duration = Duration.between(Instant.now(), pumpBattery?.second)
+        val percentLabel = "${pumpBattery?.first}%"
+        val percentValue = pumpBattery?.first?.toFloatOrNull() ?: 0f
 
-        when (case) {
-            Case.TEXT_ONLY -> {
+        var case: Case
+
+        when {
+            pumpBattery == null || pumpBattery.first == "" -> {
+                case = Case.TEXT_ONLY
                 text = PlainComplicationText.Builder(
-                    text = "$percentValue% (1)"
+                    text = "?"
                 ).build()
                 monochromaticImage = null
                 title = null
-                caseContentDescription = "$percentValue% (2)"
             }
-            Case.TEXT_WITH_ICON -> {
+            duration.seconds >= OldDataThresholdSeconds -> {
+                case = Case.TEXT_WITH_TITLE
                 text = PlainComplicationText.Builder(
-                    text = "$percentValue% (3)"
+                    text = percentLabel
+                ).build()
+                monochromaticImage = null
+                title = TimeDifferenceComplicationText.Builder(
+                    style = TimeDifferenceStyle.SHORT_DUAL_UNIT,
+                    countUpTimeReference = CountUpTimeReference(pumpBattery.second),
+                ).build()
+            }
+            else -> {
+                case = Case.TEXT_WITH_ICON
+                text = PlainComplicationText.Builder(
+                    text = percentLabel
                 ).build()
                 monochromaticImage = MonochromaticImage.Builder(
                     image = Icon.createWithResource(this, R.drawable.ic_battery)
-                )
-                    .setAmbientImage(
-                        ambientImage = Icon.createWithResource(this, R.drawable.ic_battery_burn_protect)
-                    )
-                    .build()
-                title = null
-                caseContentDescription = "$percentValue% (4)"
-            }
-            Case.TEXT_WITH_TITLE -> {
-                text = PlainComplicationText.Builder(
-                    text = "$percentValue% (5)"
-                ).build()
-                monochromaticImage = null
-                title = PlainComplicationText.Builder(
-                    text = "$percentValue% (6)"
-                ).build()
-
-                caseContentDescription = "$percentValue% (7)"
-            }
-            Case.ICON_ONLY -> {
-                text = null
-                monochromaticImage = MonochromaticImage.Builder(
-                    image = Icon.createWithResource(this, R.drawable.pump)
+                ).setAmbientImage(
+                    ambientImage = Icon.createWithResource(this, R.drawable.ic_battery_burn_protect)
                 ).build()
                 title = null
-                caseContentDescription = "$percentValue% (8)"
             }
         }
 
+        val caseContentDescription = "Pump Battery ($case)"
+
         // Create a content description that includes the value information
         val contentDescription = PlainComplicationText.Builder(
-            text = String.format(
-                "ranged_value_content_description: %s %s %s %s",
-                caseContentDescription,
-                percentValue,
-                minValue,
-                maxValue
-            )
-        )
-            .build()
+            text = "${caseContentDescription}: $percentLabel"
+        ).build()
 
         return RangedValueComplicationData.Builder(
-            value = percentValue.toFloat(),
+            value = percentValue,
             min = 0f,
             max = 100f,
             contentDescription = contentDescription
         )
+            .setColorRamp(ColorRamp(
+                colors = arrayOf(
+                    Color.Red.value.toInt(),
+                    Color.Yellow.value.toInt(),
+                    Color.Green.value.toInt(),
+                    Color.Green.value.toInt(),
+                ).toIntArray(),
+                interpolated = false,
+            ))
             .setText(text)
             .setMonochromaticImage(monochromaticImage)
             .setTitle(title)

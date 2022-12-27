@@ -16,27 +16,29 @@ package com.jwoglom.wearx2.complications.internal
  * limitations under the License.
  */
 
+import android.annotation.SuppressLint
 import android.app.PendingIntent
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
+import android.util.Log
 import androidx.wear.watchface.complications.datasource.ComplicationDataSourceUpdateRequester
-import com.jwoglom.wearx2.util.StatePrefs
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
-import timber.log.Timber
 
 /**
  * Receives intents on tap and causes complication states to be toggled and updated.
  */
+@SuppressLint("LogNotTimber")
 class ComplicationToggleReceiver : BroadcastReceiver() {
+    val tag = "WearX2:ComplicationToggleReceiver"
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
 
     override fun onReceive(context: Context, intent: Intent) {
         val args = intent.getArgs()
-        Timber.i("ComplicationToggleReceiver: onReceive($context, $intent, $args)")
+        Log.i(tag, "ComplicationToggleReceiver: onReceive($context, $intent, $args)")
 
         val result = goAsync()
 

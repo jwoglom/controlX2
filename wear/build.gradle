@@ -92,11 +92,13 @@ dependencies {
     implementation 'androidx.constraintlayout:constraintlayout:2.1.4'
     implementation 'androidx.navigation:navigation-runtime-ktx:2.5.3'
     implementation 'androidx.wear:wear-remote-interactions:1.0.0'
-    implementation 'androidx.wear.watchface:watchface:1.1.1'
-    implementation 'androidx.wear.watchface:watchface-complications-data-source:1.1.1'
-    implementation 'androidx.wear.watchface:watchface-complications-data-source-ktx:1.1.1'
-    implementation 'androidx.wear.watchface:watchface-editor:1.1.1'
     implementation 'androidx.datastore:datastore-preferences:1.0.0'
     implementation 'androidx.datastore:datastore-preferences-core:1.0.0'
+
+    implementation "androidx.wear.watchface:watchface:${project.androidx_watchface_version}"
+    implementation "androidx.wear.watchface:watchface-complications-data-source:${project.androidx_watchface_version}"
+    implementation "androidx.wear.watchface:watchface-complications-data-source-ktx:${project.androidx_watchface_version}"
+    implementation "androidx.wear.watchface:watchface-editor:${project.androidx_watchface_version}"
+    implementation "androidx.wear.watchface:watchface-complications-rendering:${project.androidx_watchface_version}"
 
 }
