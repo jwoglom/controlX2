@@ -41,7 +41,7 @@ import java.time.Instant
 @SuppressLint("LogNotTimber")
 class PumpBatteryComplicationDataSourceService : SuspendingComplicationDataSourceService() {
     val tag = "WearX2:Compl:PumpBattery"
-    val OldDataThresholdSeconds = 1200 // 20 minutes
+    val OldDataThresholdSeconds = 600 // shows icon instead of recency
 
     override suspend fun onComplicationRequest(request: ComplicationRequest): ComplicationData? {
         Log.i(tag, "onComplicationRequest(${request.complicationType}, ${request.complicationInstanceId}, ${request.immediateResponseRequired})")
@@ -62,7 +62,7 @@ class PumpBatteryComplicationDataSourceService : SuspendingComplicationDataSourc
     override fun getPreviewData(type: ComplicationType): ComplicationData? =
         getComplicationData(
             tapAction = null,
-            pumpBattery = Pair("50", Instant.now())
+            pumpBattery = Pair("50", Instant.now().minusSeconds(601))
         )
 
     private fun getComplicationData(
@@ -75,15 +75,14 @@ class PumpBatteryComplicationDataSourceService : SuspendingComplicationDataSourc
         val monochromaticImage: MonochromaticImage?
         val title: ComplicationText?
 
-        val duration = Duration.between(Instant.now(), pumpBattery?.second)
+        val duration = Duration.between(pumpBattery?.second, Instant.now())
         val percentLabel = "${pumpBattery?.first}%"
         val percentValue = pumpBattery?.first?.toFloatOrNull() ?: 0f
-
-        var case: Case
+        var displayType = ""
 
         when {
             pumpBattery == null || pumpBattery.first == "" -> {
-                case = Case.TEXT_ONLY
+                displayType = "empty"
                 text = PlainComplicationText.Builder(
                     text = "?"
                 ).build()
@@ -91,18 +90,22 @@ class PumpBatteryComplicationDataSourceService : SuspendingComplicationDataSourc
                 title = null
             }
             duration.seconds >= OldDataThresholdSeconds -> {
-                case = Case.TEXT_WITH_TITLE
+                displayType = "oldData"
                 text = PlainComplicationText.Builder(
                     text = percentLabel
                 ).build()
-                monochromaticImage = null
+                monochromaticImage = MonochromaticImage.Builder(
+                    image = Icon.createWithResource(this, R.drawable.ic_battery)
+                ).setAmbientImage(
+                    ambientImage = Icon.createWithResource(this, R.drawable.ic_battery_burn_protect)
+                ).build()
                 title = TimeDifferenceComplicationText.Builder(
                     style = TimeDifferenceStyle.SHORT_DUAL_UNIT,
                     countUpTimeReference = CountUpTimeReference(pumpBattery.second),
                 ).build()
             }
             else -> {
-                case = Case.TEXT_WITH_ICON
+                displayType = "normal"
                 text = PlainComplicationText.Builder(
                     text = percentLabel
                 ).build()
@@ -115,7 +118,9 @@ class PumpBatteryComplicationDataSourceService : SuspendingComplicationDataSourc
             }
         }
 
-        val caseContentDescription = "Pump Battery ($case)"
+        Log.i(tag, "complicationData: $displayType $pumpBattery $duration $percentLabel $percentValue")
+
+        val caseContentDescription = "Pump Battery ($displayType)"
 
         // Create a content description that includes the value information
         val contentDescription = PlainComplicationText.Builder(
@@ -142,19 +147,5 @@ class PumpBatteryComplicationDataSourceService : SuspendingComplicationDataSourc
             .setTitle(title)
             .setTapAction(tapAction)
             .build()
-    }
-
-    private enum class Case(
-        val minValue: Float,
-        val maxValue: Float
-    ) {
-        TEXT_ONLY(0f, 100f),
-        TEXT_WITH_ICON(-20f, 20f),
-        TEXT_WITH_TITLE(57.5f, 824.2f),
-        ICON_ONLY(10_045f, 100_000f);
-
-        init {
-            require(minValue < maxValue) { "Minimum value was greater than maximum value!" }
-        }
     }
 }
