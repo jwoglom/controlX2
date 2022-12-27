@@ -290,16 +290,16 @@ class CommService : WearableListenerService(), GoogleApiClient.ConnectionCallbac
             lastTimeSinceReset = response
         }
 
-        private fun pumpConnectedPrecondition(): Boolean {
+        private fun pumpConnectedPrecondition(checkConnected: Boolean = true): Boolean {
             if (!this::pump.isInitialized) {
                 Timber.e("pumpConnectedPrecondition: pump not initialized")
                 sendWearCommMessage("/from-pump/pump-not-connected", "not_initialized".toByteArray())
-            } else if (!pump.isConnected) {
-                Timber.e("pumpConnectedPrecondition: pump not connected")
-                sendWearCommMessage("/from-pump/pump-not-connected", "not_connected".toByteArray())
             } else if (pump.lastPeripheral == null) {
                 Timber.e("pumpConnectedPrecondition: pump not saved peripheral")
                 sendWearCommMessage("/from-pump/pump-not-connected", "null_peripheral".toByteArray())
+            } else if (checkConnected && !pump.isConnected) {
+                Timber.e("pumpConnectedPrecondition: pump not connected")
+                sendWearCommMessage("/from-pump/pump-not-connected", "not_connected".toByteArray())
             } else {
                 return true
             }
@@ -309,7 +309,7 @@ class CommService : WearableListenerService(), GoogleApiClient.ConnectionCallbac
         override fun handleMessage(msg: Message) {
             when (msg.what) {
                 CommServiceCodes.INIT_PUMP_COMM.ordinal -> {
-                    if (pumpConnectedPrecondition()) {
+                    if (pumpConnectedPrecondition(checkConnected = false)) {
                         Timber.w("pumpCommHandler: init_pump_comm already run, ignoring")
                         return
                     }
@@ -335,7 +335,7 @@ class CommService : WearableListenerService(), GoogleApiClient.ConnectionCallbac
                     }
                 }
                 CommServiceCodes.SEND_PUMP_PAIRING_MESSAGE.ordinal -> {
-                    if (pumpConnectedPrecondition()) {
+                    if (pumpConnectedPrecondition(checkConnected = false)) {
                         if (pump.lastPeripheral != null && pump.pairingCodeCentralChallenge != null) {
                             Timber.i("sendPumpPairingMessage: running performPairing")
                             pump.performPairing(
@@ -450,7 +450,7 @@ class CommService : WearableListenerService(), GoogleApiClient.ConnectionCallbac
                     }
                 }
                 CommServiceCodes.WRITE_CHARACTERISTIC_FAILED_CALLBACK.ordinal -> {
-                    if (pumpConnectedPrecondition()) {
+                    if (pumpConnectedPrecondition(checkConnected = false)) {
                         Timber.e("writeCharacteristicFailedCallback: calling onPumpConnected pump=$pump")
                         pump.onPumpConnected(pump.lastPeripheral)
                     }
@@ -591,7 +591,7 @@ class CommService : WearableListenerService(), GoogleApiClient.ConnectionCallbac
             "/to-phone/is-pump-connected" -> {
                 sendCheckPumpConnected()
             }
-            "/to-phone/pair" -> {
+            "/to-pump/pair" -> {
                 sendPumpPairingMessage()
             }
             "/to-phone/bolus-request" -> {
