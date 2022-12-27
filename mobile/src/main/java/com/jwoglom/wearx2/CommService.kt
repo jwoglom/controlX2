@@ -12,6 +12,8 @@ import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
 import android.content.SharedPreferences
+import android.graphics.PorterDuff
+import android.graphics.drawable.Icon
 import android.media.RingtoneManager
 import android.os.Bundle
 import android.os.Handler
@@ -48,6 +50,7 @@ import com.jwoglom.wearx2.shared.PumpMessageSerializer
 import com.jwoglom.wearx2.shared.PumpQualifyingEventsSerializer
 import com.jwoglom.wearx2.shared.CommServiceCodes
 import com.jwoglom.wearx2.shared.util.setupTimber
+import com.jwoglom.wearx2.shared.util.shortTime
 import com.jwoglom.wearx2.shared.util.twoDecimalPlaces
 import com.welie.blessed.BluetoothPeripheral
 import com.welie.blessed.HciStatus
@@ -205,6 +208,7 @@ class CommService : WearableListenerService(), GoogleApiClient.ConnectionCallbac
             wearCommHandler?.sendMessage("/from-pump/pump-connected",
                 peripheral?.name!!.toByteArray()
             )
+            updateNotification("Connected to pump at ${shortTime(Instant.now())}")
         }
 
         override fun onPumpModel(peripheral: BluetoothPeripheral?, modelNumber: String?) {
@@ -227,6 +231,7 @@ class CommService : WearableListenerService(), GoogleApiClient.ConnectionCallbac
             wearCommHandler?.sendMessage("/from-pump/pump-disconnected",
                 peripheral?.name!!.toByteArray()
             )
+            updateNotification("Disconnected from pump at ${shortTime(Instant.now())}")
             return super.onPumpDisconnected(peripheral, status)
         }
 
@@ -622,8 +627,7 @@ class CommService : WearableListenerService(), GoogleApiClient.ConnectionCallbac
         Timber.i("CommService onStartCommand $intent $flags $startId")
         Toast.makeText(this, "WearX2 service starting", Toast.LENGTH_SHORT).show()
 
-        var notification = createNotification()
-        startForeground(1, notification)
+        updateNotification("Initializing...")
 
         // For each start request, send a message to start a job and deliver the
         // start ID so we know which request we're stopping when we finish the job
@@ -634,6 +638,11 @@ class CommService : WearableListenerService(), GoogleApiClient.ConnectionCallbac
 
         // If we get killed, after returning from here, restart
         return START_STICKY
+    }
+
+    fun updateNotification(contentText: String) {
+        var notification = createNotification(contentText)
+        startForeground(1, notification)
     }
 
     override fun onTaskRemoved(rootIntent: Intent?) {
@@ -767,7 +776,7 @@ class CommService : WearableListenerService(), GoogleApiClient.ConnectionCallbac
     }
 
 
-    private fun createNotification(): Notification {
+    private fun createNotification(contentText: String): Notification {
         val notificationChannelId = "WearX2 Background Notification"
 
         val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager;
@@ -797,10 +806,10 @@ class CommService : WearableListenerService(), GoogleApiClient.ConnectionCallbac
 
         return builder
             .setContentTitle("WearX2")
-            .setContentText("WearX2 is running")
+            .setContentText(contentText)
             .setContentIntent(pendingIntent)
-            .setSmallIcon(R.drawable.pump)
-            .setTicker("WearX2 is running")
+            .setSmallIcon(Icon.createWithResource(this, R.drawable.pump_notif_1d))
+            .setTicker(contentText)
             .setPriority(Notification.PRIORITY_MAX) // for under android 26 compatibility
             .build()
     }
