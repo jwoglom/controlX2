@@ -543,9 +543,9 @@ class CommService : WearableListenerService(), GoogleApiClient.ConnectionCallbac
         // separate thread because the service normally runs in the process's
         // main thread, which we don't want to block.  We also make it
         // background priority so CPU-intensive work will not disrupt our UI.
-        HandlerThread("PumpCommServiceThread", THREAD_PRIORITY_FOREGROUND).apply {
-            start()
-            Timber.d("service thread start")
+//        HandlerThread("PumpCommServiceThread", THREAD_PRIORITY_FOREGROUND).apply {
+//            start()
+//            Timber.d("service thread start")
 
             setupTimber("MWC", writeCharacteristicFailedCallback = { handleWriteCharacteristicFailedCallback() })
             Timber.d("service onCreate")
@@ -577,7 +577,7 @@ class CommService : WearableListenerService(), GoogleApiClient.ConnectionCallbac
 
                 sendWearCommMessage("/to-phone/comm-started", "".toByteArray())
             }.start()
-        }
+//        }
     }
 
     override fun onMessageReceived(messageEvent: MessageEvent) {
