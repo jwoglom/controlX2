@@ -91,6 +91,7 @@ fun WearApp(
     sendPhoneBolusCancel: () -> Unit,
     sendPhoneConnectionCheck: () -> Unit,
     sendPhoneCommand: (String) -> Unit,
+    sendPhoneOpenActivity: () -> Unit,
 ) {
     var themeColors by remember { mutableStateOf(defaultTheme.colors) }
     WearAppTheme(colors = themeColors) {
@@ -269,6 +270,7 @@ fun WearApp(
                         swipeDismissableNavController = navController,
                         sendPumpCommands = sendPumpCommands,
                         sendPhoneCommand = sendPhoneCommand,
+                        sendPhoneOpenActivity = sendPhoneOpenActivity,
                         resetSavedBolusEnteredState = resetSavedBolusEnteredState,
                     )
 

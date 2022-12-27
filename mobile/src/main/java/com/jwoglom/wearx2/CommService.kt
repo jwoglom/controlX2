@@ -306,16 +306,20 @@ class CommService : WearableListenerService(), GoogleApiClient.ConnectionCallbac
         override fun handleMessage(msg: Message) {
             when (msg.what) {
                 CommServiceCodes.INIT_PUMP_COMM.ordinal -> {
-                    Timber.i("wearCommHandler: init pump class")
+                    if (pumpConnectedPrecondition()) {
+                        Timber.w("pumpCommHandler: init_pump_comm already run, ignoring")
+                        return
+                    }
+                    Timber.i("pumpCommHandler: init_pump_comm")
                     pump = Pump()
                     tandemBTHandler = TandemBluetoothHandler.getInstance(applicationContext, pump, null)
                     while (true) {
                         try {
-                            Timber.i("wearCommHandler: Starting scan...")
+                            Timber.i("pumpCommHandler: Starting scan...")
                             tandemBTHandler.startScan()
                             break
                         } catch (e: SecurityException) {
-                            Timber.e("wearCommHandler: Waiting for BT permissions $e")
+                            Timber.e("pumpCommHandler: Waiting for BT permissions $e")
                             Thread.sleep(500)
                         }
                     }
@@ -342,58 +346,58 @@ class CommService : WearableListenerService(), GoogleApiClient.ConnectionCallbac
                     }
                 }
                 CommServiceCodes.SEND_PUMP_COMMAND.ordinal -> {
-                    Timber.i("wearCommHandler send command raw: ${String(msg.obj as ByteArray)}")
+                    Timber.i("pumpCommHandler send command raw: ${String(msg.obj as ByteArray)}")
                     val pumpMsg = PumpMessageSerializer.fromBytes(msg.obj as ByteArray)
                     if (isBolusCommand(pumpMsg)) {
                         Timber.e("SEND_PUMP_COMMAND blocked bolus command")
                     } else if (pumpConnectedPrecondition()) {
-                        Timber.i("wearCommHandler send command: $pumpMsg")
+                        Timber.i("pumpCommHandler send command: $pumpMsg")
                         pump.command(pumpMsg)
                     }
                 }
                 CommServiceCodes.SEND_PUMP_COMMANDS_BULK.ordinal -> {
-                    Timber.i("wearCommHandler send commands raw: ${String(msg.obj as ByteArray)}")
+                    Timber.i("pumpCommHandler send commands raw: ${String(msg.obj as ByteArray)}")
                     PumpMessageSerializer.fromBulkBytes(msg.obj as ByteArray).forEach {
                         if (isBolusCommand(it)) {
                             Timber.e("SEND_PUMP_COMMAND blocked bolus command")
                         } else if (pumpConnectedPrecondition()) {
-                            Timber.i("wearCommHandler send command: $it")
+                            Timber.i("pumpCommHandler send command: $it")
                             pump.command(it)
                         }
                     }
                 }
                 CommServiceCodes.SEND_PUMP_COMMANDS_BUST_CACHE_BULK.ordinal -> {
-                    Timber.i("wearCommHandler send commands bust cache raw: ${String(msg.obj as ByteArray)}")
+                    Timber.i("pumpCommHandler send commands bust cache raw: ${String(msg.obj as ByteArray)}")
                     PumpMessageSerializer.fromBulkBytes(msg.obj as ByteArray).forEach {
                         if (lastResponseMessage.containsKey(Pair(it.characteristic, it.responseOpCode)) && !isBolusCommand(it)) {
-                            Timber.i("wearCommHandler busted cache: $it")
+                            Timber.i("pumpCommHandler busted cache: $it")
                             lastResponseMessage.remove(Pair(it.characteristic, it.responseOpCode))
                         }
                         if (isBolusCommand(it)) {
                             Timber.e("SEND_PUMP_COMMAND blocked bolus command")
                         } else if (pumpConnectedPrecondition()) {
-                            Timber.i("wearCommHandler send command bust cache: $it")
+                            Timber.i("pumpCommHandler send command bust cache: $it")
                             pump.command(it)
                         }
                     }
                 }
                 CommServiceCodes.CACHED_PUMP_COMMANDS_BULK.ordinal -> {
-                    Timber.i("wearCommHandler cached pump commands raw: ${String(msg.obj as ByteArray)}")
+                    Timber.i("pumpCommHandler cached pump commands raw: ${String(msg.obj as ByteArray)}")
                     PumpMessageSerializer.fromBulkBytes(msg.obj as ByteArray).forEach {
                         if (lastResponseMessage.containsKey(Pair(it.characteristic, it.responseOpCode)) && !isBolusCommand(it)) {
                             val response = lastResponseMessage.get(Pair(it.characteristic, it.responseOpCode))
-                            Timber.i("wearCommHandler cached hit: $response")
+                            Timber.i("pumpCommHandler cached hit: $response")
                             sendWearCommMessage("/from-pump/receive-cached-message", PumpMessageSerializer.toBytes(response?.first))
                         } else if (isBolusCommand(it)) {
                             Timber.e("CACHED_PUMP_COMMANDS_BULK blocked bolus command")
                         } else if (pumpConnectedPrecondition()) {
-                            Timber.i("wearCommHandler cached miss: $it")
+                            Timber.i("pumpCommHandler cached miss: $it")
                             pump.command(it)
                         }
                     }
                 }
                 CommServiceCodes.SEND_PUMP_COMMAND_BOLUS.ordinal -> {
-                    Timber.i("wearCommHandler send bolus raw: ${String(msg.obj as ByteArray)}")
+                    Timber.i("pumpCommHandler send bolus raw: ${String(msg.obj as ByteArray)}")
                     val secretKey = prefs(applicationContext)?.getString("initiateBolusSecret", "") ?: ""
                     val confirmedBolus =
                         InitiateConfirmedBolusSerializer.fromBytes(secretKey, msg.obj as ByteArray)
@@ -401,12 +405,12 @@ class CommService : WearableListenerService(), GoogleApiClient.ConnectionCallbac
                     val messageOk = confirmedBolus.left
                     val pumpMsg = confirmedBolus.right
                     if (!messageOk) {
-                        Timber.w("wearCommHandler bolus invalid signature")
+                        Timber.w("pumpCommHandler bolus invalid signature")
                         sendWearCommMessage("/to-wear/bolus-blocked-signature", "WearCommHandler".toByteArray())
                     } else if (!isBolusCommand(pumpMsg)) {
                         Timber.e("SEND_PUMP_COMMAND_BOLUS not a bolus command: $pumpMsg")
                     } else if (pumpConnectedPrecondition()) {
-                        Timber.i("wearCommHandler send bolus command with valid signature: $pumpMsg")
+                        Timber.i("pumpCommHandler send bolus command with valid signature: $pumpMsg")
                         if (!Prefs(applicationContext).insulinDeliveryActions()) {
                             Timber.e("No insulin delivery messages enabled -- blocking bolus command $pumpMsg")
                             sendWearCommMessage("/to-wear/bolus-not-enabled", "from_self".toByteArray())
@@ -438,7 +442,7 @@ class CommService : WearableListenerService(), GoogleApiClient.ConnectionCallbac
                     }
                 }
                 CommServiceCodes.DEBUG_GET_MESSAGE_CACHE.ordinal -> {
-                    Timber.i("wearCommHandler debug get message cache: $lastResponseMessage")
+                    Timber.i("pumpCommHandler debug get message cache: $lastResponseMessage")
                     sendWearCommMessage("/from-pump/debug-message-cache", PumpMessageSerializer.toDebugMessageCacheBytes(lastResponseMessage.values))
                 }
             }
@@ -622,8 +626,16 @@ class CommService : WearableListenerService(), GoogleApiClient.ConnectionCallbac
         }
     }
 
+    private var started = false
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         Timber.i("CommService onStartCommand $intent $flags $startId")
+
+        if (started) {
+            Timber.w("CommService onStartCommand when already running, ignoring")
+            return START_STICKY
+        }
+
+        started = true
         Toast.makeText(this, "WearX2 service starting", Toast.LENGTH_SHORT).show()
 
         updateNotification("Initializing...")

@@ -172,6 +172,7 @@ class MainActivity : ComponentActivity(), MessageApi.MessageListener, GoogleApiC
                 sendPhoneBolusRequest = sendPhoneBolusRequest,
                 sendPhoneBolusCancel = sendPhoneBolusCancel,
                 sendPhoneCommand = sendPhoneCommand,
+                sendPhoneOpenActivity = sendPhoneOpenActivity,
             )
         }
 

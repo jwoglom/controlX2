@@ -22,7 +22,7 @@ import com.jwoglom.wearx2.presentation.screens.PumpSetupStage
 import com.jwoglom.wearx2.shared.presentation.intervalOf
 import timber.log.Timber
 
-const val TroubleshootingStepsThresholdSeconds = 5
+const val TroubleshootingStepsThresholdSeconds = 15
 
 @Composable
 fun PumpSetupStageDescription(

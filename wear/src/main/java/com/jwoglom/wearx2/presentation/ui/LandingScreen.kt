@@ -79,6 +79,7 @@ fun LandingScreen(
     focusRequester: FocusRequester,
     sendPumpCommands: (SendType, List<Message>) -> Unit,
     sendPhoneCommand: (String) -> Unit,
+    sendPhoneOpenActivity: () -> Unit,
     resetSavedBolusEnteredState: () -> Unit,
     swipeDismissableNavController: NavHostController,
     modifier: Modifier = Modifier,
@@ -375,7 +376,7 @@ fun LandingScreen(
                     Spacer(Modifier.width(16.dp))
                     Chip(
                         onClick = {
-                            sendPhoneCommand("open-activity")
+                            sendPhoneOpenActivity()
                         },
                         label = {
                             Icon(
