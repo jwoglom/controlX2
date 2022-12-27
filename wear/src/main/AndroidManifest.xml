@@ -54,6 +54,25 @@
         <service android:name=".PhoneCommService"
             android:exported="true">
         </service>
+
+
+        <service
+            android:name=".complications.RangedValueDataSourceService"
+            android:exported="true"
+            android:icon="@drawable/pump"
+            android:label="WearX2 RangedValue"
+            android:permission="com.google.android.wearable.permission.BIND_COMPLICATION_PROVIDER">
+            <intent-filter>
+                <action android:name="android.support.wearable.complications.ACTION_COMPLICATION_UPDATE_REQUEST" />
+            </intent-filter>
+
+            <meta-data
+                android:name="android.support.wearable.complications.SUPPORTED_TYPES"
+                android:value="RANGED_VALUE" />
+            <meta-data
+                android:name="android.support.wearable.complications.UPDATE_PERIOD_SECONDS"
+                android:value="0" />
+        </service>
     </application>
 
 </manifest>
