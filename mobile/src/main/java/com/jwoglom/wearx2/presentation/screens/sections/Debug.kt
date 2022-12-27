@@ -7,24 +7,30 @@ import android.content.Context
 import android.content.DialogInterface
 import android.text.InputType
 import android.widget.EditText
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.wrapContentSize
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Build
-import androidx.compose.material.icons.filled.Refresh
-import androidx.compose.material.icons.outlined.Edit
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.Divider
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -41,8 +47,12 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.Popup
+import androidx.core.app.ShareCompat
 import androidx.navigation.NavHostController
+import com.google.common.base.Splitter
 import com.jwoglom.pumpx2.pump.messages.Message
+import com.jwoglom.pumpx2.pump.messages.annotations.MessageProps
 import com.jwoglom.pumpx2.pump.messages.request.control.BolusPermissionReleaseRequest
 import com.jwoglom.pumpx2.pump.messages.request.control.BolusPermissionRequest
 import com.jwoglom.pumpx2.pump.messages.request.control.CancelBolusRequest
@@ -53,12 +63,16 @@ import com.jwoglom.pumpx2.pump.messages.request.currentStatus.IDPSegmentRequest
 import com.jwoglom.pumpx2.pump.messages.request.currentStatus.IDPSettingsRequest
 import com.jwoglom.pumpx2.pump.messages.response.historyLog.BolusDeliveryHistoryLog
 import com.jwoglom.pumpx2.pump.messages.util.MessageHelpers
+import com.jwoglom.pumpx2.shared.JavaHelpers
 import com.jwoglom.wearx2.LocalDataStore
 import com.jwoglom.wearx2.presentation.theme.WearX2Theme
 import com.jwoglom.wearx2.shared.util.SendType
-import com.welie.blessed.BluetoothPeripheral
+import com.jwoglom.wearx2.shared.util.shortTimeAgo
+import org.json.JSONArray
+import org.json.JSONObject
 import timber.log.Timber
 import java.lang.reflect.InvocationTargetException
+import java.time.Instant
 import java.util.stream.Collectors
 
 
@@ -69,10 +83,26 @@ fun Debug(
     sendMessage: (String, ByteArray) -> Unit,
     sendPumpCommands: (SendType, List<Message>) -> Unit,
 ) {
-    var expanded by remember { mutableStateOf(false) }
+    var showSendPumpMessageMenu by remember { mutableStateOf(false) }
+    var showMessageCache by remember { mutableStateOf(false) }
+
     val context = LocalContext.current
     val ds = LocalDataStore.current
 
+//    fun setClipboard(str: String) {
+//        val clipboard: ClipboardManager =
+//            context.getSystemService(ComponentActivity.CLIPBOARD_SERVICE) as ClipboardManager
+//        val clip = ClipData.newPlainText(str, str)
+//        clipboard.setPrimaryClip(clip)
+//    }
+
+    fun shareTextContents(str: String, label: String, mimeType: String) {
+        ShareCompat.IntentBuilder(context)
+            .setType(mimeType)
+            .setText(str)
+            .setChooserTitle("WearX2 Debug Data")
+            .startChooser();
+    }
 
     LazyColumn(
         contentPadding = innerPadding,
@@ -93,17 +123,16 @@ fun Debug(
                         leadingContent = {
                             Icon(
                                 Icons.Filled.Build,
-                                contentDescription = "Reload icon",
+                                contentDescription = null,
                             )
                         },
                         modifier = Modifier.clickable {
-                            expanded = true
+                            showSendPumpMessageMenu = true
                         }
                     )
-                    Divider()
                     DropdownMenu(
-                        expanded = expanded,
-                        onDismissRequest = { expanded = false },
+                        expanded = showSendPumpMessageMenu,
+                        onDismissRequest = { showSendPumpMessageMenu = false },
                         modifier = Modifier.fillMaxWidth(),
                     ) {
                         val requestMessages = MessageHelpers.getAllPumpRequestMessages()
@@ -186,7 +215,7 @@ fun Debug(
                                         Timber.e(e)
                                         e.printStackTrace()
                                     }
-                                    expanded = false
+                                    showSendPumpMessageMenu = false
                                 },
                                 leadingIcon = {}
                             )
@@ -194,16 +223,100 @@ fun Debug(
                         }
                     }
 
+                }
+            }
 
-                    LaunchedEffect (Unit) {
-                        sendMessage("/to-pump/debug-message-cache", "".toByteArray())
+            item {
+                Divider()
+            }
+
+            item {
+                ListItem(
+                    headlineText = { Text("View Received Message Cache") },
+                    supportingText = { Text("Displays recently received pump messages.") },
+                    leadingContent = {
+                        Icon(
+                            Icons.Filled.Build,
+                            contentDescription = null,
+                        )
+                    },
+                    modifier = Modifier.clickable {
+                        showMessageCache = true
                     }
+                )
 
-                    val debugMessageCache = ds.debugMessageCache.observeAsState()
-                    Text(
-                        if (debugMessageCache.value != null) "${debugMessageCache.value}"
-                        else ""
-                    )
+                if (showMessageCache) {
+                    Popup(
+                        onDismissRequest = { showMessageCache = false }
+                    ) {
+                        LaunchedEffect(Unit) {
+                            sendMessage("/to-pump/debug-message-cache", "".toByteArray())
+                        }
+
+                        val debugMessageCache = ds.debugMessageCache.observeAsState()
+                        Box(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .wrapContentSize(Alignment.TopStart)
+                                .background(Color.Black.copy(alpha = 0.5f))
+                        ) {
+                            LazyColumn {
+                                item {
+                                    Spacer(Modifier.height(64.dp))
+                                }
+                                item {
+                                    LazyRow(Modifier.fillMaxWidth()) {
+                                        item {
+                                            IconButton(
+                                                onClick = {
+                                                    showMessageCache = false
+                                                }
+                                            ) {
+                                                Icon(Icons.Filled.Close, contentDescription = "Close")
+                                            }
+                                        }
+                                        item {
+                                            Spacer(Modifier.width(16.dp))
+                                        }
+                                        item {
+                                            FilledTonalButton(
+                                                onClick = {
+                                                    debugMessageCache.value?.let {
+                                                        shareTextContents(messageCacheToJson(it), "WearX2 JSON debug data","text/json")
+                                                    }
+                                                }
+                                            ) {
+                                                Text("Export")
+                                            }
+                                        }
+                                    }
+                                }
+                                debugMessageCache.value?.sortedBy {
+                                    it.second.epochSecond * -1
+                                }?.forEach { message ->
+                                    item {
+                                        ListItem(
+                                            headlineText = {
+                                                // message name
+                                                Text(shortPumpMessageTitle(message.first))
+                                            },
+                                            supportingText = {
+                                                // message detail
+                                                Text(shortPumpMessageDetail(message.first))
+                                            },
+                                            overlineText = {
+                                                // time
+                                                Text("${message.second} (${shortTimeAgo(message.second, nowThresholdSeconds = 1)})")
+                                            },
+                                            modifier = Modifier.clickable {
+                                                shareTextContents(messagePairToJson(message), "WearX2 ${shortPumpMessageTitle(message.first)} debug data","text/json")
+                                            }
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
                 }
             }
         }
@@ -460,6 +573,47 @@ fun triggerMessageWithBolusIdParameter(
         "Cancel"
     ) { dialog, which -> dialog.cancel() }
     builder.show()
+}
+
+fun messageCacheToJson(cache: List<Pair<Message, Instant>>): String {
+    val arr = JSONArray()
+    cache.forEach {
+        arr.put(JSONObject(messagePairToJson(it)))
+    }
+    return arr.toString()
+}
+
+fun messagePairToJson(it: Pair<Message, Instant>): String {
+    val obj = JSONObject()
+    obj.put("message", it.first.javaClass.name)
+    obj.put("props", messagePropsToJson(it.first.props()))
+    obj.put("fields", JSONObject(JavaHelpers.autoToStringJson(it.first, setOf())))
+    obj.put("time", it.second)
+    obj.put("timeEpoch", it.second.epochSecond)
+    return obj.toString()
+}
+
+fun messagePropsToJson(props: MessageProps): JSONObject? {
+    val raw = props.toString().removePrefix("@com.jwoglom.pumpx2.pump.messages.annotations.MessageProps(").removeSuffix(")")
+    val spl = Splitter.on(", ")
+            .withKeyValueSeparator('=')
+            .split(raw) as Map<*, *>?
+    return spl?.let { JSONObject(it) }
+}
+
+fun shortPumpMessageTitle(message: Message): String {
+    return message.javaClass.name.replace(
+        "com.jwoglom.pumpx2.pump.messages.response.",
+        ""
+    )
+}
+
+fun shortPumpMessageDetail(message: Message): String {
+    return message.toString().removePrefix("${message.javaClass.simpleName}[").removeSuffix("]")
+}
+
+fun verbosePumpMessage(message: Message): String {
+    return message.verboseToString().replace("com.jwoglom.pumpx2.pump.messages.", "")
 }
 
 @Preview(showBackground = true)

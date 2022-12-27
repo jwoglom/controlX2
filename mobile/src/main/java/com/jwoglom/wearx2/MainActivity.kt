@@ -1,12 +1,14 @@
 package com.jwoglom.wearx2
 
 import android.Manifest
+import android.R.attr.label
 import android.app.AlertDialog
 import android.bluetooth.BluetoothAdapter
 import android.bluetooth.BluetoothManager
+import android.content.ClipData
+import android.content.ClipboardManager
 import android.content.ComponentName
 import android.content.Context
-import android.content.DialogInterface
 import android.content.Intent
 import android.content.ServiceConnection
 import android.content.pm.PackageManager
@@ -46,6 +48,8 @@ import com.jwoglom.wearx2.presentation.DataStore
 import com.jwoglom.wearx2.presentation.MobileApp
 import com.jwoglom.wearx2.presentation.navigation.Screen
 import com.jwoglom.wearx2.presentation.screens.PumpSetupStage
+import com.jwoglom.wearx2.presentation.screens.sections.messagePairToJson
+import com.jwoglom.wearx2.presentation.screens.sections.verbosePumpMessage
 import com.jwoglom.wearx2.shared.PumpMessageSerializer
 import com.jwoglom.wearx2.shared.util.SendType
 import com.jwoglom.wearx2.shared.util.pumpTimeToLocalTz
@@ -57,6 +61,7 @@ import timber.log.Timber
 import java.time.Instant
 import java.time.temporal.ChronoUnit
 import java.util.*
+
 
 var dataStore = DataStore()
 val LocalDataStore = compositionLocalOf { dataStore }
@@ -314,6 +319,11 @@ class MainActivity : ComponentActivity(), GoogleApiClient.ConnectionCallbacks, G
                 onPumpMessageReceived(pumpMessage, true)
                 dataStore.pumpLastMessageTimestamp.value = Instant.now()
             }
+
+            "/from-pump/debug-message-cache" -> {
+                val processed = PumpMessageSerializer.fromDebugMessageCacheBytes(messageEvent.data)
+                dataStore.debugMessageCache.value = processed
+            }
         }
     }
 
@@ -325,9 +335,22 @@ class MainActivity : ComponentActivity(), GoogleApiClient.ConnectionCallbacks, G
                 dataStore.debugPromptAwaitingResponses.value = awaiting
                 Timber.d("removed %s from debugPromptAwaitingResponses = %s", message.javaClass.name, dataStore.debugPromptAwaitingResponses.value)
             }
+            fun setClipboard(str: String) {
+                val clipboard: ClipboardManager =
+                    getSystemService(CLIPBOARD_SERVICE) as ClipboardManager
+                val clip = ClipData.newPlainText(str, str)
+                clipboard.setPrimaryClip(clip)
+            }
+            val verboseStr = verbosePumpMessage(message)
             AlertDialog.Builder(this)
-                .setMessage(message.verboseToString().replace("com.jwoglom.pumpx2.pump.messages.", ""))
-                .setPositiveButton("OK", DialogInterface.OnClickListener { dialog, which -> dialog.cancel() })
+                .setMessage(verboseStr)
+                .setNeutralButton("Copy JSON") { dialog, which ->
+                    setClipboard(messagePairToJson(Pair(message, Instant.now())))
+                }
+                .setNegativeButton("Copy") { dialog, which ->
+                    setClipboard(verboseStr)
+                }
+                .setPositiveButton("OK") { dialog, which -> dialog.cancel() }
                 .show()
         }
         when (message) {

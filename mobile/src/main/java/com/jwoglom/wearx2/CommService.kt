@@ -547,7 +547,7 @@ class CommService : WearableListenerService(), GoogleApiClient.ConnectionCallbac
             start()
             Timber.d("service thread start")
 
-            setupTimber("MWC", writeCharacteristicFailedCallback = { writeCharacteristicFailedCallback() })
+            setupTimber("MWC", writeCharacteristicFailedCallback = { handleWriteCharacteristicFailedCallback() })
             Timber.d("service onCreate")
 
             // Listen to BLE state changes
@@ -623,7 +623,7 @@ class CommService : WearableListenerService(), GoogleApiClient.ConnectionCallbac
             }
             "/to-phone/write-characteristic-failed-callback" -> {
                 Timber.i("writeCharacteristicFailedCallback from message")
-                writeCharacteristicFailedCallback()
+                handleWriteCharacteristicFailedCallback()
             }
             "/to-pump/command" -> {
                 sendPumpCommMessage(messageEvent.data)
@@ -636,6 +636,9 @@ class CommService : WearableListenerService(), GoogleApiClient.ConnectionCallbac
             }
             "/to-pump/cached-commands" -> {
                 handleCachedCommandsRequest(messageEvent.data)
+            }
+            "/to-pump/debug-message-cache" -> {
+                handleDebugGetMessageCache()
             }
         }
     }
@@ -760,10 +763,17 @@ class CommService : WearableListenerService(), GoogleApiClient.ConnectionCallbac
         }
     }
 
-    private fun writeCharacteristicFailedCallback() {
-        Timber.i("writeCharacteristicFailedCallback")
+    private fun handleWriteCharacteristicFailedCallback() {
+        Timber.i("handleWriteCharacteristicFailedCallback")
         pumpCommHandler?.obtainMessage()?.also { msg ->
             msg.what = CommServiceCodes.WRITE_CHARACTERISTIC_FAILED_CALLBACK.ordinal
+            pumpCommHandler?.sendMessage(msg)
+        }
+    }
+
+    private fun handleDebugGetMessageCache() {
+        pumpCommHandler?.obtainMessage()?.also { msg ->
+            msg.what = CommServiceCodes.DEBUG_GET_MESSAGE_CACHE.ordinal
             pumpCommHandler?.sendMessage(msg)
         }
     }

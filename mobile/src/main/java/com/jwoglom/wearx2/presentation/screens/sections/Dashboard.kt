@@ -121,12 +121,12 @@ fun Dashboard(
         refreshScope.cancel()
     }) {
         Timber.i("reloading Dashboard from onStart lifecyclestate")
-        fetchDataStoreFields(SendType.BUST_CACHE)
+        fetchDataStoreFields(SendType.STANDARD)
     }
 
     LaunchedEffect(intervalOf(60)) {
         Timber.i("reloading Dashboard from interval")
-        fetchDataStoreFields(SendType.BUST_CACHE)
+        fetchDataStoreFields(SendType.STANDARD)
     }
 
     LaunchedEffect(refreshing) {
