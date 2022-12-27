@@ -3,7 +3,7 @@ buildscript {
     ext {
         m2_repository = "${System.properties['user.home']}/.m2/repository"
         wearx2_version = "1.0"
-        pumpx2_version = "1.2.4"
+        pumpx2_version = "1.2.5"
         compose_version = '1.3.1'
         androidx_watchface_version = '1.2.0-alpha05'
     }
