@@ -12,7 +12,6 @@ import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
 import android.content.SharedPreferences
-import android.graphics.PorterDuff
 import android.graphics.drawable.Icon
 import android.media.RingtoneManager
 import android.os.Bundle
@@ -42,6 +41,10 @@ import com.jwoglom.pumpx2.pump.messages.request.currentStatus.TimeSinceResetRequ
 import com.jwoglom.pumpx2.pump.messages.response.authentication.CentralChallengeResponse
 import com.jwoglom.pumpx2.pump.messages.response.authentication.PumpChallengeResponse
 import com.jwoglom.pumpx2.pump.messages.response.control.InitiateBolusResponse
+import com.jwoglom.pumpx2.pump.messages.response.currentStatus.ControlIQIOBResponse
+import com.jwoglom.pumpx2.pump.messages.response.currentStatus.CurrentBatteryAbstractResponse
+import com.jwoglom.pumpx2.pump.messages.response.currentStatus.HomeScreenMirrorResponse
+import com.jwoglom.pumpx2.pump.messages.response.currentStatus.InsulinStatusResponse
 import com.jwoglom.pumpx2.pump.messages.response.currentStatus.TimeSinceResetResponse
 import com.jwoglom.pumpx2.pump.messages.response.qualifyingEvent.QualifyingEvent
 import com.jwoglom.pumpx2.shared.Hex
@@ -105,6 +108,7 @@ class CommService : WearableListenerService(), GoogleApiClient.ConnectionCallbac
                 is TimeSinceResetResponse -> onReceiveTimeSinceResetResponse(message)
                 is InitiateBolusResponse -> onReceiveInitiateBolusResponse(message)
             }
+            message?.let { updateNotificationWithPumpData(it) }
         }
 
         override fun onReceiveQualifyingEvent(
@@ -640,8 +644,11 @@ class CommService : WearableListenerService(), GoogleApiClient.ConnectionCallbac
         return START_STICKY
     }
 
-    fun updateNotification(contentText: String) {
-        var notification = createNotification(contentText)
+    fun updateNotification(statusText: String? = null) {
+        if (statusText != null) {
+            currentPumpData.statusText = statusText
+        }
+        var notification = createNotification()
         startForeground(1, notification)
     }
 
@@ -651,6 +658,36 @@ class CommService : WearableListenerService(), GoogleApiClient.ConnectionCallbac
         triggerAppReload(applicationContext)
         Toast.makeText(this, "WearX2 service removed", Toast.LENGTH_SHORT).show()
         stopSelf()
+    }
+
+    private data class DisplayablePumpData(
+        var statusText: String = "Initializing...",
+        var batteryPercent: Int? = null,
+        var iobUnits: Double? = null,
+        var cartridgeRemainingUnits: Int? = null,
+    )
+
+    private val currentPumpData: DisplayablePumpData = DisplayablePumpData()
+    fun updateNotificationWithPumpData(message: com.jwoglom.pumpx2.pump.messages.Message) {
+        var changed = false
+        when (message) {
+            is CurrentBatteryAbstractResponse -> {
+                changed = currentPumpData.batteryPercent != message.batteryPercent
+                currentPumpData.batteryPercent = message.batteryPercent
+            }
+            is ControlIQIOBResponse -> {
+                changed = currentPumpData.iobUnits != InsulinUnit.from1000To1(message.pumpDisplayedIOB)
+                currentPumpData.iobUnits = InsulinUnit.from1000To1(message.pumpDisplayedIOB)
+            }
+            is InsulinStatusResponse -> {
+                changed = currentPumpData.cartridgeRemainingUnits != message.currentInsulinAmount
+                currentPumpData.cartridgeRemainingUnits = message.currentInsulinAmount
+            }
+        }
+
+        if (changed) {
+            updateNotification()
+        }
     }
 
     private fun sendPumpPairingMessage() {
@@ -776,7 +813,7 @@ class CommService : WearableListenerService(), GoogleApiClient.ConnectionCallbac
     }
 
 
-    private fun createNotification(contentText: String): Notification {
+    private fun createNotification(): Notification {
         val notificationChannelId = "WearX2 Background Notification"
 
         val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager;
@@ -804,12 +841,23 @@ class CommService : WearableListenerService(), GoogleApiClient.ConnectionCallbac
             notificationChannelId
         )
 
+        var contentText = ""
+        if (currentPumpData.batteryPercent != null) {
+            contentText += "Battery: ${currentPumpData.batteryPercent}%   "
+        }
+        if (currentPumpData.iobUnits != null) {
+            contentText += "IOB: ${currentPumpData.iobUnits}u   "
+        }
+        if (currentPumpData.cartridgeRemainingUnits != null) {
+            contentText += "Cartridge: ${currentPumpData.cartridgeRemainingUnits}u"
+        }
+
         return builder
-            .setContentTitle("WearX2")
+            .setContentTitle("WearX2: ${currentPumpData.statusText}")
             .setContentText(contentText)
             .setContentIntent(pendingIntent)
             .setSmallIcon(Icon.createWithResource(this, R.drawable.pump_notif_1d))
-            .setTicker(contentText)
+            .setTicker(currentPumpData.statusText)
             .setPriority(Notification.PRIORITY_MAX) // for under android 26 compatibility
             .build()
     }
