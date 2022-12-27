@@ -48,18 +48,18 @@ import com.jwoglom.wearx2.LocalDataStore
 import com.jwoglom.wearx2.dataStore
 import com.jwoglom.wearx2.presentation.components.LastConnectionUpdatedTimestamp
 import com.jwoglom.wearx2.presentation.components.Line
+import com.jwoglom.wearx2.presentation.components.PumpSetupStageDescription
+import com.jwoglom.wearx2.presentation.components.PumpSetupStageProgress
 import com.jwoglom.wearx2.presentation.screens.setUpPreviewState
 import com.jwoglom.wearx2.presentation.theme.WearX2Theme
 import com.jwoglom.wearx2.shared.presentation.LifecycleStateObserver
 import com.jwoglom.wearx2.shared.presentation.intervalOf
 import com.jwoglom.wearx2.shared.util.SendType
-import com.jwoglom.wearx2.shared.util.shortTimeAgo
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import timber.log.Timber
-import java.time.Instant
 
 @Composable
 fun Dashboard(
@@ -153,6 +153,8 @@ fun Dashboard(
             content = {
                 item {
                     LastConnectionUpdatedTimestamp()
+                    PumpSetupStageProgress(initialSetup = false)
+                    PumpSetupStageDescription(initialSetup = false)
 
                     LaunchedEffect(pumpLastConnectionTimestamp.value) {
                         Timber.d("pumpLastConnectionTimestamp effect: ${pumpLastConnectionTimestamp.value}")

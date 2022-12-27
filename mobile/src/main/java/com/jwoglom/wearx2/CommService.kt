@@ -16,8 +16,10 @@ import android.graphics.drawable.Icon
 import android.media.RingtoneManager
 import android.os.Bundle
 import android.os.Handler
+import android.os.HandlerThread
 import android.os.Looper
 import android.os.Message
+import android.os.Process.THREAD_PRIORITY_FOREGROUND
 import android.widget.Toast
 import androidx.core.app.NotificationCompat
 import com.google.android.gms.common.ConnectionResult
@@ -43,7 +45,6 @@ import com.jwoglom.pumpx2.pump.messages.response.authentication.PumpChallengeRes
 import com.jwoglom.pumpx2.pump.messages.response.control.InitiateBolusResponse
 import com.jwoglom.pumpx2.pump.messages.response.currentStatus.ControlIQIOBResponse
 import com.jwoglom.pumpx2.pump.messages.response.currentStatus.CurrentBatteryAbstractResponse
-import com.jwoglom.pumpx2.pump.messages.response.currentStatus.HomeScreenMirrorResponse
 import com.jwoglom.pumpx2.pump.messages.response.currentStatus.InsulinStatusResponse
 import com.jwoglom.pumpx2.pump.messages.response.currentStatus.TimeSinceResetResponse
 import com.jwoglom.pumpx2.pump.messages.response.qualifyingEvent.QualifyingEvent
@@ -69,208 +70,239 @@ class CommService : WearableListenerService(), GoogleApiClient.ConnectionCallbac
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
 
     private var serviceLooper: Looper? = null
-    private var wearCommHandler: WearCommHandler? = null
+    private var pumpCommHandler: PumpCommHandler? = null
 
     private lateinit var mApiClient: GoogleApiClient
-    private lateinit var pump: Pump
-    private lateinit var tandemBTHandler: TandemBluetoothHandler
 
     private var lastResponseMessage: MutableMap<Pair<Characteristic, Byte>, Pair<com.jwoglom.pumpx2.pump.messages.Message, Instant>> = mutableMapOf()
     private var lastTimeSinceReset: TimeSinceResetResponse? = null
 
-    private inner class Pump() : TandemPump(applicationContext) {
-        var lastPeripheral: BluetoothPeripheral? = null
-        var isConnected = false
+    // Handler that receives messages from the thread
+    private inner class PumpCommHandler(looper: Looper) : Handler(looper) {
+        private lateinit var pump: Pump
+        private lateinit var tandemBTHandler: TandemBluetoothHandler
 
-        init {
-            enableTconnectAppConnectionSharing()
-            enableSendSharedConnectionResponseMessages()
-            // before adding relyOnConnectionSharingForAuthentication(), callback issues need to be resolved
+        private inner class Pump() : TandemPump(applicationContext) {
+            var lastPeripheral: BluetoothPeripheral? = null
+            var isConnected = false
 
-            if (Prefs(applicationContext).insulinDeliveryActions()) {
-                Timber.i("ACTIONS AFFECTING INSULIN DELIVERY ENABLED")
-                enableActionsAffectingInsulinDelivery()
-            } else {
-                Timber.i("Actions affecting insulin delivery are disabled")
+            init {
+                enableTconnectAppConnectionSharing()
+                enableSendSharedConnectionResponseMessages()
+                // before adding relyOnConnectionSharingForAuthentication(), callback issues need to be resolved
+
+                if (Prefs(applicationContext).insulinDeliveryActions()) {
+                    Timber.i("ACTIONS AFFECTING INSULIN DELIVERY ENABLED")
+                    enableActionsAffectingInsulinDelivery()
+                } else {
+                    Timber.i("Actions affecting insulin delivery are disabled")
+                }
+                Timber.i("Pump init")
             }
-            Timber.i("Pump init")
-        }
 
-        override fun onReceiveMessage(
-            peripheral: BluetoothPeripheral?,
-            message: com.jwoglom.pumpx2.pump.messages.Message?
-        ) {
-            message?.let { lastResponseMessage.put(Pair(it.characteristic, it.opCode()), Pair(it, Instant.now())) }
-            wearCommHandler?.sendMessage("/from-pump/receive-message", PumpMessageSerializer.toBytes(message))
+            override fun onReceiveMessage(
+                peripheral: BluetoothPeripheral?,
+                message: com.jwoglom.pumpx2.pump.messages.Message?
+            ) {
+                message?.let { lastResponseMessage.put(Pair(it.characteristic, it.opCode()), Pair(it, Instant.now())) }
+                sendWearCommMessage("/from-pump/receive-message", PumpMessageSerializer.toBytes(message))
 
-            // Callbacks handled by this service itself
-            when (message) {
-                is TimeSinceResetResponse -> onReceiveTimeSinceResetResponse(message)
-                is InitiateBolusResponse -> onReceiveInitiateBolusResponse(message)
+                // Callbacks handled by this service itself
+                when (message) {
+                    is TimeSinceResetResponse -> onReceiveTimeSinceResetResponse(message)
+                    is InitiateBolusResponse -> onReceiveInitiateBolusResponse(message)
+                }
+                message?.let { updateNotificationWithPumpData(it) }
             }
-            message?.let { updateNotificationWithPumpData(it) }
-        }
 
-        override fun onReceiveQualifyingEvent(
-            peripheral: BluetoothPeripheral?,
-            events: MutableSet<QualifyingEvent>?
-        ) {
-            Timber.i("onReceiveQualifyingEvent: $events")
-            events?.forEach { event ->
-                event.suggestedHandlers.forEach {
-                    Timber.i("onReceiveQualifyingEvent: running handler for $event message: ${it.get()}")
-                    command(it.get())
+            override fun onReceiveQualifyingEvent(
+                peripheral: BluetoothPeripheral?,
+                events: MutableSet<QualifyingEvent>?
+            ) {
+                Timber.i("onReceiveQualifyingEvent: $events")
+                events?.forEach { event ->
+                    event.suggestedHandlers.forEach {
+                        Timber.i("onReceiveQualifyingEvent: running handler for $event message: ${it.get()}")
+                        command(it.get())
+                    }
+                }
+                sendWearCommMessage("/from-pump/receive-qualifying-event", PumpQualifyingEventsSerializer.toBytes(events))
+            }
+
+            var pairingCodeCentralChallenge: CentralChallengeResponse? = null
+            override fun onWaitingForPairingCode(
+                peripheral: BluetoothPeripheral?,
+                centralChallengeResponse: CentralChallengeResponse?
+            ) {
+                pairingCodeCentralChallenge = centralChallengeResponse
+                performPairing(peripheral, centralChallengeResponse, false)
+            }
+
+            override fun onInvalidPairingCode(
+                peripheral: BluetoothPeripheral?,
+                resp: PumpChallengeResponse?
+            ) {
+                sendWearCommMessage("/from-pump/invalid-pairing-code", "".toByteArray())
+                super.onInvalidPairingCode(peripheral, resp)
+            }
+
+            fun performPairing(
+                peripheral: BluetoothPeripheral?,
+                centralChallengeResponse: CentralChallengeResponse?,
+                manuallyTriggered: Boolean
+            ) {
+                Timber.i("performPairing manuallyTriggered=$manuallyTriggered")
+                PumpState.getPairingCode(context)?.let {
+                    Timber.i("Pairing with saved code: $it centralChallenge: $centralChallengeResponse")
+                    pair(peripheral, centralChallengeResponse, it)
+                    sendWearCommMessage(
+                        "/from-pump/entered-pairing-code",
+                        PumpMessageSerializer.toBytes(centralChallengeResponse))
+                } ?: run {
+                    sendWearCommMessage(
+                        "/from-pump/missing-pairing-code",
+                        PumpMessageSerializer.toBytes(centralChallengeResponse))
                 }
             }
-            wearCommHandler?.sendMessage("/from-pump/receive-qualifying-event", PumpQualifyingEventsSerializer.toBytes(events))
-        }
 
-        var pairingCodeCentralChallenge: CentralChallengeResponse? = null
-        override fun onWaitingForPairingCode(
-            peripheral: BluetoothPeripheral?,
-            centralChallengeResponse: CentralChallengeResponse?
-        ) {
-            pairingCodeCentralChallenge = centralChallengeResponse
-            performPairing(peripheral, centralChallengeResponse, false)
-        }
-
-        override fun onInvalidPairingCode(
-            peripheral: BluetoothPeripheral?,
-            resp: PumpChallengeResponse?
-        ) {
-            wearCommHandler?.sendMessage("/from-pump/invalid-pairing-code", "".toByteArray())
-            super.onInvalidPairingCode(peripheral, resp)
-        }
-
-        fun performPairing(
-            peripheral: BluetoothPeripheral?,
-            centralChallengeResponse: CentralChallengeResponse?,
-            manuallyTriggered: Boolean
-        ) {
-            Timber.i("performPairing manuallyTriggered=$manuallyTriggered")
-            PumpState.getPairingCode(context)?.let {
-                Timber.i("Pairing with saved code: $it centralChallenge: $centralChallengeResponse")
-                pair(peripheral, centralChallengeResponse, it)
-                wearCommHandler?.sendMessage(
-                    "/from-pump/entered-pairing-code",
-                    PumpMessageSerializer.toBytes(centralChallengeResponse))
-            } ?: run {
-                wearCommHandler?.sendMessage(
-                    "/from-pump/missing-pairing-code",
-                    PumpMessageSerializer.toBytes(centralChallengeResponse))
+            /**
+             * Callback is not run when the pump is already bonded
+             */
+            override fun onPumpDiscovered(
+                peripheral: BluetoothPeripheral?,
+                scanResult: ScanResult?
+            ): Boolean {
+                sendWearCommMessage("/from-pump/pump-discovered", "${peripheral?.name}".toByteArray())
+                return super.onPumpDiscovered(peripheral, scanResult)
             }
-        }
 
-        /**
-         * Callback is not run when the pump is already bonded
-         */
-        override fun onPumpDiscovered(
-            peripheral: BluetoothPeripheral?,
-            scanResult: ScanResult?
-        ): Boolean {
-            wearCommHandler?.sendMessage("/from-pump/pump-discovered", "${peripheral?.name}".toByteArray())
-            return super.onPumpDiscovered(peripheral, scanResult)
-        }
-
-        override fun onInitialPumpConnection(peripheral: BluetoothPeripheral?) {
-            lastPeripheral = peripheral
-            val wait = (500..1000).random()
-            Timber.i("Waiting to pair onInitialPumpConnection to avoid race condition with tconnect app for ${wait}ms")
-            Thread.sleep(wait.toLong())
-
-            wearCommHandler?.sendMessage("/from-pump/initial-pump-connection", "${peripheral?.name}".toByteArray())
-
-            if (Packetize.txId.get() > 0) {
-                Timber.w("Not pairing in onInitialPumpConnection because it looks like the tconnect app has already paired with txId=${Packetize.txId.get()}")
-                return
-            }
-            super.onInitialPumpConnection(peripheral)
-        }
-
-        override fun onPumpConnected(peripheral: BluetoothPeripheral?) {
-            lastPeripheral = peripheral
-            var numResponses = -99999
-            while (PumpState.processedResponseMessages != numResponses) {
-                numResponses = PumpState.processedResponseMessages
-                val wait = (250..500).random()
-                Timber.i("service onPumpConnected -- waiting for ${wait}ms to avoid race conditions: (processedResponseMessages: ${PumpState.processedResponseMessages})")
+            override fun onInitialPumpConnection(peripheral: BluetoothPeripheral?) {
+                lastPeripheral = peripheral
+                val wait = (500..1000).random()
+                Timber.i("Waiting to pair onInitialPumpConnection to avoid race condition with tconnect app for ${wait}ms")
                 Thread.sleep(wait.toLong())
-            }
-            Timber.i("service onPumpConnected -- checking for base messages (processedResponseMessages: ${PumpState.processedResponseMessages})")
-            if (!lastResponseMessage.containsKey(Pair(Characteristic.CURRENT_STATUS, ApiVersionRequest().opCode()))) {
-                Timber.i("service onPumpConnected -- sending ApiVersionRequest")
-                this.sendCommand(peripheral, ApiVersionRequest())
-            }
 
-            if (!lastResponseMessage.containsKey(Pair(Characteristic.CURRENT_STATUS, TimeSinceResetResponse().opCode()))) {
-                Timber.i("service onPumpConnected -- sending TimeSinceResetResponse")
-                this.sendCommand(peripheral, TimeSinceResetRequest())
-            }
-            Thread.sleep(250)
-            isConnected = true
-            Timber.i("service onPumpConnected: $this")
-            wearCommHandler?.sendMessage("/from-pump/pump-connected",
-                peripheral?.name!!.toByteArray()
-            )
-            updateNotification("Connected to pump at ${shortTime(Instant.now())}")
-        }
+                sendWearCommMessage("/from-pump/initial-pump-connection", "${peripheral?.name}".toByteArray())
 
-        override fun onPumpModel(peripheral: BluetoothPeripheral?, modelNumber: String?) {
-            super.onPumpModel(peripheral, modelNumber)
-            Timber.i("service onPumpModel")
-            wearCommHandler?.sendMessage("/from-pump/pump-model",
-                modelNumber!!.toByteArray()
-            )
-        }
-
-        override fun onPumpDisconnected(
-            peripheral: BluetoothPeripheral?,
-            status: HciStatus?
-        ): Boolean {
-            Timber.i("service onPumpDisconnected: isConnected=false")
-            lastPeripheral = null
-            lastResponseMessage.clear()
-            lastTimeSinceReset = null
-            isConnected = false
-            wearCommHandler?.sendMessage("/from-pump/pump-disconnected",
-                peripheral?.name!!.toByteArray()
-            )
-            updateNotification("Disconnected from pump at ${shortTime(Instant.now())}")
-            return super.onPumpDisconnected(peripheral, status)
-        }
-
-        override fun onPumpCriticalError(peripheral: BluetoothPeripheral?, reason: TandemError?) {
-            super.onPumpCriticalError(peripheral, reason)
-            Timber.w("onPumpCriticalError $reason")
-            wearCommHandler?.sendMessage("/from-pump/pump-critical-error",
-                reason?.message!!.toByteArray()
-            );
-        }
-
-        @Synchronized
-        fun command(message: com.jwoglom.pumpx2.pump.messages.Message?) {
-            if (lastPeripheral == null) {
-                Timber.w("Not sending message because no saved peripheral yet: $message")
-                return
+                if (Packetize.txId.get() > 0) {
+                    Timber.w("Not pairing in onInitialPumpConnection because it looks like the tconnect app has already paired with txId=${Packetize.txId.get()}")
+                    return
+                }
+                super.onInitialPumpConnection(peripheral)
             }
 
-            if (!isConnected) {
-                Timber.w("Not sending message because no onConnected event yet: $message")
-                return
+            override fun onPumpConnected(peripheral: BluetoothPeripheral?) {
+                lastPeripheral = peripheral
+                var numResponses = -99999
+                while (PumpState.processedResponseMessages != numResponses) {
+                    numResponses = PumpState.processedResponseMessages
+                    val wait = (250..500).random()
+                    Timber.i("service onPumpConnected -- waiting for ${wait}ms to avoid race conditions: (processedResponseMessages: ${PumpState.processedResponseMessages})")
+                    Thread.sleep(wait.toLong())
+                }
+                Timber.i("service onPumpConnected -- checking for base messages (processedResponseMessages: ${PumpState.processedResponseMessages})")
+                if (!lastResponseMessage.containsKey(Pair(Characteristic.CURRENT_STATUS, ApiVersionRequest().opCode()))) {
+                    Timber.i("service onPumpConnected -- sending ApiVersionRequest")
+                    this.sendCommand(peripheral, ApiVersionRequest())
+                }
+
+                if (!lastResponseMessage.containsKey(Pair(Characteristic.CURRENT_STATUS, TimeSinceResetResponse().opCode()))) {
+                    Timber.i("service onPumpConnected -- sending TimeSinceResetResponse")
+                    this.sendCommand(peripheral, TimeSinceResetRequest())
+                }
+                Thread.sleep(250)
+                isConnected = true
+                Timber.i("service onPumpConnected: $this")
+                sendWearCommMessage("/from-pump/pump-connected",
+                    peripheral?.name!!.toByteArray()
+                )
+                updateNotification("Connected to pump at ${shortTime(Instant.now())}")
             }
 
-            Timber.i("Pump send command: $message")
-            sendCommand(lastPeripheral, message)
+            override fun onPumpModel(peripheral: BluetoothPeripheral?, modelNumber: String?) {
+                super.onPumpModel(peripheral, modelNumber)
+                Timber.i("service onPumpModel")
+                sendWearCommMessage("/from-pump/pump-model",
+                    modelNumber!!.toByteArray()
+                )
+            }
+
+            override fun onPumpDisconnected(
+                peripheral: BluetoothPeripheral?,
+                status: HciStatus?
+            ): Boolean {
+                Timber.i("service onPumpDisconnected: isConnected=false")
+                lastPeripheral = null
+                lastResponseMessage.clear()
+                lastTimeSinceReset = null
+                isConnected = false
+                sendWearCommMessage("/from-pump/pump-disconnected",
+                    peripheral?.name!!.toByteArray()
+                )
+                updateNotification("Disconnected from pump at ${shortTime(Instant.now())}")
+                return super.onPumpDisconnected(peripheral, status)
+            }
+
+            override fun onPumpCriticalError(peripheral: BluetoothPeripheral?, reason: TandemError?) {
+                super.onPumpCriticalError(peripheral, reason)
+                Timber.w("onPumpCriticalError $reason")
+                sendWearCommMessage("/from-pump/pump-critical-error",
+                    reason?.message!!.toByteArray()
+                );
+            }
+
+            @Synchronized
+            fun command(message: com.jwoglom.pumpx2.pump.messages.Message?) {
+                if (lastPeripheral == null) {
+                    Timber.w("Not sending message because no saved peripheral yet: $message")
+                    return
+                }
+
+                if (!isConnected) {
+                    Timber.w("Not sending message because no onConnected event yet: $message")
+                    return
+                }
+
+                Timber.i("Pump send command: $message")
+                sendCommand(lastPeripheral, message)
+            }
+
+            override fun toString(): String {
+                return "Pump(isConnected=$isConnected, lastPeripheral=$lastPeripheral)"
+            }
+
         }
 
-        override fun toString(): String {
-            return "Pump(isConnected=$isConnected, lastPeripheral=$lastPeripheral)"
+        
+        private fun onReceiveInitiateBolusResponse(response: InitiateBolusResponse?) {
+            val intent: Intent? = Intent(applicationContext, BolusNotificationBroadcastReceiver::class.java).apply {
+                putExtra("action", "INITIATE_RESPONSE")
+                putExtra("response", PumpMessageSerializer.toBytes(response))
+            }
+            applicationContext.startService(intent)
         }
 
-    }
+        private fun onReceiveTimeSinceResetResponse(response: TimeSinceResetResponse?) {
+            Timber.i("lastTimeSinceReset = $response")
+            lastTimeSinceReset = response
+        }
 
-    // Handler that receives messages from the thread
-    private inner class WearCommHandler(looper: Looper) : Handler(looper) {
+        private fun pumpConnectedPrecondition(): Boolean {
+            if (!this::pump.isInitialized) {
+                Timber.e("pumpConnectedPrecondition: pump not initialized")
+                sendWearCommMessage("/from-pump/pump-not-connected", "not_initialized".toByteArray())
+            } else if (!pump.isConnected) {
+                Timber.e("pumpConnectedPrecondition: pump not connected")
+                sendWearCommMessage("/from-pump/pump-not-connected", "not_connected".toByteArray())
+            } else if (pump.lastPeripheral == null) {
+                Timber.e("pumpConnectedPrecondition: pump not saved peripheral")
+                sendWearCommMessage("/from-pump/pump-not-connected", "null_peripheral".toByteArray())
+            } else {
+                return true
+            }
+            return false
+        }
+        
         override fun handleMessage(msg: Message) {
             when (msg.what) {
                 CommServiceCodes.INIT_PUMP_COMM.ordinal -> {
@@ -288,34 +320,45 @@ class CommService : WearableListenerService(), GoogleApiClient.ConnectionCallbac
                         }
                     }
                 }
+                CommServiceCodes.CHECK_PUMP_CONNECTED.ordinal -> {
+                    if (pumpConnectedPrecondition()) {
+                        sendWearCommMessage("/from-pump/pump-connected",
+                            pump.lastPeripheral?.name!!.toByteArray()
+                        )
+                    }
+                }
                 CommServiceCodes.SEND_PUMP_PAIRING_MESSAGE.ordinal -> {
-                    if (pump.lastPeripheral != null && pump.pairingCodeCentralChallenge != null) {
-                        Timber.i("wearCommHandler send pump pairing message")
-                        pump.performPairing(pump.lastPeripheral, pump.pairingCodeCentralChallenge, true)
-                    } else {
-                        Timber.w("wearCommHandler cannot send pump pairing message: lastPeripheral=${pump.lastPeripheral} pairingCodeCentralChallenge=${pump.pairingCodeCentralChallenge}")
+                    if (pumpConnectedPrecondition()) {
+                        if (pump.lastPeripheral != null && pump.pairingCodeCentralChallenge != null) {
+                            Timber.i("sendPumpPairingMessage: running performPairing")
+                            pump.performPairing(
+                                pump.lastPeripheral,
+                                pump.pairingCodeCentralChallenge,
+                                true
+                            )
+                        } else {
+                            Timber.w("sendPumpPairingMessage: cannot send pump pairing message: lastPeripheral=${pump.lastPeripheral} pairingCodeCentralChallenge=${pump.pairingCodeCentralChallenge}")
+                        }
                     }
                 }
                 CommServiceCodes.SEND_PUMP_COMMAND.ordinal -> {
                     Timber.i("wearCommHandler send command raw: ${String(msg.obj as ByteArray)}")
                     val pumpMsg = PumpMessageSerializer.fromBytes(msg.obj as ByteArray)
-                    if (this@CommService::pump.isInitialized && pump.isConnected && !isBolusCommand(pumpMsg)) {
+                    if (isBolusCommand(pumpMsg)) {
+                        Timber.e("SEND_PUMP_COMMAND blocked bolus command")
+                    } else if (pumpConnectedPrecondition()) {
                         Timber.i("wearCommHandler send command: $pumpMsg")
                         pump.command(pumpMsg)
-                    } else {
-                        Timber.w("wearCommHandler not sending command due to pump state: $pump $pumpMsg")
-                        wearCommHandler?.sendMessage("/from-pump/pump-disconnected", "from_pump_command".toByteArray())
                     }
                 }
                 CommServiceCodes.SEND_PUMP_COMMANDS_BULK.ordinal -> {
                     Timber.i("wearCommHandler send commands raw: ${String(msg.obj as ByteArray)}")
                     PumpMessageSerializer.fromBulkBytes(msg.obj as ByteArray).forEach {
-                        if (this@CommService::pump.isInitialized && pump.isConnected && !isBolusCommand(it)) {
+                        if (isBolusCommand(it)) {
+                            Timber.e("SEND_PUMP_COMMAND blocked bolus command")
+                        } else if (pumpConnectedPrecondition()) {
                             Timber.i("wearCommHandler send command: $it")
                             pump.command(it)
-                        } else {
-                            Timber.w("wearCommHandler not sending command due to pump state: $pump $it")
-                            wearCommHandler?.sendMessage("/from-pump/pump-disconnected", "from_pump_command".toByteArray())
                         }
                     }
                 }
@@ -326,12 +369,11 @@ class CommService : WearableListenerService(), GoogleApiClient.ConnectionCallbac
                             Timber.i("wearCommHandler busted cache: $it")
                             lastResponseMessage.remove(Pair(it.characteristic, it.responseOpCode))
                         }
-                        if (this@CommService::pump.isInitialized && pump.isConnected && !isBolusCommand(it)) {
+                        if (isBolusCommand(it)) {
+                            Timber.e("SEND_PUMP_COMMAND blocked bolus command")
+                        } else if (pumpConnectedPrecondition()) {
                             Timber.i("wearCommHandler send command bust cache: $it")
                             pump.command(it)
-                        } else {
-                            Timber.w("wearCommHandler not sending command due to pump state: $pump $it")
-                            wearCommHandler?.sendMessage("/from-pump/pump-disconnected", "from_pump_command".toByteArray())
                         }
                     }
                 }
@@ -341,13 +383,12 @@ class CommService : WearableListenerService(), GoogleApiClient.ConnectionCallbac
                         if (lastResponseMessage.containsKey(Pair(it.characteristic, it.responseOpCode)) && !isBolusCommand(it)) {
                             val response = lastResponseMessage.get(Pair(it.characteristic, it.responseOpCode))
                             Timber.i("wearCommHandler cached hit: $response")
-                            wearCommHandler?.sendMessage("/from-pump/receive-cached-message", PumpMessageSerializer.toBytes(response?.first))
-                        } else if (this@CommService::pump.isInitialized && pump.isConnected && !isBolusCommand(it)) {
+                            sendWearCommMessage("/from-pump/receive-cached-message", PumpMessageSerializer.toBytes(response?.first))
+                        } else if (isBolusCommand(it)) {
+                            Timber.e("CACHED_PUMP_COMMANDS_BULK blocked bolus command")
+                        } else if (pumpConnectedPrecondition()) {
                             Timber.i("wearCommHandler cached miss: $it")
                             pump.command(it)
-                        } else {
-                            Timber.w("wearCommHandler not sending cached send command due to pump state: $pump $it")
-                            wearCommHandler?.sendMessage("/from-pump/pump-disconnected", "from_pump_command".toByteArray())
                         }
                     }
                 }
@@ -361,12 +402,14 @@ class CommService : WearableListenerService(), GoogleApiClient.ConnectionCallbac
                     val pumpMsg = confirmedBolus.right
                     if (!messageOk) {
                         Timber.w("wearCommHandler bolus invalid signature")
-                        sendMessage("/to-wear/bolus-blocked-signature", "WearCommHandler".toByteArray())
-                    } else if (this@CommService::pump.isInitialized && pump.isConnected && isBolusCommand(pumpMsg)) {
+                        sendWearCommMessage("/to-wear/bolus-blocked-signature", "WearCommHandler".toByteArray())
+                    } else if (!isBolusCommand(pumpMsg)) {
+                        Timber.e("SEND_PUMP_COMMAND_BOLUS not a bolus command: $pumpMsg")
+                    } else if (pumpConnectedPrecondition()) {
                         Timber.i("wearCommHandler send bolus command with valid signature: $pumpMsg")
                         if (!Prefs(applicationContext).insulinDeliveryActions()) {
                             Timber.e("No insulin delivery messages enabled -- blocking bolus command $pumpMsg")
-                            sendMessage("/to-wear/bolus-not-enabled", "from_self".toByteArray())
+                            sendWearCommMessage("/to-wear/bolus-not-enabled", "from_self".toByteArray())
                             return
                         }
                         try {
@@ -384,22 +427,25 @@ class CommService : WearableListenerService(), GoogleApiClient.ConnectionCallbac
                             pump.command(pumpMsg)
                         } catch (e: Packetize.ActionsAffectingInsulinDeliveryNotEnabledInPumpX2Exception) {
                             Timber.e(e)
-                            sendMessage("/to-wear/bolus-not-enabled", "from_pumpx2_lib".toByteArray())
+                            sendWearCommMessage("/to-wear/bolus-not-enabled", "from_pumpx2_lib".toByteArray())
                         }
-                    } else {
-                        Timber.w("wearCommHandler not sending command due to pump state: $pump")
-                        wearCommHandler?.sendMessage("/from-pump/pump-disconnected", "from_pump_command".toByteArray())
+                    }
+                }
+                CommServiceCodes.WRITE_CHARACTERISTIC_FAILED_CALLBACK.ordinal -> {
+                    if (pumpConnectedPrecondition()) {
+                        Timber.e("writeCharacteristicFailedCallback: calling onPumpConnected pump=$pump")
+                        pump.onPumpConnected(pump.lastPeripheral)
                     }
                 }
                 CommServiceCodes.DEBUG_GET_MESSAGE_CACHE.ordinal -> {
                     Timber.i("wearCommHandler debug get message cache: $lastResponseMessage")
-                    wearCommHandler?.sendMessage("/from-pump/debug-message-cache", PumpMessageSerializer.toDebugMessageCacheBytes(lastResponseMessage.values))
+                    sendWearCommMessage("/from-pump/debug-message-cache", PumpMessageSerializer.toDebugMessageCacheBytes(lastResponseMessage.values))
                 }
             }
         }
 
-        fun sendMessage(path: String, message: ByteArray) {
-            sendWearCommMessage(path, message)
+        fun sendWearCommMessage(path: String, message: ByteArray) {
+            this@CommService.sendWearCommMessage(path, message)
         }
 
         private fun isBolusCommand(message: com.jwoglom.pumpx2.pump.messages.Message): Boolean {
@@ -474,22 +520,24 @@ class CommService : WearableListenerService(), GoogleApiClient.ConnectionCallbac
 
     override fun onCreate() {
         super.onCreate()
-        setupTimber("MWC", writeCharacteristicFailedCallback = { writeCharacteristicFailedCallback() })
-        Timber.d("service onCreate")
-
-        // Listen to BLE state changes
-        val intentFilter = IntentFilter()
-        intentFilter.addAction("android.bluetooth.adapter.action.STATE_CHANGED")
-        intentFilter.addAction("android.bluetooth.device.action.BOND_STATE_CHANGED")
-        registerReceiver(this.bleChangeReceiver, intentFilter)
 
         // Start up the thread running the service.  Note that we create a
         // separate thread because the service normally runs in the process's
         // main thread, which we don't want to block.  We also make it
         // background priority so CPU-intensive work will not disrupt our UI.
-//        HandlerThread("PumpCommServiceThread", Process.THREAD_PRIORITY_FOREGROUND).apply {
-//            start()
-//            Timber.d("service thread start")
+        HandlerThread("PumpCommServiceThread", THREAD_PRIORITY_FOREGROUND).apply {
+            start()
+            Timber.d("service thread start")
+
+            setupTimber("MWC", writeCharacteristicFailedCallback = { writeCharacteristicFailedCallback() })
+            Timber.d("service onCreate")
+
+            // Listen to BLE state changes
+            val intentFilter = IntentFilter()
+            intentFilter.addAction("android.bluetooth.adapter.action.STATE_CHANGED")
+            intentFilter.addAction("android.bluetooth.device.action.BOND_STATE_CHANGED")
+            registerReceiver(bleChangeReceiver, intentFilter)
+
 
             mApiClient = GoogleApiClient.Builder(applicationContext)
                 .addApi(Wearable.API)
@@ -498,10 +546,9 @@ class CommService : WearableListenerService(), GoogleApiClient.ConnectionCallbac
                 .build()
 
             mApiClient.connect()
-
             // Get the HandlerThread's Looper and use it for our Handler
             serviceLooper = looper
-            wearCommHandler = WearCommHandler(looper)
+            pumpCommHandler = PumpCommHandler(looper)
 
 
             Thread {
@@ -512,105 +559,49 @@ class CommService : WearableListenerService(), GoogleApiClient.ConnectionCallbac
 
                 sendWearCommMessage("/to-phone/comm-started", "".toByteArray())
             }.start()
-
-        // }
+        }
     }
 
     override fun onMessageReceived(messageEvent: MessageEvent) {
         Timber.i("service messageReceived: ${messageEvent.path} ${String(messageEvent.data)}")
         when (messageEvent.path) {
-            "/to-phone/open-activity" -> {
-                startActivity(
-                    Intent(this, MainActivity::class.java)
-                        .addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP)
-                )
-            }
+
             "/to-phone/force-reload" -> {
                 Timber.i("force-reload")
                 triggerAppReload(applicationContext)
             }
             "/to-phone/is-pump-connected" -> {
-                if (!this::pump.isInitialized) {
-                    Timber.e("pump not initialized")
-                    wearCommHandler?.sendMessage("/from-pump/pump-disconnected", "not_initialized".toByteArray())
-                } else if (!pump.isConnected) {
-                    Timber.e("pump not connected")
-                    wearCommHandler?.sendMessage("/from-pump/pump-disconnected", "not_connected".toByteArray())
-                } else if (pump.lastPeripheral == null) {
-                    Timber.e("pump not saved peripheral")
-                    wearCommHandler?.sendMessage("/from-pump/pump-disconnected", "null_peripheral".toByteArray())
-                } else {
-                    wearCommHandler?.sendMessage("/from-pump/pump-connected",
-                        pump.lastPeripheral?.name!!.toByteArray()
-                    )
-                }
+                sendCheckPumpConnected()
             }
             "/to-phone/pair" -> {
-                if (!this::pump.isInitialized) {
-                    Timber.e("pump not initialized")
-                    wearCommHandler?.sendMessage("/from-pump/pump-disconnected", "not_initialized".toByteArray())
-                } else if (!pump.isConnected) {
-                    Timber.e("pump not connected")
-                    wearCommHandler?.sendMessage("/from-pump/pump-disconnected", "not_connected".toByteArray())
-                } else if (pump.lastPeripheral == null) {
-                    Timber.e("pump not saved peripheral")
-                    wearCommHandler?.sendMessage("/from-pump/pump-disconnected", "null_peripheral".toByteArray())
-                } else {
-                    sendPumpPairingMessage()
-                }
+                sendPumpPairingMessage()
             }
             "/to-phone/bolus-request" -> {
-                if (!this::pump.isInitialized) {
-                    Timber.e("pump not initialized")
-                    wearCommHandler?.sendMessage("/from-pump/pump-disconnected", "not_initialized".toByteArray())
-                } else if (!pump.isConnected) {
-                    Timber.e("pump not connected")
-                    wearCommHandler?.sendMessage("/from-pump/pump-disconnected", "not_connected".toByteArray())
-                } else if (pump.lastPeripheral == null) {
-                    Timber.e("pump not saved peripheral")
-                    wearCommHandler?.sendMessage(
-                        "/from-pump/pump-disconnected",
-                        "null_peripheral".toByteArray()
-                    )
-                } else {
-                    confirmBolusRequest(PumpMessageSerializer.fromBytes(messageEvent.data) as InitiateBolusRequest)
-                }
+                // removed: initialized check
+                confirmBolusRequest(PumpMessageSerializer.fromBytes(messageEvent.data) as InitiateBolusRequest)
             }
             "/to-phone/bolus-cancel" -> {
                 Timber.i("bolus state cancelled")
                 resetBolusPrefs(this)
             }
             "/to-phone/initiate-confirmed-bolus" -> {
-                if (!this::pump.isInitialized) {
-                    Timber.e("pump not initialized")
-                    wearCommHandler?.sendMessage("/from-pump/pump-disconnected", "not_initialized".toByteArray())
-                } else if (!pump.isConnected) {
-                    Timber.e("pump not connected")
-                    wearCommHandler?.sendMessage("/from-pump/pump-disconnected", "not_connected".toByteArray())
-                } else if (pump.lastPeripheral == null) {
-                    Timber.e("pump not saved peripheral")
-                    wearCommHandler?.sendMessage(
-                        "/from-pump/pump-disconnected",
-                        "null_peripheral".toByteArray()
+                // removed: initialized check
+                val secretKey = prefs(this)?.getString("initiateBolusSecret", "") ?: ""
+                val confirmedBolus =
+                    InitiateConfirmedBolusSerializer.fromBytes(secretKey, messageEvent.data)
+
+                val messageOk = confirmedBolus.left
+                val initiateMessage = confirmedBolus.right
+                if (!messageOk) {
+                    Timber.e("invalid message -- blocked signature $messageOk $initiateMessage")
+                    sendWearCommMessage("/to-wear/blocked-bolus-signature",
+                        "CommService".toByteArray()
                     )
-                } else {
-                    val secretKey = prefs(this)?.getString("initiateBolusSecret", "") ?: ""
-                    val confirmedBolus =
-                        InitiateConfirmedBolusSerializer.fromBytes(secretKey, messageEvent.data)
-
-                    val messageOk = confirmedBolus.left
-                    val initiateMessage = confirmedBolus.right
-                    if (!messageOk) {
-                        Timber.e("invalid message -- blocked signature $messageOk $initiateMessage")
-                        wearCommHandler?.sendMessage("/to-wear/blocked-bolus-signature",
-                            "CommService".toByteArray()
-                        )
-                        return
-                    }
-
-                    Timber.i("sending confirmed bolus request: $initiateMessage")
-                    sendPumpCommBolusMessage(messageEvent.data)
+                    return
                 }
+
+                Timber.i("sending confirmed bolus request: $initiateMessage")
+                sendPumpCommBolusMessage(messageEvent.data)
             }
             "/to-phone/write-characteristic-failed-callback" -> {
                 Timber.i("writeCharacteristicFailedCallback from message")
@@ -639,9 +630,9 @@ class CommService : WearableListenerService(), GoogleApiClient.ConnectionCallbac
 
         // For each start request, send a message to start a job and deliver the
         // start ID so we know which request we're stopping when we finish the job
-        wearCommHandler?.obtainMessage()?.also { msg ->
+        pumpCommHandler?.obtainMessage()?.also { msg ->
             msg.what = CommServiceCodes.INIT_PUMP_COMM.ordinal
-            wearCommHandler?.sendMessage(msg)
+            pumpCommHandler?.sendMessage(msg)
         }
 
         // If we get killed, after returning from here, restart
@@ -662,20 +653,6 @@ class CommService : WearableListenerService(), GoogleApiClient.ConnectionCallbac
         triggerAppReload(applicationContext)
         Toast.makeText(this, "WearX2 service removed", Toast.LENGTH_SHORT).show()
         stopSelf()
-    }
-
-    private fun writeCharacteristicFailedCallback() {
-        Timber.i("writeCharacteristicFailedCallback")
-        if (!this::pump.isInitialized) {
-            Timber.e("writeCharacteristicFailedCallback: pump not initialized")
-        } else if (pump.isConnected) {
-            Timber.e("writeCharacteristicFailedCallback: pump already connected")
-        } else if (pump.lastPeripheral == null) {
-            Timber.e("writeCharacteristicFailedCallback: pump not saved peripheral")
-        } else {
-            Timber.e("writeCharacteristicFailedCallback: calling onPumpConnected pump=$pump")
-            pump.onPumpConnected(pump.lastPeripheral)
-        }
     }
 
     private data class DisplayablePumpData(
@@ -707,48 +684,64 @@ class CommService : WearableListenerService(), GoogleApiClient.ConnectionCallbac
             updateNotification()
         }
     }
+    
+    private fun sendCheckPumpConnected() {
+        pumpCommHandler?.obtainMessage()?.also { msg ->
+            msg.what = CommServiceCodes.CHECK_PUMP_CONNECTED.ordinal
+            pumpCommHandler?.sendMessage(msg)
+        }
+    }
 
     private fun sendPumpPairingMessage() {
-        wearCommHandler?.obtainMessage()?.also { msg ->
+        pumpCommHandler?.obtainMessage()?.also { msg ->
             msg.what = CommServiceCodes.SEND_PUMP_PAIRING_MESSAGE.ordinal
-            wearCommHandler?.sendMessage(msg)
+            pumpCommHandler?.sendMessage(msg)
         }
     }
     private fun sendPumpCommMessage(pumpMsgBytes: ByteArray) {
-        wearCommHandler?.obtainMessage()?.also { msg ->
+        pumpCommHandler?.obtainMessage()?.also { msg ->
             msg.what = CommServiceCodes.SEND_PUMP_COMMAND.ordinal
             msg.obj = pumpMsgBytes
-            wearCommHandler?.sendMessage(msg)
+            pumpCommHandler?.sendMessage(msg)
         }
     }
     private fun sendPumpCommMessages(pumpMsgBytes: ByteArray) {
-        wearCommHandler?.obtainMessage()?.also { msg ->
+        pumpCommHandler?.obtainMessage()?.also { msg ->
             msg.what = CommServiceCodes.SEND_PUMP_COMMANDS_BULK.ordinal
             msg.obj = pumpMsgBytes
-            wearCommHandler?.sendMessage(msg)
+            pumpCommHandler?.sendMessage(msg)
         }
     }
     private fun sendPumpCommMessagesBustCache(pumpMsgBytes: ByteArray) {
-        wearCommHandler?.obtainMessage()?.also { msg ->
+        pumpCommHandler?.obtainMessage()?.also { msg ->
             msg.what = CommServiceCodes.SEND_PUMP_COMMANDS_BUST_CACHE_BULK.ordinal
             msg.obj = pumpMsgBytes
-            wearCommHandler?.sendMessage(msg)
+            pumpCommHandler?.sendMessage(msg)
         }
     }
     private fun handleCachedCommandsRequest(rawBytes: ByteArray) {
-        wearCommHandler?.obtainMessage()?.also { msg ->
+        pumpCommHandler?.obtainMessage()?.also { msg ->
             msg.what = CommServiceCodes.CACHED_PUMP_COMMANDS_BULK.ordinal
             msg.obj = rawBytes
-            wearCommHandler?.sendMessage(msg)
+            pumpCommHandler?.sendMessage(msg)
         }
     }
     private fun sendPumpCommBolusMessage(initiateConfirmedBolusBytes: ByteArray) {
-        wearCommHandler?.obtainMessage()?.also { msg ->
+        pumpCommHandler?.obtainMessage()?.also { msg ->
             msg.what = CommServiceCodes.SEND_PUMP_COMMAND_BOLUS.ordinal
             msg.obj = initiateConfirmedBolusBytes
-            wearCommHandler?.sendMessage(msg)
+            pumpCommHandler?.sendMessage(msg)
         }
     }
+
+    private fun writeCharacteristicFailedCallback() {
+        Timber.i("writeCharacteristicFailedCallback")
+        pumpCommHandler?.obtainMessage()?.also { msg ->
+            msg.what = CommServiceCodes.WRITE_CHARACTERISTIC_FAILED_CALLBACK.ordinal
+            pumpCommHandler?.sendMessage(msg)
+        }
+    }
+
 
     private var bolusNotificationId: Int = 1000
 
@@ -784,19 +777,6 @@ class CommService : WearableListenerService(), GoogleApiClient.ConnectionCallbac
         val notif = builder.build()
         Timber.i("bolus notification $bolusNotificationId $builder $notif")
         makeNotif(bolusNotificationId, notif)
-    }
-
-    private fun onReceiveInitiateBolusResponse(response: InitiateBolusResponse?) {
-        val intent: Intent? = Intent(applicationContext, BolusNotificationBroadcastReceiver::class.java).apply {
-            putExtra("action", "INITIATE_RESPONSE")
-            putExtra("response", PumpMessageSerializer.toBytes(response))
-        }
-        applicationContext.startService(intent)
-    }
-
-    private fun onReceiveTimeSinceResetResponse(response: TimeSinceResetResponse?) {
-        Timber.i("lastTimeSinceReset = $response")
-        lastTimeSinceReset = response
     }
 
     private fun makeNotif(id: Int, notif: Notification) {

@@ -288,10 +288,20 @@ class MainActivity : ComponentActivity(), GoogleApiClient.ConnectionCallbacks, G
                 dataStore.pumpLastConnectionTimestamp.value = Instant.now()
             }
 
+            // on explicit disconnection
             "/from-pump/pump-disconnected" -> {
                 dataStore.pumpSetupStage.value = dataStore.pumpSetupStage.value?.nextStage(PumpSetupStage.PUMPX2_PUMP_DISCONNECTED)
                 dataStore.setupDeviceModel.value = String(messageEvent.data)
                 dataStore.pumpConnected.value = false
+            }
+
+            // on implicit disconnection (i.e. we didn't get the explicit disconnect)
+            "/from-pump/pump-not-connected" -> {
+                if (dataStore.pumpConnected.value == true) {
+                    Timber.i("tracked implicit disconnection (before pump-disconnected)")
+                    dataStore.pumpSetupStage.value = dataStore.pumpSetupStage.value?.nextStage(PumpSetupStage.PUMPX2_PUMP_DISCONNECTED)
+                    dataStore.pumpConnected.value = false
+                }
             }
 
             "/from-pump/receive-message" -> {

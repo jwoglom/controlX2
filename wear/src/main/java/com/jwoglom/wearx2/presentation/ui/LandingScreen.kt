@@ -1,10 +1,17 @@
 package com.jwoglom.wearx2.presentation.ui
 
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.material.ExperimentalMaterialApi
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.OpenInFull
+import androidx.compose.material.icons.filled.OpenInNew
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.pullrefresh.PullRefreshIndicator
 import androidx.compose.material.pullrefresh.pullRefresh
 import androidx.compose.material.pullrefresh.rememberPullRefreshState
@@ -27,6 +34,7 @@ import androidx.navigation.NavHostController
 import androidx.wear.compose.material.AutoCenteringParams
 import androidx.wear.compose.material.Chip
 import androidx.wear.compose.material.ExperimentalWearMaterialApi
+import androidx.wear.compose.material.Icon
 import androidx.wear.compose.material.ScalingLazyColumn
 import androidx.wear.compose.material.ScalingLazyListState
 import androidx.wear.compose.material.Text
@@ -350,13 +358,33 @@ fun LandingScreen(
             }
 
             item {
-                MiniChip(
-                    onClick = {
-                        sendPhoneCommand("force-reload")
-                    },
+                FlowRow(
                     modifier = Modifier.padding(top = 25.dp),
-                    label = "Force service reload"
-                )
+                ) {
+                    Chip(
+                        onClick = {
+                            sendPhoneCommand("force-reload")
+                        },
+                        label = {
+                            Icon(
+                                imageVector = Icons.Filled.Refresh,
+                                contentDescription = "Force reload app"
+                            )
+                        },
+                    )
+                    Spacer(Modifier.width(16.dp))
+                    Chip(
+                        onClick = {
+                            sendPhoneCommand("open-activity")
+                        },
+                        label = {
+                            Icon(
+                                imageVector = Icons.Filled.OpenInNew,
+                                contentDescription = "Open on phone"
+                            )
+                        },
+                    )
+                }
             }
 
 //            item {

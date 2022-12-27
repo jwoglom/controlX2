@@ -37,13 +37,13 @@ fun LastConnectionUpdatedTimestamp() {
         updatePumpLastMessageTsRelative()
     }
 
-    Line(
-        when {
-            pumpConnected.value == false -> "Connecting: ${setupStage.value}\nLast connected: $pumpLastMessageTimestampRelative"
-            pumpLastMessageTimestamp.value == null -> ""
-            pumpLastMessageTimestampRelative == null -> ""
-            else -> "Last updated: $pumpLastMessageTimestampRelative"
+    when {
+        pumpConnected.value == false -> Line("Last connected: $pumpLastMessageTimestampRelative", bold = true)
+        pumpLastMessageTimestamp.value == null -> {}
+        pumpLastMessageTimestampRelative == null -> {}
+        else -> {
+            Line("Last updated: $pumpLastMessageTimestampRelative", bold = true)
+        }
 
-        }, bold = true
-    )
+    }
 }

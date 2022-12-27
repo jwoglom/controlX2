@@ -1,6 +1,7 @@
 package com.jwoglom.wearx2
 
 import android.content.Intent
+import android.net.Uri
 import android.os.Bundle
 import android.widget.Toast
 import androidx.activity.ComponentActivity
@@ -62,6 +63,7 @@ import com.jwoglom.wearx2.shared.util.shortTimeAgo
 import com.jwoglom.wearx2.shared.util.twoDecimalPlaces1000Unit
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.asExecutor
+import kotlinx.coroutines.guava.await
 import timber.log.Timber
 import java.time.temporal.ChronoUnit
 
@@ -139,7 +141,19 @@ class MainActivity : ComponentActivity(), MessageApi.MessageListener, GoogleApiC
             }
 
             val sendPhoneOpenActivity: () -> Unit = {
-                this.sendMessage("/to-phone/open-activity", "".toByteArray())
+                val phoneIntent = Intent(Intent.ACTION_VIEW)
+                    .addCategory(Intent.CATEGORY_BROWSABLE)
+                    .setData(Uri.parse("com_jwoglom_wearx2://wearx2/"))
+                Wearable.NodeApi.getConnectedNodes(mApiClient).setResultCallback { nodes ->
+                    Timber.d("wear openActivity nodes: ${nodes.nodes}")
+                    nodes.nodes.forEach { node ->
+                        RemoteActivityHelper(this)
+                            .startRemoteActivity(
+                                targetIntent = phoneIntent,
+                                targetNodeId = node.id
+                            )
+                    }
+                }
             }
 
             val sendPhoneOpenTconnect: () -> Unit = {
@@ -530,8 +544,11 @@ class MainActivity : ComponentActivity(), MessageApi.MessageListener, GoogleApiC
                         navController.navigateClearBackStack(Screen.PumpDisconnectedReconnecting.route)
                     }
                 } else {
-                    runOnUiThread {
-                        Toast.makeText(applicationContext, "Disconnected", Toast.LENGTH_SHORT).show()
+                    if (dataStore.connectionStatus.value == "") {
+                        runOnUiThread {
+                            Toast.makeText(applicationContext, "Disconnected", Toast.LENGTH_SHORT)
+                                .show()
+                        }
                     }
                 }
                 dataStore.connectionStatus.value = "Reconnecting"

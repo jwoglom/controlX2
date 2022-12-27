@@ -34,7 +34,6 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.SpanStyle
-import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -51,9 +50,10 @@ import com.jwoglom.wearx2.LocalDataStore
 import com.jwoglom.wearx2.Prefs
 import com.jwoglom.wearx2.presentation.components.DialogScreen
 import com.jwoglom.wearx2.presentation.components.Line
+import com.jwoglom.wearx2.presentation.components.PumpSetupStageDescription
+import com.jwoglom.wearx2.presentation.components.PumpSetupStageProgress
 import com.jwoglom.wearx2.presentation.navigation.Screen
 import com.jwoglom.wearx2.presentation.theme.WearX2Theme
-import org.apache.commons.lang3.text.FormattableUtils.append
 import timber.log.Timber
 
 @Composable
@@ -66,18 +66,7 @@ fun PumpSetup(
 
     val setupStage = ds.pumpSetupStage.observeAsState()
 
-    var progress by remember { mutableStateOf(0.0f) }
-    val animatedProgress by animateFloatAsState(
-        targetValue = progress,
-        animationSpec = ProgressIndicatorDefaults.ProgressAnimationSpec
-    )
-
     var pairingCodeText by remember { mutableStateOf(PumpState.getPairingCode(context)) }
-
-    LaunchedEffect (setupStage.value) {
-        progress = ((1.0 * (setupStage.value?.step ?: 0)) / PumpSetupStage.PUMPX2_PUMP_CONNECTED.step).toFloat()
-    }
-
     DialogScreen(
         "Pump Setup",
         buttonContent = {
@@ -163,55 +152,13 @@ fun PumpSetup(
         }
     ) {
         item {
-            Line(
-                "${setupStage.value?.description} (stage ${setupStage.value?.step ?: 0} of ${PumpSetupStage.PUMPX2_PUMP_CONNECTED.step})",
-                style = MaterialTheme.typography.bodySmall,
-                modifier = Modifier.padding(start = 10.dp, top = 10.dp)
-            )
-            LinearProgressIndicator(
-                modifier = Modifier
-                    .semantics(mergeDescendants = true) {}
-                    .padding(10.dp)
-                    .fillMaxWidth(),
-                progress = animatedProgress,
-            )
+            PumpSetupStageProgress(initialSetup = true)
         }
         item {
             val setupDeviceName = ds.setupDeviceName.observeAsState()
-            val setupDeviceModel = ds.setupDeviceModel.observeAsState()
-            when (setupStage.value) {
-                PumpSetupStage.PERMISSIONS_NOT_GRANTED -> {
-                    Line("Notification permissions weren't granted, which are needed to make remote boluses.")
-                }
-                PumpSetupStage.WAITING_PUMPX2_INIT -> {
-                    Line("Waiting for library initialization...")
-                }
-                PumpSetupStage.PUMPX2_SEARCHING_FOR_PUMP -> {
-                    Line("Open your pump and select:")
-                    Line("Options > Device Settings > Bluetooth Settings", bold = true)
-                    Spacer(Modifier.height(16.dp))
-                    Line("Enable the 'Mobile Connection' option and press 'Pair Device.' If already paired, press 'Unpair Device' first.")
-                }
-                PumpSetupStage.PUMPX2_PUMP_DISCONNECTED -> {
-                    Line("Disconnected from '${setupDeviceName.value}', reconnecting...")
-                    Spacer(Modifier.height(16.dp))
-                    Line("Troubleshooting Steps:", bold = true)
-                    Line("1. Toggle Bluetooth on and off.")
-                    Line("2. If the t:connect Android application is open, force-stop it: long-press the app, select App Info, then 'Force Stop'")
-                    Line("3. Open your pump and select:")
-                    Line("Options > Device Settings > Bluetooth Settings", bold = true)
-                    Line("Disable and then re-enable 'Mobile Connection', then press 'Pair Device.' If already paired, press 'Unpair Device' first.")
-                }
-                PumpSetupStage.PUMPX2_PUMP_DISCOVERED -> {
-                    Line("Connecting to ${setupDeviceName.value}")
-                }
-                PumpSetupStage.PUMPX2_PUMP_MODEL_METADATA -> {
-                    Line("Connecting to ${setupDeviceName.value} (t:slim ${setupDeviceModel.value})")
-                }
-                PumpSetupStage.PUMPX2_INITIAL_PUMP_CONNECTION -> {
-                    Line("Initial connection made to ${setupDeviceName.value}")
-                }
-                PumpSetupStage.PUMPX2_WAITING_FOR_PAIRING_CODE, PumpSetupStage.PUMPX2_INVALID_PAIRING_CODE -> {
+            PumpSetupStageDescription(
+                initialSetup = true,
+                pairingCodeStage = {
                     val focusRequester = remember { FocusRequester() }
                     val focusManager = LocalFocusManager.current
 
@@ -314,16 +261,7 @@ fun PumpSetup(
                         focusRequester.requestFocus()
                     }
                 }
-                PumpSetupStage.PUMPX2_WAITING_TO_PAIR -> {
-                    Line("Pairing with ${setupDeviceName.value}...")
-                }
-                PumpSetupStage.PUMPX2_PUMP_CONNECTED -> {
-                    Line("Connected to ${setupDeviceName.value}!", bold = true)
-                    Spacer(modifier = Modifier.height(16.dp))
-                    Line("Press 'Next' to continue.")
-                }
-                else -> {}
-            }
+            )
         }
     }
 }
