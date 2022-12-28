@@ -7,6 +7,11 @@ import timber.log.Timber
 import java.time.Instant
 
 class StatePrefs(val context: Context) {
+    var connected: Pair<String, Instant>?
+        get() = get("connected")
+        set(value) {
+            set("connected", value)
+        }
 
     var pumpBattery: Pair<String, Instant>?
         get() = get("pumpBattery")

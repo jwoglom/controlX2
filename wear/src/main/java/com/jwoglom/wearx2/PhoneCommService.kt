@@ -6,8 +6,10 @@ import android.app.ActivityManager.RunningAppProcessInfo.IMPORTANCE_VISIBLE
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.content.Intent
+import android.os.Bundle
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
+import com.google.android.gms.common.ConnectionResult
 import com.google.android.gms.common.api.GoogleApiClient
 import com.google.android.gms.wearable.MessageEvent
 import com.google.android.gms.wearable.Node
@@ -20,21 +22,33 @@ import com.jwoglom.pumpx2.pump.messages.response.currentStatus.CurrentBatteryAbs
 import com.jwoglom.wearx2.presentation.navigation.Screen
 import com.jwoglom.wearx2.shared.PumpMessageSerializer
 import com.jwoglom.wearx2.shared.util.setupTimber
+import com.jwoglom.wearx2.util.ConnectedState
 import com.jwoglom.wearx2.util.StatePrefs
 import timber.log.Timber
 import java.time.Instant
 
 
-class PhoneCommService : WearableListenerService() {
-    private var currentlyConnected = false
+class PhoneCommService : WearableListenerService(), GoogleApiClient.ConnectionCallbacks, GoogleApiClient.OnConnectionFailedListener {
+    private var connected: ConnectedState = ConnectedState.UNKNOWN
     private var notificationId = 0
 
+    private lateinit var mApiClient: GoogleApiClient
     private val notificationManagerCompat: NotificationManagerCompat by lazy { NotificationManagerCompat.from(this) }
 
     override fun onCreate() {
         super.onCreate()
         setupTimber("WPC")
         Timber.d("wear service onCreate")
+
+        mApiClient = GoogleApiClient.Builder(this)
+            .addApi(Wearable.API)
+            .addConnectionCallbacks(this)
+            .addOnConnectionFailedListener(this)
+            .build()
+
+        Timber.d("create: mApiClient: $mApiClient")
+        mApiClient.connect()
+
     }
 
     override fun onMessageReceived(messageEvent: MessageEvent) {
@@ -65,6 +79,14 @@ class PhoneCommService : WearableListenerService() {
                     .addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP)
                     .putExtra("route", Screen.BolusNotEnabled.route)
             }
+            "/from-pump/pump-connected" -> {
+                connected = ConnectedState.PHONE_CONNECTED_PUMP_CONNECTED
+                StatePrefs(this).connected = Pair(connected.name, Instant.now())
+            }
+            "/from-pump/pump-disconnected" -> {
+                connected = ConnectedState.PHONE_CONNECTED_PUMP_DISCONNECTED
+                StatePrefs(this).connected = Pair(connected.name, Instant.now())
+            }
             "/from-pump/receive-message" -> {
                 val pumpMessage = PumpMessageSerializer.fromBytes(messageEvent.data)
                 onPumpMessageReceived(pumpMessage, false)
@@ -87,23 +109,35 @@ class PhoneCommService : WearableListenerService() {
     override fun onConnectedNodes(nodes: MutableList<Node>) {
         Timber.i("onConnectedNodes: ${nodes.size}: $nodes")
         super.onConnectedNodes(nodes)
-        if (nodes.size == 0) {
-            currentlyConnected = false
-            // disconnectedNotification("phone disconnected")
-        }
     }
 
-//    override fun onPeerDisconnected(node: Node) {
-//        Timber.i("onPeerDisconnected $node")
-//        super.onPeerDisconnected(node)
-//        currentlyConnected = false
-//        disconnectedNotification("phone disconnected")
-//    }
+    override fun onPeerDisconnected(node: Node) {
+        Timber.i("onPeerDisconnected $node")
+        super.onPeerDisconnected(node)
+        connected = ConnectedState.PHONE_DISCONNECTED
+        StatePrefs(this).connected = Pair(connected.name, Instant.now())
+        // disconnectedNotification("phone disconnected")
+    }
+
+    override fun onConnected(bundle: Bundle?) {
+        Timber.i("wear service onConnected: $bundle")
+        Wearable.MessageApi.addListener(mApiClient, this)
+    }
+
+    override fun onConnectionSuspended(id: Int) {
+        Timber.w("wear service connectionSuspended: $id")
+        mApiClient.reconnect()
+    }
+
+    override fun onConnectionFailed(result: ConnectionResult) {
+        Timber.w("wear service connectionFailed $result")
+        mApiClient.reconnect()
+    }
 
     private fun disconnectedNotification(reason: String) {
         Thread {
             Thread.sleep(30 * 1000)
-            if (currentlyConnected) {
+            if (connected == ConnectedState.PHONE_CONNECTED_PUMP_CONNECTED) {
                 return@Thread
             }
 

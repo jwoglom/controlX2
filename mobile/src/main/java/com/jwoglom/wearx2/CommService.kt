@@ -16,10 +16,8 @@ import android.graphics.drawable.Icon
 import android.media.RingtoneManager
 import android.os.Bundle
 import android.os.Handler
-import android.os.HandlerThread
 import android.os.Looper
 import android.os.Message
-import android.os.Process.THREAD_PRIORITY_FOREGROUND
 import android.widget.Toast
 import androidx.core.app.NotificationCompat
 import com.google.android.gms.common.ConnectionResult
@@ -28,7 +26,6 @@ import com.google.android.gms.wearable.MessageEvent
 import com.google.android.gms.wearable.Node
 import com.google.android.gms.wearable.Wearable
 import com.google.android.gms.wearable.WearableListenerService
-import com.google.common.base.Strings
 import com.jwoglom.pumpx2.pump.PumpState
 import com.jwoglom.pumpx2.pump.TandemError
 import com.jwoglom.pumpx2.pump.bluetooth.TandemBluetoothHandler
@@ -36,11 +33,16 @@ import com.jwoglom.pumpx2.pump.bluetooth.TandemPump
 import com.jwoglom.pumpx2.pump.messages.Packetize
 import com.jwoglom.pumpx2.pump.messages.bluetooth.Characteristic
 import com.jwoglom.pumpx2.pump.messages.bluetooth.CharacteristicUUID
+import com.jwoglom.pumpx2.pump.messages.builders.CurrentBatteryRequestBuilder
 import com.jwoglom.pumpx2.pump.messages.helpers.Bytes
+import com.jwoglom.pumpx2.pump.messages.models.ApiVersion
 import com.jwoglom.pumpx2.pump.messages.models.InsulinUnit
+import com.jwoglom.pumpx2.pump.messages.models.KnownApiVersion
 import com.jwoglom.pumpx2.pump.messages.request.control.InitiateBolusRequest
 import com.jwoglom.pumpx2.pump.messages.request.control.RemoteCarbEntryRequest
 import com.jwoglom.pumpx2.pump.messages.request.currentStatus.ApiVersionRequest
+import com.jwoglom.pumpx2.pump.messages.request.currentStatus.ControlIQIOBRequest
+import com.jwoglom.pumpx2.pump.messages.request.currentStatus.InsulinStatusRequest
 import com.jwoglom.pumpx2.pump.messages.request.currentStatus.TimeSinceResetRequest
 import com.jwoglom.pumpx2.pump.messages.response.authentication.CentralChallengeResponse
 import com.jwoglom.pumpx2.pump.messages.response.authentication.PumpChallengeResponse
@@ -51,6 +53,7 @@ import com.jwoglom.pumpx2.pump.messages.response.currentStatus.InsulinStatusResp
 import com.jwoglom.pumpx2.pump.messages.response.currentStatus.TimeSinceResetResponse
 import com.jwoglom.pumpx2.pump.messages.response.qualifyingEvent.QualifyingEvent
 import com.jwoglom.pumpx2.shared.Hex
+import com.jwoglom.wearx2.presentation.screens.sections.apiVersion
 import com.jwoglom.wearx2.shared.InitiateConfirmedBolusSerializer
 import com.jwoglom.wearx2.shared.PumpMessageSerializer
 import com.jwoglom.wearx2.shared.PumpQualifyingEventsSerializer
@@ -92,9 +95,11 @@ class CommService : WearableListenerService(), GoogleApiClient.ConnectionCallbac
             var isConnected = false
 
             init {
-                enableTconnectAppConnectionSharing()
-                enableSendSharedConnectionResponseMessages()
-                // before adding relyOnConnectionSharingForAuthentication(), callback issues need to be resolved
+                if (Prefs(applicationContext).connectionSharingEnabled()) {
+                    enableTconnectAppConnectionSharing()
+                    enableSendSharedConnectionResponseMessages()
+                    // before adding relyOnConnectionSharingForAuthentication(), callback issues need to be resolved
+                }
 
                 if (Prefs(applicationContext).insulinDeliveryActions()) {
                     Timber.i("ACTIONS AFFECTING INSULIN DELIVERY ENABLED")
@@ -544,7 +549,29 @@ class CommService : WearableListenerService(), GoogleApiClient.ConnectionCallbac
                 }
             }
         }
+    }
 
+    private val periodicUpdateIntervalMs: Long = 1000 * 60 * 9 // 9 minutes
+    private var periodicUpdateTask: Runnable = Runnable {}
+    init {
+        periodicUpdateTask = Runnable {
+            pumpCommHandler?.postDelayed(periodicUpdateTask, periodicUpdateIntervalMs)
+
+            fun apiVersion(): ApiVersion {
+                var apiVersion = PumpState.getPumpAPIVersion()
+                if (apiVersion == null) {
+                    apiVersion = KnownApiVersion.API_V2_5.get()
+                }
+                return apiVersion
+            }
+
+            Timber.i("running periodicUpdateTask")
+            sendPumpCommMessages(PumpMessageSerializer.toBulkBytes(listOf(
+                CurrentBatteryRequestBuilder.create(apiVersion()),
+                ControlIQIOBRequest(),
+                InsulinStatusRequest(),
+            )))
+        }
     }
 
     override fun onCreate() {
@@ -579,6 +606,7 @@ class CommService : WearableListenerService(), GoogleApiClient.ConnectionCallbac
             serviceLooper = looper
             pumpCommHandler = PumpCommHandler(looper)
 
+            pumpCommHandler?.postDelayed(periodicUpdateTask, periodicUpdateIntervalMs)
 
             Thread {
                 while (!mApiClient.isConnected) {

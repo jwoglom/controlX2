@@ -1,8 +1,12 @@
 package com.jwoglom.wearx2
 
+import android.content.ComponentName
 import android.content.Intent
+import android.content.ServiceConnection
 import android.net.Uri
+import android.os.Build
 import android.os.Bundle
+import android.os.IBinder
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -187,19 +191,31 @@ class MainActivity : ComponentActivity(), MessageApi.MessageListener, GoogleApiC
         Timber.d("create: mApiClient: $mApiClient")
         mApiClient.connect()
 
-        // Start PhoneCommService
-        try {
-            Intent(this, PhoneCommService::class.java).also { intent: Intent? ->
-                val started = startService(intent)
-                if (started == null) {
-                    Timber.i("when starting PhoneCommService was already running")
-                } else {
-                    Timber.i("started PhoneCommService: $started")
-                }
-            }
-        } catch (e: Exception) {
-            Timber.e("could not start PhoneCommService: $e")
-            Timber.e(e)
+        startPhoneCommService()
+    }
+
+    private fun startPhoneCommService() {
+        Timber.i("starting PhoneCommService")
+        // Start CommService
+        val intent = Intent(applicationContext, PhoneCommService::class.java)
+
+        if (Build.VERSION.SDK_INT >= 26) {
+            applicationContext.startForegroundService(intent)
+        } else {
+            applicationContext.startService(intent)
+        }
+        applicationContext.bindService(intent, commServiceConnection, BIND_AUTO_CREATE)
+    }
+
+    private val commServiceConnection = object : ServiceConnection {
+        override fun onServiceConnected(name: ComponentName, service: IBinder) {
+            //retrieve an instance of the service here from the IBinder returned
+            //from the onBind method to communicate with
+            Timber.i("PhoneCommService onServiceConnected")
+        }
+
+        override fun onServiceDisconnected(name: ComponentName) {
+            Timber.i("PhoneCommService onServiceDisconnected")
         }
     }
 

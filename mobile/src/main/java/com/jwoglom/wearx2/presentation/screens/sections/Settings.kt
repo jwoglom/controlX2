@@ -92,6 +92,40 @@ fun Settings(
                 }
                 Divider()
             }
+            item {
+                if (Prefs(context).connectionSharingEnabled()) {
+                    ListItem(
+                        headlineText = { Text("Disable connection sharing") },
+                        supportingText = { Text("Removes workarounds to run WearX2 and the t:connect app at the same time.") },
+                        leadingContent = {
+                            Icon(
+                                Icons.Filled.Close,
+                                contentDescription = "Stop icon",
+                            )
+                        },
+                        modifier = Modifier.clickable {
+                            Prefs(context).setConnectionSharingEnabled(false)
+                            sendMessage("/to-phone/force-reload", "".toByteArray())
+                        }
+                    )
+                } else {
+                    ListItem(
+                        headlineText = { Text("Enable connection sharing") },
+                        supportingText = { Text("Enables workarounds to run WearX2 and the t:connect app at the same time.") },
+                        leadingContent = {
+                            Icon(
+                                Icons.Filled.Check,
+                                contentDescription = "Start icon",
+                            )
+                        },
+                        modifier = Modifier.clickable {
+                            Prefs(context).setConnectionSharingEnabled(false)
+                            sendMessage("/to-phone/force-reload", "".toByteArray())
+                        }
+                    )
+                }
+                Divider()
+            }
 
             item {
                 ListItem(

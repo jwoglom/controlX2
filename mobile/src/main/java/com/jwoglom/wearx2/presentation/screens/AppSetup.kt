@@ -1,5 +1,8 @@
+@file:OptIn(ExperimentalMaterial3Api::class)
+
 package com.jwoglom.wearx2.presentation.screens
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -7,9 +10,16 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.selection.toggleable
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.Button
+import androidx.compose.material3.Divider
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
+import androidx.compose.material3.ListItem
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -49,6 +59,7 @@ fun AppSetup(
     val ds = LocalDataStore.current
 
     var insulinDeliveryActions by remember { mutableStateOf(Prefs(context).insulinDeliveryActions()) }
+    var connectionSharingEnabled by remember { mutableStateOf(Prefs(context).connectionSharingEnabled()) }
     val setupComplete by remember { mutableStateOf(true) }
 
     DialogScreen(
@@ -85,6 +96,40 @@ fun AppSetup(
             }
         }
     ) {
+        item {
+            Row(
+                Modifier
+                    .fillMaxWidth()
+                    .height(56.dp)
+                    .toggleable(
+                        value = connectionSharingEnabled,
+                        onValueChange = {
+                            connectionSharingEnabled = !connectionSharingEnabled
+                            Prefs(context).setConnectionSharingEnabled(connectionSharingEnabled)
+                            coroutineScope.launch {
+                                sendMessage(
+                                    "/to-phone/app-reload",
+                                    "".toByteArray()
+                                )
+                            }
+                        },
+                        role = Role.Checkbox
+                    )
+                    .padding(horizontal = 16.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Checkbox(
+                    checked = connectionSharingEnabled,
+                    onCheckedChange = null // null recommended for accessibility with screenreaders
+                )
+                Line(
+                    "Enable t:connect app connection sharing",
+                    bold = true,
+                    modifier = Modifier.padding(start = 16.dp))
+                Line("Enables workarounds to run WearX2 and the t:connect app at the same time.")
+            }
+            Divider()
+        }
         item {
             Row(
                 Modifier

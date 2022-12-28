@@ -22,6 +22,14 @@ class Prefs(val context: Context) {
         prefs().edit().putBoolean("service-enabled", b).apply()
     }
 
+    fun connectionSharingEnabled(): Boolean {
+        return prefs().getBoolean("connection-sharing-enabled", false)
+    }
+
+    fun setConnectionSharingEnabled(b: Boolean) {
+        prefs().edit().putBoolean("connection-sharing-enabled", b).apply()
+    }
+
     fun pumpSetupComplete(): Boolean {
         return prefs().getBoolean("pump-setup-complete", false)
     }

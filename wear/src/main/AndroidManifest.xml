@@ -51,10 +51,17 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
-        <service android:name=".PhoneCommService"
-            android:exported="true">
-        </service>
 
+        <service
+            android:name=".PhoneCommService"
+            android:exported="false"
+            android:icon="@drawable/pump">
+            <intent-filter>
+                <action
+                    android:name="com.google.android.gms.wearable.BIND_LISTENER"
+                    tools:ignore="WearableBindListener" />
+            </intent-filter>
+        </service>
 
         <service
             android:name=".complications.PumpBatteryComplicationDataSourceService"
