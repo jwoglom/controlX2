@@ -28,6 +28,9 @@ import com.jwoglom.wearx2.shared.util.oneDecimalPlace
 import com.jwoglom.wearx2.shared.util.twoDecimalPlaces
 import com.jwoglom.wearx2.shared.util.twoDecimalPlaces1000Unit
 import com.jwoglom.wearx2.util.StatePrefs
+import com.jwoglom.wearx2.util.StateWearableApi
+import com.jwoglom.wearx2.util.connectGoogleApi
+import com.jwoglom.wearx2.util.getStateWearableApi
 import java.time.Duration
 import java.time.Instant
 
@@ -54,7 +57,7 @@ class PumpIOBComplicationDataSourceService : SuspendingComplicationDataSourceSer
         Log.i(tag, "onComplicationRequest(${request.complicationType}, ${request.complicationInstanceId}, ${request.immediateResponseRequired})")
 
         val tapIntent = PendingIntent.getActivity(this, 0, Intent(this, MainActivity::class.java), PendingIntent.FLAG_IMMUTABLE)
-        val pumpIOB = StatePrefs(this).pumpIOB
+        val pumpIOB = getStateWearableApi(this).pumpIOB
 
         return getComplicationDataForType(
             request.complicationType,
