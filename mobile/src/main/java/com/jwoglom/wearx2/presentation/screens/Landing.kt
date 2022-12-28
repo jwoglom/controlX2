@@ -60,6 +60,7 @@ import com.jwoglom.wearx2.Prefs
 import com.jwoglom.wearx2.R
 import com.jwoglom.wearx2.presentation.DataStore
 import com.jwoglom.wearx2.presentation.components.Line
+import com.jwoglom.wearx2.presentation.components.ServiceDisabledMessage
 import com.jwoglom.wearx2.presentation.navigation.Screen
 import com.jwoglom.wearx2.presentation.screens.sections.BolusWindow
 import com.jwoglom.wearx2.presentation.screens.sections.Dashboard
@@ -166,6 +167,7 @@ fun Landing(
                 sheetPeekHeight = 0.dp,
                 backgroundColor = MaterialTheme.colorScheme.background,
             ) {
+                ServiceDisabledMessage()
                 when (selectedItem) {
                     LandingSection.DASHBOARD -> {
                         Dashboard(

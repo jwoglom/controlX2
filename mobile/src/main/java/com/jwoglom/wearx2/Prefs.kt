@@ -14,6 +14,14 @@ class Prefs(val context: Context) {
         prefs().edit().putBoolean("tos-accepted", b).apply()
     }
 
+    fun serviceEnabled(): Boolean {
+        return prefs().getBoolean("service-enabled", false)
+    }
+
+    fun setServiceEnabled(b: Boolean) {
+        prefs().edit().putBoolean("service-enabled", b).apply()
+    }
+
     fun pumpSetupComplete(): Boolean {
         return prefs().getBoolean("pump-setup-complete", false)
     }

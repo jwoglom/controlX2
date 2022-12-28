@@ -92,10 +92,12 @@ class MainActivity : ComponentActivity(), GoogleApiClient.ConnectionCallbacks, G
 
         mApiClient.connect()
 
-        if (Prefs(applicationContext).tosAccepted()) {
-            startCommService()
-        } else {
+        if (!Prefs(applicationContext).tosAccepted()) {
             Timber.i("commService not started because first TOS not accepted")
+        } else if (!Prefs(applicationContext).serviceEnabled()) {
+            Timber.i("commService not started because service not enabled")
+        } else {
+            startCommService()
         }
     }
 
@@ -109,10 +111,12 @@ class MainActivity : ComponentActivity(), GoogleApiClient.ConnectionCallbacks, G
             mApiClient.connect()
         }
 
-        if (Prefs(applicationContext).tosAccepted()) {
-            startBTPermissionsCheck()
-        } else {
+        if (!Prefs(applicationContext).tosAccepted()) {
             Timber.i("BTPermissionsCheck not started because TOS not accepted")
+        } else if (!Prefs(applicationContext).serviceEnabled()) {
+            Timber.i("BTPermissionsCheck not started because service not enabled")
+        } else {
+            startBTPermissionsCheck()
         }
         super.onResume()
     }

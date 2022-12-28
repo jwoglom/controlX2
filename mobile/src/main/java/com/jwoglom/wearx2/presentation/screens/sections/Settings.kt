@@ -11,6 +11,8 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.Button
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Settings
@@ -56,6 +58,41 @@ fun Settings(
             .fillMaxSize()
             .padding(horizontal = 0.dp),
         content = {
+            item {
+                if (Prefs(context).serviceEnabled()) {
+                    ListItem(
+                        headlineText = { Text("Disable WearX2 service") },
+                        supportingText = { Text("Stops the background service and disables it from starting automatically when the app is opened.") },
+                        leadingContent = {
+                            Icon(
+                                Icons.Filled.Close,
+                                contentDescription = "Stop icon",
+                            )
+                        },
+                        modifier = Modifier.clickable {
+                            Prefs(context).setServiceEnabled(false)
+                            sendMessage("/to-phone/stop-comm", "".toByteArray())
+                        }
+                    )
+                } else {
+                    ListItem(
+                        headlineText = { Text("Enable WearX2 service") },
+                        supportingText = { Text("Starts the background service and enables it to start automatically when the app is opened.") },
+                        leadingContent = {
+                            Icon(
+                                Icons.Filled.Check,
+                                contentDescription = "Start icon",
+                            )
+                        },
+                        modifier = Modifier.clickable {
+                            Prefs(context).setServiceEnabled(true)
+                            sendMessage("/to-phone/start-comm", "".toByteArray())
+                        }
+                    )
+                }
+                Divider()
+            }
+
             item {
                 ListItem(
                     headlineText = { Text("Force service reload") },

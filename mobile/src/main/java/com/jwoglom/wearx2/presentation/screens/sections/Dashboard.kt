@@ -25,6 +25,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
@@ -45,11 +46,13 @@ import com.jwoglom.pumpx2.pump.messages.request.currentStatus.GlobalMaxBolusSett
 import com.jwoglom.pumpx2.pump.messages.request.currentStatus.HomeScreenMirrorRequest
 import com.jwoglom.pumpx2.pump.messages.request.currentStatus.InsulinStatusRequest
 import com.jwoglom.wearx2.LocalDataStore
+import com.jwoglom.wearx2.Prefs
 import com.jwoglom.wearx2.dataStore
 import com.jwoglom.wearx2.presentation.components.LastConnectionUpdatedTimestamp
 import com.jwoglom.wearx2.presentation.components.Line
 import com.jwoglom.wearx2.presentation.components.PumpSetupStageDescription
 import com.jwoglom.wearx2.presentation.components.PumpSetupStageProgress
+import com.jwoglom.wearx2.presentation.components.ServiceDisabledMessage
 import com.jwoglom.wearx2.presentation.screens.setUpPreviewState
 import com.jwoglom.wearx2.presentation.theme.WearX2Theme
 import com.jwoglom.wearx2.shared.presentation.LifecycleStateObserver
@@ -68,7 +71,7 @@ fun Dashboard(
     sendMessage: (String, ByteArray) -> Unit,
     sendPumpCommands: (SendType, List<Message>) -> Unit,
 ) {
-
+    val context = LocalContext.current
     val ds = LocalDataStore.current
 
     val setupStage = ds.pumpSetupStage.observeAsState()
@@ -84,6 +87,7 @@ fun Dashboard(
     }
 
     fun waitForLoaded() = refreshScope.launch {
+        if (!Prefs(context).serviceEnabled()) return@launch
         var sinceLastFetchTime = 0
         while (true) {
             val nullFields = dashboardFields.filter { field -> field.value == null }.toSet()
@@ -108,6 +112,7 @@ fun Dashboard(
     }
 
     fun refresh() = refreshScope.launch {
+        if (!Prefs(context).serviceEnabled()) return@launch
         Timber.i("reloading Dashboard with force")
         refreshing = true
 

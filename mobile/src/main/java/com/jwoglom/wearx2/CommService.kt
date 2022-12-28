@@ -594,10 +594,13 @@ class CommService : WearableListenerService(), GoogleApiClient.ConnectionCallbac
     override fun onMessageReceived(messageEvent: MessageEvent) {
         Timber.i("service messageReceived: ${messageEvent.path} ${String(messageEvent.data)}")
         when (messageEvent.path) {
-
             "/to-phone/force-reload" -> {
                 Timber.i("force-reload")
                 triggerAppReload(applicationContext)
+            }
+            "/to-phone/stop-comm" -> {
+                Timber.w("stop-comm")
+                Runtime.getRuntime().exit(0)
             }
             "/to-phone/is-pump-connected" -> {
                 sendCheckPumpConnected()
