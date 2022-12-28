@@ -14,6 +14,8 @@ import com.google.android.gms.wearable.Node
 import com.google.android.gms.wearable.Wearable
 import com.google.android.gms.wearable.WearableListenerService
 import com.jwoglom.pumpx2.pump.messages.Message
+import com.jwoglom.pumpx2.pump.messages.models.InsulinUnit
+import com.jwoglom.pumpx2.pump.messages.response.currentStatus.ControlIQIOBResponse
 import com.jwoglom.pumpx2.pump.messages.response.currentStatus.CurrentBatteryAbstractResponse
 import com.jwoglom.wearx2.presentation.navigation.Screen
 import com.jwoglom.wearx2.shared.PumpMessageSerializer
@@ -75,6 +77,9 @@ class PhoneCommService : WearableListenerService() {
         when (message) {
             is CurrentBatteryAbstractResponse -> {
                 StatePrefs(this).pumpBattery = Pair("${message.batteryPercent}", Instant.now())
+            }
+            is ControlIQIOBResponse -> {
+                StatePrefs(this).pumpIOB = Pair("${InsulinUnit.from1000To1(message.pumpDisplayedIOB)}", Instant.now())
             }
         }
     }

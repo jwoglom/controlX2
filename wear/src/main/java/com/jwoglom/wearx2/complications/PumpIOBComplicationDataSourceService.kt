@@ -15,124 +15,192 @@ import androidx.wear.watchface.complications.data.CountUpTimeReference
 import androidx.wear.watchface.complications.data.MonochromaticImage
 import androidx.wear.watchface.complications.data.PlainComplicationText
 import androidx.wear.watchface.complications.data.RangedValueComplicationData
+import androidx.wear.watchface.complications.data.ShortTextComplicationData
 import androidx.wear.watchface.complications.data.TimeDifferenceComplicationText
 import androidx.wear.watchface.complications.data.TimeDifferenceStyle
 import androidx.wear.watchface.complications.datasource.ComplicationDataSourceService
 import androidx.wear.watchface.complications.datasource.ComplicationRequest
 import androidx.wear.watchface.complications.datasource.SuspendingComplicationDataSourceService
+import com.jwoglom.pumpx2.pump.messages.models.InsulinUnit
 import com.jwoglom.wearx2.MainActivity
 import com.jwoglom.wearx2.R
+import com.jwoglom.wearx2.shared.util.oneDecimalPlace
+import com.jwoglom.wearx2.shared.util.twoDecimalPlaces
+import com.jwoglom.wearx2.shared.util.twoDecimalPlaces1000Unit
 import com.jwoglom.wearx2.util.StatePrefs
 import java.time.Duration
 import java.time.Instant
 
+/**
+ * A complication provider that supports only [ComplicationType.RANGED_VALUE] and cycles
+ * through the possible configurations on tap. The value is randomised on each update.
+ *
+ * Note: This subclasses [SuspendingComplicationDataSourceService] instead of [ComplicationDataSourceService] to support
+ * coroutines, so data operations (specifically, calls to [DataStore]) can be supported directly in the
+ * [onComplicationRequest].
+ *
+ * If you don't perform any suspending operations to update your complications, you can subclass
+ * [ComplicationDataSourceService] and override [onComplicationRequest] directly.
+ * (see [NoDataDataSourceService] for an example)
+ */
 @SuppressLint("LogNotTimber")
 class PumpIOBComplicationDataSourceService : SuspendingComplicationDataSourceService() {
     val tag = "WearX2:Compl:PumpIOB"
     val OldDataThresholdSeconds = 600 // shows icon instead of recency
+    val MaxIob = 20.0f
+    val TwoDecimalPlaces = false
 
     override suspend fun onComplicationRequest(request: ComplicationRequest): ComplicationData? {
         Log.i(tag, "onComplicationRequest(${request.complicationType}, ${request.complicationInstanceId}, ${request.immediateResponseRequired})")
-        if (request.complicationType != ComplicationType.RANGED_VALUE) {
-            return null
-        }
 
         val tapIntent = PendingIntent.getActivity(this, 0, Intent(this, MainActivity::class.java), PendingIntent.FLAG_IMMUTABLE)
-        // Suspending function to retrieve the complication's state
-        val pumpBattery = StatePrefs(this).pumpBattery
+        val pumpIOB = StatePrefs(this).pumpIOB
 
-        return getComplicationData(
-            tapAction = tapIntent,
-            pumpBattery = pumpBattery,
+        return getComplicationDataForType(
+            request.complicationType,
+            buildDataFields(pumpIOB = pumpIOB),
+            tapIntent,
         )
     }
 
-    override fun getPreviewData(type: ComplicationType): ComplicationData? =
-        getComplicationData(
-            tapAction = null,
-            pumpBattery = Pair("50", Instant.now().minusSeconds(601))
-        )
-
-    private fun getComplicationData(
+    private fun getComplicationDataForType(
+        type: ComplicationType,
+        data: DataFields,
         tapAction: PendingIntent?,
-        pumpBattery: Pair<String, Instant>?,
-    ): ComplicationData {
-        Log.i(tag, "getComplicationData($pumpBattery)")
+    ): ComplicationData? {
+        Log.i(tag, "getComplicationDataForType($type, $data, $tapAction)")
+        return when (type) {
+            ComplicationType.RANGED_VALUE -> rangedValueComplication(data, tapAction)
+            ComplicationType.SHORT_TEXT -> shortTextComplication(data, tapAction)
+            else -> null
+        }
+    }
 
-        val text: ComplicationText?
+    override fun getPreviewData(type: ComplicationType): ComplicationData? {
+        val data = buildDataFields(
+            pumpIOB = Pair("15.00", Instant.now())
+        )
+        return getComplicationDataForType(type, data, null)
+    }
+
+    data class DataFields(
+        val iobValue: Float,
+        val contentDescription: ComplicationText,
+        val text: ComplicationText,
+        val monochromaticImage: MonochromaticImage?,
+        val title: ComplicationText?
+    )
+
+    private fun buildDataFields(
+        pumpIOB: Pair<String, Instant>?,
+    ): DataFields {
+        Log.i(tag, "buildDataFields($pumpIOB)")
+
+        val text: ComplicationText
         val monochromaticImage: MonochromaticImage?
         val title: ComplicationText?
 
-        val duration = Duration.between(pumpBattery?.second, Instant.now())
-        val percentLabel = "${pumpBattery?.first}%"
-        val percentValue = pumpBattery?.first?.toFloatOrNull() ?: 0f
+        val duration = pumpIOB?.second?.let {
+            Duration.between(it, Instant.now())
+        } ?: Duration.ZERO
+        val iobNum = pumpIOB?.first?.toDoubleOrNull() ?: 0.0
+        val iobLabel = if (TwoDecimalPlaces) "${twoDecimalPlaces(iobNum)}u"
+                       else "${oneDecimalPlace(iobNum)}u"
         var displayType = ""
 
         when {
-            pumpBattery == null || pumpBattery.first == "" -> {
+            pumpIOB == null || pumpIOB.first == "" || duration == Duration.ZERO -> {
                 displayType = "empty"
                 text = PlainComplicationText.Builder(
                     text = "?"
                 ).build()
-                monochromaticImage = null
+                monochromaticImage = MonochromaticImage.Builder(
+                    image = Icon.createWithResource(this, R.drawable.bolus_x)
+                ).build()
                 title = null
             }
             duration.seconds >= OldDataThresholdSeconds -> {
                 displayType = "oldData"
                 text = PlainComplicationText.Builder(
-                    text = percentLabel
+                    text = iobLabel
                 ).build()
                 monochromaticImage = MonochromaticImage.Builder(
-                    image = Icon.createWithResource(this, R.drawable.ic_battery)
-                ).setAmbientImage(
-                    ambientImage = Icon.createWithResource(this, R.drawable.ic_battery_burn_protect)
+                    image = Icon.createWithResource(this, R.drawable.bolus_x)
                 ).build()
                 title = TimeDifferenceComplicationText.Builder(
                     style = TimeDifferenceStyle.SHORT_DUAL_UNIT,
-                    countUpTimeReference = CountUpTimeReference(pumpBattery.second),
+                    countUpTimeReference = CountUpTimeReference(pumpIOB.second),
                 ).build()
             }
             else -> {
                 displayType = "normal"
                 text = PlainComplicationText.Builder(
-                    text = percentLabel
+                    text = iobLabel
                 ).build()
                 monochromaticImage = MonochromaticImage.Builder(
-                    image = Icon.createWithResource(this, R.drawable.ic_battery)
-                ).setAmbientImage(
-                    ambientImage = Icon.createWithResource(this, R.drawable.ic_battery_burn_protect)
+                    image = Icon.createWithResource(this, R.drawable.bolus_icon)
                 ).build()
                 title = null
             }
         }
 
-        Log.i(tag, "complicationData: $displayType $pumpBattery $duration $percentLabel $percentValue")
+        Log.i(
+            tag,
+            "complicationData: displayType=$displayType pumpIOB=$pumpIOB duration=${duration.seconds}s iobLabel=$iobLabel iobNum=$iobNum"
+        )
 
-        val caseContentDescription = "Pump Battery ($displayType)"
+        val caseContentDescription = "Pump IOB ($displayType)"
 
         // Create a content description that includes the value information
         val contentDescription = PlainComplicationText.Builder(
-            text = "${caseContentDescription}: $percentLabel"
+            text = "${caseContentDescription}: $iobLabel"
         ).build()
 
+        return DataFields(
+            iobValue = iobNum.toFloat(),
+            contentDescription = contentDescription,
+            text = text,
+            monochromaticImage = monochromaticImage,
+            title = title,
+        )
+    }
+
+    private fun rangedValueComplication(
+        data: DataFields,
+        tapAction: PendingIntent?
+    ): ComplicationData {
         return RangedValueComplicationData.Builder(
-            value = percentValue,
+            value = data.iobValue,
             min = 0f,
-            max = 100f,
-            contentDescription = contentDescription
+            max = MaxIob,
+            contentDescription = data.contentDescription
         )
             .setColorRamp(ColorRamp(
                 colors = arrayOf(
-                    Color.Red.value.toInt(),
-                    Color.Yellow.value.toInt(),
-                    Color.Green.value.toInt(),
-                    Color.Green.value.toInt(),
+                    Color.White.value.toInt(), // 0..5
+                    Color.Blue.value.toInt(),  // 5..10
+                    Color.Blue.value.toInt(),  // 10..15
+                    Color.Red.value.toInt(),   // 15..20
                 ).toIntArray(),
                 interpolated = false,
             ))
-            .setText(text)
-            .setMonochromaticImage(monochromaticImage)
-            .setTitle(title)
+            .setText(data.text)
+            .setMonochromaticImage(data.monochromaticImage)
+            .setTitle(data.title)
+            .setTapAction(tapAction)
+            .build()
+    }
+
+    private fun shortTextComplication(
+        data: DataFields,
+        tapAction: PendingIntent?
+    ): ComplicationData {
+        return ShortTextComplicationData.Builder(
+            text = data.text,
+            contentDescription = data.contentDescription,
+        )
+            .setMonochromaticImage(data.monochromaticImage)
+            .setTitle(data.title)
             .setTapAction(tapAction)
             .build()
     }

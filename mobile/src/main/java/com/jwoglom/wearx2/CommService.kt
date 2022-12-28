@@ -28,12 +28,14 @@ import com.google.android.gms.wearable.MessageEvent
 import com.google.android.gms.wearable.Node
 import com.google.android.gms.wearable.Wearable
 import com.google.android.gms.wearable.WearableListenerService
+import com.google.common.base.Strings
 import com.jwoglom.pumpx2.pump.PumpState
 import com.jwoglom.pumpx2.pump.TandemError
 import com.jwoglom.pumpx2.pump.bluetooth.TandemBluetoothHandler
 import com.jwoglom.pumpx2.pump.bluetooth.TandemPump
 import com.jwoglom.pumpx2.pump.messages.Packetize
 import com.jwoglom.pumpx2.pump.messages.bluetooth.Characteristic
+import com.jwoglom.pumpx2.pump.messages.bluetooth.CharacteristicUUID
 import com.jwoglom.pumpx2.pump.messages.helpers.Bytes
 import com.jwoglom.pumpx2.pump.messages.models.InsulinUnit
 import com.jwoglom.pumpx2.pump.messages.request.control.InitiateBolusRequest
@@ -219,7 +221,8 @@ class CommService : WearableListenerService(), GoogleApiClient.ConnectionCallbac
                 sendWearCommMessage("/from-pump/pump-connected",
                     peripheral?.name!!.toByteArray()
                 )
-                updateNotification("Connected to pump at ${shortTime(Instant.now())}")
+                currentPumpData.connectionTime = Instant.now()
+                updateNotification("Connected to pump")
             }
 
             override fun onPumpModel(peripheral: BluetoothPeripheral?, modelNumber: String?) {
@@ -242,7 +245,8 @@ class CommService : WearableListenerService(), GoogleApiClient.ConnectionCallbac
                 sendWearCommMessage("/from-pump/pump-disconnected",
                     peripheral?.name!!.toByteArray()
                 )
-                updateNotification("Disconnected from pump at ${shortTime(Instant.now())}")
+                currentPumpData.connectionTime = Instant.now()
+                updateNotification("Disconnected from pump")
                 return super.onPumpDisconnected(peripheral, status)
             }
 
@@ -450,9 +454,16 @@ class CommService : WearableListenerService(), GoogleApiClient.ConnectionCallbac
                     }
                 }
                 CommServiceCodes.WRITE_CHARACTERISTIC_FAILED_CALLBACK.ordinal -> {
+                    val uuidStr = msg.obj as String
                     if (pumpConnectedPrecondition(checkConnected = false)) {
-                        Timber.e("writeCharacteristicFailedCallback: calling onPumpConnected pump=$pump")
-                        pump.onPumpConnected(pump.lastPeripheral)
+                        if (uuidStr == "${CharacteristicUUID.AUTHORIZATION_CHARACTERISTICS}") {
+                            Timber.w("writeCharacteristicFailedCallback: calling onPumpConnected pump=$pump from authorization error")
+                            pump.onPumpConnected(pump.lastPeripheral)
+                        } else {
+                            Timber.w("writeCharacteristicFailedCallback: triggering disconnection from non-authorization error")
+                            pump.lastPeripheral?.cancelConnection();
+                            pump.lastPeripheral?.let { pump.onPumpDisconnected(it, null) }
+                        }
                     }
                 }
                 CommServiceCodes.DEBUG_GET_MESSAGE_CACHE.ordinal -> {
@@ -547,7 +558,7 @@ class CommService : WearableListenerService(), GoogleApiClient.ConnectionCallbac
 //            start()
 //            Timber.d("service thread start")
 
-            setupTimber("MWC", writeCharacteristicFailedCallback = { handleWriteCharacteristicFailedCallback() })
+            setupTimber("MWC", writeCharacteristicFailedCallback = handleWriteCharacteristicFailedCallback)
             Timber.d("service onCreate")
 
             // Listen to BLE state changes
@@ -623,7 +634,7 @@ class CommService : WearableListenerService(), GoogleApiClient.ConnectionCallbac
             }
             "/to-phone/write-characteristic-failed-callback" -> {
                 Timber.i("writeCharacteristicFailedCallback from message")
-                handleWriteCharacteristicFailedCallback()
+                handleWriteCharacteristicFailedCallback(String(messageEvent.data))
             }
             "/to-pump/command" -> {
                 sendPumpCommMessage(messageEvent.data)
@@ -686,6 +697,8 @@ class CommService : WearableListenerService(), GoogleApiClient.ConnectionCallbac
 
     private data class DisplayablePumpData(
         var statusText: String = "Initializing...",
+        var connectionTime: Instant? = null,
+        var lastMessageTime: Instant? = null,
         var batteryPercent: Int? = null,
         var iobUnits: Double? = null,
         var cartridgeRemainingUnits: Int? = null,
@@ -710,6 +723,7 @@ class CommService : WearableListenerService(), GoogleApiClient.ConnectionCallbac
         }
 
         if (changed) {
+            currentPumpData.lastMessageTime = Instant.now()
             updateNotification()
         }
     }
@@ -763,10 +777,11 @@ class CommService : WearableListenerService(), GoogleApiClient.ConnectionCallbac
         }
     }
 
-    private fun handleWriteCharacteristicFailedCallback() {
-        Timber.i("handleWriteCharacteristicFailedCallback")
+    private val handleWriteCharacteristicFailedCallback: (String) -> Unit = { uuid ->
+        Timber.i("handleWriteCharacteristicFailedCallback($uuid)")
         pumpCommHandler?.obtainMessage()?.also { msg ->
             msg.what = CommServiceCodes.WRITE_CHARACTERISTIC_FAILED_CALLBACK.ordinal
+            msg.obj = uuid
             pumpCommHandler?.sendMessage(msg)
         }
     }
@@ -875,6 +890,15 @@ class CommService : WearableListenerService(), GoogleApiClient.ConnectionCallbac
             notificationChannelId
         )
 
+        var title = "WearX2: ${currentPumpData.statusText}"
+        var atTime = currentPumpData.lastMessageTime
+        currentPumpData.connectionTime?.let {
+            if (atTime == null || it.isAfter(atTime)) atTime = it
+        }
+        atTime?.let {
+            title += " at ${shortTime(it)}"
+        }
+
         var contentText = ""
         if (currentPumpData.batteryPercent != null) {
             contentText += "Battery: ${currentPumpData.batteryPercent}%\u00A0\u00A0\u00A0"
@@ -885,9 +909,12 @@ class CommService : WearableListenerService(), GoogleApiClient.ConnectionCallbac
         if (currentPumpData.cartridgeRemainingUnits != null) {
             contentText += "Cartridge: ${currentPumpData.cartridgeRemainingUnits}u"
         }
+        currentPumpData.connectionTime?.let {
+            contentText += "    \nConnection established at: ${shortTime(it)}"
+        }
 
         return builder
-            .setContentTitle("WearX2: ${currentPumpData.statusText}")
+            .setContentTitle(title)
             .setContentText(contentText)
             .setContentIntent(pendingIntent)
             .setSmallIcon(Icon.createWithResource(this, R.drawable.pump_notif_1d))

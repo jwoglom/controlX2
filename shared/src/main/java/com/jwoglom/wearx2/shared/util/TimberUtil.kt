@@ -9,7 +9,7 @@ import java.util.function.Consumer
 
 fun setupTimber(
     prefix: String,
-    writeCharacteristicFailedCallback: () -> Unit = {},
+    writeCharacteristicFailedCallback: (String) -> Unit = {},
 ) {
     if (Timber.treeCount == 0) {
         Timber.plant(DebugTree(prefix, writeCharacteristicFailedCallback))

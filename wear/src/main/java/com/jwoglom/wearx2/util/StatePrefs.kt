@@ -14,6 +14,12 @@ class StatePrefs(val context: Context) {
             set("pumpBattery", value)
         }
 
+    var pumpIOB: Pair<String, Instant>?
+        get() = get("pumpIOB")
+        set(value) {
+            set("pumpIOB", value)
+        }
+
     private fun get(key: String): Pair<String, Instant>? {
         val s = prefs().getString("StatePrefs_${key}", "")
         val parts = s?.split(";;", limit = 2)

@@ -316,6 +316,7 @@ class MainActivity : ComponentActivity(), MessageApi.MessageListener, GoogleApiC
             }
             is ControlIQIOBResponse -> {
                 dataStore.iobUnits.value = InsulinUnit.from1000To1(message.pumpDisplayedIOB)
+                StatePrefs(this).pumpIOB = Pair("${InsulinUnit.from1000To1(message.pumpDisplayedIOB)}", Instant.now())
             }
             is ControlIQInfoAbstractResponse -> {
                 dataStore.controlIQMode.value = when (message.currentUserModeType) {
