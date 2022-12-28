@@ -3,9 +3,13 @@ package com.jwoglom.wearx2
 import android.app.ActivityManager
 import android.app.ActivityManager.RunningAppProcessInfo.IMPORTANCE_FOREGROUND
 import android.app.ActivityManager.RunningAppProcessInfo.IMPORTANCE_VISIBLE
+import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
+import android.app.PendingIntent
+import android.content.Context
 import android.content.Intent
+import android.graphics.drawable.Icon
 import android.os.Bundle
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
@@ -22,6 +26,7 @@ import com.jwoglom.pumpx2.pump.messages.response.currentStatus.CurrentBatteryAbs
 import com.jwoglom.wearx2.presentation.navigation.Screen
 import com.jwoglom.wearx2.shared.PumpMessageSerializer
 import com.jwoglom.wearx2.shared.util.setupTimber
+import com.jwoglom.wearx2.shared.util.shortTime
 import com.jwoglom.wearx2.util.ConnectedState
 import com.jwoglom.wearx2.util.StatePrefs
 import timber.log.Timber
@@ -49,6 +54,51 @@ class PhoneCommService : WearableListenerService(), GoogleApiClient.ConnectionCa
         Timber.d("create: mApiClient: $mApiClient")
         mApiClient.connect()
 
+        updateNotification()
+    }
+
+    private fun updateNotification() {
+        var notification = createNotification()
+        startForeground(1, notification)
+    }
+
+    private fun createNotification(): Notification {
+        val notificationChannelId = "WearX2 Background Notification"
+
+        val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager;
+        val channel = NotificationChannel(
+            notificationChannelId,
+            "Endless Service notifications channel",
+            NotificationManager.IMPORTANCE_NONE
+        ).let {
+            it.description = "Endless Service channel"
+            it.setShowBadge(false)
+            it.lockscreenVisibility = 0
+
+            it
+        }
+        notificationManager.createNotificationChannel(channel)
+
+        val pendingIntent: PendingIntent =
+            Intent(this, MainActivity::class.java).let { notificationIntent ->
+                PendingIntent.getActivity(this, 0, notificationIntent,
+                    PendingIntent.FLAG_IMMUTABLE)
+            }
+
+        val builder: Notification.Builder = Notification.Builder(
+            this,
+            notificationChannelId
+        )
+
+        val title = "WearX2 is running: $connected"
+        return builder
+            .setContentTitle(title)
+            .setContentText(title)
+            .setContentIntent(pendingIntent)
+            .setSmallIcon(Icon.createWithResource(this, R.drawable.pump))
+            .setTicker(title)
+            .setPriority(Notification.PRIORITY_MAX) // for under android 26 compatibility
+            .build()
     }
 
     override fun onMessageReceived(messageEvent: MessageEvent) {
@@ -60,13 +110,16 @@ class PhoneCommService : WearableListenerService(), GoogleApiClient.ConnectionCa
                         .addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP)
                 )
             }
-//            "/from-pump/pump-connected" -> {
-//                currentlyConnected = true
-//            }
-//            "/from-pump/pump-disconnected" -> {
-//                currentlyConnected = false
-//                disconnectedNotification("pump disconnected")
-//            }
+            "/from-pump/pump-connected" -> {
+                connected = ConnectedState.PHONE_CONNECTED_PUMP_CONNECTED
+                StatePrefs(this).connected = Pair(connected.name, Instant.now())
+                updateNotification()
+            }
+            "/from-pump/pump-disconnected" -> {
+                connected = ConnectedState.PHONE_CONNECTED_PUMP_DISCONNECTED
+                StatePrefs(this).connected = Pair(connected.name, Instant.now())
+                updateNotification()
+            }
             "/to-wear/blocked-bolus-signature" -> {
                 Timber.w("PhoneCommService: blocked bolus signature")
                 Intent(applicationContext, MainActivity::class.java)
@@ -78,14 +131,6 @@ class PhoneCommService : WearableListenerService(), GoogleApiClient.ConnectionCa
                 Intent(applicationContext, MainActivity::class.java)
                     .addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP)
                     .putExtra("route", Screen.BolusNotEnabled.route)
-            }
-            "/from-pump/pump-connected" -> {
-                connected = ConnectedState.PHONE_CONNECTED_PUMP_CONNECTED
-                StatePrefs(this).connected = Pair(connected.name, Instant.now())
-            }
-            "/from-pump/pump-disconnected" -> {
-                connected = ConnectedState.PHONE_CONNECTED_PUMP_DISCONNECTED
-                StatePrefs(this).connected = Pair(connected.name, Instant.now())
             }
             "/from-pump/receive-message" -> {
                 val pumpMessage = PumpMessageSerializer.fromBytes(messageEvent.data)
@@ -117,6 +162,7 @@ class PhoneCommService : WearableListenerService(), GoogleApiClient.ConnectionCa
         connected = ConnectedState.PHONE_DISCONNECTED
         StatePrefs(this).connected = Pair(connected.name, Instant.now())
         // disconnectedNotification("phone disconnected")
+        updateNotification()
     }
 
     override fun onConnected(bundle: Bundle?) {
