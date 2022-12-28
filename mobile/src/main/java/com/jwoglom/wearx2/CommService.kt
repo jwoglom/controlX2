@@ -24,7 +24,6 @@ import com.google.android.gms.common.ConnectionResult
 import com.google.android.gms.common.api.GoogleApiClient
 import com.google.android.gms.wearable.MessageEvent
 import com.google.android.gms.wearable.Node
-import com.google.android.gms.wearable.PutDataRequest
 import com.google.android.gms.wearable.Wearable
 import com.google.android.gms.wearable.WearableListenerService
 import com.jwoglom.pumpx2.pump.PumpState
@@ -62,7 +61,6 @@ import com.jwoglom.wearx2.shared.CommServiceCodes
 import com.jwoglom.wearx2.shared.util.setupTimber
 import com.jwoglom.wearx2.shared.util.shortTime
 import com.jwoglom.wearx2.shared.util.twoDecimalPlaces
-import com.jwoglom.wearx2.util.StateWearableApi
 import com.welie.blessed.BluetoothPeripheral
 import com.welie.blessed.HciStatus
 import kotlinx.coroutines.CoroutineScope
@@ -229,7 +227,6 @@ class CommService : WearableListenerService(), GoogleApiClient.ConnectionCallbac
                     peripheral?.name!!.toByteArray()
                 )
                 currentPumpData.connectionTime = Instant.now()
-                StateWearableApi(mApiClient).connected = Pair("true", Instant.now())
                 updateNotification("Connected to pump")
             }
 
@@ -255,7 +252,6 @@ class CommService : WearableListenerService(), GoogleApiClient.ConnectionCallbac
                 )
                 currentPumpData.connectionTime = Instant.now()
                 updateNotification("Disconnected from pump")
-                StateWearableApi(mApiClient).connected = Pair("false", Instant.now())
                 return super.onPumpDisconnected(peripheral, status)
             }
 
@@ -744,19 +740,16 @@ class CommService : WearableListenerService(), GoogleApiClient.ConnectionCallbac
         var changed = false
         when (message) {
             is CurrentBatteryAbstractResponse -> {
-                changed = true
+                changed = currentPumpData.batteryPercent != message.batteryPercent
                 currentPumpData.batteryPercent = message.batteryPercent
-                StateWearableApi(mApiClient).pumpBattery = Pair("${message.batteryPercent}", Instant.now())
             }
             is ControlIQIOBResponse -> {
-                changed = true
+                changed = currentPumpData.iobUnits != InsulinUnit.from1000To1(message.pumpDisplayedIOB)
                 currentPumpData.iobUnits = InsulinUnit.from1000To1(message.pumpDisplayedIOB)
-                StateWearableApi(mApiClient).pumpIOB = Pair("${message.pumpDisplayedIOB}", Instant.now())
             }
             is InsulinStatusResponse -> {
-                changed = true
+                changed = currentPumpData.cartridgeRemainingUnits != message.currentInsulinAmount
                 currentPumpData.cartridgeRemainingUnits = message.currentInsulinAmount
-                // todo: StateWearableApi
             }
         }
 
