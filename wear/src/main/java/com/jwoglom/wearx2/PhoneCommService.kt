@@ -29,6 +29,8 @@ import com.jwoglom.wearx2.shared.util.setupTimber
 import com.jwoglom.wearx2.shared.util.shortTime
 import com.jwoglom.wearx2.util.ConnectedState
 import com.jwoglom.wearx2.util.StatePrefs
+import com.jwoglom.wearx2.util.UpdateComplication
+import com.jwoglom.wearx2.util.WearX2Complication
 import timber.log.Timber
 import java.time.Instant
 
@@ -144,9 +146,11 @@ class PhoneCommService : WearableListenerService(), GoogleApiClient.ConnectionCa
         when (message) {
             is CurrentBatteryAbstractResponse -> {
                 StatePrefs(this).pumpBattery = Pair("${message.batteryPercent}", Instant.now())
+                UpdateComplication(this, WearX2Complication.PUMP_BATTERY)
             }
             is ControlIQIOBResponse -> {
                 StatePrefs(this).pumpIOB = Pair("${InsulinUnit.from1000To1(message.pumpDisplayedIOB)}", Instant.now())
+                UpdateComplication(this, WearX2Complication.PUMP_IOB)
             }
         }
     }
