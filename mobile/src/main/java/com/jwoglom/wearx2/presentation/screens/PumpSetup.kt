@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material.IconButton
 import androidx.compose.material.ProgressIndicatorDefaults
 import androidx.compose.material3.Button
 import androidx.compose.material3.LinearProgressIndicator
@@ -53,6 +54,7 @@ import com.jwoglom.wearx2.presentation.components.Line
 import com.jwoglom.wearx2.presentation.components.PumpSetupStageDescription
 import com.jwoglom.wearx2.presentation.components.PumpSetupStageProgress
 import com.jwoglom.wearx2.presentation.navigation.Screen
+import com.jwoglom.wearx2.presentation.screens.sections.Settings
 import com.jwoglom.wearx2.presentation.theme.WearX2Theme
 import timber.log.Timber
 

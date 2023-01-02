@@ -24,6 +24,7 @@ import com.jwoglom.wearx2.presentation.theme.Colors
 fun DialogScreen(
     title: String,
     buttonContent: @Composable RowScope.() -> Unit,
+    actionContent: @Composable RowScope.() -> Unit = {},
     content: LazyListScope.() -> Unit,
 ) {
     Scaffold(
@@ -32,6 +33,7 @@ fun DialogScreen(
                 title = {
                     Text(title)
                 },
+                actions = actionContent,
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = Colors.primary)
             )
         },

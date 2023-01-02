@@ -337,6 +337,9 @@ class CommService : WearableListenerService(), GoogleApiClient.ConnectionCallbac
                         }
                     }
                 }
+                CommServiceCodes.STOP_PUMP_COMM.ordinal -> {
+                    tandemBTHandler.stop()
+                }
                 CommServiceCodes.CHECK_PUMP_CONNECTED.ordinal -> {
                     if (pumpConnectedPrecondition()) {
                         sendWearCommMessage("/from-pump/pump-connected",
@@ -618,7 +621,7 @@ class CommService : WearableListenerService(), GoogleApiClient.ConnectionCallbac
             }
             "/to-phone/stop-comm" -> {
                 Timber.w("stop-comm")
-                Runtime.getRuntime().exit(0)
+                sendStopPumpComm()
             }
             "/to-phone/is-pump-connected" -> {
                 sendCheckPumpConnected()
@@ -810,6 +813,12 @@ class CommService : WearableListenerService(), GoogleApiClient.ConnectionCallbac
     private fun handleDebugGetMessageCache() {
         pumpCommHandler?.obtainMessage()?.also { msg ->
             msg.what = CommServiceCodes.DEBUG_GET_MESSAGE_CACHE.ordinal
+            pumpCommHandler?.sendMessage(msg)
+        }
+    }
+    private fun sendStopPumpComm() {
+        pumpCommHandler?.obtainMessage()?.also { msg ->
+            msg.what = CommServiceCodes.STOP_PUMP_COMM.ordinal
             pumpCommHandler?.sendMessage(msg)
         }
     }

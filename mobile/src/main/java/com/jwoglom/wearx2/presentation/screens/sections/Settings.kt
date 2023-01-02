@@ -9,11 +9,9 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.material.Button
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Divider
@@ -32,14 +30,14 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavHostController
 import com.jwoglom.pumpx2.pump.messages.Message
-import com.jwoglom.wearx2.LocalDataStore
 import com.jwoglom.wearx2.Prefs
 import com.jwoglom.wearx2.R
 import com.jwoglom.wearx2.presentation.navigation.Screen
-import com.jwoglom.wearx2.presentation.screens.setUpPreviewState
 import com.jwoglom.wearx2.presentation.theme.WearX2Theme
 import com.jwoglom.wearx2.shared.util.SendType
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 @Composable
 fun Settings(
@@ -71,7 +69,12 @@ fun Settings(
                         },
                         modifier = Modifier.clickable {
                             Prefs(context).setServiceEnabled(false)
-                            sendMessage("/to-phone/stop-comm", "".toByteArray())
+                            coroutineScope.launch {
+                                withContext(Dispatchers.IO) {
+                                    Thread.sleep(250)
+                                }
+                                sendMessage("/to-phone/force-reload", "".toByteArray())
+                            }
                         }
                     )
                 } else {
@@ -86,7 +89,12 @@ fun Settings(
                         },
                         modifier = Modifier.clickable {
                             Prefs(context).setServiceEnabled(true)
-                            sendMessage("/to-phone/start-comm", "".toByteArray())
+                            coroutineScope.launch {
+                                withContext(Dispatchers.IO) {
+                                    Thread.sleep(250)
+                                }
+                                sendMessage("/to-phone/force-reload", "".toByteArray())
+                            }
                         }
                     )
                 }
@@ -105,7 +113,12 @@ fun Settings(
                         },
                         modifier = Modifier.clickable {
                             Prefs(context).setConnectionSharingEnabled(false)
-                            sendMessage("/to-phone/force-reload", "".toByteArray())
+                            coroutineScope.launch {
+                                withContext(Dispatchers.IO) {
+                                    Thread.sleep(250)
+                                }
+                                sendMessage("/to-phone/force-reload", "".toByteArray())
+                            }
                         }
                     )
                 } else {
@@ -120,7 +133,12 @@ fun Settings(
                         },
                         modifier = Modifier.clickable {
                             Prefs(context).setConnectionSharingEnabled(false)
-                            sendMessage("/to-phone/force-reload", "".toByteArray())
+                            coroutineScope.launch {
+                                withContext(Dispatchers.IO) {
+                                    Thread.sleep(250)
+                                }
+                                sendMessage("/to-phone/force-reload", "".toByteArray())
+                            }
                         }
                     )
                 }
@@ -159,6 +177,9 @@ fun Settings(
                     modifier = Modifier.clickable {
                         Prefs(context).setPumpSetupComplete(false)
                         coroutineScope.launch {
+                            withContext(Dispatchers.IO) {
+                                Thread.sleep(250)
+                            }
                             sendMessage(
                                 "/to-phone/app-reload",
                                 "".toByteArray()
