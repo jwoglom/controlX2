@@ -75,9 +75,9 @@ import kotlinx.coroutines.launch
 
 @Composable
 fun Landing(
-    navController: NavHostController? = null,
-    sendMessage: (String, ByteArray) -> Unit,
-    sendPumpCommands: (SendType, List<Message>) -> Unit,
+        navController: NavHostController? = null,
+        sendMessage: (String, ByteArray) -> Unit,
+        sendPumpCommands: (SendType, List<Message>) -> Unit,
     sectionState: LandingSection = LandingSection.DASHBOARD,
     bolusSheetState: BottomSheetValue = BottomSheetValue.Collapsed,
 ) {
@@ -151,7 +151,11 @@ fun Landing(
                         content = {
                             item {
                                 if (displayBolusWindow.bottomSheetState.isExpanded || displayBolusWindow.bottomSheetState.isAnimationRunning) {
-                                    BolusWindow()
+                                    BolusWindow(
+                                        navController = navController,
+                                        sendMessage = sendMessage,
+                                        sendPumpCommands = sendPumpCommands,
+                                    )
                                 }
                             }
                             item {
