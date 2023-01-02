@@ -2,16 +2,7 @@ package com.jwoglom.wearx2.presentation
 
 import androidx.lifecycle.MutableLiveData
 import com.jwoglom.pumpx2.pump.messages.Message
-import com.jwoglom.pumpx2.pump.messages.calculator.BolusCalcCondition
-import com.jwoglom.pumpx2.pump.messages.calculator.BolusCalcUnits
-import com.jwoglom.pumpx2.pump.messages.calculator.BolusCalculatorBuilder
-import com.jwoglom.pumpx2.pump.messages.calculator.BolusParameters
-import com.jwoglom.pumpx2.pump.messages.response.control.BolusPermissionResponse
-import com.jwoglom.pumpx2.pump.messages.response.control.CancelBolusResponse
-import com.jwoglom.pumpx2.pump.messages.response.control.InitiateBolusResponse
-import com.jwoglom.pumpx2.pump.messages.response.control.RemoteCarbEntryResponse
 import com.jwoglom.pumpx2.pump.messages.response.currentStatus.BolusCalcDataSnapshotResponse
-import com.jwoglom.pumpx2.pump.messages.response.currentStatus.CurrentBolusStatusResponse
 import com.jwoglom.pumpx2.pump.messages.response.currentStatus.LastBGResponse
 import com.jwoglom.wearx2.presentation.screens.PumpSetupStage
 import timber.log.Timber
@@ -51,21 +42,6 @@ class DataStore {
     val landingBasalDisplayedText = MutableLiveData<String>()
     val landingControlIQDisplayedText = MutableLiveData<String>()
 
-    val bolusUnitsDisplayedText = MutableLiveData<String>()
-    val bolusBGDisplayedText = MutableLiveData<String>()
-
-    val bolusCalculatorBuilder = MutableLiveData<BolusCalculatorBuilder>()
-    val bolusCurrentParameters = MutableLiveData<BolusParameters>()
-    val bolusFinalParameters = MutableLiveData<BolusParameters>()
-    val bolusFinalCalcUnits = MutableLiveData<BolusCalcUnits>()
-    val bolusFinalConditions = MutableLiveData<Set<BolusCalcCondition>>()
-
-    val bolusPermissionResponse = MutableLiveData<BolusPermissionResponse>()
-    val bolusCarbEntryResponse = MutableLiveData<RemoteCarbEntryResponse>()
-    val bolusInitiateResponse = MutableLiveData<InitiateBolusResponse>()
-    val bolusCancelResponse = MutableLiveData<CancelBolusResponse>()
-    val bolusCurrentResponse = MutableLiveData<CurrentBolusStatusResponse>()
-
     val debugMessageCache = MutableLiveData<List<Pair<Message, Instant>>>()
     val debugPromptAwaitingResponses = MutableLiveData<MutableSet<String>>()
 
@@ -102,21 +78,6 @@ class DataStore {
 
         landingBasalDisplayedText.observeForever { t -> Timber.i("DataStore.landingBasalDisplayedText=$t") }
         landingControlIQDisplayedText.observeForever { t -> Timber.i("DataStore.landingControlIQDisplayedText=$t") }
-
-        bolusUnitsDisplayedText.observeForever { t -> Timber.i("DataStore.bolusUnitsDisplayedText=$t") }
-        bolusBGDisplayedText.observeForever { t -> Timber.i("DataStore.bolusBGDisplayedText=$t") }
-
-        bolusCalculatorBuilder.observeForever { t -> Timber.i("DataStore.bolusCalculatorBuilder=$t") }
-        bolusCurrentParameters.observeForever { t -> Timber.i("DataStore.bolusCurrentParameters=$t") }
-        bolusFinalParameters.observeForever { t -> Timber.i("DataStore.bolusFinalParameters=$t") }
-        bolusFinalCalcUnits.observeForever { t -> Timber.i("DataStore.bolusFinalCalcUnits=$t") }
-        bolusFinalConditions.observeForever { t -> Timber.i("DataStore.bolusFinalConditions=$t") }
-
-        bolusPermissionResponse.observeForever { t -> Timber.i("DataStore.bolusPermissionResponse=$t") }
-        bolusCarbEntryResponse.observeForever { t -> Timber.i("DataStore.bolusCarbEntryResponse=$t") }
-        bolusInitiateResponse.observeForever { t -> Timber.i("DataStore.bolusInitiateResponse=$t") }
-        bolusCancelResponse.observeForever { t -> Timber.i("DataStore.bolusCancelResponse=$t") }
-        bolusCurrentResponse.observeForever { t -> Timber.i("DataStore.bolusCurrentResponse=$t") }
 
         debugMessageCache.observeForever { t -> Timber.i("DataStore.debugMessageCache=$t") }
         debugPromptAwaitingResponses.observeForever { t -> Timber.i("DataStore.debugPromptAwaitingResponses=$t") }
