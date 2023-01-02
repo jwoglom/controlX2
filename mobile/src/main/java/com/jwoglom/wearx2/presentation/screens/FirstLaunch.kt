@@ -53,7 +53,9 @@ fun FirstLaunch(
                 text = """
                             This application is for EXPERIMENTAL USE ONLY and can be used to MODIFY ACTIVE INSULIN DELIVERY ON YOUR INSULIN PUMP.
 
-                            There is NO WARRANTY IMPLIED OR EXPRESSED DUE TO USE OF THIS SOFTWARE. YOU ASSUME ALL RISK FOR ANY MALFUNCTIONS, BUGS, OR INSULIN DELIVERY ACTIONS.
+                            It is NOT AFFILIATED WITH OR SUPPORTED by Tandem, Dexcom, or any other manufacturer. It has not been officially approved for use and is provided as a RESEARCH TOOL ONLY.
+
+                            There is NO WARRANTY IMPLIED OR EXPRESSED DUE TO USE OF THIS SOFTWARE. YOU ASSUME ALL RISK FOR ANY MALFUNCTIONS, BUGS, OR INSULIN DELIVERY ACTIONS. 
                         """.trimIndent(),
                 style = MaterialTheme.typography.bodyLarge,
                 modifier = Modifier
