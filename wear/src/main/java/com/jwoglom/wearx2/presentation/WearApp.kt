@@ -63,6 +63,8 @@ import com.jwoglom.pumpx2.pump.messages.Message
 import com.jwoglom.pumpx2.pump.messages.calculator.BolusCalcUnits
 import com.jwoglom.pumpx2.pump.messages.calculator.BolusParameters
 import com.jwoglom.pumpx2.pump.messages.request.currentStatus.GlobalMaxBolusSettingsRequest
+import com.jwoglom.pumpx2.pump.messages.response.currentStatus.BolusCalcDataSnapshotResponse
+import com.jwoglom.pumpx2.pump.messages.response.currentStatus.TimeSinceResetResponse
 import com.jwoglom.wearx2.LocalDataStore
 import com.jwoglom.wearx2.R
 import com.jwoglom.wearx2.presentation.components.BottomText
@@ -87,7 +89,7 @@ fun WearApp(
     modifier: Modifier = Modifier,
     navController: NavHostController = rememberSwipeDismissableNavController(),
     sendPumpCommands: (SendType, List<Message>) -> Unit,
-    sendPhoneBolusRequest: (Int, BolusParameters, BolusCalcUnits, Double) -> Unit,
+    sendPhoneBolusRequest: (Int, BolusParameters, BolusCalcUnits, BolusCalcDataSnapshotResponse, TimeSinceResetResponse) -> Unit,
     sendPhoneBolusCancel: () -> Unit,
     sendPhoneConnectionCheck: () -> Unit,
     sendPhoneCommand: (String) -> Unit,

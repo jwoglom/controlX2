@@ -12,6 +12,7 @@ import com.jwoglom.pumpx2.pump.messages.response.control.RemoteCarbEntryResponse
 import com.jwoglom.pumpx2.pump.messages.response.currentStatus.BolusCalcDataSnapshotResponse
 import com.jwoglom.pumpx2.pump.messages.response.currentStatus.CurrentBolusStatusResponse
 import com.jwoglom.pumpx2.pump.messages.response.currentStatus.LastBGResponse
+import com.jwoglom.pumpx2.pump.messages.response.currentStatus.TimeSinceResetResponse
 import timber.log.Timber
 
 class DataStore {
@@ -50,6 +51,7 @@ class DataStore {
     val bolusFinalCalcUnits = MutableLiveData<BolusCalcUnits>()
     val bolusFinalConditions = MutableLiveData<Set<BolusCalcCondition>>()
 
+    val timeSinceResetResponse = MutableLiveData<TimeSinceResetResponse>()
     val bolusPermissionResponse = MutableLiveData<BolusPermissionResponse>()
     val bolusCarbEntryResponse = MutableLiveData<RemoteCarbEntryResponse>()
     val bolusInitiateResponse = MutableLiveData<InitiateBolusResponse>()
@@ -92,6 +94,7 @@ class DataStore {
         bolusFinalCalcUnits.observeForever { t -> Timber.i("DataStore.bolusFinalCalcUnits=$t") }
         bolusFinalConditions.observeForever { t -> Timber.i("DataStore.bolusFinalConditions=$t") }
 
+        timeSinceResetResponse.observeForever { t -> Timber.i("DataStore.timeSinceResetResponse=$t") }
         bolusPermissionResponse.observeForever { t -> Timber.i("DataStore.bolusPermissionResponse=$t") }
         bolusCarbEntryResponse.observeForever { t -> Timber.i("DataStore.bolusCarbEntryResponse=$t") }
         bolusInitiateResponse.observeForever { t -> Timber.i("DataStore.bolusInitiateResponse=$t") }

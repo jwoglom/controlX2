@@ -67,6 +67,7 @@ import com.jwoglom.pumpx2.pump.messages.response.control.CancelBolusResponse.Can
 import com.jwoglom.pumpx2.pump.messages.response.currentStatus.BolusCalcDataSnapshotResponse
 import com.jwoglom.pumpx2.pump.messages.response.currentStatus.CurrentBolusStatusResponse.CurrentBolusStatus
 import com.jwoglom.pumpx2.pump.messages.response.currentStatus.LastBGResponse
+import com.jwoglom.pumpx2.pump.messages.response.currentStatus.TimeSinceResetResponse
 import com.jwoglom.wearx2.LocalDataStore
 import com.jwoglom.wearx2.R
 import com.jwoglom.wearx2.presentation.DataStore
@@ -95,7 +96,7 @@ fun BolusScreen(
     onClickBG: () -> Unit,
     onClickLanding: () -> Unit,
     sendPumpCommands: (SendType, List<Message>) -> Unit,
-    sendPhoneBolusRequest: (Int, BolusParameters, BolusCalcUnits, Double) -> Unit,
+    sendPhoneBolusRequest: (Int, BolusParameters, BolusCalcUnits, BolusCalcDataSnapshotResponse, TimeSinceResetResponse) -> Unit,
     resetSavedBolusEnteredState: () -> Unit,
     sendPhoneBolusCancel: () -> Unit,
     modifier: Modifier = Modifier
@@ -436,17 +437,16 @@ fun BolusScreen(
             }
         }
 
-        fun sendBolusRequestToPhone(bolusParameters: BolusParameters?, unitBreakdown: BolusCalcUnits?) {
-            if (bolusParameters == null || dataStore.bolusPermissionResponse.value == null || dataStore.bolusCalcDataSnapshot.value == null || unitBreakdown == null) {
+        fun sendBolusRequestToPhone(bolusParameters: BolusParameters?, unitBreakdown: BolusCalcUnits?, dataSnapshot: BolusCalcDataSnapshotResponse?, timeSinceReset: TimeSinceResetResponse?) {
+            if (bolusParameters == null || dataStore.bolusPermissionResponse.value == null || dataStore.bolusCalcDataSnapshot.value == null || unitBreakdown == null || dataSnapshot == null || timeSinceReset == null) {
                 Timber.w("sendBolusRequestToPhone: null parameters")
                 return
             }
 
             val bolusId = dataStore.bolusPermissionResponse.value!!.bolusId
-            val iobUnits = InsulinUnit.from1000To1(dataStore.bolusCalcDataSnapshot.value!!.iob)
 
-            Timber.i("sendBolusRequestToPhone: sending bolus request to phone: bolusId=$bolusId bolusParameters=$bolusParameters unitBreakdown=$unitBreakdown iobUnits=$iobUnits")
-            sendPhoneBolusRequest(bolusId, bolusParameters, unitBreakdown, iobUnits)
+            Timber.i("sendBolusRequestToPhone: sending bolus request to phone: bolusId=$bolusId bolusParameters=$bolusParameters unitBreakdown=$unitBreakdown dataSnapshot=$dataSnapshot timeSinceReset=$timeSinceReset")
+            sendPhoneBolusRequest(bolusId, bolusParameters, unitBreakdown, dataSnapshot, timeSinceReset)
         }
 
         Dialog(
@@ -485,13 +485,18 @@ fun BolusScreen(
                 positiveButton = {
                     bolusFinalParameters.value?.let { finalParameters ->
                         bolusPermissionResponse.value?.let { permissionResponse ->
-                            if (permissionResponse.status == 0 && permissionResponse.nackReason == BolusPermissionResponse.NackReason.PERMISSION_GRANTED && finalParameters.units >= 0.05) {
+                            if (permissionResponse.isPermissionGranted && finalParameters.units >= 0.05) {
                                 Button(
                                     onClick = {
-                                        if (permissionResponse.status == 0 && permissionResponse.nackReason == BolusPermissionResponse.NackReason.PERMISSION_GRANTED && finalParameters.units >= 0.05) {
+                                        if (permissionResponse.isPermissionGranted && finalParameters.units >= 0.05) {
                                             showConfirmDialog = false
                                             showInProgressDialog = true
-                                            sendBolusRequestToPhone(dataStore.bolusFinalParameters.value, dataStore.bolusFinalCalcUnits.value)
+                                            sendBolusRequestToPhone(
+                                                dataStore.bolusFinalParameters.value,
+                                                dataStore.bolusFinalCalcUnits.value,
+                                                dataStore.bolusCalcDataSnapshot.value,
+                                                dataStore.timeSinceResetResponse.value,
+                                            )
                                         }
                                     },
                                     colors = ButtonDefaults.primaryButtonColors()

@@ -39,6 +39,7 @@ import com.jwoglom.pumpx2.pump.messages.models.ApiVersion
 import com.jwoglom.pumpx2.pump.messages.models.InsulinUnit
 import com.jwoglom.pumpx2.pump.messages.models.KnownApiVersion
 import com.jwoglom.pumpx2.pump.messages.request.control.InitiateBolusRequest
+import com.jwoglom.pumpx2.pump.messages.request.control.RemoteBgEntryRequest
 import com.jwoglom.pumpx2.pump.messages.request.control.RemoteCarbEntryRequest
 import com.jwoglom.pumpx2.pump.messages.request.currentStatus.ApiVersionRequest
 import com.jwoglom.pumpx2.pump.messages.request.currentStatus.ControlIQIOBRequest
@@ -440,18 +441,7 @@ class CommService : WearableListenerService(), GoogleApiClient.ConnectionCallbac
                             return
                         }
                         try {
-                            val bolusReq = pumpMsg as InitiateBolusRequest
-                            if (bolusReq.bolusCarbs > 0 && lastTimeSinceReset != null) {
-                                pump.command(
-                                    RemoteCarbEntryRequest(
-                                        bolusReq.bolusCarbs,
-                                        lastTimeSinceReset!!.currentTime,
-                                        bolusReq.bolusID
-                                    )
-                                )
-                            }
-
-                            pump.command(pumpMsg)
+                            pump.command(pumpMsg as InitiateBolusRequest)
                         } catch (e: Packetize.ActionsAffectingInsulinDeliveryNotEnabledInPumpX2Exception) {
                             Timber.e(e)
                             sendWearCommMessage("/to-wear/bolus-not-enabled", "from_pumpx2_lib".toByteArray())

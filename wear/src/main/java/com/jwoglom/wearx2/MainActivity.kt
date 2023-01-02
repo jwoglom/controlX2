@@ -27,6 +27,8 @@ import com.jwoglom.pumpx2.pump.messages.calculator.BolusCalcUnits
 import com.jwoglom.pumpx2.pump.messages.calculator.BolusParameters
 import com.jwoglom.pumpx2.pump.messages.models.InsulinUnit
 import com.jwoglom.pumpx2.pump.messages.request.control.InitiateBolusRequest
+import com.jwoglom.pumpx2.pump.messages.request.control.RemoteBgEntryRequest
+import com.jwoglom.pumpx2.pump.messages.request.control.RemoteCarbEntryRequest
 import com.jwoglom.pumpx2.pump.messages.response.control.BolusPermissionResponse
 import com.jwoglom.pumpx2.pump.messages.response.control.CancelBolusResponse
 import com.jwoglom.pumpx2.pump.messages.response.control.InitiateBolusResponse
@@ -50,6 +52,7 @@ import com.jwoglom.pumpx2.pump.messages.response.currentStatus.HomeScreenMirrorR
 import com.jwoglom.pumpx2.pump.messages.response.currentStatus.InsulinStatusResponse
 import com.jwoglom.pumpx2.pump.messages.response.currentStatus.LastBGResponse
 import com.jwoglom.pumpx2.pump.messages.response.currentStatus.LastBolusStatusAbstractResponse
+import com.jwoglom.pumpx2.pump.messages.response.currentStatus.TimeSinceResetResponse
 import com.jwoglom.pumpx2.pump.messages.response.historyLog.BolusDeliveryHistoryLog
 import com.jwoglom.pumpx2.pump.messages.response.qualifyingEvent.QualifyingEvent
 import com.jwoglom.wearx2.presentation.DataStore
@@ -68,7 +71,6 @@ import com.jwoglom.wearx2.shared.util.twoDecimalPlaces1000Unit
 import com.jwoglom.wearx2.util.StatePrefs
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.asExecutor
-import kotlinx.coroutines.guava.await
 import timber.log.Timber
 import java.time.Instant
 import java.time.temporal.ChronoUnit
@@ -106,12 +108,12 @@ class MainActivity : ComponentActivity(), MessageApi.MessageListener, GoogleApiC
                 this.sendMessage("/to-phone/is-pump-connected", "phone_connection_check".toByteArray())
             }
 
-            val sendPhoneBolusRequest: (Int, BolusParameters, BolusCalcUnits, Double) -> Unit = { bolusId, params, unitBreakdown, currentIob ->
+            val sendPhoneBolusRequest: (Int, BolusParameters, BolusCalcUnits, BolusCalcDataSnapshotResponse, TimeSinceResetResponse) -> Unit = { bolusId, params, unitBreakdown, dataSnapshot, timeSinceReset ->
                 val numUnits = InsulinUnit.from1To1000(params.units)
                 val numCarbs = params.carbsGrams
                 val bgValue = params.glucoseMgdl
 
-                var bolusTypes = mutableListOf(BolusDeliveryHistoryLog.BolusType.FOOD2)
+                val bolusTypes = mutableListOf(BolusDeliveryHistoryLog.BolusType.FOOD2)
 
                 val foodVolume = InsulinUnit.from1To1000(unitBreakdown.fromCarbs)
                 if (foodVolume > 0) {
@@ -125,8 +127,39 @@ class MainActivity : ComponentActivity(), MessageApi.MessageListener, GoogleApiC
                     corrVolume = 0 // negative correction volume is not passed through
                 }
 
-                val iobUnits = InsulinUnit.from1To1000(currentIob)
+                val preCommands: MutableList<Message> = mutableListOf()
+                if (bgValue > 0 && timeSinceReset.pumpTimeSecondsSinceReset > 0) {
+                    val autopopBg = when {
+                        !dataSnapshot.isAutopopAllowed -> false
+                        dataSnapshot.correctionFactor == 0 -> false
+                        bgValue != dataSnapshot.correctionFactor -> false
+                        else -> true
+                    }
+                    val remoteBgRequest = RemoteBgEntryRequest(
+                        bgValue,
+                        autopopBg,
+                        timeSinceReset.pumpTimeSecondsSinceReset,
+                        bolusId
+                    )
+                    Timber.i("sendPhoneBolusRequest: sending remoteBgRequest=$remoteBgRequest")
+                    preCommands.add(remoteBgRequest)
+                }
 
+                if (numCarbs > 0 && timeSinceReset.pumpTimeSecondsSinceReset > 0) {
+                    val remoteCarbRequest = RemoteCarbEntryRequest(
+                        numCarbs,
+                        timeSinceReset.pumpTimeSecondsSinceReset,
+                        bolusId
+                    )
+                    Timber.i("sendPhoneBolusRequest: sending remoteCarbRequest=$remoteCarbRequest")
+                    preCommands.add(remoteCarbRequest)
+                }
+
+                if (preCommands.isNotEmpty()) {
+                    this.sendPumpCommands(SendType.STANDARD, preCommands)
+                }
+
+                val iobUnits = dataSnapshot.iob
                 val bolusRequest = InitiateBolusRequest(
                     numUnits,
                     bolusId,
@@ -138,7 +171,7 @@ class MainActivity : ComponentActivity(), MessageApi.MessageListener, GoogleApiC
                     iobUnits
                 )
 
-                Timber.i("sendPhoneBolusRequest: numUnits=$numUnits numCarbs=$numCarbs bgValue=$bgValue foodVolume=$foodVolume corrVolume=$corrVolume iobUnits=$iobUnits: bolusRequest=$bolusRequest")
+                Timber.i("sendPhoneBolusRequest: numUnits=$numUnits numCarbs=$numCarbs bgValue=$bgValue foodVolume=$foodVolume corrVolume=$corrVolume iobUnits=$iobUnits: bolusRequest=$bolusRequest preCommands=$preCommands")
                 this.sendMessage("/to-phone/bolus-request", PumpMessageSerializer.toBytes(bolusRequest))
             }
 
@@ -449,6 +482,9 @@ class MainActivity : ComponentActivity(), MessageApi.MessageListener, GoogleApiC
             }
             is CurrentBolusStatusResponse -> {
                 dataStore.bolusCurrentResponse.value = message
+            }
+            is TimeSinceResetResponse -> {
+                dataStore.timeSinceResetResponse.value = message
             }
         }
     }
