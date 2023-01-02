@@ -171,7 +171,6 @@ fun Landing(
                 sheetPeekHeight = 0.dp,
                 backgroundColor = MaterialTheme.colorScheme.background,
             ) {
-                ServiceDisabledMessage()
                 when (selectedItem) {
                     LandingSection.DASHBOARD -> {
                         Dashboard(

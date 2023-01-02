@@ -43,12 +43,12 @@ fun ServiceDisabledMessage() {
     if (!enabled) {
         Card(Modifier.fillMaxWidth()) {
             Row(
-                modifier = Modifier.padding(16.dp)
+                modifier = Modifier.padding(8.dp)
             ) {
                 Icon(
                     imageVector = Icons.Filled.Close,
                     contentDescription = null,
-                    modifier = Modifier.size(32.dp)
+                    modifier = Modifier.size(48.dp).padding(8.dp)
                 )
                 Text(buildAnnotatedString {
                     withStyle(SpanStyle(fontWeight = FontWeight.Bold)) {
