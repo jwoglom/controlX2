@@ -52,6 +52,7 @@ import androidx.core.app.ShareCompat
 import androidx.navigation.NavHostController
 import com.google.common.base.Splitter
 import com.jwoglom.pumpx2.pump.messages.Message
+import com.jwoglom.pumpx2.pump.messages.annotations.HistoryLogProps
 import com.jwoglom.pumpx2.pump.messages.annotations.MessageProps
 import com.jwoglom.pumpx2.pump.messages.request.control.BolusPermissionReleaseRequest
 import com.jwoglom.pumpx2.pump.messages.request.control.BolusPermissionRequest
@@ -62,6 +63,7 @@ import com.jwoglom.pumpx2.pump.messages.request.currentStatus.HistoryLogRequest
 import com.jwoglom.pumpx2.pump.messages.request.currentStatus.IDPSegmentRequest
 import com.jwoglom.pumpx2.pump.messages.request.currentStatus.IDPSettingsRequest
 import com.jwoglom.pumpx2.pump.messages.response.historyLog.BolusDeliveryHistoryLog
+import com.jwoglom.pumpx2.pump.messages.response.historyLog.HistoryLog
 import com.jwoglom.pumpx2.pump.messages.util.MessageHelpers
 import com.jwoglom.pumpx2.shared.JavaHelpers
 import com.jwoglom.wearx2.LocalDataStore
@@ -85,6 +87,7 @@ fun Debug(
 ) {
     var showSendPumpMessageMenu by remember { mutableStateOf(false) }
     var showMessageCache by remember { mutableStateOf(false) }
+    var showHistoryLogs by remember { mutableStateOf(false) }
 
     val context = LocalContext.current
     val ds = LocalDataStore.current
@@ -319,6 +322,100 @@ fun Debug(
                     }
                 }
             }
+
+            item {
+                Divider()
+            }
+
+            item {
+                ListItem(
+                    headlineText = { Text("View History Log Messages") },
+                    supportingText = { Text("Displays pump history log messages") },
+                    leadingContent = {
+                        Icon(
+                            Icons.Filled.Build,
+                            contentDescription = null,
+                        )
+                    },
+                    modifier = Modifier.clickable {
+                        showHistoryLogs = true
+                    }
+                )
+
+                if (showHistoryLogs) {
+                    Popup(
+                        onDismissRequest = { showHistoryLogs = false }
+                    ) {
+//                        LaunchedEffect(Unit) {
+//                            sendMessage("/to-pump/debug-message-cache", "".toByteArray())
+//                        }
+
+                        val historyLogCache = ds.historyLogCache.observeAsState()
+                        Box(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .wrapContentSize(Alignment.TopStart)
+                                .background(Color.Black.copy(alpha = 0.5f))
+                        ) {
+                            LazyColumn {
+                                item {
+                                    Spacer(Modifier.height(64.dp))
+                                }
+                                item {
+                                    LazyRow(Modifier.fillMaxWidth()) {
+                                        item {
+                                            IconButton(
+                                                onClick = {
+                                                    showHistoryLogs = false
+                                                }
+                                            ) {
+                                                Icon(Icons.Filled.Close, contentDescription = "Close")
+                                            }
+                                        }
+                                        item {
+                                            Spacer(Modifier.width(16.dp))
+                                        }
+                                        item {
+                                            FilledTonalButton(
+                                                onClick = {
+                                                    historyLogCache.value?.let {
+                                                        shareTextContents(historyLogCacheToJson(it), "WearX2 History Log JSON data","text/json")
+                                                    }
+                                                }
+                                            ) {
+                                                Text("Export")
+                                            }
+                                        }
+                                    }
+                                }
+                                historyLogCache.value?.entries?.sortedBy {
+                                    it.key * -1
+                                }?.forEach { log ->
+                                    item {
+                                        ListItem(
+                                            headlineText = {
+//                                                // message name
+//                                                Text(shortPumpMessageTitle(log.value))
+                                            },
+                                            supportingText = {
+                                                // message detail
+                                                Text("${log.value}")
+                                            },
+                                            overlineText = {
+                                                // time
+                                                Text("${log.key}")
+                                            },
+                                            modifier = Modifier.clickable {
+                                                shareTextContents(historyLogToJson(log), "WearX2 History Log Event","text/json")
+                                            }
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
         }
     )
 }
@@ -400,7 +497,7 @@ fun triggerHistoryLogRequestDialog(
     builder.setTitle("Enter start log ID")
     builder.setMessage("Enter the ID of the first history log item to return from")
     val input1 = EditText(context)
-    input1.inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_NORMAL
+    input1.inputType = InputType.TYPE_CLASS_NUMBER or InputType.TYPE_NUMBER_VARIATION_NORMAL
     builder.setView(input1)
     builder.setPositiveButton("OK") { dialog, which ->
         val startLog = input1.text.toString()
@@ -409,7 +506,7 @@ fun triggerHistoryLogRequestDialog(
         builder2.setTitle("Enter number of logs ")
         builder2.setMessage("Enter the max number of logs to return")
         val input2 = EditText(context)
-        input2.inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_NORMAL
+        input2.inputType = InputType.TYPE_CLASS_NUMBER or InputType.TYPE_NUMBER_VARIATION_NORMAL
         builder2.setView(input2)
         builder2.setPositiveButton(
             "OK"
@@ -614,6 +711,38 @@ fun shortPumpMessageDetail(message: Message): String {
 
 fun verbosePumpMessage(message: Message): String {
     return message.verboseToString().replace("com.jwoglom.pumpx2.pump.messages.", "")
+}
+
+fun historyLogCacheToJson(cache: Map<Long, HistoryLog>): String {
+    val arr = JSONArray()
+    cache.entries.sortedBy {
+        it.key
+    }.forEach {
+        arr.put(JSONObject(historyLogToJson(it)))
+    }
+    return arr.toString()
+}
+
+fun historyLogMessagePropsToJson(props: HistoryLogProps?): JSONObject? {
+    if (props == null) {
+        return JSONObject()
+    }
+    val raw = props.toString().removePrefix("@com.jwoglom.pumpx2.pump.messages.annotations.HistoryLogProps(").removeSuffix(")")
+    val spl = Splitter.on(", ")
+        .withKeyValueSeparator('=')
+        .split(raw) as Map<*, *>?
+    return spl?.let { JSONObject(it) }
+}
+
+fun historyLogToJson(it: Map.Entry<Long, HistoryLog>): String {
+    val obj = JSONObject()
+    obj.put("historyLog", it.value.javaClass.name)
+    obj.put("props", historyLogMessagePropsToJson(it.value.props()))
+    obj.put("fields", JSONObject(JavaHelpers.autoToStringJson(it.value, setOf())))
+    obj.put("sequenceNum", it.key)
+    obj.put("pumpTimeSec", it.value.pumpTimeSec)
+    obj.put("pumpTime", it.value.pumpTimeSecInstant)
+    return obj.toString()
 }
 
 @Preview(showBackground = true)

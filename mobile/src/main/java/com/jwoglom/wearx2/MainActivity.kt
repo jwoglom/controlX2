@@ -43,6 +43,7 @@ import com.jwoglom.pumpx2.pump.messages.response.currentStatus.HomeScreenMirrorR
 import com.jwoglom.pumpx2.pump.messages.response.currentStatus.InsulinStatusResponse
 import com.jwoglom.pumpx2.pump.messages.response.currentStatus.LastBGResponse
 import com.jwoglom.pumpx2.pump.messages.response.currentStatus.LastBolusStatusAbstractResponse
+import com.jwoglom.pumpx2.pump.messages.response.historyLog.HistoryLogStreamResponse
 import com.jwoglom.wearx2.presentation.DataStore
 import com.jwoglom.wearx2.presentation.MobileApp
 import com.jwoglom.wearx2.presentation.navigation.Screen
@@ -465,6 +466,12 @@ class MainActivity : ComponentActivity(), GoogleApiClient.ConnectionCallbacks, G
                 dataStore.maxBolusAmount.value = message.maxBolus
             }
             // TODO: bolus
+            is HistoryLogStreamResponse -> {
+                message.historyLogs.forEach {
+                    Timber.d("added historyLog: ${it.sequenceNum}: $it")
+                    dataStore.historyLogCache.value?.put(it.sequenceNum, it)
+                }
+            }
         }
     }
 

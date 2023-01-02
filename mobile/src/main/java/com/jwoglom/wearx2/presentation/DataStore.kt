@@ -4,6 +4,7 @@ import androidx.lifecycle.MutableLiveData
 import com.jwoglom.pumpx2.pump.messages.Message
 import com.jwoglom.pumpx2.pump.messages.response.currentStatus.BolusCalcDataSnapshotResponse
 import com.jwoglom.pumpx2.pump.messages.response.currentStatus.LastBGResponse
+import com.jwoglom.pumpx2.pump.messages.response.historyLog.HistoryLog
 import com.jwoglom.wearx2.presentation.screens.PumpSetupStage
 import timber.log.Timber
 import java.time.Instant
@@ -42,6 +43,7 @@ class DataStore {
     val landingBasalDisplayedText = MutableLiveData<String>()
     val landingControlIQDisplayedText = MutableLiveData<String>()
 
+    val historyLogCache = MutableLiveData<MutableMap<Long, HistoryLog>>(mutableMapOf())
     val debugMessageCache = MutableLiveData<List<Pair<Message, Instant>>>()
     val debugPromptAwaitingResponses = MutableLiveData<MutableSet<String>>()
 
@@ -79,6 +81,7 @@ class DataStore {
         landingBasalDisplayedText.observeForever { t -> Timber.i("DataStore.landingBasalDisplayedText=$t") }
         landingControlIQDisplayedText.observeForever { t -> Timber.i("DataStore.landingControlIQDisplayedText=$t") }
 
+        historyLogCache.observeForever { t -> Timber.i("DataStore.historyLogCache=$t") }
         debugMessageCache.observeForever { t -> Timber.i("DataStore.debugMessageCache=$t") }
         debugPromptAwaitingResponses.observeForever { t -> Timber.i("DataStore.debugPromptAwaitingResponses=$t") }
     }
