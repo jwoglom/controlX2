@@ -12,12 +12,14 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import com.jwoglom.wearx2.LocalDataStore
+import com.jwoglom.wearx2.Prefs
 import com.jwoglom.wearx2.presentation.screens.PumpSetupStage
 import com.jwoglom.wearx2.shared.presentation.intervalOf
 import timber.log.Timber
@@ -29,6 +31,7 @@ fun PumpSetupStageDescription(
     initialSetup: Boolean = false,
     pairingCodeStage: @Composable () -> Unit = {},
 ) {
+    val context = LocalContext.current
     val ds = LocalDataStore.current
     val setupStage = ds.pumpSetupStage.observeAsState()
     val setupDeviceName = ds.setupDeviceName.observeAsState()
@@ -53,7 +56,9 @@ fun PumpSetupStageDescription(
             Line("Notification permissions weren't granted, which are needed to make remote boluses.")
         }
         PumpSetupStage.WAITING_PUMPX2_INIT -> {
-            Line("Waiting for library initialization...")
+            if (Prefs(context).serviceEnabled()) {
+                Line("Waiting for library initialization...")
+            }
         }
         PumpSetupStage.PUMPX2_SEARCHING_FOR_PUMP -> {
             if (initialSetup) {
@@ -119,11 +124,21 @@ fun PumpSetupStageDescription(
         if (pumpConnectionWaitingSeconds > TroubleshootingStepsThresholdSeconds) {
             Spacer(Modifier.height(16.dp))
             Line("Troubleshooting Steps:", bold = true)
-            Line("1. Toggle Bluetooth on and off.")
-            Line("2. If the t:connect Android application is open, force-stop it: long-press the app, select App Info, then 'Force Stop'")
-            Line("3. Open your pump and select:")
-            Line("Options > Device Settings > Bluetooth Settings", bold = true)
-            Line("Disable and then re-enable 'Mobile Connection'")
+            when (setupStage.value) {
+                PumpSetupStage.WAITING_PUMPX2_INIT -> {
+                    Line("1. Toggle Bluetooth on and off.")
+                    Line("2. Restart the WearX2 app: open the app switcher and long-press on the app icon to open the App Info page, then click 'Force Stop' followed by 'Open'")
+                    Line("3. Ensure the WearX2 app has sufficient permissions: on the App Info page for WearX2, ensure that Bluetooth/Connected Devices-related permissions have been granted")
+                    Line("4. If everything still isn't working, hit 'Clear Data' on the App Info page which will reset the app's settings")
+                }
+                else -> {
+                    Line("1. Toggle Bluetooth on and off.")
+                    Line("2. If the t:connect Android application is open, force-stop it: long-press the app, select App Info, then 'Force Stop'")
+                    Line("3. Open your pump and select:")
+                    Line("Options > Device Settings > Bluetooth Settings", bold = true)
+                    Line("Disable and then re-enable 'Mobile Connection'")
+                }
+            }
         }
         Spacer(Modifier.height(16.dp))
         Divider()

@@ -588,6 +588,15 @@ class CommService : WearableListenerService(), GoogleApiClient.ConnectionCallbac
             registerReceiver(bleChangeReceiver, intentFilter)
 
 
+            if (!Prefs(applicationContext).tosAccepted()) {
+                Timber.w("commService is short-circuiting because first TOS not accepted")
+                return
+            } else if (!Prefs(applicationContext).serviceEnabled()) {
+                Timber.w("commService is short-circuiting because service not enabled")
+                return
+            }
+
+
             mApiClient = GoogleApiClient.Builder(applicationContext)
                 .addApi(Wearable.API)
                 .addConnectionCallbacks(this@CommService)

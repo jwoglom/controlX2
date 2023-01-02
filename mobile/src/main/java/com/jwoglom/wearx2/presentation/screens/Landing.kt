@@ -81,6 +81,7 @@ fun Landing(
     sectionState: LandingSection = LandingSection.DASHBOARD,
     bolusSheetState: BottomSheetValue = BottomSheetValue.Collapsed,
 ) {
+    val context = LocalContext.current
     val ds = LocalDataStore.current
     val coroutineScope = rememberCoroutineScope()
 
@@ -106,7 +107,10 @@ fun Landing(
                             modifier = Modifier.size(28.dp)
                         )
                         Text(
-                            "Disconnected, reconnecting...",
+                            when {
+                                Prefs(context).serviceEnabled() -> "Disconnected, reconnecting..."
+                                else -> "Service disabled"
+                             },
                             modifier = Modifier.padding(start = 36.dp)
                         )
                     } else {

@@ -1,7 +1,6 @@
 package com.jwoglom.wearx2
 
 import android.Manifest
-import android.R.attr.label
 import android.app.AlertDialog
 import android.bluetooth.BluetoothAdapter
 import android.bluetooth.BluetoothManager
@@ -92,13 +91,8 @@ class MainActivity : ComponentActivity(), GoogleApiClient.ConnectionCallbacks, G
 
         mApiClient.connect()
 
-        if (!Prefs(applicationContext).tosAccepted()) {
-            Timber.i("commService not started because first TOS not accepted")
-        } else if (!Prefs(applicationContext).serviceEnabled()) {
-            Timber.i("commService not started because service not enabled")
-        } else {
-            startCommService()
-        }
+
+        startCommServiceWithPreconditions()
     }
 
     private val writeCharacteristicFailedCallback: (String) -> Unit = { uuid ->
@@ -134,6 +128,15 @@ class MainActivity : ComponentActivity(), GoogleApiClient.ConnectionCallbacks, G
         super.onDestroy()
     }
 
+    private fun startCommServiceWithPreconditions() {
+        if (!Prefs(applicationContext).tosAccepted()) {
+            Timber.i("commService not started because first TOS not accepted")
+        } else if (!Prefs(applicationContext).serviceEnabled()) {
+            Timber.i("commService not started because service not enabled")
+        } else {
+            startCommService()
+        }
+    }
     private fun startCommService() {
         Timber.i("starting CommService")
         // Start CommService
@@ -222,7 +225,7 @@ class MainActivity : ComponentActivity(), GoogleApiClient.ConnectionCallbacks, G
                 when (String(messageEvent.data)) {
                     "skip_notif_permission" -> {
                         startBTPermissionsCheck()
-                        startCommService()
+                        startCommServiceWithPreconditions()
                         dataStore.pumpSetupStage.value =
                             dataStore.pumpSetupStage.value?.nextStage(PumpSetupStage.WAITING_PUMPX2_INIT)
                     }
@@ -230,7 +233,7 @@ class MainActivity : ComponentActivity(), GoogleApiClient.ConnectionCallbacks, G
                         requestNotificationCallback = { isGranted ->
                             if (isGranted) {
                                 startBTPermissionsCheck()
-                                startCommService()
+                                startCommServiceWithPreconditions()
                                 dataStore.pumpSetupStage.value =
                                     dataStore.pumpSetupStage.value?.nextStage(PumpSetupStage.WAITING_PUMPX2_INIT)
                             } else {
