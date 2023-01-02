@@ -93,7 +93,13 @@ fun Settings(
                                 withContext(Dispatchers.IO) {
                                     Thread.sleep(250)
                                 }
+                                // reload service, if running
                                 sendMessage("/to-phone/force-reload", "".toByteArray())
+                                withContext(Dispatchers.IO) {
+                                    Thread.sleep(250)
+                                    // reload main activity as fallback
+                                    sendMessage("/to-phone/app-reload", "".toByteArray())
+                                }
                             }
                         }
                     )
