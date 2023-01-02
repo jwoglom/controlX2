@@ -324,8 +324,13 @@ class CommService : WearableListenerService(), GoogleApiClient.ConnectionCallbac
                         return
                     }
                     Timber.i("pumpCommHandler: init_pump_comm")
-                    pump = Pump()
-                    tandemBTHandler = TandemBluetoothHandler.getInstance(applicationContext, pump, null)
+                    try {
+                        pump = Pump()
+                        tandemBTHandler =
+                            TandemBluetoothHandler.getInstance(applicationContext, pump, null)
+                    } catch (e: SecurityException) {
+                        Timber.e("pumpCommHandler: SecurityException starting pump $e")
+                    }
                     while (true) {
                         try {
                             Timber.i("pumpCommHandler: Starting scan...")

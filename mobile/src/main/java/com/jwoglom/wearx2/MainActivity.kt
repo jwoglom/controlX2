@@ -4,6 +4,7 @@ import android.Manifest
 import android.app.AlertDialog
 import android.bluetooth.BluetoothAdapter
 import android.bluetooth.BluetoothManager
+import android.content.ActivityNotFoundException
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.ComponentName
@@ -12,6 +13,7 @@ import android.content.Intent
 import android.content.ServiceConnection
 import android.content.pm.PackageManager
 import android.location.LocationManager
+import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.os.IBinder
@@ -23,6 +25,8 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.runtime.compositionLocalOf
 import androidx.core.app.ActivityCompat
 import com.google.android.gms.common.ConnectionResult
+import com.google.android.gms.common.GoogleApiAvailability
+import com.google.android.gms.common.GooglePlayServicesUtil
 import com.google.android.gms.common.api.GoogleApiClient
 import com.google.android.gms.wearable.MessageApi
 import com.google.android.gms.wearable.MessageEvent
@@ -61,6 +65,7 @@ import timber.log.Timber
 import java.time.Instant
 import java.time.temporal.ChronoUnit
 import java.util.*
+import kotlin.system.exitProcess
 
 
 var dataStore = DataStore()
@@ -84,6 +89,13 @@ class MainActivity : ComponentActivity(), GoogleApiClient.ConnectionCallbacks, G
             )
         }
 
+        reinitializeGoogleApiClient()
+
+
+        startCommServiceWithPreconditions()
+    }
+
+    private fun reinitializeGoogleApiClient() {
         mApiClient = GoogleApiClient.Builder(this)
             .addApi(Wearable.API)
             .addConnectionCallbacks(this)
@@ -91,9 +103,6 @@ class MainActivity : ComponentActivity(), GoogleApiClient.ConnectionCallbacks, G
             .build()
 
         mApiClient.connect()
-
-
-        startCommServiceWithPreconditions()
     }
 
     private val writeCharacteristicFailedCallback: (String) -> Unit = { uuid ->
@@ -164,6 +173,7 @@ class MainActivity : ComponentActivity(), GoogleApiClient.ConnectionCallbacks, G
     }
 
     override fun onConnected(bundle: Bundle?) {
+        connectionFailureCount = 0
         Timber.i("mobile onConnected $bundle")
         sendMessage("/to-wear/connected", "phone_launched".toByteArray())
         Wearable.MessageApi.addListener(mApiClient, this)
@@ -174,8 +184,49 @@ class MainActivity : ComponentActivity(), GoogleApiClient.ConnectionCallbacks, G
         mApiClient.reconnect()
     }
 
+    private var connectionFailureCount = 0
     override fun onConnectionFailed(result: ConnectionResult) {
-        Timber.i("mobile onConnectionFailed: $result")
+        Timber.i("mobile onConnectionFailed: $result connectionFailureCount=$connectionFailureCount")
+        if (!result.isSuccess) {
+            val apiAvail = GoogleApiAvailability.getInstance()
+            connectionFailureCount++
+            when (result.errorCode) {
+                ConnectionResult.API_UNAVAILABLE -> {
+                    AlertDialog.Builder(this)
+                        .setMessage(
+                            """The 'Wear OS' application is not installed on this device.
+                    This is required, even if not using a wearable, due to the current implementation of the app which uses these libraries.
+                    To resolve this issue, install the 'Wear OS' app from Google Play. This dependency will be removed in a later version.""".trimMargin()
+                        )
+                        .setNegativeButton("Cancel") { dialog, which ->
+
+                        }
+                        .setPositiveButton("OK") { dialog, which ->
+                            openPlayStore("com.google.android.wearable.app")
+                        }
+                        .show()
+                    return
+                }
+                else -> {
+                    if (connectionFailureCount > 3) {
+                        if (apiAvail.isUserResolvableError(result.errorCode)) {
+                            apiAvail.getErrorDialog(this, result.errorCode, 1000) {
+                                exitProcess(0)
+                            }?.show();
+                        } else {
+                            AlertDialog.Builder(this)
+                                .setTitle("Error connecting to Google Play Services")
+                                .setMessage("$result")
+                                .setPositiveButton("OK") { dialog, which -> dialog.cancel() }
+                                .show()
+                        }
+                    } else {
+                        reinitializeGoogleApiClient()
+                        return
+                    }
+                }
+            }
+        }
         mApiClient.reconnect()
     }
 
@@ -655,6 +706,14 @@ class MainActivity : ComponentActivity(), GoogleApiClient.ConnectionCallbacks, G
         val mainIntent = Intent.makeRestartActivityTask(componentName)
         context.startActivity(mainIntent)
         Runtime.getRuntime().exit(0)
+    }
+
+    private fun openPlayStore(pkg: String) {
+        try {
+            startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("market://details?id=$pkg")))
+        } catch (e: ActivityNotFoundException) {
+            startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://play.google.com/store/apps/details?id=$pkg")))
+        }
     }
 
     private fun determineStartDestination(): String {
