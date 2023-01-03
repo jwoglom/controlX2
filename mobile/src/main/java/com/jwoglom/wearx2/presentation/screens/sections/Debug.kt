@@ -192,13 +192,6 @@ fun Debug(
                                                 BolusPermissionReleaseRequest::class.java
                                             )
                                             return@DropdownMenuItem
-                                        } else if (className == BolusPermissionRequest::class.java.name) {
-                                            triggerMessageWithBolusIdParameter(
-                                                context,
-                                                sendPumpCommands,
-                                                BolusPermissionRequest::class.java
-                                            )
-                                            return@DropdownMenuItem
                                         }
                                         val clazz = Class.forName(className)
                                         Timber.i("Instantiated %s: %s", className, clazz)
