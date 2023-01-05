@@ -131,6 +131,7 @@ class CommService : WearableListenerService(), GoogleApiClient.ConnectionCallbac
                 events: MutableSet<QualifyingEvent>?
             ) {
                 Timber.i("onReceiveQualifyingEvent: $events")
+                Toast.makeText(this@CommService, "Events: $events", Toast.LENGTH_SHORT).show()
                 events?.forEach { event ->
                     event.suggestedHandlers.forEach {
                         Timber.i("onReceiveQualifyingEvent: running handler for $event message: ${it.get()}")

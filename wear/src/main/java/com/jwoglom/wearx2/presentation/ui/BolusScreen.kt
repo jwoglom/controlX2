@@ -596,7 +596,7 @@ fun BolusScreen(
             Alert(
                 title = {
                     Text(
-                        text = "${when (bolusCancelResponse.value?.status) {
+                        text = when (bolusCancelResponse.value?.status) {
                             CancelStatus.SUCCESS ->
                                 "The bolus was cancelled."
                             CancelStatus.FAILED ->
@@ -609,15 +609,21 @@ fun BolusScreen(
                                     }"
                                 }
                             else -> "Please check your pump to confirm whether the bolus was cancelled."
-                        }}\n${when {
-                            matchesBolusId() == true -> 
-                                lastBolusStatusResponse.value?.deliveredVolume?.let { 
+                        },
+                        textAlign = TextAlign.Center,
+                        color = MaterialTheme.colors.onBackground
+                    )
+                },
+                content = {
+                    Text(
+                        text = when {
+                            matchesBolusId() == true ->
+                                lastBolusStatusResponse.value?.deliveredVolume?.let {
                                     if (it == 0L) "A bolus was started and no insulin was delivered." else "${twoDecimalPlaces1000Unit(it)}u was delivered."
-                                }
+                                } ?: ""
                             matchesBolusId() == false -> "No insulin was delivered."
                             else -> "Checking if any insulin was delivered..."
-                            }
-                        }}",
+                        },
                         textAlign = TextAlign.Center,
                         color = MaterialTheme.colors.onBackground
                     )
@@ -651,16 +657,20 @@ fun BolusScreen(
             fun performCancel() {
                 bolusPermissionResponse.value?.bolusId?.let { bolusId ->
                     sendPumpCommands(SendType.BUST_CACHE, listOf(CancelBolusRequest(bolusId)))
-                    showCancellingDialog = true
                 }
             }
-            performCancel()
+            showCancellingDialog = true
             refreshScope.launch {
+                var time = 0
                 while (dataStore.bolusCancelResponse.value == null) {
-                    withContext(Dispatchers.IO) {
-                        Thread.sleep(250)
+                    if (time >= 5000) {
+                        performCancel()
+                        time = 0
                     }
-                    performCancel()
+                    withContext(Dispatchers.IO) {
+                        Thread.sleep(100)
+                    }
+                    time += 100
                 }
                 showCancellingDialog = false
                 showCancelledDialog = true
@@ -868,6 +878,7 @@ fun resetBolusDataStoreState(dataStore: DataStore) {
     dataStore.bolusPermissionResponse.value = null
     dataStore.bolusCancelResponse.value = null
     dataStore.bolusInitiateResponse.value = null
+    dataStore.lastBolusStatusResponse.value = null
     dataStore.bolusCalculatorBuilder.value = null
     dataStore.bolusCurrentParameters.value = null
     dataStore.bolusFinalParameters.value = null
