@@ -47,7 +47,9 @@ import com.jwoglom.wearx2.presentation.components.DialogScreen
 import com.jwoglom.wearx2.presentation.components.Line
 import com.jwoglom.wearx2.presentation.navigation.Screen
 import com.jwoglom.wearx2.presentation.theme.WearX2Theme
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 @Composable
 fun AppSetup(
@@ -81,6 +83,9 @@ fun AppSetup(
                         onClick = {
                             Prefs(context).setAppSetupComplete(true)
                             coroutineScope.launch {
+                                withContext(Dispatchers.IO) {
+                                    Thread.sleep(250)
+                                }
                                 sendMessage(
                                     "/to-phone/app-reload",
                                     "".toByteArray()
@@ -107,6 +112,9 @@ fun AppSetup(
                             connectionSharingEnabled = !connectionSharingEnabled
                             Prefs(context).setConnectionSharingEnabled(connectionSharingEnabled)
                             coroutineScope.launch {
+                                withContext(Dispatchers.IO) {
+                                    Thread.sleep(250)
+                                }
                                 sendMessage(
                                     "/to-phone/app-reload",
                                     "".toByteArray()
@@ -141,6 +149,9 @@ fun AppSetup(
                             insulinDeliveryActions = !insulinDeliveryActions
                             Prefs(context).setInsulinDeliveryActions(insulinDeliveryActions)
                             coroutineScope.launch {
+                                withContext(Dispatchers.IO) {
+                                    Thread.sleep(250)
+                                }
                                 sendMessage(
                                     "/to-phone/app-reload",
                                     "".toByteArray()
