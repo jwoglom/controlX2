@@ -850,28 +850,78 @@ class CommService : WearableListenerService(), GoogleApiClient.ConnectionCallbac
             ?.putString("initiateBolusSecret", Hex.encodeHexString(Bytes.getSecureRandom10Bytes()))
             ?.putLong("initiateBolusTime", Instant.now().toEpochMilli())
             ?.putInt("initiateBolusNotificationId", bolusNotificationId)
-            ?.apply()
+            ?.commit().let {
+                if (it != true) {
+                    Timber.e("synchronous preference write failed in confirmBolusRequest")
+                }
+            }
 
-        val builder = confirmBolusRequestBaseNotification(this, "Bolus Request", "$units units. Press Confirm to deliver.")
-            .setSound(RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION))
-            .setVibrate(longArrayOf(500L, 500L, 500L, 500L, 500L, 500L, 500L, 500L, 500L, 500L))
-
-        val rejectIntent = Intent(applicationContext, BolusNotificationBroadcastReceiver::class.java).apply {
-            putExtra("action", "REJECT")
+        fun getRejectIntent(): PendingIntent {
+            val rejectIntent =
+                Intent(applicationContext, BolusNotificationBroadcastReceiver::class.java).apply {
+                    putExtra("action", "REJECT")
+                }
+            return PendingIntent.getBroadcast(
+                this,
+                2000,
+                rejectIntent,
+                FLAG_IMMUTABLE or FLAG_ONE_SHOT
+            )
         }
-        val rejectPendingIntent = PendingIntent.getBroadcast(this, 2000, rejectIntent, FLAG_IMMUTABLE or FLAG_ONE_SHOT)
-        builder.addAction(R.drawable.decline, "Reject", rejectPendingIntent)
 
-        val confirmIntent = Intent(applicationContext, BolusNotificationBroadcastReceiver::class.java).apply {
-            putExtra("action", "INITIATE")
-            putExtra("request", PumpMessageSerializer.toBytes(request))
+        fun getConfirmIntent(): PendingIntent {
+            val confirmIntent =
+                Intent(applicationContext, BolusNotificationBroadcastReceiver::class.java).apply {
+                    putExtra("action", "INITIATE")
+                    putExtra("request", PumpMessageSerializer.toBytes(request))
+                }
+            return PendingIntent.getBroadcast(
+                this,
+                2001,
+                confirmIntent,
+                FLAG_IMMUTABLE or FLAG_ONE_SHOT
+            )
         }
-        val confirmPendingIntent = PendingIntent.getBroadcast(this, 2001, confirmIntent, FLAG_IMMUTABLE or FLAG_ONE_SHOT)
-        builder.addAction(R.drawable.bolus_icon, "Confirm ${units}u", confirmPendingIntent)
 
-        val notif = builder.build()
-        Timber.i("bolus notification $bolusNotificationId $builder $notif")
-        makeNotif(bolusNotificationId, notif)
+        val minNotifyThreshold = Prefs(this).bolusConfirmationInsulinThreshold()
+        sendWearCommMessage("/to-wear/bolus-min-notify-threshold", "$minNotifyThreshold".toByteArray())
+
+        if (InsulinUnit.from1000To1(request.totalVolume) >= minNotifyThreshold || minNotifyThreshold == 0.0) {
+            Timber.i("Requesting permission for bolus because $units >= minNotifyThreshold=$minNotifyThreshold")
+
+            val builder = confirmBolusRequestBaseNotification(
+                this,
+                "Bolus Request",
+                "$units units. Press Confirm to deliver."
+            )
+                .setSound(RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION))
+                .setVibrate(longArrayOf(500L, 500L, 500L, 500L, 500L, 500L, 500L, 500L, 500L, 500L))
+
+            builder.addAction(R.drawable.decline, "Reject", getRejectIntent())
+
+            builder.addAction(R.drawable.bolus_icon, "Confirm ${units}u", getConfirmIntent())
+
+            val notif = builder.build()
+            Timber.i("bolus notification $bolusNotificationId $builder $notif")
+            makeNotif(bolusNotificationId, notif)
+        } else {
+            Timber.i("Sending immediate bolus request because $units is less than minNotifyThreshold=$minNotifyThreshold")
+
+            val confirmIntent =
+                Intent(applicationContext, BolusNotificationBroadcastReceiver::class.java).apply {
+                    putExtra("action", "INITIATE")
+                    putExtra("request", PumpMessageSerializer.toBytes(request))
+                }
+            val confirmPendingIntent = PendingIntent.getBroadcast(
+                this,
+                2001,
+                confirmIntent,
+                FLAG_IMMUTABLE or FLAG_ONE_SHOT
+            )
+            // wait to avoid prefs not being saved
+            Thread.sleep(250)
+            confirmPendingIntent.send()
+        }
     }
 
     private fun makeNotif(id: Int, notif: Notification) {

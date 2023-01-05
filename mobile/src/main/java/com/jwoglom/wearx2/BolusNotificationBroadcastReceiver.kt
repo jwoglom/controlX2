@@ -22,6 +22,7 @@ import com.jwoglom.pumpx2.pump.messages.response.control.InitiateBolusResponse
 import com.jwoglom.pumpx2.shared.Hex
 import com.jwoglom.wearx2.shared.InitiateConfirmedBolusSerializer
 import com.jwoglom.wearx2.shared.PumpMessageSerializer
+import com.jwoglom.wearx2.shared.util.shortTimeAgo
 import com.jwoglom.wearx2.shared.util.twoDecimalPlaces
 import timber.log.Timber
 import java.time.Instant
@@ -210,7 +211,8 @@ public class BolusNotificationBroadcastReceiver : BroadcastReceiver(),
         val currentBolusToConfirm = getCurrentBolusToConfirm(context)
 
         val intentRequest = PumpMessageSerializer.fromBytes(intentRequestBytes)
-        if (checkBolusTimeExpired(context)) {
+        val expired = checkBolusTimeExpired(context)
+        if (expired != null) {
             Timber.e("Bolus expired: $intentRequest")
             reply(
                 context,
@@ -218,7 +220,7 @@ public class BolusNotificationBroadcastReceiver : BroadcastReceiver(),
                 confirmBolusRequestBaseNotification(
                     context,
                     "Bolus Request Expired",
-                    "The bolus request expired: $intentRequest"
+                    "The bolus request expired ${shortTimeAgo(Instant.now().plusMillis(expired))}. Boluses time out 1 minute after they are requested."
                 )
             )
             resetBolusPrefs(context)
@@ -240,8 +242,8 @@ public class BolusNotificationBroadcastReceiver : BroadcastReceiver(),
             return null
         }
 
-        if (!intentRequest?.cargo.contentEquals(currentBolusToConfirm?.cargo) || intentRequest !is InitiateBolusRequest) {
-            Timber.w("BolusNotificationBroadcastReceiver mismatched intent $intentRequest $currentBolusToConfirm")
+        if (!intentRequest.cargo.contentEquals(currentBolusToConfirm.cargo) || intentRequest !is InitiateBolusRequest) {
+            Timber.e("BolusNotificationBroadcastReceiver mismatched intent intentRequest=$intentRequest currentBolusToConfirm=$currentBolusToConfirm ${intentRequest.cargo} != ${currentBolusToConfirm.cargo}")
             reply(
                 context,
                 notifId,
@@ -277,17 +279,17 @@ public class BolusNotificationBroadcastReceiver : BroadcastReceiver(),
         return prefRequest
     }
 
-    private fun checkBolusTimeExpired(context: Context?): Boolean {
-        val initiateMillis = prefs(context)?.getLong("initiateBolusTime", 0L) ?: return true
+    private fun checkBolusTimeExpired(context: Context?): Long? {
+        val initiateMillis = prefs(context)?.getLong("initiateBolusTime", 0L) ?: return -1
 
         val nowMillis = Instant.now().toEpochMilli()
 
         // Bolus expires after 1 minute
         if (nowMillis - initiateMillis > 60 * 1000) {
-            return true
+            return nowMillis - initiateMillis
         }
 
-        return false
+        return null
     }
 
     private fun getInitiateBolusResponse(intent: Intent?): InitiateBolusResponse? {

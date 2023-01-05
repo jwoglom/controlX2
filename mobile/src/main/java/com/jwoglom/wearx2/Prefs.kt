@@ -3,6 +3,7 @@ package com.jwoglom.wearx2
 import android.content.Context
 import android.content.SharedPreferences
 import com.google.android.gms.wearable.WearableListenerService
+import com.jwoglom.pumpx2.pump.messages.models.InsulinUnit
 
 class Prefs(val context: Context) {
 
@@ -46,12 +47,26 @@ class Prefs(val context: Context) {
         prefs().edit().putBoolean("app-setup-complete", b).apply()
     }
 
+    /**
+     * Allows insulin delivery actions (remote boluses) from phone or wearable
+     */
     fun insulinDeliveryActions(): Boolean {
         return prefs().getBoolean("insulin-delivery-actions", false)
     }
 
     fun setInsulinDeliveryActions(b: Boolean) {
         prefs().edit().putBoolean("insulin-delivery-actions", b).apply()
+    }
+
+    /**
+     * Boluses above this threshold (in milliunits) will require phone confirmation in a notification.
+     */
+    fun bolusConfirmationInsulinThreshold(): Double {
+        return InsulinUnit.from1000To1(prefs().getLong("bolus-confirmation-insulin-threshold", 0))
+    }
+
+    fun setBolusConfirmationInsulinThreshold(d: Double) {
+        prefs().edit().putLong("bolus-confirmation-insulin-threshold", InsulinUnit.from1To1000(d)).apply()
     }
 
     private fun prefs(): SharedPreferences {

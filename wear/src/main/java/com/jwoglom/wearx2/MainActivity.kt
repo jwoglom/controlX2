@@ -509,6 +509,9 @@ class MainActivity : ComponentActivity(), MessageApi.MessageListener, GoogleApiC
                 }
                 dataStore.connectionStatus.value = "Waiting to find pump"
             }
+            "/to-wear/bolus-min-notify-threshold" -> {
+                dataStore.bolusMinNotifyThreshold.value = String(messageEvent.data).toDoubleOrNull()
+            }
             "/to-wear/initiate-confirmed-bolus" -> {
                 if (inWaitingState()) {
                     Timber.e("in invalid state for initiate-confirmed-bolus")

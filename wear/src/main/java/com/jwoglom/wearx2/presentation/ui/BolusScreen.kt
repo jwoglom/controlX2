@@ -55,14 +55,13 @@ import com.jwoglom.pumpx2.pump.messages.calculator.BolusCalcDecision
 import com.jwoglom.pumpx2.pump.messages.calculator.BolusCalcUnits
 import com.jwoglom.pumpx2.pump.messages.calculator.BolusCalculatorBuilder
 import com.jwoglom.pumpx2.pump.messages.calculator.BolusParameters
-import com.jwoglom.pumpx2.pump.messages.models.InsulinUnit
 import com.jwoglom.pumpx2.pump.messages.request.control.BolusPermissionRequest
 import com.jwoglom.pumpx2.pump.messages.request.control.CancelBolusRequest
 import com.jwoglom.pumpx2.pump.messages.request.currentStatus.BolusCalcDataSnapshotRequest
 import com.jwoglom.pumpx2.pump.messages.request.currentStatus.CurrentBolusStatusRequest
 import com.jwoglom.pumpx2.pump.messages.request.currentStatus.LastBGRequest
+import com.jwoglom.pumpx2.pump.messages.request.currentStatus.LastBolusStatusV2Request
 import com.jwoglom.pumpx2.pump.messages.request.currentStatus.TimeSinceResetRequest
-import com.jwoglom.pumpx2.pump.messages.response.control.BolusPermissionResponse
 import com.jwoglom.pumpx2.pump.messages.response.control.CancelBolusResponse.CancelStatus
 import com.jwoglom.pumpx2.pump.messages.response.currentStatus.BolusCalcDataSnapshotResponse
 import com.jwoglom.pumpx2.pump.messages.response.currentStatus.CurrentBolusStatusResponse.CurrentBolusStatus
@@ -71,13 +70,14 @@ import com.jwoglom.pumpx2.pump.messages.response.currentStatus.TimeSinceResetRes
 import com.jwoglom.wearx2.LocalDataStore
 import com.jwoglom.wearx2.R
 import com.jwoglom.wearx2.presentation.DataStore
-import com.jwoglom.wearx2.shared.presentation.LifecycleStateObserver
 import com.jwoglom.wearx2.presentation.components.LineTextDescription
-import com.jwoglom.wearx2.shared.util.firstLetterCapitalized
-import com.jwoglom.wearx2.shared.util.snakeCaseToSpace
-import com.jwoglom.wearx2.shared.util.oneDecimalPlace
-import com.jwoglom.wearx2.shared.util.twoDecimalPlaces
+import com.jwoglom.wearx2.shared.presentation.LifecycleStateObserver
 import com.jwoglom.wearx2.shared.util.SendType
+import com.jwoglom.wearx2.shared.util.firstLetterCapitalized
+import com.jwoglom.wearx2.shared.util.oneDecimalPlace
+import com.jwoglom.wearx2.shared.util.snakeCaseToSpace
+import com.jwoglom.wearx2.shared.util.twoDecimalPlaces
+import com.jwoglom.wearx2.shared.util.twoDecimalPlaces1000Unit
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -564,11 +564,39 @@ fun BolusScreen(
         ) {
             val bolusCancelResponse = dataStore.bolusCancelResponse.observeAsState()
             val bolusInitiateResponse = dataStore.bolusInitiateResponse.observeAsState()
+            val lastBolusStatusResponse = dataStore.lastBolusStatusResponse.observeAsState()
+
+            LaunchedEffect (bolusCancelResponse.value, Unit) {
+                sendPumpCommands(SendType.STANDARD, listOf(LastBolusStatusV2Request()))
+            }
+
+            fun matchesBolusId(): Boolean? {
+                lastBolusStatusResponse.value?.let { last ->
+                    bolusInitiateResponse.value?.let { initiate ->
+                        return (last.bolusId == initiate.bolusId)
+                    }
+                }
+                return null
+            }
+
+            LaunchedEffect (lastBolusStatusResponse.value) {
+                if (matchesBolusId() == false) {
+                    refreshScope.launch {
+                        withContext(Dispatchers.IO) {
+                            Thread.sleep(250)
+                        }
+                        sendPumpCommands(
+                            SendType.STANDARD,
+                            listOf(LastBolusStatusV2Request())
+                        )
+                    }
+                }
+            }
 
             Alert(
                 title = {
                     Text(
-                        text = when (bolusCancelResponse.value?.status) {
+                        text = "${when (bolusCancelResponse.value?.status) {
                             CancelStatus.SUCCESS ->
                                 "The bolus was cancelled."
                             CancelStatus.FAILED ->
@@ -581,7 +609,15 @@ fun BolusScreen(
                                     }"
                                 }
                             else -> "Please check your pump to confirm whether the bolus was cancelled."
-                        },
+                        }}\n${when {
+                            matchesBolusId() == true -> 
+                                lastBolusStatusResponse.value?.deliveredVolume?.let { 
+                                    if (it == 0L) "A bolus was started and no insulin was delivered." else "${twoDecimalPlaces1000Unit(it)}u was delivered."
+                                }
+                            matchesBolusId() == false -> "No insulin was delivered."
+                            else -> "Checking if any insulin was delivered..."
+                            }
+                        }}",
                         textAlign = TextAlign.Center,
                         color = MaterialTheme.colors.onBackground
                     )
@@ -645,6 +681,7 @@ fun BolusScreen(
             val bolusFinalParameters = dataStore.bolusFinalParameters.observeAsState()
             val bolusInitiateResponse = dataStore.bolusInitiateResponse.observeAsState()
             val bolusCancelResponse = dataStore.bolusCancelResponse.observeAsState()
+            val bolusMinNotifyThreshold = dataStore.bolusMinNotifyThreshold.observeAsState()
 
             LaunchedEffect(bolusInitiateResponse.value) {
                 if (bolusInitiateResponse.value != null) {
@@ -692,7 +729,14 @@ fun BolusScreen(
                 }
             ) {
                 Text(
-                    text = "A notification was sent to acknowledge the request.",
+                    text = when {
+                        bolusInitiateResponse.value != null -> "Bolus request received by pump"
+                        bolusFinalParameters.value != null && bolusMinNotifyThreshold.value != null -> when {
+                            bolusFinalParameters.value!!.units >= bolusMinNotifyThreshold.value!! -> "A notification was sent to approve the request."
+                            else -> "Sending request to pump..."
+                        }
+                        else -> "Sending request to phone..."
+                    },
                     textAlign = TextAlign.Center,
                     style = MaterialTheme.typography.body2,
                     color = MaterialTheme.colors.onBackground

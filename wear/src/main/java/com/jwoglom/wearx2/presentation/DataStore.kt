@@ -12,6 +12,7 @@ import com.jwoglom.pumpx2.pump.messages.response.control.RemoteCarbEntryResponse
 import com.jwoglom.pumpx2.pump.messages.response.currentStatus.BolusCalcDataSnapshotResponse
 import com.jwoglom.pumpx2.pump.messages.response.currentStatus.CurrentBolusStatusResponse
 import com.jwoglom.pumpx2.pump.messages.response.currentStatus.LastBGResponse
+import com.jwoglom.pumpx2.pump.messages.response.currentStatus.LastBolusStatusAbstractResponse
 import com.jwoglom.pumpx2.pump.messages.response.currentStatus.TimeSinceResetResponse
 import timber.log.Timber
 
@@ -50,12 +51,14 @@ class DataStore {
     val bolusFinalParameters = MutableLiveData<BolusParameters>()
     val bolusFinalCalcUnits = MutableLiveData<BolusCalcUnits>()
     val bolusFinalConditions = MutableLiveData<Set<BolusCalcCondition>>()
+    val bolusMinNotifyThreshold = MutableLiveData<Double>()
 
     val timeSinceResetResponse = MutableLiveData<TimeSinceResetResponse>()
     val bolusPermissionResponse = MutableLiveData<BolusPermissionResponse>()
     val bolusCarbEntryResponse = MutableLiveData<RemoteCarbEntryResponse>()
     val bolusInitiateResponse = MutableLiveData<InitiateBolusResponse>()
     val bolusCancelResponse = MutableLiveData<CancelBolusResponse>()
+    val lastBolusStatusResponse = MutableLiveData<LastBolusStatusAbstractResponse>()
     val bolusCurrentResponse = MutableLiveData<CurrentBolusStatusResponse>()
 
     init {
@@ -93,6 +96,7 @@ class DataStore {
         bolusFinalParameters.observeForever { t -> Timber.i("DataStore.bolusFinalParameters=$t") }
         bolusFinalCalcUnits.observeForever { t -> Timber.i("DataStore.bolusFinalCalcUnits=$t") }
         bolusFinalConditions.observeForever { t -> Timber.i("DataStore.bolusFinalConditions=$t") }
+        bolusMinNotifyThreshold.observeForever { t -> Timber.i("DataStore.bolusMinNotifyThreshold=$t") }
 
         timeSinceResetResponse.observeForever { t -> Timber.i("DataStore.timeSinceResetResponse=$t") }
         bolusPermissionResponse.observeForever { t -> Timber.i("DataStore.bolusPermissionResponse=$t") }
