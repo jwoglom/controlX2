@@ -260,6 +260,7 @@ class CommService : WearableListenerService(), GoogleApiClient.ConnectionCallbac
             override fun onPumpCriticalError(peripheral: BluetoothPeripheral?, reason: TandemError?) {
                 super.onPumpCriticalError(peripheral, reason)
                 Timber.w("onPumpCriticalError $reason")
+                Toast.makeText(this@CommService, "Pump Error: ${reason?.message}", Toast.LENGTH_SHORT).show()
                 sendWearCommMessage("/from-pump/pump-critical-error",
                     reason?.message!!.toByteArray()
                 );
