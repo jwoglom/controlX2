@@ -3,17 +3,46 @@
 Android Wear OS and Phone companion app for controlling a Tandem pump with [PumpX2](https://github.com/jwoglom/pumpx2)
 from a wearable.
 
+<table border=0><tr valign=top><td>
+<a href="https://www.youtube.com/watch?v=jUUlqxDBQdQ">
+<b>Demo video from watch:</b>
+<br />
+<img src="https://img.youtube.com/vi/jUUlqxDBQdQ/0.jpg" width=300 alt="PumpX2 Alpha for Wear OS - December 2022" title="PumpX2 Alpha for Wear OS - December 2022" />
+</a>
+
+</td><td>
+<a href="https://www.youtube.com/watch?v=FybrFaLCs9Y">
+<b>Demo video from phone:</b>
+<br />
+<img src="https://img.youtube.com/vi/FybrFaLCs9Y/0.jpg" width=300 alt="PumpX2 Alpha for Android - December 2022" title="PumpX2 Alpha for Android - December 2022" />
+</a>
+</td></tr></table>
+
+> **Warning**\
+> **This application is for EXPERIMENTAL USE ONLY and can be used to MODIFY ACTIVE INSULIN DELIVERY ON YOUR INSULIN PUMP.**\
+> There is NO WARRANTY IMPLIED OR EXPRESSED DUE TO USE OF THIS SOFTWARE. YOU ASSUME ALL RISK FOR ANY MALFUNCTIONS, BUGS, OR INSULIN DELIVERY ACTIONS.
+
 **Supported features:**
 
 * Viewing pump status information (IOB, cartridge amount, battery, basal rate) 
 * Viewing connected CGM information (current reading, arrow trend, sensor and transmitter status)
-* Delivering a bolus (with units, carbs, and BG amounts)
+* Delivering a bolus (with units, carbs, and BG amounts) from wearable
 * Bolus calculator (to compute units based on entered carbs and BG)
 * Bolus cancellation
 
-**This application is for EXPERIMENTAL USE ONLY and can be used to MODIFY ACTIVE INSULIN DELIVERY ON YOUR INSULIN PUMP.**
-There is NO WARRANTY IMPLIED OR EXPRESSED DUE TO USE OF THIS SOFTWARE. YOU ASSUME ALL RISK FOR ANY MALFUNCTIONS, BUGS, OR INSULIN DELIVERY ACTIONS.
+**Work in progress features:**
 
+* Watch face complications
+* Delivering a bolus (with units, carbs, and BG amounts) from phone
+
+**Planned features:**
+
+* Watch tile
+* Show CGM history graph
+* Send pump alerts/alarms as notifications
+* Upload data to Nightscout
+
+### Wear OS Screenshots
 
 ![App home screen](https://user-images.githubusercontent.com/192620/206879718-91b90287-dbad-4a9d-9905-a43144025a0c.png)
 ![Selecting bolus units](https://user-images.githubusercontent.com/192620/206879726-5c13adad-0c05-4786-8e1a-b4bd63faae7f.png)
