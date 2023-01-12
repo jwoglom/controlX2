@@ -55,7 +55,7 @@ import com.jwoglom.wearx2.presentation.components.PumpSetupStageProgress
 import com.jwoglom.wearx2.presentation.components.ServiceDisabledMessage
 import com.jwoglom.wearx2.presentation.screens.setUpPreviewState
 import com.jwoglom.wearx2.presentation.theme.WearX2Theme
-import com.jwoglom.wearx2.shared.presentation.LifecycleStateObserver
+import com.jwoglom.wearx2.presentation.util.LifecycleStateObserver
 import com.jwoglom.wearx2.shared.presentation.intervalOf
 import com.jwoglom.wearx2.shared.util.SendType
 import kotlinx.coroutines.Dispatchers

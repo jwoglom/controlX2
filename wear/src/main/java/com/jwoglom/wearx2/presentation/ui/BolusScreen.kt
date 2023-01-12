@@ -1,7 +1,9 @@
 package com.jwoglom.wearx2.presentation.ui
 
+import android.content.res.Configuration
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -9,6 +11,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.wrapContentSize
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.material.ExperimentalMaterialApi
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
@@ -31,6 +34,8 @@ import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.tooling.preview.Devices
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.zIndex
@@ -360,7 +365,11 @@ fun BolusScreen(
             }
 
             item {
-                CompactButton(
+                Spacer(modifier = Modifier.height(8.dp))
+            }
+
+            item {
+                Button(
                     onClick = {
                         dataStore.bolusFinalConditions.value =
                             bolusCalcDecision(dataStore.bolusCalculatorBuilder.value)?.conditions
@@ -372,13 +381,15 @@ fun BolusScreen(
                     },
                     enabled = true
                 ) {
-                    Icon(
-                        imageVector = Icons.Filled.Check,
-                        contentDescription = "continue",
-                        modifier = Modifier
-                            .size(ButtonDefaults.SmallIconSize)
-                            .wrapContentSize(align = Alignment.Center),
-                    )
+                    Row() {
+                        Icon(
+                            imageVector = Icons.Filled.Check,
+                            contentDescription = "continue",
+                            modifier = Modifier
+                                .size(ButtonDefaults.SmallIconSize)
+                                .wrapContentSize(align = Alignment.Center),
+                        )
+                    }
                 }
             }
 
@@ -883,4 +894,29 @@ fun resetBolusDataStoreState(dataStore: DataStore) {
     dataStore.bolusCurrentParameters.value = null
     dataStore.bolusFinalParameters.value = null
     dataStore.bolusFinalConditions.value = null
+}
+
+
+@Preview(
+    apiLevel = 26,
+    uiMode = Configuration.UI_MODE_TYPE_WATCH,
+    device = Devices.WEAR_OS_LARGE_ROUND,
+)
+@Composable
+fun Preview() {
+    BolusScreen(
+        scalingLazyListState = ScalingLazyListState(0, 0),
+        focusRequester = FocusRequester(),
+        bolusUnitsUserInput = 0.0,
+        bolusCarbsGramsUserInput = 0,
+        bolusBgMgdlUserInput = 0,
+        onClickUnits = {},
+        onClickCarbs = { },
+        onClickBG = { },
+        onClickLanding = { },
+        sendPumpCommands = {_, _ -> },
+        sendPhoneBolusRequest = {_, _, _, _, _ -> },
+        resetSavedBolusEnteredState = {},
+        sendPhoneBolusCancel = {}
+    )
 }
