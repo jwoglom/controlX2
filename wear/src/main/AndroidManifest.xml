@@ -98,6 +98,24 @@
                 android:name="android.support.wearable.complications.UPDATE_PERIOD_SECONDS"
                 android:value="301" /> <!-- 5 minutes -->
         </service>
+
+        <service
+            android:name=".complications.CGMReadingComplicationDataSourceService"
+            android:exported="true"
+            android:icon="@drawable/pump"
+            android:label="WearX2 CGM Reading"
+            android:permission="com.google.android.wearable.permission.BIND_COMPLICATION_PROVIDER">
+            <intent-filter>
+                <action android:name="android.support.wearable.complications.ACTION_COMPLICATION_UPDATE_REQUEST" />
+            </intent-filter>
+
+            <meta-data
+                android:name="android.support.wearable.complications.SUPPORTED_TYPES"
+                android:value="RANGED_VALUE,SHORT_TEXT" />
+            <meta-data
+                android:name="android.support.wearable.complications.UPDATE_PERIOD_SECONDS"
+                android:value="301" /> <!-- 5 minutes -->
+        </service>
     </application>
 
 </manifest>

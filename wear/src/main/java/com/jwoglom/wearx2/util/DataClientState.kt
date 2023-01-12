@@ -39,6 +39,12 @@ class DataClientState(private val context: Context) {
             set("pumpCurrentBasal", value)
         }
 
+    var cgmReading: Pair<String, Instant>?
+        get() = get("cgmReading")
+        set(value) {
+            set("cgmReading", value)
+        }
+
     private fun get(key: String): Pair<String, Instant>? {
         Timber.d("DataClientState fields() = ${fields()}")
         val parts = fields()[key]

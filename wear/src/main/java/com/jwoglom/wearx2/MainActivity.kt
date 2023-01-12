@@ -461,6 +461,7 @@ class MainActivity : ComponentActivity(), MessageApi.MessageListener, GoogleApiC
             is CurrentEGVGuiDataResponse -> {
                 dataStore.cgmReading.value = message.cgmReading
                 dataStore.cgmDelta.value = message.trendRate
+                UpdateComplication(applicationContext, WearX2Complication.CGM_READING)
             }
             is BolusCalcDataSnapshotResponse -> {
                 if (!cached) {
