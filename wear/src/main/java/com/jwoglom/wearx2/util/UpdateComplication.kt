@@ -7,6 +7,7 @@ import androidx.wear.watchface.complications.datasource.ComplicationDataSourceSe
 import androidx.wear.watchface.complications.datasource.ComplicationDataSourceUpdateRequester
 import com.jwoglom.wearx2.complications.PumpBatteryComplicationDataSourceService
 import com.jwoglom.wearx2.complications.PumpIOBComplicationDataSourceService
+import timber.log.Timber
 import kotlin.reflect.KClass
 
 enum class WearX2Complication(val cls: Class<out ComplicationDataSourceService>) {
@@ -20,5 +21,6 @@ fun UpdateComplication(context: Context, complication: WearX2Complication) {
             context, complication.cls
         )
     )
+    Timber.d("UpdateComplication($complication)")
     request.requestUpdateAll()
 }

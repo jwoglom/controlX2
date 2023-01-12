@@ -22,8 +22,11 @@ import android.widget.Toast
 import androidx.core.app.NotificationCompat
 import com.google.android.gms.common.ConnectionResult
 import com.google.android.gms.common.api.GoogleApiClient
+import com.google.android.gms.wearable.MessageApi
 import com.google.android.gms.wearable.MessageEvent
 import com.google.android.gms.wearable.Node
+import com.google.android.gms.wearable.PutDataMapRequest
+import com.google.android.gms.wearable.PutDataRequest
 import com.google.android.gms.wearable.Wearable
 import com.google.android.gms.wearable.WearableListenerService
 import com.jwoglom.pumpx2.pump.PumpState
@@ -49,6 +52,7 @@ import com.jwoglom.pumpx2.pump.messages.response.authentication.CentralChallenge
 import com.jwoglom.pumpx2.pump.messages.response.authentication.PumpChallengeResponse
 import com.jwoglom.pumpx2.pump.messages.response.control.InitiateBolusResponse
 import com.jwoglom.pumpx2.pump.messages.response.currentStatus.ControlIQIOBResponse
+import com.jwoglom.pumpx2.pump.messages.response.currentStatus.CurrentBasalStatusResponse
 import com.jwoglom.pumpx2.pump.messages.response.currentStatus.CurrentBatteryAbstractResponse
 import com.jwoglom.pumpx2.pump.messages.response.currentStatus.InsulinStatusResponse
 import com.jwoglom.pumpx2.pump.messages.response.currentStatus.TimeSinceResetResponse
@@ -62,6 +66,7 @@ import com.jwoglom.wearx2.shared.CommServiceCodes
 import com.jwoglom.wearx2.shared.util.setupTimber
 import com.jwoglom.wearx2.shared.util.shortTime
 import com.jwoglom.wearx2.shared.util.twoDecimalPlaces
+import com.jwoglom.wearx2.util.DataClientState
 import com.welie.blessed.BluetoothPeripheral
 import com.welie.blessed.HciStatus
 import kotlinx.coroutines.CoroutineScope
@@ -122,6 +127,10 @@ class CommService : WearableListenerService(), GoogleApiClient.ConnectionCallbac
                 when (message) {
                     is TimeSinceResetResponse -> onReceiveTimeSinceResetResponse(message)
                     is InitiateBolusResponse -> onReceiveInitiateBolusResponse(message)
+                    is CurrentBatteryAbstractResponse -> DataClientState(context).pumpBattery = Pair("${message.batteryPercent}", Instant.now())
+                    is ControlIQIOBResponse -> DataClientState(context).pumpIOB = Pair("${InsulinUnit.from1000To1(message.pumpDisplayedIOB)}", Instant.now())
+                    is InsulinStatusResponse -> DataClientState(context).pumpCartridgeUnits = Pair("${message.currentInsulinAmount}", Instant.now())
+                    is CurrentBasalStatusResponse -> DataClientState(context).pumpCurrentBasal = Pair("${InsulinUnit.from1000To1(message.currentBasalRate)}", Instant.now())
                 }
                 message?.let { updateNotificationWithPumpData(it) }
             }

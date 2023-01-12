@@ -68,7 +68,9 @@ import com.jwoglom.wearx2.shared.util.pumpTimeToLocalTz
 import com.jwoglom.wearx2.shared.util.shortTime
 import com.jwoglom.wearx2.shared.util.shortTimeAgo
 import com.jwoglom.wearx2.shared.util.twoDecimalPlaces1000Unit
-import com.jwoglom.wearx2.util.StatePrefs
+import com.jwoglom.wearx2.util.DataClientState
+import com.jwoglom.wearx2.util.UpdateComplication
+import com.jwoglom.wearx2.util.WearX2Complication
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.asExecutor
 import timber.log.Timber
@@ -224,7 +226,11 @@ class MainActivity : ComponentActivity(), MessageApi.MessageListener, GoogleApiC
         Timber.d("create: mApiClient: $mApiClient")
         mApiClient.connect()
 
-        startPhoneCommService()
+        WearX2Complication.values().forEach {
+            UpdateComplication(this, it)
+        }
+
+        // startPhoneCommService()
     }
 
     private fun startPhoneCommService() {
@@ -361,11 +367,13 @@ class MainActivity : ComponentActivity(), MessageApi.MessageListener, GoogleApiC
         when (message) {
             is CurrentBatteryAbstractResponse -> {
                 dataStore.batteryPercent.value = message.batteryPercent
-                StatePrefs(this).pumpBattery = Pair("${message.batteryPercent}", Instant.now())
+                // DataClientState(this).pumpBattery = Pair("${message.batteryPercent}", Instant.now())
+                UpdateComplication(this, WearX2Complication.PUMP_BATTERY)
             }
             is ControlIQIOBResponse -> {
                 dataStore.iobUnits.value = InsulinUnit.from1000To1(message.pumpDisplayedIOB)
-                StatePrefs(this).pumpIOB = Pair("${InsulinUnit.from1000To1(message.pumpDisplayedIOB)}", Instant.now())
+                // DataClientState(this).pumpIOB = Pair("${InsulinUnit.from1000To1(message.pumpDisplayedIOB)}", Instant.now())
+                UpdateComplication(this, WearX2Complication.PUMP_IOB)
             }
             is ControlIQInfoAbstractResponse -> {
                 dataStore.controlIQMode.value = when (message.currentUserModeType) {

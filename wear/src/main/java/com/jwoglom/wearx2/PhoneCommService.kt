@@ -26,9 +26,8 @@ import com.jwoglom.pumpx2.pump.messages.response.currentStatus.CurrentBatteryAbs
 import com.jwoglom.wearx2.presentation.navigation.Screen
 import com.jwoglom.wearx2.shared.PumpMessageSerializer
 import com.jwoglom.wearx2.shared.util.setupTimber
-import com.jwoglom.wearx2.shared.util.shortTime
 import com.jwoglom.wearx2.util.ConnectedState
-import com.jwoglom.wearx2.util.StatePrefs
+import com.jwoglom.wearx2.util.DataClientState
 import com.jwoglom.wearx2.util.UpdateComplication
 import com.jwoglom.wearx2.util.WearX2Complication
 import timber.log.Timber
@@ -114,12 +113,12 @@ class PhoneCommService : WearableListenerService(), GoogleApiClient.ConnectionCa
             }
             "/from-pump/pump-connected" -> {
                 connected = ConnectedState.PHONE_CONNECTED_PUMP_CONNECTED
-                StatePrefs(this).connected = Pair(connected.name, Instant.now())
+                DataClientState(this).connected = Pair(connected.name, Instant.now())
                 updateNotification()
             }
             "/from-pump/pump-disconnected" -> {
                 connected = ConnectedState.PHONE_CONNECTED_PUMP_DISCONNECTED
-                StatePrefs(this).connected = Pair(connected.name, Instant.now())
+                DataClientState(this).connected = Pair(connected.name, Instant.now())
                 updateNotification()
             }
             "/to-wear/blocked-bolus-signature" -> {
@@ -145,11 +144,11 @@ class PhoneCommService : WearableListenerService(), GoogleApiClient.ConnectionCa
         Timber.i("phoneComm onPumpMessageReceived($message)")
         when (message) {
             is CurrentBatteryAbstractResponse -> {
-                StatePrefs(this).pumpBattery = Pair("${message.batteryPercent}", Instant.now())
+                DataClientState(this).pumpBattery = Pair("${message.batteryPercent}", Instant.now())
                 UpdateComplication(this, WearX2Complication.PUMP_BATTERY)
             }
             is ControlIQIOBResponse -> {
-                StatePrefs(this).pumpIOB = Pair("${InsulinUnit.from1000To1(message.pumpDisplayedIOB)}", Instant.now())
+                DataClientState(this).pumpIOB = Pair("${InsulinUnit.from1000To1(message.pumpDisplayedIOB)}", Instant.now())
                 UpdateComplication(this, WearX2Complication.PUMP_IOB)
             }
         }
@@ -164,7 +163,7 @@ class PhoneCommService : WearableListenerService(), GoogleApiClient.ConnectionCa
         Timber.i("onPeerDisconnected $node")
         super.onPeerDisconnected(node)
         connected = ConnectedState.PHONE_DISCONNECTED
-        StatePrefs(this).connected = Pair(connected.name, Instant.now())
+        DataClientState(this).connected = Pair(connected.name, Instant.now())
         // disconnectedNotification("phone disconnected")
         updateNotification()
     }

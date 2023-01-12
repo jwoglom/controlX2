@@ -21,28 +21,14 @@ import androidx.wear.watchface.complications.data.TimeDifferenceStyle
 import androidx.wear.watchface.complications.datasource.ComplicationDataSourceService
 import androidx.wear.watchface.complications.datasource.ComplicationRequest
 import androidx.wear.watchface.complications.datasource.SuspendingComplicationDataSourceService
-import com.jwoglom.pumpx2.pump.messages.models.InsulinUnit
 import com.jwoglom.wearx2.MainActivity
 import com.jwoglom.wearx2.R
 import com.jwoglom.wearx2.shared.util.oneDecimalPlace
 import com.jwoglom.wearx2.shared.util.twoDecimalPlaces
-import com.jwoglom.wearx2.shared.util.twoDecimalPlaces1000Unit
-import com.jwoglom.wearx2.util.StatePrefs
+import com.jwoglom.wearx2.util.DataClientState
 import java.time.Duration
 import java.time.Instant
 
-/**
- * A complication provider that supports only [ComplicationType.RANGED_VALUE] and cycles
- * through the possible configurations on tap. The value is randomised on each update.
- *
- * Note: This subclasses [SuspendingComplicationDataSourceService] instead of [ComplicationDataSourceService] to support
- * coroutines, so data operations (specifically, calls to [DataStore]) can be supported directly in the
- * [onComplicationRequest].
- *
- * If you don't perform any suspending operations to update your complications, you can subclass
- * [ComplicationDataSourceService] and override [onComplicationRequest] directly.
- * (see [NoDataDataSourceService] for an example)
- */
 @SuppressLint("LogNotTimber")
 class PumpIOBComplicationDataSourceService : SuspendingComplicationDataSourceService() {
     val tag = "WearX2:Compl:PumpIOB"
@@ -54,7 +40,7 @@ class PumpIOBComplicationDataSourceService : SuspendingComplicationDataSourceSer
         Log.i(tag, "onComplicationRequest(${request.complicationType}, ${request.complicationInstanceId}, ${request.immediateResponseRequired})")
 
         val tapIntent = PendingIntent.getActivity(this, 0, Intent(this, MainActivity::class.java), PendingIntent.FLAG_IMMUTABLE)
-        val pumpIOB = StatePrefs(this).pumpIOB
+        val pumpIOB = DataClientState(this).pumpIOB
 
         return getComplicationDataForType(
             request.complicationType,

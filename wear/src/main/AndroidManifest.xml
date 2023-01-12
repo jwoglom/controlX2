@@ -52,7 +52,7 @@
             </intent-filter>
         </activity>
 
-        <service
+        <!--service
             android:name=".PhoneCommService"
             android:exported="false"
             android:icon="@drawable/pump">
@@ -61,7 +61,7 @@
                     android:name="com.google.android.gms.wearable.BIND_LISTENER"
                     tools:ignore="WearableBindListener" />
             </intent-filter>
-        </service>
+        </service-->
 
         <service
             android:name=".complications.PumpBatteryComplicationDataSourceService"
