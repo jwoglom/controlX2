@@ -46,9 +46,7 @@ import com.jwoglom.pumpx2.pump.messages.response.currentStatus.CurrentBolusStatu
 import com.jwoglom.pumpx2.pump.messages.response.currentStatus.CurrentEGVGuiDataResponse
 import com.jwoglom.pumpx2.pump.messages.response.currentStatus.GlobalMaxBolusSettingsResponse
 import com.jwoglom.pumpx2.pump.messages.response.currentStatus.HomeScreenMirrorResponse
-import com.jwoglom.pumpx2.pump.messages.response.currentStatus.HomeScreenMirrorResponse.ApControlStateIcon
-import com.jwoglom.pumpx2.pump.messages.response.currentStatus.HomeScreenMirrorResponse.CGMAlertIcon
-import com.jwoglom.pumpx2.pump.messages.response.currentStatus.HomeScreenMirrorResponse.BasalStatusIcon
+import com.jwoglom.pumpx2.pump.messages.response.currentStatus.HomeScreenMirrorResponse.*
 import com.jwoglom.pumpx2.pump.messages.response.currentStatus.InsulinStatusResponse
 import com.jwoglom.pumpx2.pump.messages.response.currentStatus.LastBGResponse
 import com.jwoglom.pumpx2.pump.messages.response.currentStatus.LastBolusStatusAbstractResponse
@@ -62,19 +60,17 @@ import com.jwoglom.wearx2.presentation.ui.resetBolusDataStoreState
 import com.jwoglom.wearx2.shared.InitiateConfirmedBolusSerializer
 import com.jwoglom.wearx2.shared.PumpMessageSerializer
 import com.jwoglom.wearx2.shared.PumpQualifyingEventsSerializer
-import com.jwoglom.wearx2.shared.util.setupTimber
 import com.jwoglom.wearx2.shared.util.SendType
 import com.jwoglom.wearx2.shared.util.pumpTimeToLocalTz
+import com.jwoglom.wearx2.shared.util.setupTimber
 import com.jwoglom.wearx2.shared.util.shortTime
 import com.jwoglom.wearx2.shared.util.shortTimeAgo
 import com.jwoglom.wearx2.shared.util.twoDecimalPlaces1000Unit
-import com.jwoglom.wearx2.util.DataClientState
 import com.jwoglom.wearx2.util.UpdateComplication
 import com.jwoglom.wearx2.util.WearX2Complication
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.asExecutor
 import timber.log.Timber
-import java.time.Instant
 import java.time.temporal.ChronoUnit
 
 var dataStore = DataStore()
@@ -225,10 +221,6 @@ class MainActivity : ComponentActivity(), MessageApi.MessageListener, GoogleApiC
 
         Timber.d("create: mApiClient: $mApiClient")
         mApiClient.connect()
-
-        WearX2Complication.values().forEach {
-            UpdateComplication(this, it)
-        }
 
         startPhoneCommService()
     }
