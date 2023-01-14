@@ -230,7 +230,7 @@ class MainActivity : ComponentActivity(), MessageApi.MessageListener, GoogleApiC
             UpdateComplication(this, it)
         }
 
-        // startPhoneCommService()
+        startPhoneCommService()
     }
 
     private fun startPhoneCommService() {

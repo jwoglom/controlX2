@@ -144,11 +144,9 @@ class PhoneCommService : WearableListenerService(), GoogleApiClient.ConnectionCa
         Timber.i("phoneComm onPumpMessageReceived($message)")
         when (message) {
             is CurrentBatteryAbstractResponse -> {
-                DataClientState(this).pumpBattery = Pair("${message.batteryPercent}", Instant.now())
                 UpdateComplication(this, WearX2Complication.PUMP_BATTERY)
             }
             is ControlIQIOBResponse -> {
-                DataClientState(this).pumpIOB = Pair("${InsulinUnit.from1000To1(message.pumpDisplayedIOB)}", Instant.now())
                 UpdateComplication(this, WearX2Complication.PUMP_IOB)
             }
         }

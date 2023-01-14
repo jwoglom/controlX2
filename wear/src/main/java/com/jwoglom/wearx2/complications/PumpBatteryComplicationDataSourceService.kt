@@ -23,6 +23,7 @@ import androidx.wear.watchface.complications.datasource.ComplicationRequest
 import androidx.wear.watchface.complications.datasource.SuspendingComplicationDataSourceService
 import com.jwoglom.wearx2.MainActivity
 import com.jwoglom.wearx2.R
+import com.jwoglom.wearx2.complications.internal.initGoogleApi
 import com.jwoglom.wearx2.util.DataClientState
 import java.time.Duration
 import java.time.Instant
@@ -36,6 +37,7 @@ class PumpBatteryComplicationDataSourceService : SuspendingComplicationDataSourc
         Log.i(tag, "onComplicationRequest(${request.complicationType}, ${request.complicationInstanceId}, ${request.immediateResponseRequired})")
 
         val tapIntent = PendingIntent.getActivity(this, 0, Intent(this, MainActivity::class.java), PendingIntent.FLAG_IMMUTABLE)
+        initGoogleApi(this)
         val pumpBattery = DataClientState(this).pumpBattery
 
         return getComplicationDataForType(
