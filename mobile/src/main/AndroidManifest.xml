@@ -66,11 +66,11 @@
         <receiver
             android:name=".BolusNotificationBroadcastReceiver"
             android:exported="false">
-            <intent-filter>
-                <!--action
+            <!--intent-filter>
+                <action
                     android:name="com.google.android.gms.wearable.BIND_LISTENER"
-                    tools:ignore="WearableBindListener" /-->
-            </intent-filter>
+                    tools:ignore="WearableBindListener" />
+            </intent-filter-->
         </receiver>
     </application>
 
