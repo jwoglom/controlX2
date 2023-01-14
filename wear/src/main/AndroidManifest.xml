@@ -120,6 +120,36 @@
                 android:name="android.support.wearable.complications.UPDATE_PERIOD_SECONDS"
                 android:value="301" /> <!-- 5 minutes -->
         </service>
+
+        <service
+            android:name=".complications.BolusButtonComplicationDataSourceService"
+            android:exported="true"
+            android:icon="@drawable/bolus_icon"
+            android:label="WearX2 Bolus Button"
+            android:permission="com.google.android.wearable.permission.BIND_COMPLICATION_PROVIDER">
+            <intent-filter>
+                <action android:name="android.support.wearable.complications.ACTION_COMPLICATION_UPDATE_REQUEST" />
+            </intent-filter>
+
+            <meta-data
+                android:name="android.support.wearable.complications.SUPPORTED_TYPES"
+                android:value="SMALL_IMAGE,MONOCHROMATIC_IMAGE,ICON" />
+        </service>
+
+        <service
+            android:name=".complications.PumpButtonComplicationDataSourceService"
+            android:exported="true"
+            android:icon="@drawable/pump"
+            android:label="WearX2 App Button"
+            android:permission="com.google.android.wearable.permission.BIND_COMPLICATION_PROVIDER">
+            <intent-filter>
+                <action android:name="android.support.wearable.complications.ACTION_COMPLICATION_UPDATE_REQUEST" />
+            </intent-filter>
+
+            <meta-data
+                android:name="android.support.wearable.complications.SUPPORTED_TYPES"
+                android:value="SMALL_IMAGE,MONOCHROMATIC_IMAGE,ICON" />
+        </service>
     </application>
 
 </manifest>

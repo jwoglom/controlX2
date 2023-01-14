@@ -37,7 +37,9 @@ class PumpBatteryComplicationDataSourceService : SuspendingComplicationDataSourc
         Log.i(tag, "onComplicationRequest(${request.complicationType}, ${request.complicationInstanceId}, ${request.immediateResponseRequired})")
 
         val tapIntent = PendingIntent.getActivity(this, 0, Intent(this, MainActivity::class.java), PendingIntent.FLAG_IMMUTABLE)
-        initGoogleApi(this)
+        if (!initGoogleApi(this)) {
+            return null
+        }
         val pumpBattery = DataClientState(this).pumpBattery
 
         return getComplicationDataForType(

@@ -19,6 +19,7 @@ import android.content.ComponentName
 import android.os.Parcelable
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.longPreferencesKey
+import com.jwoglom.wearx2.util.WearX2Complication
 import kotlinx.parcelize.Parcelize
 import java.time.Instant
 
@@ -36,7 +37,7 @@ data class ComplicationToggleArgs(
     /**
      * An app-defined key for different provided complications.
      */
-    val complication: Complication,
+    val complication: WearX2Complication,
 
     /**
      * The system-defined key for the instance of a provided complication.
