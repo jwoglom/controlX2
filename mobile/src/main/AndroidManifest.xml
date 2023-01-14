@@ -53,9 +53,13 @@
             android:exported="false"
             android:icon="@drawable/pump">
             <intent-filter>
-                <action
+                <!--action
                     android:name="com.google.android.gms.wearable.BIND_LISTENER"
-                    tools:ignore="WearableBindListener" />
+                    tools:ignore="WearableBindListener" /-->
+                <action android:name="com.google.android.gms.wearable.DATA_CHANGED" />
+                <action android:name="com.google.android.gms.wearable.MESSAGE_RECEIVED" />
+                <data android:scheme="wear" android:host="*" android:pathPrefix="/to-phone" />
+                <data android:scheme="wear" android:host="*" android:pathPrefix="/from-pump" />
             </intent-filter>
         </service>
 
@@ -63,9 +67,9 @@
             android:name=".BolusNotificationBroadcastReceiver"
             android:exported="false">
             <intent-filter>
-                <action
+                <!--action
                     android:name="com.google.android.gms.wearable.BIND_LISTENER"
-                    tools:ignore="WearableBindListener" />
+                    tools:ignore="WearableBindListener" /-->
             </intent-filter>
         </receiver>
     </application>
