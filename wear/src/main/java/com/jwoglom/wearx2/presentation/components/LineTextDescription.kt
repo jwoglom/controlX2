@@ -29,6 +29,7 @@ internal fun LineTextDescription(
     height: Dp = 40.dp,
     align: Alignment = Alignment.CenterStart,
     bottomPadding: Dp = 2.dp,
+    modifier: Modifier = Modifier,
 ) {
     Chip(
         onClick = onClick,
@@ -57,7 +58,7 @@ internal fun LineTextDescription(
             top = 2.dp, bottom = bottomPadding,
             start = 10.dp, end = 10.dp
         ),
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
             .height(height)
     )
