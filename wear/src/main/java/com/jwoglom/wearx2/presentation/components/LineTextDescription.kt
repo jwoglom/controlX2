@@ -8,6 +8,8 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -23,6 +25,10 @@ internal fun LineTextDescription(
     secondaryLabelText: String = "",
     onClick: () -> Unit = {},
     fontSize: TextUnit = TextUnit.Unspecified,
+    textColor: Color = defaultTheme.colors.primary,
+    height: Dp = 40.dp,
+    align: Alignment = Alignment.CenterStart,
+    bottomPadding: Dp = 2.dp,
 ) {
     Chip(
         onClick = onClick,
@@ -34,7 +40,7 @@ internal fun LineTextDescription(
                 Text(
                     labelText,
                     fontSize = fontSize,
-                    modifier = Modifier.align(Alignment.CenterStart),
+                    modifier = Modifier.align(align),
                 )
                 Text(
                     secondaryLabelText,
@@ -45,14 +51,14 @@ internal fun LineTextDescription(
         },
         colors = ChipDefaults.chipColors(
             backgroundColor = defaultTheme.colors.background,
-            contentColor = defaultTheme.colors.primary,
+            contentColor = textColor,
         ),
         contentPadding = PaddingValues(
-            top = 2.dp, bottom = 2.dp,
+            top = 2.dp, bottom = bottomPadding,
             start = 10.dp, end = 10.dp
         ),
         modifier = Modifier
             .fillMaxWidth()
-            .height(40.dp)
+            .height(height)
     )
 }

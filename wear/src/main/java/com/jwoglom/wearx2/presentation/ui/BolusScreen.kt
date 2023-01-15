@@ -2,6 +2,7 @@ package com.jwoglom.wearx2.presentation.ui
 
 import android.content.res.Configuration
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -11,7 +12,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.wrapContentSize
-import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.material.ExperimentalMaterialApi
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
@@ -30,6 +30,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.style.TextAlign
@@ -43,7 +44,6 @@ import androidx.wear.compose.material.AutoCenteringParams
 import androidx.wear.compose.material.Button
 import androidx.wear.compose.material.ButtonDefaults
 import androidx.wear.compose.material.Chip
-import androidx.wear.compose.material.CompactButton
 import androidx.wear.compose.material.Icon
 import androidx.wear.compose.material.MaterialTheme
 import androidx.wear.compose.material.ScalingLazyColumn
@@ -74,8 +74,10 @@ import com.jwoglom.pumpx2.pump.messages.response.currentStatus.LastBGResponse
 import com.jwoglom.pumpx2.pump.messages.response.currentStatus.TimeSinceResetResponse
 import com.jwoglom.wearx2.LocalDataStore
 import com.jwoglom.wearx2.R
+import com.jwoglom.wearx2.dataStore
 import com.jwoglom.wearx2.presentation.DataStore
 import com.jwoglom.wearx2.presentation.components.LineTextDescription
+import com.jwoglom.wearx2.presentation.defaultTheme
 import com.jwoglom.wearx2.shared.presentation.LifecycleStateObserver
 import com.jwoglom.wearx2.shared.util.SendType
 import com.jwoglom.wearx2.shared.util.firstLetterCapitalized
@@ -106,6 +108,7 @@ fun BolusScreen(
     sendPhoneBolusCancel: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    var showBolusConditionPrompt by remember { mutableStateOf(false) }
     var showPermissionCheckDialog by remember { mutableStateOf(false) }
     var showConfirmDialog by remember { mutableStateOf(false) }
     var showInProgressDialog by remember { mutableStateOf(false) }
@@ -127,14 +130,14 @@ fun BolusScreen(
 
     val dataStore = LocalDataStore.current
 
-    fun runBolusCalculator(
+    fun buildBolusCalculator(
         dataSnapshot: BolusCalcDataSnapshotResponse?,
         lastBG: LastBGResponse?,
         bolusUnitsUserInput: Double?,
         bolusCarbsGramsUserInput: Int?,
         bolusBgMgdlUserInput: Int?
     ): BolusCalculatorBuilder {
-        Timber.i("runBolusCalculator: INPUT units=$bolusUnitsUserInput carbs=$bolusCarbsGramsUserInput bg=$bolusBgMgdlUserInput dataSnapshot=$dataSnapshot lastBG=$lastBG")
+        Timber.i("buildBolusCalculator: INPUT units=$bolusUnitsUserInput carbs=$bolusCarbsGramsUserInput bg=$bolusBgMgdlUserInput dataSnapshot=$dataSnapshot lastBG=$lastBG")
         val bolusCalc = BolusCalculatorBuilder()
         if (dataSnapshot != null) {
             bolusCalc.onBolusCalcDataSnapshotResponse(dataSnapshot)
@@ -150,13 +153,14 @@ fun BolusScreen(
     }
 
     fun bolusCalcDecision(bolusCalc: BolusCalculatorBuilder?): BolusCalcDecision? {
-        val decision = bolusCalc?.build()?.parse()
-        Timber.i("bolusCalcDecision: OUTPUT units=${decision?.units} conditions=${decision?.conditions}")
+        val excluded = (dataStore.bolusConditionsExcluded.value ?: mutableSetOf()).stream().toArray { arrayOfNulls<BolusCalcCondition>(it) }
+        val decision = bolusCalc?.build()?.parse(*excluded)
+        Timber.i("bolusCalcDecision: OUTPUT units=${decision?.units} conditions=${decision?.conditions} excluded=$excluded")
         return decision
     }
 
     fun bolusCalcParameters(bolusCalc: BolusCalculatorBuilder?): Pair<BolusParameters, BolusCalcUnits> {
-        val decision = bolusCalc?.build()?.parse()
+        val decision = bolusCalcDecision(bolusCalc)
         return Pair(
             BolusParameters(
                 decision?.units?.total,
@@ -249,15 +253,60 @@ fun BolusScreen(
             bolusCarbsGramsUserInput,
             bolusBgMgdlUserInput
         ) {
-            dataStore.bolusCalculatorBuilder.value = runBolusCalculator(
+            dataStore.bolusCalculatorBuilder.value = buildBolusCalculator(
                 bolusCalcDataSnapshot.value,
                 bolusCalcLastBG.value,
                 bolusUnitsUserInput,
                 bolusCarbsGramsUserInput,
                 bolusBgMgdlUserInput
             )
+
             dataStore.bolusCurrentParameters.value =
                 bolusCalcParameters(dataStore.bolusCalculatorBuilder.value).first
+
+            fun sortConditions(set: Set<BolusCalcCondition>?): List<BolusCalcCondition> {
+                if (set == null) {
+                    return emptyList()
+                }
+
+                return set.sortedWith(
+                    compareBy(
+                        { it.javaClass == FailedSanityCheck::class.java },
+                        { it.javaClass == FailedPrecondition::class.java },
+                        { it.javaClass == WaitingOnPrecondition::class.java },
+                        { it.javaClass == Decision::class.java },
+                        { it.javaClass == NonActionDecision::class.java },
+                    )
+                )
+            }
+            val conditions = bolusCalcDecision(dataStore.bolusCalculatorBuilder.value)?.conditions
+            dataStore.bolusCurrentConditions.value = sortConditions(conditions)
+
+            val conditionsWithPrompt = conditions?.filter {
+                it.prompt != null
+            }
+            val conditionsAcknowledged = dataStore.bolusConditionsPromptAcknowledged.value
+            Timber.d("bolusCalc conditionsWithPrompt: $conditionsWithPrompt conditionsAcknowledged: $conditionsAcknowledged conditions: $conditions")
+            if (conditionsWithPrompt?.size == 1) {
+                var alreadyAcked = false
+                conditionsAcknowledged?.forEach {
+                    if (conditionsWithPrompt[0] == it) {
+                        alreadyAcked = true
+                    }
+                }
+                if (alreadyAcked) {
+                    Timber.d("bolusCalc: Not displaying acknowledged prompt again: $conditionsAcknowledged")
+                } else {
+                    dataStore.bolusConditionsPrompt.value = mutableListOf<BolusCalcCondition>().let {
+                        it.addAll(conditionsWithPrompt)
+                        it
+                    }
+                    showBolusConditionPrompt = true
+                }
+            } else {
+                dataStore.bolusConditionsPrompt.value = null
+                showBolusConditionPrompt = false
+            }
 
             dataStore.bolusUnitsDisplayedText.value = when (bolusUnitsUserInput) {
                 null -> when (dataStore.bolusCurrentParameters.value) {
@@ -285,10 +334,44 @@ fun BolusScreen(
             autoCentering = AutoCenteringParams()
         ) {
             item {
-                val bolusUnitsDisplayedText = dataStore.bolusUnitsDisplayedText.observeAsState()
-
                 // Signify we have drawn the content of the first screen
                 ReportFullyDrawn()
+
+                val bolusUnitsDisplayedText = dataStore.bolusUnitsDisplayedText.observeAsState()
+                val bolusConditionsPromptAcknowledged = dataStore.bolusConditionsPromptAcknowledged.observeAsState()
+                val bolusConditionsExcluded = dataStore.bolusConditionsExcluded.observeAsState()
+
+                if (bolusConditionsPromptAcknowledged.value != null && bolusConditionsPromptAcknowledged.value!!.size > 0) {
+                    Box(
+                        modifier = Modifier.fillMaxSize().clickable {
+                            dataStore.bolusConditionsPrompt.value = mutableListOf<BolusCalcCondition>().let {
+                                it.addAll(bolusConditionsPromptAcknowledged.value!!)
+                                it
+                            }
+                            dataStore.bolusConditionsPromptAcknowledged.value?.clear()
+                            dataStore.bolusConditionsExcluded.value?.clear()
+                            showBolusConditionPrompt = true
+                        }
+                    ) {
+                        Spacer(modifier = Modifier.height(48.dp))
+                        bolusConditionsPromptAcknowledged.value?.forEach {
+                            LineTextDescription(
+                                when {
+                                    bolusConditionsExcluded.value?.contains(it) == true -> "${it.prompt?.whenIgnoredNotice}"
+                                    else -> "${it.prompt?.whenAcceptedNotice}"
+                                },
+                                textColor = when {
+                                    bolusConditionsExcluded.value?.contains(it) == true -> Color.Red
+                                    else -> defaultTheme.colors.primary
+                                },
+                                fontSize = 12.sp,
+                                align = Alignment.Center,
+                                height = 60.dp,
+                                bottomPadding = 8.dp,
+                            )
+                        }
+                    }
+                }
 
                 Chip(
                     onClick = {
@@ -393,29 +476,14 @@ fun BolusScreen(
                 }
             }
 
-            fun sortConditions(set: Set<BolusCalcCondition>?): List<BolusCalcCondition> {
-                if (set == null) {
-                    return emptyList()
-                }
-
-                return set.sortedWith(
-                    compareBy(
-                        { it.javaClass == FailedSanityCheck::class.java },
-                        { it.javaClass == FailedPrecondition::class.java },
-                        { it.javaClass == WaitingOnPrecondition::class.java },
-                        { it.javaClass == Decision::class.java },
-                        { it.javaClass == NonActionDecision::class.java },
-                    )
-                )
-            }
-
             items(5) { index ->
-                val bolusCalculatorBuilder = dataStore.bolusCalculatorBuilder.observeAsState()
-                val conditions = sortConditions(bolusCalculatorBuilder.value?.conditions)
+                val conditions = dataStore.bolusCurrentConditions.observeAsState()
 
-                if (index < conditions.size) {
+                if (conditions.value == null) {
+                    Spacer(modifier = Modifier.height(0.dp))
+                } else if (index < (conditions.value?.size ?: 0)) {
                     LineTextDescription(
-                        labelText = firstLetterCapitalized(conditions[index].msg),
+                        labelText = firstLetterCapitalized(conditions.value?.get(index)?.msg ?: ""),
                         fontSize = 12.sp,
                     )
                 } else {
@@ -425,6 +493,103 @@ fun BolusScreen(
         }
 
         val scrollState = rememberScalingLazyListState()
+
+        Dialog(
+            showDialog = showBolusConditionPrompt,
+            onDismissRequest = {
+                showBolusConditionPrompt = false
+            },
+            scrollState = scrollState
+        ) {
+            val bolusConditionsPrompt = dataStore.bolusConditionsPrompt.observeAsState()
+
+            Alert(
+                title = {
+                    Text(
+                        text = when {
+                            bolusConditionsPrompt.value != null -> "${bolusConditionsPrompt.value?.first()?.msg}"
+                            else -> "Bolus Conditions Prompt"
+                        },
+                        textAlign = TextAlign.Center,
+                        color = MaterialTheme.colors.onBackground
+                    )
+                },
+                negativeButton = {
+                    Button(
+                        onClick = {
+                            bolusConditionsPrompt.value?.let {
+                                if (dataStore.bolusConditionsPromptAcknowledged.value == null) {
+                                    dataStore.bolusConditionsPromptAcknowledged.value = mutableListOf(it.first())
+                                } else {
+                                    dataStore.bolusConditionsPromptAcknowledged.value!!.add(it.first())
+                                }
+
+                                if (dataStore.bolusConditionsExcluded.value == null) {
+                                    dataStore.bolusConditionsExcluded.value = mutableSetOf(it.first())
+                                } else {
+                                    dataStore.bolusConditionsExcluded.value?.add(it.first())
+                                }
+
+                                if (it.size == 1) {
+                                    showBolusConditionPrompt = false
+                                }
+                                dataStore.bolusConditionsPrompt.value?.drop(0)
+                            }
+
+                        },
+                        colors = ButtonDefaults.secondaryButtonColors()
+                    ) {
+                        Icon(
+                            imageVector = Icons.Filled.Clear,
+                            contentDescription = "Do not apply"
+                        )
+                    }
+                },
+                positiveButton = {
+                    Button(
+                        onClick = {
+                            bolusConditionsPrompt.value?.let {
+                                if (dataStore.bolusConditionsPromptAcknowledged.value == null) {
+                                    dataStore.bolusConditionsPromptAcknowledged.value = mutableListOf(it.first())
+                                } else {
+                                    dataStore.bolusConditionsPromptAcknowledged.value!!.add(it.first())
+                                }
+
+                                if (it.size == 1) {
+                                    showBolusConditionPrompt = false
+                                }
+
+                                dataStore.bolusConditionsPrompt.value?.drop(0)
+                            }
+                        },
+                        colors = ButtonDefaults.primaryButtonColors()
+                    ) {
+                        Icon(
+                            imageVector = Icons.Filled.Check,
+                            contentDescription = "Apply"
+                        )
+                    }
+                },
+                icon = {
+                    Image(
+                        painterResource(R.drawable.bolus_icon),
+                        "Bolus icon",
+                        Modifier.size(24.dp)
+                    )
+                },
+                scrollState = scrollState,
+            ) {
+                Text(
+                    text = when {
+                        bolusConditionsPrompt.value != null -> "${bolusConditionsPrompt.value?.first()?.prompt?.promptMessage}"
+                        else -> ""
+                    },
+                    textAlign = TextAlign.Center,
+                    style = MaterialTheme.typography.body2,
+                    color = MaterialTheme.colors.onBackground
+                )
+            }
+        }
 
         Dialog(
             showDialog = showPermissionCheckDialog,
@@ -903,7 +1068,33 @@ fun resetBolusDataStoreState(dataStore: DataStore) {
     device = Devices.WEAR_OS_LARGE_ROUND,
 )
 @Composable
-fun Preview() {
+fun EmptyPreview() {
+    dataStore.bolusConditionsPromptAcknowledged.value = mutableListOf()
+    BolusScreen(
+        scalingLazyListState = ScalingLazyListState(0, 0),
+        focusRequester = FocusRequester(),
+        bolusUnitsUserInput = 0.0,
+        bolusCarbsGramsUserInput = 0,
+        bolusBgMgdlUserInput = 0,
+        onClickUnits = {},
+        onClickCarbs = { },
+        onClickBG = { },
+        onClickLanding = { },
+        sendPumpCommands = {_, _ -> },
+        sendPhoneBolusRequest = {_, _, _, _, _ -> },
+        resetSavedBolusEnteredState = {},
+        sendPhoneBolusCancel = {}
+    )
+}
+
+@Preview(
+    apiLevel = 26,
+    uiMode = Configuration.UI_MODE_TYPE_WATCH,
+    device = Devices.WEAR_OS_LARGE_ROUND,
+)
+@Composable
+fun ConditionAcknowledgedPreview() {
+    dataStore.bolusConditionsPromptAcknowledged.value = mutableListOf(BolusCalcCondition.POSITIVE_BG_CORRECTION)
     BolusScreen(
         scalingLazyListState = ScalingLazyListState(0, 0),
         focusRequester = FocusRequester(),

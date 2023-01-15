@@ -48,6 +48,10 @@ class DataStore {
 
     val bolusCalculatorBuilder = MutableLiveData<BolusCalculatorBuilder>()
     val bolusCurrentParameters = MutableLiveData<BolusParameters>()
+    val bolusCurrentConditions = MutableLiveData<List<BolusCalcCondition>>()
+    val bolusConditionsPrompt = MutableLiveData<MutableList<BolusCalcCondition>>()
+    val bolusConditionsPromptAcknowledged = MutableLiveData<MutableList<BolusCalcCondition>>()
+    val bolusConditionsExcluded = MutableLiveData<MutableSet<BolusCalcCondition>>()
     val bolusFinalParameters = MutableLiveData<BolusParameters>()
     val bolusFinalCalcUnits = MutableLiveData<BolusCalcUnits>()
     val bolusFinalConditions = MutableLiveData<Set<BolusCalcCondition>>()
@@ -93,6 +97,10 @@ class DataStore {
 
         bolusCalculatorBuilder.observeForever { t -> Timber.i("DataStore.bolusCalculatorBuilder=$t") }
         bolusCurrentParameters.observeForever { t -> Timber.i("DataStore.bolusCurrentParameters=$t") }
+        bolusCurrentConditions.observeForever { t -> Timber.i("DataStore.bolusCurrentConditions=$t") }
+        bolusConditionsPrompt.observeForever { t -> Timber.i("DataStore.bolusConditionsPrompt=$t") }
+        bolusConditionsPromptAcknowledged.observeForever { t -> Timber.i("DataStore.bolusConditionsPromptAcknowledged=$t") }
+        bolusConditionsExcluded.observeForever { t -> Timber.i("DataStore.bolusConditionsExcluded=$t") }
         bolusFinalParameters.observeForever { t -> Timber.i("DataStore.bolusFinalParameters=$t") }
         bolusFinalCalcUnits.observeForever { t -> Timber.i("DataStore.bolusFinalCalcUnits=$t") }
         bolusFinalConditions.observeForever { t -> Timber.i("DataStore.bolusFinalConditions=$t") }
