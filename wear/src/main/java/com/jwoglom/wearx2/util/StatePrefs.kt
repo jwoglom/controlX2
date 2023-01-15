@@ -44,7 +44,8 @@ class StatePrefs(val context: Context) {
     private fun set(key: String, pair: Pair<String, Instant>?) {
         pair?.let {
             Timber.d("StatePrefs set $key=$pair")
-            prefs().edit().putString("StatePrefs_${key}", "${pair.first};;${pair.second.toEpochMilli()}").apply()
+            val ok = prefs().edit().putString("StatePrefs_${key}", "${pair.first};;${pair.second.toEpochMilli()}").commit()
+            Timber.d("StatePrefs reply $key=$pair: $ok")
         }
     }
 
