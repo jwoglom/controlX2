@@ -359,13 +359,9 @@ class MainActivity : ComponentActivity(), MessageApi.MessageListener, GoogleApiC
         when (message) {
             is CurrentBatteryAbstractResponse -> {
                 dataStore.batteryPercent.value = message.batteryPercent
-                // DataClientState(this).pumpBattery = Pair("${message.batteryPercent}", Instant.now())
-                UpdateComplication(this, WearX2Complication.PUMP_BATTERY)
             }
             is ControlIQIOBResponse -> {
                 dataStore.iobUnits.value = InsulinUnit.from1000To1(message.pumpDisplayedIOB)
-                // DataClientState(this).pumpIOB = Pair("${InsulinUnit.from1000To1(message.pumpDisplayedIOB)}", Instant.now())
-                UpdateComplication(this, WearX2Complication.PUMP_IOB)
             }
             is ControlIQInfoAbstractResponse -> {
                 dataStore.controlIQMode.value = when (message.currentUserModeType) {

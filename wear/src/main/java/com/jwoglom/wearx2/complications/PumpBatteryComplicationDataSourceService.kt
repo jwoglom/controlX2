@@ -6,7 +6,6 @@ import android.content.Intent
 import android.graphics.drawable.Icon
 import android.util.Log
 import androidx.compose.ui.graphics.Color
-import androidx.datastore.core.DataStore
 import androidx.wear.watchface.complications.data.ColorRamp
 import androidx.wear.watchface.complications.data.ComplicationData
 import androidx.wear.watchface.complications.data.ComplicationText
@@ -18,13 +17,11 @@ import androidx.wear.watchface.complications.data.RangedValueComplicationData
 import androidx.wear.watchface.complications.data.ShortTextComplicationData
 import androidx.wear.watchface.complications.data.TimeDifferenceComplicationText
 import androidx.wear.watchface.complications.data.TimeDifferenceStyle
-import androidx.wear.watchface.complications.datasource.ComplicationDataSourceService
 import androidx.wear.watchface.complications.datasource.ComplicationRequest
 import androidx.wear.watchface.complications.datasource.SuspendingComplicationDataSourceService
 import com.jwoglom.wearx2.MainActivity
 import com.jwoglom.wearx2.R
-import com.jwoglom.wearx2.complications.internal.initGoogleApi
-import com.jwoglom.wearx2.util.DataClientState
+import com.jwoglom.wearx2.util.StatePrefs
 import java.time.Duration
 import java.time.Instant
 
@@ -37,10 +34,7 @@ class PumpBatteryComplicationDataSourceService : SuspendingComplicationDataSourc
         Log.i(tag, "onComplicationRequest(${request.complicationType}, ${request.complicationInstanceId}, ${request.immediateResponseRequired})")
 
         val tapIntent = PendingIntent.getActivity(this, 0, Intent(this, MainActivity::class.java), PendingIntent.FLAG_IMMUTABLE)
-        if (!initGoogleApi(this)) {
-            return null
-        }
-        val pumpBattery = DataClientState(this).pumpBattery
+        val pumpBattery = StatePrefs(this).pumpBattery
 
         return getComplicationDataForType(
             request.complicationType,

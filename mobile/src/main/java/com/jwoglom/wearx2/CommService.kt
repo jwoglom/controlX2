@@ -22,11 +22,8 @@ import android.widget.Toast
 import androidx.core.app.NotificationCompat
 import com.google.android.gms.common.ConnectionResult
 import com.google.android.gms.common.api.GoogleApiClient
-import com.google.android.gms.wearable.MessageApi
 import com.google.android.gms.wearable.MessageEvent
 import com.google.android.gms.wearable.Node
-import com.google.android.gms.wearable.PutDataMapRequest
-import com.google.android.gms.wearable.PutDataRequest
 import com.google.android.gms.wearable.Wearable
 import com.google.android.gms.wearable.WearableListenerService
 import com.jwoglom.pumpx2.pump.PumpState
@@ -42,8 +39,6 @@ import com.jwoglom.pumpx2.pump.messages.models.ApiVersion
 import com.jwoglom.pumpx2.pump.messages.models.InsulinUnit
 import com.jwoglom.pumpx2.pump.messages.models.KnownApiVersion
 import com.jwoglom.pumpx2.pump.messages.request.control.InitiateBolusRequest
-import com.jwoglom.pumpx2.pump.messages.request.control.RemoteBgEntryRequest
-import com.jwoglom.pumpx2.pump.messages.request.control.RemoteCarbEntryRequest
 import com.jwoglom.pumpx2.pump.messages.request.currentStatus.ApiVersionRequest
 import com.jwoglom.pumpx2.pump.messages.request.currentStatus.ControlIQIOBRequest
 import com.jwoglom.pumpx2.pump.messages.request.currentStatus.InsulinStatusRequest
@@ -59,11 +54,10 @@ import com.jwoglom.pumpx2.pump.messages.response.currentStatus.InsulinStatusResp
 import com.jwoglom.pumpx2.pump.messages.response.currentStatus.TimeSinceResetResponse
 import com.jwoglom.pumpx2.pump.messages.response.qualifyingEvent.QualifyingEvent
 import com.jwoglom.pumpx2.shared.Hex
-import com.jwoglom.wearx2.presentation.screens.sections.apiVersion
+import com.jwoglom.wearx2.shared.CommServiceCodes
 import com.jwoglom.wearx2.shared.InitiateConfirmedBolusSerializer
 import com.jwoglom.wearx2.shared.PumpMessageSerializer
 import com.jwoglom.wearx2.shared.PumpQualifyingEventsSerializer
-import com.jwoglom.wearx2.shared.CommServiceCodes
 import com.jwoglom.wearx2.shared.util.setupTimber
 import com.jwoglom.wearx2.shared.util.shortTime
 import com.jwoglom.wearx2.shared.util.twoDecimalPlaces
@@ -123,6 +117,15 @@ class CommService : WearableListenerService(), GoogleApiClient.ConnectionCallbac
             ) {
                 message?.let { lastResponseMessage.put(Pair(it.characteristic, it.opCode()), Pair(it, Instant.now())) }
                 sendWearCommMessage("/from-pump/receive-message", PumpMessageSerializer.toBytes(message))
+
+                message?.let {
+                    if (it is CurrentBatteryAbstractResponse ||
+                        it is ControlIQIOBResponse ||
+                        it is CurrentEGVGuiDataResponse
+                    ) {
+                        sendWearCommMessage("/to-wear/service-receive-message", PumpMessageSerializer.toBytes(message))
+                    }
+                }
 
                 // Callbacks handled by this service itself
                 when (message) {
