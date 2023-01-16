@@ -16,5 +16,6 @@ class DebugTree(
             }
         }
         super.log(priority, "WearX2:${prefix}:$tag", message, t)
+
     }
 }

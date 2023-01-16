@@ -154,7 +154,10 @@ fun Landing(
                             .fillMaxHeight(0.5F),
                         content = {
                             item {
-                                if (displayBolusWindow.bottomSheetState.isExpanded || displayBolusWindow.bottomSheetState.isAnimationRunning) {
+                                if (displayBolusWindow.bottomSheetState.isExpanded ||
+                                    displayBolusWindow.bottomSheetState.isAnimationRunning ||
+                                    bolusSheetState == BottomSheetValue.Expanded)
+                                {
                                     BolusWindow()
                                 }
                             }
@@ -283,7 +286,7 @@ private fun DefaultPreview() {
 
 @Preview(showBackground = true)
 @Composable
-private fun BolusPreview() {
+fun BolusPreview() {
     WearX2Theme() {
         Surface(
             modifier = Modifier.fillMaxSize(),
