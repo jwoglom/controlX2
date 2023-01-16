@@ -9,9 +9,11 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.absolutePadding
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.wrapContentSize
@@ -318,11 +320,11 @@ fun BolusScreen(
                     null -> "0.00u"
                     else -> "${twoDecimalPlaces(dataStore.bolusCurrentParameters.value!!.units)}u"
                 }
-                else -> "${oneDecimalPlace(bolusUnitsUserInput)}u"
+                else -> "${twoDecimalPlaces(bolusUnitsUserInput)}u"
             }
             dataStore.bolusUnitsDisplayedSubtitle.value = when (bolusUnitsUserInput) {
                 null -> when (dataStore.bolusCurrentParameters.value) {
-                    null -> ""
+                    null -> "Units"
                     else -> "Calculated"
                 }
                 else -> "Override"
@@ -330,9 +332,14 @@ fun BolusScreen(
 
             val autofilledBg = dataStore.bolusCalculatorBuilder.value?.glucoseMgdl?.orElse(null)
             dataStore.bolusBGDisplayedText.value = when {
-                bolusBgMgdlUserInput != null -> "Entered: $bolusBgMgdlUserInput"
-                autofilledBg != null -> "From CGM: $autofilledBg"
-                else -> "Not Entered"
+                bolusBgMgdlUserInput != null -> "$bolusBgMgdlUserInput"
+                autofilledBg != null -> "$autofilledBg"
+                else -> "?"
+            }
+            dataStore.bolusBGDisplayedSubtitle.value = when {
+                bolusBgMgdlUserInput != null -> "Entered (mg/dL)"
+                autofilledBg != null -> "CGM (mg/dL)"
+                else -> "BG (mg/dL)"
             }
         }
 
@@ -360,136 +367,168 @@ fun BolusScreen(
                 val bolusUnitsDisplayedText = dataStore.bolusUnitsDisplayedText.observeAsState()
                 val bolusUnitsDisplayedSubtitle = dataStore.bolusUnitsDisplayedSubtitle.observeAsState()
 
-                Chip(
-                    onClick = {
-                        if (dataStore.bolusCurrentParameters.value != null) {
-                            onClickUnits(dataStore.bolusCurrentParameters.value!!.units)
-                        } else {
-                            onClickUnits(null)
-                        }
-                    },
-                    label = {
-                        Column(
-                            Modifier
-                                .fillMaxWidth(),
-                            verticalArrangement = Arrangement.Center,
-                            horizontalAlignment = Alignment.CenterHorizontally
-                        ) {
-                            Text(
-                                "${bolusUnitsDisplayedText.value}",
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                                textAlign = TextAlign.Center,
-                                fontSize = 18.sp,
-                            )
-                        }
-                    },
-                    secondaryLabel = {
-                        Column(
-                            Modifier
-                                .fillMaxWidth(),
-                            verticalArrangement = Arrangement.Center,
-                            horizontalAlignment = Alignment.CenterHorizontally
-                        ) {
-                            Text(
-                                text = "${bolusUnitsDisplayedSubtitle.value}",
-                                maxLines = 1,
-                                textAlign = TextAlign.Center,
-                                fontSize = 8.sp,
-                            )
-                        }
-                    },
-                    contentPadding = PaddingValues(
-                        start = 2.dp, end = 2.dp,
-                        top = 2.dp, bottom = 2.dp
-                    ),
-                    modifier = Modifier
-                        .fillMaxWidth(fraction = 0.5f)
-                        .height(40.dp)
-                )
-            }
-
-            item {
-                Chip(
-                    onClick = onClickCarbs,
-                    label = {
-                        Text(
-                            "Carbs (g)",
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
-                    },
-                    secondaryLabel = {
-                        Text(
-                            text = when (bolusCarbsGramsUserInput) {
-                                null -> "Not Entered"
-                                else -> "$bolusCarbsGramsUserInput"
+                Box(modifier = Modifier.padding(top = 24.dp)) {
+                    Chip(
+                        onClick = {
+                            if (dataStore.bolusCurrentParameters.value != null) {
+                                onClickUnits(dataStore.bolusCurrentParameters.value!!.units)
+                            } else {
+                                onClickUnits(null)
                             }
-                        )
-                    },
-                    modifier = Modifier.fillMaxWidth()
-                )
-            }
-
-            item {
-                val bolusBGDisplayedText = dataStore.bolusBGDisplayedText.observeAsState()
-
-                Chip(
-                    onClick = onClickBG,
-                    label = {
-                        Text(
-                            "BG (mg/dL)",
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
-                    },
-                    secondaryLabel = {
-                        Text(
-                            text = "${bolusBGDisplayedText.value}",
-                        )
-                    },
-                    modifier = Modifier.fillMaxWidth()
-                )
-            }
-
-            fun performPermissionCheck() {
-                showPermissionCheckDialog = true
-                sendPumpCommands(SendType.BUST_CACHE, listOf(BolusPermissionRequest()))
-            }
-
-            item {
-                Spacer(modifier = Modifier.height(8.dp))
-            }
-
-            item {
-                Button(
-                    onClick = {
-                        dataStore.bolusFinalConditions.value =
-                            bolusCalcDecision(dataStore.bolusCalculatorBuilder.value, bolusConditionsExcluded.value)?.conditions
-
-                        val pair = bolusCalcParameters(dataStore.bolusCalculatorBuilder.value, bolusConditionsExcluded.value)
-                        dataStore.bolusFinalParameters.value = pair.first
-                        dataStore.bolusFinalCalcUnits.value = pair.second
-                        performPermissionCheck()
-                    },
-                    enabled = true
-                ) {
-                    Row() {
-                        Icon(
-                            imageVector = Icons.Filled.Check,
-                            contentDescription = "continue",
-                            modifier = Modifier
-                                .size(ButtonDefaults.SmallIconSize)
-                                .wrapContentSize(align = Alignment.Center),
-                        )
-                    }
+                        },
+                        label = {
+                            Column(
+                                Modifier
+                                    .fillMaxWidth(),
+                                verticalArrangement = Arrangement.Center,
+                                horizontalAlignment = Alignment.CenterHorizontally
+                            ) {
+                                Text(
+                                    "${bolusUnitsDisplayedText.value}",
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                    textAlign = TextAlign.Center,
+                                    fontSize = 18.sp,
+                                )
+                            }
+                        },
+                        secondaryLabel = {
+                            Column(
+                                Modifier
+                                    .fillMaxWidth(),
+                                verticalArrangement = Arrangement.Center,
+                                horizontalAlignment = Alignment.CenterHorizontally
+                            ) {
+                                Text(
+                                    text = when (bolusUnitsDisplayedSubtitle.value) {
+                                        null -> "Units"
+                                        else -> "${bolusUnitsDisplayedSubtitle.value}"
+                                    },
+                                    maxLines = 1,
+                                    textAlign = TextAlign.Center,
+                                    fontSize = 10.sp,
+                                )
+                            }
+                        },
+                        contentPadding = PaddingValues(
+                            start = 2.dp, end = 2.dp,
+                            top = 2.dp, bottom = 2.dp
+                        ),
+                        shape = MaterialTheme.shapes.medium,
+                        modifier = Modifier
+                            .fillMaxWidth(fraction = 0.5f)
+                            .height(40.dp)
+                    )
                 }
             }
 
             item {
-                // Signify we have drawn the content of the first screen
-                ReportFullyDrawn()
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(PaddingValues(top = 4.dp))
+                ) {
+                    Chip(
+                        onClick = onClickCarbs,
+                        label = {
+                            Column(
+                                Modifier
+                                    .fillMaxWidth(),
+                                verticalArrangement = Arrangement.Center,
+                                horizontalAlignment = Alignment.CenterHorizontally
+                            ) {
+                                Text(
+                                    text = when (bolusCarbsGramsUserInput) {
+                                        null -> "0"
+                                        else -> "$bolusCarbsGramsUserInput"
+                                    },
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                    textAlign = TextAlign.Center,
+                                    fontSize = 34.sp,
+                                )
+                            }
+                        },
+                        secondaryLabel = {
+                            Column(
+                                Modifier
+                                    .fillMaxWidth(),
+                                verticalArrangement = Arrangement.Center,
+                                horizontalAlignment = Alignment.CenterHorizontally
+                            ) {
+                                Text(
+                                    text = "Carbs (grams)",
+                                    maxLines = 1,
+                                    textAlign = TextAlign.Center,
+                                    fontSize = 10.sp,
+                                )
+                            }
+                        },
+                        contentPadding = PaddingValues(
+                            start = 2.dp, end = 2.dp,
+                            top = 2.dp, bottom = 2.dp
+                        ),
+                        shape = MaterialTheme.shapes.medium,
+                        modifier = Modifier
+                            .padding(PaddingValues(end = 4.dp))
+                            .height(60.dp)
+                            .weight(1f)
+                    )
 
+                    val bolusBGDisplayedText = dataStore.bolusBGDisplayedText.observeAsState()
+                    val bolusBGDisplayedSubtitle = dataStore.bolusBGDisplayedSubtitle.observeAsState()
+
+                    Chip(
+                        onClick = onClickBG,
+                        label = {
+                            Column(
+                                Modifier
+                                    .fillMaxWidth(),
+                                verticalArrangement = Arrangement.Center,
+                                horizontalAlignment = Alignment.CenterHorizontally
+                            ) {
+                                Text(
+                                    text = when (bolusBGDisplayedText.value) {
+                                        null -> ""
+                                        else -> "${bolusBGDisplayedText.value}"
+                                    },
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                    textAlign = TextAlign.Center,
+                                    fontSize = 34.sp,
+                                )
+                            }
+                        },
+                        secondaryLabel = {
+                            Column(
+                                Modifier
+                                    .fillMaxWidth(),
+                                verticalArrangement = Arrangement.Center,
+                                horizontalAlignment = Alignment.CenterHorizontally
+                            ) {
+                                Text(
+                                    text = when (bolusBGDisplayedSubtitle.value) {
+                                        null -> "BG (mg/dL)"
+                                        else -> "${bolusBGDisplayedSubtitle.value}"
+                                    },
+                                    maxLines = 1,
+                                    textAlign = TextAlign.Center,
+                                    fontSize = 10.sp,
+                                )
+                            }
+                        },
+                        contentPadding = PaddingValues(
+                            start = 2.dp, end = 2.dp,
+                            top = 2.dp, bottom = 2.dp
+                        ),
+                        shape = MaterialTheme.shapes.medium,
+                        modifier = Modifier
+                            .padding(PaddingValues(start = 4.dp))
+                            .height(60.dp)
+                            .weight(1f)
+                    )
+                }
+            }
+
+            item {
                 val bolusConditionsPromptAcknowledged = dataStore.bolusConditionsPromptAcknowledged.observeAsState()
 
                 if (bolusConditionsPromptAcknowledged.value != null && bolusConditionsPromptAcknowledged.value!!.size > 0) {
@@ -518,7 +557,6 @@ fun BolusScreen(
                             },
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .padding(top = 0.dp)
                         )
                     }
                 } else {
@@ -526,6 +564,36 @@ fun BolusScreen(
                         .height(0.dp)
                         .fillMaxWidth()
                     )
+                }
+            }
+
+            fun performPermissionCheck() {
+                showPermissionCheckDialog = true
+                sendPumpCommands(SendType.BUST_CACHE, listOf(BolusPermissionRequest()))
+            }
+
+            item {
+                Button(
+                    onClick = {
+                        dataStore.bolusFinalConditions.value =
+                            bolusCalcDecision(dataStore.bolusCalculatorBuilder.value, bolusConditionsExcluded.value)?.conditions
+
+                        val pair = bolusCalcParameters(dataStore.bolusCalculatorBuilder.value, bolusConditionsExcluded.value)
+                        dataStore.bolusFinalParameters.value = pair.first
+                        dataStore.bolusFinalCalcUnits.value = pair.second
+                        performPermissionCheck()
+                    },
+                    enabled = true
+                ) {
+                    Row() {
+                        Icon(
+                            imageVector = Icons.Filled.Check,
+                            contentDescription = "continue",
+                            modifier = Modifier
+                                .size(ButtonDefaults.SmallIconSize)
+                                .wrapContentSize(align = Alignment.Center),
+                        )
+                    }
                 }
             }
 
