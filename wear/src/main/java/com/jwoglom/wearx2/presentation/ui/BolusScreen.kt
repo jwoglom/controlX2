@@ -629,9 +629,10 @@ fun BolusScreen(
                     Text(
                         text = when {
                             bolusConditionsPrompt.value != null -> "${bolusConditionsPrompt.value?.first()?.msg}"
-                            else -> "Bolus Conditions Prompt"
+                            else -> ""
                         },
                         textAlign = TextAlign.Center,
+                        fontSize = 14.sp,
                         color = MaterialTheme.colors.onBackground
                     )
                 },
@@ -696,13 +697,6 @@ fun BolusScreen(
                             contentDescription = "Apply"
                         )
                     }
-                },
-                icon = {
-                    Image(
-                        painterResource(R.drawable.bolus_icon),
-                        "Bolus icon",
-                        Modifier.size(24.dp)
-                    )
                 },
                 scrollState = scrollState,
             ) {
