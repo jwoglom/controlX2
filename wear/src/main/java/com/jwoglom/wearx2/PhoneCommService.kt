@@ -45,7 +45,7 @@ class PhoneCommService : WearableListenerService(), GoogleApiClient.ConnectionCa
 
     override fun onCreate() {
         super.onCreate()
-        setupTimber("WPC")
+        setupTimber("WPC", context = this)
         Timber.d("wear service onCreate")
 
         mApiClient = GoogleApiClient.Builder(this)

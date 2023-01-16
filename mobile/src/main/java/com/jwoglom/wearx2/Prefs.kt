@@ -12,7 +12,7 @@ class Prefs(val context: Context) {
     }
 
     fun setTosAccepted(b: Boolean) {
-        prefs().edit().putBoolean("tos-accepted", b).apply()
+        prefs().edit().putBoolean("tos-accepted", b).commit()
     }
 
     fun serviceEnabled(): Boolean {
@@ -20,7 +20,7 @@ class Prefs(val context: Context) {
     }
 
     fun setServiceEnabled(b: Boolean) {
-        prefs().edit().putBoolean("service-enabled", b).apply()
+        prefs().edit().putBoolean("service-enabled", b).commit()
     }
 
     fun connectionSharingEnabled(): Boolean {
@@ -28,7 +28,23 @@ class Prefs(val context: Context) {
     }
 
     fun setConnectionSharingEnabled(b: Boolean) {
-        prefs().edit().putBoolean("connection-sharing-enabled", b).apply()
+        prefs().edit().putBoolean("connection-sharing-enabled", b).commit()
+    }
+
+    fun onlySnoopBluetoothEnabled(): Boolean {
+        return prefs().getBoolean("only-snoop-bluetooth-enabled", false)
+    }
+
+    fun setOnlySnoopBluetoothEnabled(b: Boolean) {
+        prefs().edit().putBoolean("only-snoop-bluetooth-enabled", b).commit()
+    }
+
+    fun verboseFileLoggingEnabled(): Boolean {
+        return prefs().getBoolean("verbose-file-logging-enabled", false)
+    }
+
+    fun setVerboseFileLoggingEnabled(b: Boolean) {
+        prefs().edit().putBoolean("verbose-file-logging-enabled", b).commit()
     }
 
     fun pumpSetupComplete(): Boolean {
@@ -36,7 +52,7 @@ class Prefs(val context: Context) {
     }
 
     fun setPumpSetupComplete(b: Boolean) {
-        prefs().edit().putBoolean("pump-setup-complete", b).apply()
+        prefs().edit().putBoolean("pump-setup-complete", b).commit()
     }
 
     fun appSetupComplete(): Boolean {
@@ -44,7 +60,7 @@ class Prefs(val context: Context) {
     }
 
     fun setAppSetupComplete(b: Boolean) {
-        prefs().edit().putBoolean("app-setup-complete", b).apply()
+        prefs().edit().putBoolean("app-setup-complete", b).commit()
     }
 
     /**
@@ -55,7 +71,7 @@ class Prefs(val context: Context) {
     }
 
     fun setInsulinDeliveryActions(b: Boolean) {
-        prefs().edit().putBoolean("insulin-delivery-actions", b).apply()
+        prefs().edit().putBoolean("insulin-delivery-actions", b).commit()
     }
 
     /**
@@ -66,7 +82,7 @@ class Prefs(val context: Context) {
     }
 
     fun setBolusConfirmationInsulinThreshold(d: Double) {
-        prefs().edit().putLong("bolus-confirmation-insulin-threshold", InsulinUnit.from1To1000(d)).apply()
+        prefs().edit().putLong("bolus-confirmation-insulin-threshold", InsulinUnit.from1To1000(d)).commit()
     }
 
     private fun prefs(): SharedPreferences {

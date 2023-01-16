@@ -34,10 +34,12 @@ fun ServiceDisabledMessage() {
     val ds = LocalDataStore.current
 
     var enabled by remember { mutableStateOf(Prefs(context).serviceEnabled()) }
+    var onlySnoopEnabled by remember { mutableStateOf(Prefs(context).onlySnoopBluetoothEnabled()) }
 
     val pumpConnected = ds.pumpConnected.observeAsState()
     LaunchedEffect (pumpConnected.value) {
         enabled = Prefs(context).serviceEnabled()
+        onlySnoopEnabled = Prefs(context).onlySnoopBluetoothEnabled()
     }
 
     if (!enabled) {
@@ -55,6 +57,24 @@ fun ServiceDisabledMessage() {
                         append("The background service is disabled, so WearX2 cannot connect to the pump. ")
                     }
                     append("Select Settings > Enable WearX2 service to enable connection.")
+                })
+            }
+        }
+    } else if (onlySnoopEnabled) {
+        Card(Modifier.fillMaxWidth()) {
+            Row(
+                modifier = Modifier.padding(8.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Filled.Close,
+                    contentDescription = null,
+                    modifier = Modifier.size(48.dp).padding(8.dp)
+                )
+                Text(buildAnnotatedString {
+                    withStyle(SpanStyle(fontWeight = FontWeight.Bold)) {
+                        append("OnlySnoopBluetooth debug option is enabled, so limited app functionality is available. ")
+                    }
+                    append("Select Settings > Disable OnlySnoopBluetooth to disable.")
                 })
             }
         }

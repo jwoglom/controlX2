@@ -18,6 +18,7 @@ import android.os.Build
 import android.os.Bundle
 import android.os.IBinder
 import android.provider.Settings
+import android.util.Log
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -26,7 +27,6 @@ import androidx.compose.runtime.compositionLocalOf
 import androidx.core.app.ActivityCompat
 import com.google.android.gms.common.ConnectionResult
 import com.google.android.gms.common.GoogleApiAvailability
-import com.google.android.gms.common.GooglePlayServicesUtil
 import com.google.android.gms.common.api.GoogleApiClient
 import com.google.android.gms.wearable.MessageApi
 import com.google.android.gms.wearable.MessageEvent
@@ -54,6 +54,7 @@ import com.jwoglom.wearx2.presentation.navigation.Screen
 import com.jwoglom.wearx2.presentation.screens.PumpSetupStage
 import com.jwoglom.wearx2.presentation.screens.sections.messagePairToJson
 import com.jwoglom.wearx2.presentation.screens.sections.verbosePumpMessage
+import com.jwoglom.wearx2.presentation.util.ShouldLogToFile
 import com.jwoglom.wearx2.shared.PumpMessageSerializer
 import com.jwoglom.wearx2.shared.util.SendType
 import com.jwoglom.wearx2.shared.util.pumpTimeToLocalTz
@@ -77,7 +78,11 @@ class MainActivity : ComponentActivity(), GoogleApiClient.ConnectionCallbacks, G
     override fun onCreate(savedInstanceState: Bundle?) {
         Timber.d("mobile UIActivity onCreate $savedInstanceState")
         super.onCreate(savedInstanceState)
-        setupTimber("MUA", writeCharacteristicFailedCallback = writeCharacteristicFailedCallback)
+        setupTimber("MUA",
+            context = this,
+            logToFile = true,
+            shouldLog = ShouldLogToFile(this),
+            writeCharacteristicFailedCallback = writeCharacteristicFailedCallback)
         val startDestination = determineStartDestination()
         Timber.d("startDestination=%s", startDestination)
 

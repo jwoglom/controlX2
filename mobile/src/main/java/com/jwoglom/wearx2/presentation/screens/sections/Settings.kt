@@ -1,4 +1,4 @@
-@file:OptIn(ExperimentalMaterial3Api::class)
+@file:OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3Api::class)
 
 package com.jwoglom.wearx2.presentation.screens.sections
 
@@ -127,6 +127,48 @@ fun Settings(
                             }
                         }
                     )
+
+                    if (Prefs(context).onlySnoopBluetoothEnabled()) {
+                        ListItem(
+                            headlineText = { Text("Disable Only Snoop Bluetooth") },
+                            supportingText = { Text("Re-enables app functionality.") },
+                            leadingContent = {
+                                Icon(
+                                    Icons.Filled.Close,
+                                    contentDescription = "Stop icon",
+                                )
+                            },
+                            modifier = Modifier.clickable {
+                                Prefs(context).setOnlySnoopBluetoothEnabled(false)
+                                coroutineScope.launch {
+                                    withContext(Dispatchers.IO) {
+                                        Thread.sleep(250)
+                                    }
+                                    sendMessage("/to-phone/force-reload", "".toByteArray())
+                                }
+                            }
+                        )
+                    } else {
+                        ListItem(
+                            headlineText = { Text("Enable Only Snoop Bluetooth") },
+                            supportingText = { Text("All app functionality will be disabled, for debugging purposes only.") },
+                            leadingContent = {
+                                Icon(
+                                    Icons.Filled.Check,
+                                    contentDescription = "Start icon",
+                                )
+                            },
+                            modifier = Modifier.clickable {
+                                Prefs(context).setOnlySnoopBluetoothEnabled(true)
+                                coroutineScope.launch {
+                                    withContext(Dispatchers.IO) {
+                                        Thread.sleep(250)
+                                    }
+                                    sendMessage("/to-phone/force-reload", "".toByteArray())
+                                }
+                            }
+                        )
+                    }
                 } else {
                     ListItem(
                         headlineText = { Text("Enable connection sharing") },
@@ -138,7 +180,7 @@ fun Settings(
                             )
                         },
                         modifier = Modifier.clickable {
-                            Prefs(context).setConnectionSharingEnabled(false)
+                            Prefs(context).setConnectionSharingEnabled(true)
                             coroutineScope.launch {
                                 withContext(Dispatchers.IO) {
                                     Thread.sleep(250)

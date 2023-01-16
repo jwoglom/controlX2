@@ -54,6 +54,7 @@ import com.jwoglom.pumpx2.pump.messages.response.currentStatus.InsulinStatusResp
 import com.jwoglom.pumpx2.pump.messages.response.currentStatus.TimeSinceResetResponse
 import com.jwoglom.pumpx2.pump.messages.response.qualifyingEvent.QualifyingEvent
 import com.jwoglom.pumpx2.shared.Hex
+import com.jwoglom.wearx2.presentation.util.ShouldLogToFile
 import com.jwoglom.wearx2.shared.CommServiceCodes
 import com.jwoglom.wearx2.shared.InitiateConfirmedBolusSerializer
 import com.jwoglom.wearx2.shared.PumpMessageSerializer
@@ -100,6 +101,10 @@ class CommService : WearableListenerService(), GoogleApiClient.ConnectionCallbac
                     enableTconnectAppConnectionSharing()
                     enableSendSharedConnectionResponseMessages()
                     // before adding relyOnConnectionSharingForAuthentication(), callback issues need to be resolved
+                }
+                if (Prefs(applicationContext).onlySnoopBluetoothEnabled()) {
+                    Timber.i("ONLY SNOOP BLUETOOTH ENABLED")
+                    onlySnoopBluetoothAndBlockAllPumpX2Functionality()
                 }
 
                 if (Prefs(applicationContext).insulinDeliveryActions()) {
@@ -599,7 +604,12 @@ class CommService : WearableListenerService(), GoogleApiClient.ConnectionCallbac
 //            start()
 //            Timber.d("service thread start")
 
-            setupTimber("MWC", writeCharacteristicFailedCallback = handleWriteCharacteristicFailedCallback)
+            // Timber already set in up MUA, but for good measure:
+            setupTimber("MWC",
+                context = this,
+                logToFile = true,
+                shouldLog = ShouldLogToFile(this),
+                writeCharacteristicFailedCallback = handleWriteCharacteristicFailedCallback)
             Timber.d("service onCreate")
 
             // Listen to BLE state changes

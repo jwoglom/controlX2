@@ -87,7 +87,7 @@ class MainActivity : ComponentActivity(), MessageApi.MessageListener, GoogleApiC
         installSplashScreen()
         super.onCreate(savedInstanceState)
         setTheme(R.style.MainTheme) // clean up from splash screen icon
-        setupTimber("WA")
+        setupTimber("WA", context = this)
 
         if (intent != null) {
             initialRoute = intent.getStringExtra("route") ?: Screen.Landing.route

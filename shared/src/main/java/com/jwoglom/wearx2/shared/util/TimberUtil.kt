@@ -1,5 +1,6 @@
 package com.jwoglom.wearx2.shared.util
 
+import android.content.Context
 import com.jwoglom.pumpx2.shared.L
 import com.jwoglom.pumpx2.shared.QuadConsumer
 import com.jwoglom.pumpx2.shared.TriConsumer
@@ -9,10 +10,14 @@ import java.util.function.Consumer
 
 fun setupTimber(
     prefix: String,
+    context: Context,
+    logToFile: Boolean = false,
+    shouldLog: (Int, String) -> Boolean = { _, _ -> false },
     writeCharacteristicFailedCallback: (String) -> Unit = {},
 ) {
     if (Timber.treeCount == 0) {
-        Timber.plant(DebugTree(prefix, writeCharacteristicFailedCallback))
+        val tree = DebugTree(prefix, context, logToFile, shouldLog, writeCharacteristicFailedCallback)
+        Timber.plant(tree)
     }
     L.getPrintln = Consumer {  }
     L.getTimberDebug = TriConsumer { tag: String?, message: String?, args: String? ->
