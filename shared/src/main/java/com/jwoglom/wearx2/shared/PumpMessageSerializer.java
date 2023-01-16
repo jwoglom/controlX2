@@ -1,9 +1,12 @@
 package com.jwoglom.wearx2.shared;
 
+import com.google.common.collect.ImmutableList;
 import com.jwoglom.pumpx2.pump.messages.Message;
 import com.jwoglom.pumpx2.pump.messages.Messages;
 import com.jwoglom.pumpx2.pump.messages.bluetooth.Characteristic;
 import com.jwoglom.pumpx2.pump.messages.helpers.Bytes;
+import com.jwoglom.pumpx2.pump.messages.response.historyLog.HistoryLog;
+import com.jwoglom.pumpx2.pump.messages.response.historyLog.HistoryLogStreamResponse;
 import com.jwoglom.pumpx2.shared.Hex;
 
 import org.apache.commons.codec.DecoderException;
@@ -15,7 +18,9 @@ import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 
 import kotlin.Pair;
@@ -96,6 +101,41 @@ public class PumpMessageSerializer {
                 Message msg = fromBytes(Hex.decodeHex(obj.getString("message")));
                 Instant instant = Instant.ofEpochMilli(obj.getLong("instant"));
                 ret.add(new Pair<>(msg, instant));
+            }
+            return ret;
+        } catch (JSONException | DecoderException e) {
+            Timber.e(e);
+            return null;
+        }
+    }
+
+    public static byte[] toDebugHistoryLogCacheBytes(Map<Long, HistoryLog> messages) {
+        try {
+            JSONArray array = new JSONArray();
+            for (Map.Entry<Long, HistoryLog> pair : messages.entrySet()) {
+                JSONObject obj = new JSONObject();
+                obj.put("seq", pair.getKey());
+                obj.put("message", Hex.encodeHexString(Objects.requireNonNull(toBytes(
+                        new HistoryLogStreamResponse(1, 0, ImmutableList.of(pair.getValue().getCargo()))))));
+                array.put(obj);
+            }
+            return array.toString().getBytes();
+        } catch (JSONException e) {
+            Timber.e(e);
+            return null;
+        }
+    }
+
+    public static Map<Long, HistoryLog> fromDebugHistoryLogCacheBytes(byte[] bytes) {
+        Map<Long, HistoryLog> ret = new HashMap<>();
+        JSONArray array = null;
+        try {
+            array = new JSONArray(new String(bytes));
+            for (int i=0; i < array.length(); i++) {
+                JSONObject obj = array.getJSONObject(i);
+                HistoryLogStreamResponse msg = (HistoryLogStreamResponse) fromBytes(Hex.decodeHex(obj.getString("message")));
+                Long seq = obj.getLong("seq");
+                ret.put(seq, Objects.requireNonNull(msg).getHistoryLogs().get(0));
             }
             return ret;
         } catch (JSONException | DecoderException e) {

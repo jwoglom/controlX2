@@ -388,6 +388,16 @@ class MainActivity : ComponentActivity(), GoogleApiClient.ConnectionCallbacks, G
                 val processed = PumpMessageSerializer.fromDebugMessageCacheBytes(messageEvent.data)
                 dataStore.debugMessageCache.value = processed
             }
+
+            "/from-pump/debug-historylog-cache" -> {
+                val processed = PumpMessageSerializer.fromDebugHistoryLogCacheBytes(messageEvent.data)
+                var mp = dataStore.historyLogCache.value
+                if (mp == null) {
+                     mp = mutableMapOf()
+                }
+                mp.putAll(processed)
+                dataStore.historyLogCache.value = mp
+            }
         }
     }
 
@@ -522,12 +532,6 @@ class MainActivity : ComponentActivity(), GoogleApiClient.ConnectionCallbacks, G
                 dataStore.maxBolusAmount.value = message.maxBolus
             }
             // TODO: bolus
-            is HistoryLogStreamResponse -> {
-                message.historyLogs.forEach {
-                    Timber.d("added historyLog: ${it.sequenceNum}: $it")
-                    dataStore.historyLogCache.value?.put(it.sequenceNum, it)
-                }
-            }
         }
     }
 

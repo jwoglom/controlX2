@@ -287,6 +287,11 @@ fun Debug(
                                         }
                                     }
                                 }
+                                if (debugMessageCache.value?.isEmpty() == true) {
+                                    item {
+                                        Text("No message entries present in cache.")
+                                    }
+                                }
                                 debugMessageCache.value?.sortedBy {
                                     it.second.epochSecond * -1
                                 }?.forEach { message ->
@@ -339,9 +344,9 @@ fun Debug(
                     Popup(
                         onDismissRequest = { showHistoryLogs = false }
                     ) {
-//                        LaunchedEffect(Unit) {
-//                            sendMessage("/to-pump/debug-message-cache", "".toByteArray())
-//                        }
+                        LaunchedEffect(Unit) {
+                            sendMessage("/to-pump/debug-historylog-cache", "".toByteArray())
+                        }
 
                         val historyLogCache = ds.historyLogCache.observeAsState()
                         Box(
@@ -381,6 +386,11 @@ fun Debug(
                                         }
                                     }
                                 }
+                                if (historyLogCache.value?.entries?.isEmpty() == true) {
+                                    item {
+                                        Text("No history log entries present in cache.")
+                                    }
+                                }
                                 historyLogCache.value?.entries?.sortedBy {
                                     it.key * -1
                                 }?.forEach { log ->
@@ -388,7 +398,7 @@ fun Debug(
                                         ListItem(
                                             headlineText = {
 //                                                // message name
-//                                                Text(shortPumpMessageTitle(log.value))
+                                                Text(shortPumpMessageTitle(log.value))
                                             },
                                             supportingText = {
                                                 // message detail
@@ -396,7 +406,7 @@ fun Debug(
                                             },
                                             overlineText = {
                                                 // time
-                                                Text("${log.key}")
+                                                Text("#${log.key} ${log.value.pumpTimeSecInstant}")
                                             },
                                             modifier = Modifier.clickable {
                                                 shareTextContents(historyLogToJson(log), "WearX2 History Log Event","text/json")
@@ -691,7 +701,7 @@ fun messagePropsToJson(props: MessageProps): JSONObject? {
     return spl?.let { JSONObject(it) }
 }
 
-fun shortPumpMessageTitle(message: Message): String {
+fun shortPumpMessageTitle(message: Any): String {
     return message.javaClass.name.replace(
         "com.jwoglom.pumpx2.pump.messages.response.",
         ""

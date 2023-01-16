@@ -52,6 +52,8 @@ import com.jwoglom.pumpx2.pump.messages.response.currentStatus.CurrentBatteryAbs
 import com.jwoglom.pumpx2.pump.messages.response.currentStatus.CurrentEGVGuiDataResponse
 import com.jwoglom.pumpx2.pump.messages.response.currentStatus.InsulinStatusResponse
 import com.jwoglom.pumpx2.pump.messages.response.currentStatus.TimeSinceResetResponse
+import com.jwoglom.pumpx2.pump.messages.response.historyLog.HistoryLog
+import com.jwoglom.pumpx2.pump.messages.response.historyLog.HistoryLogStreamResponse
 import com.jwoglom.pumpx2.pump.messages.response.qualifyingEvent.QualifyingEvent
 import com.jwoglom.pumpx2.shared.Hex
 import com.jwoglom.wearx2.presentation.util.ShouldLogToFile
@@ -85,6 +87,7 @@ class CommService : WearableListenerService(), GoogleApiClient.ConnectionCallbac
     private lateinit var mApiClient: GoogleApiClient
 
     private var lastResponseMessage: MutableMap<Pair<Characteristic, Byte>, Pair<com.jwoglom.pumpx2.pump.messages.Message, Instant>> = mutableMapOf()
+    private var historyLogCache: MutableMap<Long, HistoryLog> = mutableMapOf()
     private var lastTimeSinceReset: TimeSinceResetResponse? = null
 
     // Handler that receives messages from the thread
@@ -141,6 +144,12 @@ class CommService : WearableListenerService(), GoogleApiClient.ConnectionCallbac
                     is InsulinStatusResponse -> DataClientState(context).pumpCartridgeUnits = Pair("${message.currentInsulinAmount}", Instant.now())
                     is CurrentBasalStatusResponse -> DataClientState(context).pumpCurrentBasal = Pair("${InsulinUnit.from1000To1(message.currentBasalRate)}", Instant.now())
                     is CurrentEGVGuiDataResponse -> DataClientState(context).cgmReading = Pair("${message.cgmReading}", Instant.now())
+                    is HistoryLogStreamResponse -> {
+                        message.historyLogs.forEach {
+                            Timber.d("added historyLog: ${it.sequenceNum}: $it")
+                            historyLogCache[it.sequenceNum] = it
+                        }
+                    }
                 }
                 message?.let { updateNotificationWithPumpData(it) }
             }
@@ -494,6 +503,10 @@ class CommService : WearableListenerService(), GoogleApiClient.ConnectionCallbac
                     Timber.i("pumpCommHandler debug get message cache: $lastResponseMessage")
                     sendWearCommMessage("/from-pump/debug-message-cache", PumpMessageSerializer.toDebugMessageCacheBytes(lastResponseMessage.values))
                 }
+                CommServiceCodes.DEBUG_GET_HISTORYLOG_CACHE.ordinal -> {
+                    Timber.i("pumpCommHandler debug get historylog cache: $historyLogCache")
+                    sendWearCommMessage("/from-pump/debug-historylog-cache", PumpMessageSerializer.toDebugHistoryLogCacheBytes(historyLogCache))
+                }
             }
         }
 
@@ -715,6 +728,9 @@ class CommService : WearableListenerService(), GoogleApiClient.ConnectionCallbac
             "/to-pump/debug-message-cache" -> {
                 handleDebugGetMessageCache()
             }
+            "/to-pump/debug-historylog-cache" -> {
+                handleDebugGetHistoryLogCache()
+            }
         }
     }
 
@@ -856,6 +872,14 @@ class CommService : WearableListenerService(), GoogleApiClient.ConnectionCallbac
             pumpCommHandler?.sendMessage(msg)
         }
     }
+
+    private fun handleDebugGetHistoryLogCache() {
+        pumpCommHandler?.obtainMessage()?.also { msg ->
+            msg.what = CommServiceCodes.DEBUG_GET_HISTORYLOG_CACHE.ordinal
+            pumpCommHandler?.sendMessage(msg)
+        }
+    }
+
     private fun sendStopPumpComm() {
         pumpCommHandler?.obtainMessage()?.also { msg ->
             msg.what = CommServiceCodes.STOP_PUMP_COMM.ordinal
