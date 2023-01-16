@@ -350,11 +350,9 @@ fun BolusScreen(
                 // Signify we have drawn the content of the first screen
                 ReportFullyDrawn()
 
-                val bolusUnitsDisplayedText = dataStore.bolusUnitsDisplayedText.observeAsState()
                 val bolusConditionsPromptAcknowledged = dataStore.bolusConditionsPromptAcknowledged.observeAsState()
 
                 if (bolusConditionsPromptAcknowledged.value != null && bolusConditionsPromptAcknowledged.value!!.size > 0) {
-                    Spacer(modifier = Modifier.height(96.dp))
                     bolusConditionsPromptAcknowledged.value?.forEach {
                         LineTextDescription(
                             when {
@@ -367,8 +365,7 @@ fun BolusScreen(
                             },
                             fontSize = 12.sp,
                             align = Alignment.Center,
-                            height = 48.dp,
-                            bottomPadding = 8.dp,
+                            height = 28.dp,
                             onClick = {
                                 Timber.i("bolusConditionsPromptAcknowledged click")
                                 dataStore.bolusConditionsPrompt.value = mutableListOf<BolusCalcCondition>().let {
@@ -378,10 +375,22 @@ fun BolusScreen(
                                 dataStore.bolusConditionsPromptAcknowledged.value = mutableListOf()
                                 dataStore.bolusConditionsExcluded.value = mutableSetOf()
                                 showBolusConditionPrompt = true
-                            }
+                            },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(top = 0.dp)
                         )
                     }
+                } else {
+                    Spacer(modifier = Modifier
+                        .height(0.dp)
+                        .fillMaxWidth()
+                    )
                 }
+            }
+
+            item {
+                val bolusUnitsDisplayedText = dataStore.bolusUnitsDisplayedText.observeAsState()
 
                 Chip(
                     onClick = {
@@ -405,7 +414,6 @@ fun BolusScreen(
                     },
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(top = 35.dp)
                 )
             }
 
