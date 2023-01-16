@@ -74,7 +74,7 @@ fun ServiceDisabledMessage() {
                     withStyle(SpanStyle(fontWeight = FontWeight.Bold)) {
                         append("OnlySnoopBluetooth debug option is enabled, so limited app functionality is available. ")
                     }
-                    append("Select Settings > Disable OnlySnoopBluetooth to disable.")
+                    append("Select 'Debug > Disable Only Snoop Bluetooth' to disable.")
                 })
             }
         }

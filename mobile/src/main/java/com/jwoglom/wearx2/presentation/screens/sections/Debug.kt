@@ -23,6 +23,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Build
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.Divider
 import androidx.compose.material3.DropdownMenu
@@ -40,6 +41,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.livedata.observeAsState
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -67,9 +69,13 @@ import com.jwoglom.pumpx2.pump.messages.response.historyLog.HistoryLog
 import com.jwoglom.pumpx2.pump.messages.util.MessageHelpers
 import com.jwoglom.pumpx2.shared.JavaHelpers
 import com.jwoglom.wearx2.LocalDataStore
+import com.jwoglom.wearx2.Prefs
 import com.jwoglom.wearx2.presentation.theme.WearX2Theme
 import com.jwoglom.wearx2.shared.util.SendType
 import com.jwoglom.wearx2.shared.util.shortTimeAgo
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import org.json.JSONArray
 import org.json.JSONObject
 import timber.log.Timber
@@ -85,6 +91,8 @@ fun Debug(
     sendMessage: (String, ByteArray) -> Unit,
     sendPumpCommands: (SendType, List<Message>) -> Unit,
 ) {
+    val coroutineScope = rememberCoroutineScope()
+
     var showSendPumpMessageMenu by remember { mutableStateOf(false) }
     var showMessageCache by remember { mutableStateOf(false) }
     var showHistoryLogs by remember { mutableStateOf(false) }
@@ -416,6 +424,56 @@ fun Debug(
                                 }
                             }
                         }
+                    }
+                }
+            }
+
+            if (Prefs(context).connectionSharingEnabled()) {
+                item {
+                    Divider()
+                }
+
+                item {
+                    if (Prefs(context).onlySnoopBluetoothEnabled()) {
+                        ListItem(
+                            headlineText = { Text("Disable Only Snoop Bluetooth") },
+                            supportingText = { Text("Re-enables app functionality.") },
+                            leadingContent = {
+                                Icon(
+                                    Icons.Filled.Close,
+                                    contentDescription = "Stop icon",
+                                )
+                            },
+                            modifier = Modifier.clickable {
+                                Prefs(context).setOnlySnoopBluetoothEnabled(false)
+                                coroutineScope.launch {
+                                    withContext(Dispatchers.IO) {
+                                        Thread.sleep(250)
+                                    }
+                                    sendMessage("/to-phone/force-reload", "".toByteArray())
+                                }
+                            }
+                        )
+                    } else {
+                        ListItem(
+                            headlineText = { Text("Enable Only Snoop Bluetooth") },
+                            supportingText = { Text("All app functionality will be disabled, for debugging purposes only.") },
+                            leadingContent = {
+                                Icon(
+                                    Icons.Filled.Check,
+                                    contentDescription = "Start icon",
+                                )
+                            },
+                            modifier = Modifier.clickable {
+                                Prefs(context).setOnlySnoopBluetoothEnabled(true)
+                                coroutineScope.launch {
+                                    withContext(Dispatchers.IO) {
+                                        Thread.sleep(250)
+                                    }
+                                    sendMessage("/to-phone/force-reload", "".toByteArray())
+                                }
+                            }
+                        )
                     }
                 }
             }
