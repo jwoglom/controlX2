@@ -44,6 +44,7 @@ class DataStore {
     val landingControlIQDisplayedText = MutableLiveData<String>()
 
     val bolusUnitsDisplayedText = MutableLiveData<String>()
+    val bolusUnitsDisplayedSubtitle = MutableLiveData<String>()
     val bolusBGDisplayedText = MutableLiveData<String>()
 
     val bolusCalculatorBuilder = MutableLiveData<BolusCalculatorBuilder>()
@@ -93,6 +94,7 @@ class DataStore {
         landingControlIQDisplayedText.observeForever { t -> Timber.i("DataStore.landingControlIQDisplayedText=$t") }
 
         bolusUnitsDisplayedText.observeForever { t -> Timber.i("DataStore.bolusUnitsDisplayedText=$t") }
+        bolusUnitsDisplayedSubtitle.observeForever { t -> Timber.i("DataStore.bolusUnitsDisplayedSubtitle=$t") }
         bolusBGDisplayedText.observeForever { t -> Timber.i("DataStore.bolusBGDisplayedText=$t") }
 
         bolusCalculatorBuilder.observeForever { t -> Timber.i("DataStore.bolusCalculatorBuilder=$t") }

@@ -3,7 +3,10 @@ package com.jwoglom.wearx2.presentation.ui
 import android.content.res.Configuration
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -312,10 +315,17 @@ fun BolusScreen(
 
             dataStore.bolusUnitsDisplayedText.value = when (bolusUnitsUserInput) {
                 null -> when (dataStore.bolusCurrentParameters.value) {
-                    null -> "None Entered"
-                    else -> "Calculated: ${twoDecimalPlaces(dataStore.bolusCurrentParameters.value!!.units)}"
+                    null -> "0.00u"
+                    else -> "${twoDecimalPlaces(dataStore.bolusCurrentParameters.value!!.units)}u"
                 }
-                else -> "Entered: ${oneDecimalPlace(bolusUnitsUserInput)}"
+                else -> "${oneDecimalPlace(bolusUnitsUserInput)}u"
+            }
+            dataStore.bolusUnitsDisplayedSubtitle.value = when (bolusUnitsUserInput) {
+                null -> when (dataStore.bolusCurrentParameters.value) {
+                    null -> ""
+                    else -> "Calculated"
+                }
+                else -> "Override"
             }
 
             val autofilledBg = dataStore.bolusCalculatorBuilder.value?.glucoseMgdl?.orElse(null)
@@ -347,50 +357,8 @@ fun BolusScreen(
             autoCentering = AutoCenteringParams()
         ) {
             item {
-                // Signify we have drawn the content of the first screen
-                ReportFullyDrawn()
-
-                val bolusConditionsPromptAcknowledged = dataStore.bolusConditionsPromptAcknowledged.observeAsState()
-
-                if (bolusConditionsPromptAcknowledged.value != null && bolusConditionsPromptAcknowledged.value!!.size > 0) {
-                    bolusConditionsPromptAcknowledged.value?.forEach {
-                        LineTextDescription(
-                            when {
-                                bolusConditionsExcluded.value?.contains(it) == true -> "${it.prompt?.whenIgnoredNotice}"
-                                else -> "${it.prompt?.whenAcceptedNotice}"
-                            },
-                            textColor = when {
-                                bolusConditionsExcluded.value?.contains(it) == true -> Color.Red
-                                else -> defaultTheme.colors.primary
-                            },
-                            fontSize = 12.sp,
-                            align = Alignment.Center,
-                            height = 28.dp,
-                            onClick = {
-                                Timber.i("bolusConditionsPromptAcknowledged click")
-                                dataStore.bolusConditionsPrompt.value = mutableListOf<BolusCalcCondition>().let {
-                                    it.addAll(bolusConditionsPromptAcknowledged.value!!)
-                                    it
-                                }
-                                dataStore.bolusConditionsPromptAcknowledged.value = mutableListOf()
-                                dataStore.bolusConditionsExcluded.value = mutableSetOf()
-                                showBolusConditionPrompt = true
-                            },
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(top = 0.dp)
-                        )
-                    }
-                } else {
-                    Spacer(modifier = Modifier
-                        .height(0.dp)
-                        .fillMaxWidth()
-                    )
-                }
-            }
-
-            item {
                 val bolusUnitsDisplayedText = dataStore.bolusUnitsDisplayedText.observeAsState()
+                val bolusUnitsDisplayedSubtitle = dataStore.bolusUnitsDisplayedSubtitle.observeAsState()
 
                 Chip(
                     onClick = {
@@ -401,19 +369,43 @@ fun BolusScreen(
                         }
                     },
                     label = {
-                        Text(
-                            "Units",
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
+                        Column(
+                            Modifier
+                                .fillMaxWidth(),
+                            verticalArrangement = Arrangement.Center,
+                            horizontalAlignment = Alignment.CenterHorizontally
+                        ) {
+                            Text(
+                                "${bolusUnitsDisplayedText.value}",
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                                textAlign = TextAlign.Center,
+                                fontSize = 18.sp,
+                            )
+                        }
                     },
                     secondaryLabel = {
-                        Text(
-                            text = "${bolusUnitsDisplayedText.value}",
-                        )
+                        Column(
+                            Modifier
+                                .fillMaxWidth(),
+                            verticalArrangement = Arrangement.Center,
+                            horizontalAlignment = Alignment.CenterHorizontally
+                        ) {
+                            Text(
+                                text = "${bolusUnitsDisplayedSubtitle.value}",
+                                maxLines = 1,
+                                textAlign = TextAlign.Center,
+                                fontSize = 8.sp,
+                            )
+                        }
                     },
+                    contentPadding = PaddingValues(
+                        start = 2.dp, end = 2.dp,
+                        top = 2.dp, bottom = 2.dp
+                    ),
                     modifier = Modifier
-                        .fillMaxWidth()
+                        .fillMaxWidth(fraction = 0.5f)
+                        .height(40.dp)
                 )
             }
 
@@ -491,6 +483,49 @@ fun BolusScreen(
                                 .wrapContentSize(align = Alignment.Center),
                         )
                     }
+                }
+            }
+
+            item {
+                // Signify we have drawn the content of the first screen
+                ReportFullyDrawn()
+
+                val bolusConditionsPromptAcknowledged = dataStore.bolusConditionsPromptAcknowledged.observeAsState()
+
+                if (bolusConditionsPromptAcknowledged.value != null && bolusConditionsPromptAcknowledged.value!!.size > 0) {
+                    bolusConditionsPromptAcknowledged.value?.forEach {
+                        LineTextDescription(
+                            when {
+                                bolusConditionsExcluded.value?.contains(it) == true -> "${it.prompt?.whenIgnoredNotice}"
+                                else -> "${it.prompt?.whenAcceptedNotice}"
+                            },
+                            textColor = when {
+                                bolusConditionsExcluded.value?.contains(it) == true -> Color.Red
+                                else -> defaultTheme.colors.primary
+                            },
+                            fontSize = 12.sp,
+                            align = Alignment.Center,
+                            height = 28.dp,
+                            onClick = {
+                                Timber.i("bolusConditionsPromptAcknowledged click")
+                                dataStore.bolusConditionsPrompt.value = mutableListOf<BolusCalcCondition>().let {
+                                    it.addAll(bolusConditionsPromptAcknowledged.value!!)
+                                    it
+                                }
+                                dataStore.bolusConditionsPromptAcknowledged.value = mutableListOf()
+                                dataStore.bolusConditionsExcluded.value = mutableSetOf()
+                                showBolusConditionPrompt = true
+                            },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(top = 0.dp)
+                        )
+                    }
+                } else {
+                    Spacer(modifier = Modifier
+                        .height(0.dp)
+                        .fillMaxWidth()
+                    )
                 }
             }
 
@@ -1098,6 +1133,7 @@ fun resetBolusDataStoreState(dataStore: DataStore) {
 )
 @Composable
 fun EmptyPreview() {
+    dataStore.bolusUnitsDisplayedText.value = "0.00u"
     dataStore.bolusConditionsPromptAcknowledged.value = mutableListOf()
     BolusScreen(
         scalingLazyListState = ScalingLazyListState(0, 0),
