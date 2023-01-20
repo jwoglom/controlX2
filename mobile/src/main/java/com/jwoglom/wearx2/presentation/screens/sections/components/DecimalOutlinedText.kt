@@ -18,10 +18,10 @@ import com.jwoglom.wearx2.shared.util.twoDecimalPlaces
 fun DecimalOutlinedText(
     title: String,
     value: String?,
-    onValueChange: (String) -> Unit,
-    decimalPlaces: Int = 2
+    onValueChange: (String) -> Unit
 ) {
     var error = false
+    val decimalPlaces = 2
 
     OutlinedTextField(
         value = when (value) {
