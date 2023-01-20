@@ -8,9 +8,14 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextFieldColors
 import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.TextFieldValue
+import com.jwoglom.wearx2.presentation.util.onFocusSelectAll
 import com.jwoglom.wearx2.shared.util.twoDecimalPlaces
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -18,18 +23,26 @@ import com.jwoglom.wearx2.shared.util.twoDecimalPlaces
 fun DecimalOutlinedText(
     title: String,
     value: String?,
-    onValueChange: (String) -> Unit
+    onValueChange: (String) -> Unit,
+    modifier: Modifier = Modifier
 ) {
     var error = false
     val decimalPlaces = 2
 
+    var textFieldValue = remember {
+        mutableStateOf(TextFieldValue(value ?: ""))
+    }
+
+    LaunchedEffect (value) {
+        textFieldValue.value = TextFieldValue(value ?: "")
+    }
+
     OutlinedTextField(
-        value = when (value) {
-            null -> ""
-            else -> value
-        },
+        value = textFieldValue.value,
         onValueChange = {
-            var filtered = it.filter { (it in '0'..'9') || it == '.' }
+            textFieldValue.value = it
+            val text = it.text
+            var filtered = text.filter { (it in '0'..'9') || it == '.' }
             val dotIndex = filtered.lastIndexOf('.')
             if (dotIndex >= 0 && filtered.length - dotIndex > decimalPlaces+1) {
                 filtered = filtered.substring(0, dotIndex + decimalPlaces)
@@ -46,6 +59,6 @@ fun DecimalOutlinedText(
             Text(title)
         },
         isError = error,
-        modifier = Modifier.fillMaxWidth()
+        modifier = modifier.fillMaxWidth().onFocusSelectAll(textFieldValue)
     )
 }

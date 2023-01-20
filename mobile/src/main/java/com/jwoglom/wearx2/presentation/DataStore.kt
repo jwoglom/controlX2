@@ -2,6 +2,9 @@ package com.jwoglom.wearx2.presentation
 
 import androidx.lifecycle.MutableLiveData
 import com.jwoglom.pumpx2.pump.messages.Message
+import com.jwoglom.pumpx2.pump.messages.calculator.BolusCalcCondition
+import com.jwoglom.pumpx2.pump.messages.calculator.BolusCalculatorBuilder
+import com.jwoglom.pumpx2.pump.messages.calculator.BolusParameters
 import com.jwoglom.pumpx2.pump.messages.response.currentStatus.BolusCalcDataSnapshotResponse
 import com.jwoglom.pumpx2.pump.messages.response.currentStatus.HistoryLogStatusResponse
 import com.jwoglom.pumpx2.pump.messages.response.currentStatus.LastBGResponse
@@ -45,6 +48,13 @@ class DataStore {
     val landingBasalDisplayedText = MutableLiveData<String>()
     val landingControlIQDisplayedText = MutableLiveData<String>()
 
+    val bolusCalculatorBuilder = MutableLiveData<BolusCalculatorBuilder>()
+    val bolusCurrentParameters = MutableLiveData<BolusParameters>()
+    val bolusCurrentConditions = MutableLiveData<List<BolusCalcCondition>>()
+    val bolusConditionsPrompt = MutableLiveData<MutableList<BolusCalcCondition>>()
+    val bolusConditionsPromptAcknowledged = MutableLiveData<MutableList<BolusCalcCondition>>()
+    val bolusConditionsExcluded = MutableLiveData<MutableSet<BolusCalcCondition>>()
+
     val historyLogStatus = MutableLiveData<HistoryLogStatusResponse>()
 
     val historyLogCache = MutableLiveData<MutableMap<Long, HistoryLog>>(mutableMapOf())
@@ -85,6 +95,13 @@ class DataStore {
 
         landingBasalDisplayedText.observeForever { t -> Timber.i("DataStore.landingBasalDisplayedText=$t") }
         landingControlIQDisplayedText.observeForever { t -> Timber.i("DataStore.landingControlIQDisplayedText=$t") }
+
+        bolusCalculatorBuilder.observeForever { t -> Timber.i("DataStore.bolusCalculatorBuilder=$t") }
+        bolusCurrentParameters.observeForever { t -> Timber.i("DataStore.bolusCurrentParameters=$t") }
+        bolusCurrentConditions.observeForever { t -> Timber.i("DataStore.bolusCurrentConditions=$t") }
+        bolusConditionsPrompt.observeForever { t -> Timber.i("DataStore.bolusConditionsPrompt=$t") }
+        bolusConditionsPromptAcknowledged.observeForever { t -> Timber.i("DataStore.bolusConditionsPromptAcknowledged=$t") }
+        bolusConditionsExcluded.observeForever { t -> Timber.i("DataStore.bolusConditionsExcluded=$t") }
 
         historyLogStatus.observeForever { t -> Timber.i("DataStore.historyLogStatus=$t") }
 

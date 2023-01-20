@@ -161,7 +161,7 @@ fun Landing(
                             .fillMaxWidth()
                             .fillMaxHeight(0.7F).let {
                                  if (isSystemInDarkTheme()) {
-                                     it.background(MaterialTheme.colorScheme.background)
+                                     it.background(MaterialTheme.colorScheme.onBackground)
                                  }
                                 it
                             },
@@ -173,7 +173,9 @@ fun Landing(
                                     Spacer(Modifier.size(100.dp))
                                 }
                                 if (showBolusWindow()) {
-                                    BolusWindow()
+                                    BolusWindow(
+                                        sendPumpCommands = sendPumpCommands
+                                    )
                                 }
                             }
                             item {
