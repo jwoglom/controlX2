@@ -83,6 +83,7 @@ import com.jwoglom.wearx2.presentation.ui.ScrollStateViewModel
 import com.jwoglom.wearx2.shared.util.SendType
 import kotlin.math.abs
 import kotlin.math.pow
+import kotlin.math.roundToInt
 
 @Composable
 fun WearApp(
@@ -340,7 +341,7 @@ fun WearApp(
                         rotaryScrollCalc = rotaryExponentialScroll(1.3f),
                         maxNumber = when (maxBolusAmount.value) {
                             null -> 30
-                            else -> maxBolusAmount.value!!
+                            else -> maxBolusAmount.value!!.toInt()
                         },
                         defaultNumber = when {
                             currentUnits != null -> currentUnits

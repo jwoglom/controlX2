@@ -460,7 +460,7 @@ class MainActivity : ComponentActivity(), MessageApi.MessageListener, GoogleApiC
                 dataStore.bolusCalcLastBG.value = message
             }
             is GlobalMaxBolusSettingsResponse -> {
-                dataStore.maxBolusAmount.value = message.maxBolus
+                dataStore.maxBolusAmount.value = InsulinUnit.from1000To1(message.maxBolus.toLong())
             }
             is BolusPermissionResponse -> {
                 dataStore.bolusPermissionResponse.value = message

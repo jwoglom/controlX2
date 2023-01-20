@@ -88,7 +88,7 @@ fun DecimalNumberPicker(
         initialNumberOfOptions = 10 * (maxNumber + 10) + 10,
         initiallySelectedOption = when (defaultNumber) {
             null -> 0
-            else -> ((defaultNumber * 10) % 10).toInt()
+            else -> 10*defaultNumber.toInt() + ((defaultNumber * 10) % 10).toInt()
         }
     )
 
@@ -116,9 +116,9 @@ fun DecimalNumberPicker(
         fun runRotaryScrollFix() {
             rotaryScrollFix?.cancel()
             rotaryScrollFix = coroutineScope.launch {
-                Timber.d("coroutine: delay")
+                Timber.d("rotaryScrollFix coroutine: delay ${leftState.selectedOption} ${rightState.selectedOption}")
                 delay(250)
-                Timber.d("coroutine: start")
+                Timber.d("rotaryScrollFix coroutine: start ${leftState.selectedOption} ${rightState.selectedOption}")
                 if (!leftState.isScrollInProgress && !rightState.isScrollInProgress) {
                     Timber.d("coroutine: scroll")
                     if (leftState.selectedOption > maxNumber) {

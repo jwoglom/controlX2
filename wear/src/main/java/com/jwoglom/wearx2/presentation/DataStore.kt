@@ -38,7 +38,7 @@ class DataStore {
     val cgmDeltaArrow = MutableLiveData<String>()
     val bolusCalcDataSnapshot = MutableLiveData<BolusCalcDataSnapshotResponse>()
     val bolusCalcLastBG = MutableLiveData<LastBGResponse>()
-    val maxBolusAmount = MutableLiveData<Int>()
+    val maxBolusAmount = MutableLiveData<Double>()
 
     val landingBasalDisplayedText = MutableLiveData<String>()
     val landingControlIQDisplayedText = MutableLiveData<String>()
