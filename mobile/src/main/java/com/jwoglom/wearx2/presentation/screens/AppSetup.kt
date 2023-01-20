@@ -62,6 +62,7 @@ import com.jwoglom.wearx2.LocalDataStore
 import com.jwoglom.wearx2.Prefs
 import com.jwoglom.wearx2.presentation.components.DialogScreen
 import com.jwoglom.wearx2.presentation.components.Line
+import com.jwoglom.wearx2.presentation.components.ServiceDisabledMessage
 import com.jwoglom.wearx2.presentation.navigation.Screen
 import com.jwoglom.wearx2.presentation.theme.WearX2Theme
 import com.jwoglom.wearx2.shared.util.twoDecimalPlaces
@@ -121,6 +122,9 @@ fun AppSetup(
             }
         }
     ) {
+        item {
+            ServiceDisabledMessage(sendMessage = sendMessage)
+        }
         item {
             Row(
                 Modifier

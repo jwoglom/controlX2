@@ -3,6 +3,7 @@
 package com.jwoglom.wearx2.presentation.screens
 
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -158,7 +159,12 @@ fun Landing(
                         modifier = Modifier
                             .padding(horizontal = 16.dp)
                             .fillMaxWidth()
-                            .fillMaxHeight(0.7F),
+                            .fillMaxHeight(0.7F).let {
+                                 if (isSystemInDarkTheme()) {
+                                     it.background(MaterialTheme.colorScheme.background)
+                                 }
+                                it
+                            },
                         content = {
                             item {
                                 // Fix for Android Studio preview which renders the scaffold at the

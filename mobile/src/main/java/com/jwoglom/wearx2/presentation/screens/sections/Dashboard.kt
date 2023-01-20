@@ -157,7 +157,7 @@ fun Dashboard(
                 .padding(horizontal = 16.dp),
             content = {
                 item {
-                    ServiceDisabledMessage()
+                    ServiceDisabledMessage(sendMessage = sendMessage)
                     LastConnectionUpdatedTimestamp()
                     PumpSetupStageProgress(initialSetup = false)
                     PumpSetupStageDescription(initialSetup = false)

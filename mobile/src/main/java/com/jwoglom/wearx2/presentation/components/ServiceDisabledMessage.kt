@@ -1,5 +1,6 @@
 package com.jwoglom.wearx2.presentation.components
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -16,6 +17,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.livedata.observeAsState
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -26,10 +28,16 @@ import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import com.jwoglom.wearx2.LocalDataStore
 import com.jwoglom.wearx2.Prefs
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import org.apache.commons.lang3.text.FormattableUtils.append
 
 @Composable
-fun ServiceDisabledMessage() {
+fun ServiceDisabledMessage(
+    sendMessage: (String, ByteArray) -> Unit
+) {
+    val coroutineScope = rememberCoroutineScope()
     val context = LocalContext.current
     val ds = LocalDataStore.current
 
@@ -45,7 +53,21 @@ fun ServiceDisabledMessage() {
     if (!enabled) {
         Card(Modifier.fillMaxWidth()) {
             Row(
-                modifier = Modifier.padding(8.dp)
+                modifier = Modifier.padding(8.dp).clickable {
+                    Prefs(context).setServiceEnabled(true)
+                    coroutineScope.launch {
+                        withContext(Dispatchers.IO) {
+                            Thread.sleep(250)
+                        }
+                        // reload service, if running
+                        sendMessage("/to-phone/force-reload", "".toByteArray())
+                        withContext(Dispatchers.IO) {
+                            Thread.sleep(250)
+                            // reload main activity as fallback
+                            sendMessage("/to-phone/app-reload", "".toByteArray())
+                        }
+                    }
+                }
             ) {
                 Icon(
                     imageVector = Icons.Filled.Close,
@@ -56,7 +78,7 @@ fun ServiceDisabledMessage() {
                     withStyle(SpanStyle(fontWeight = FontWeight.Bold)) {
                         append("The background service is disabled, so WearX2 cannot connect to the pump. ")
                     }
-                    append("Select Settings > Enable WearX2 service to enable connection.")
+                    append("Press here to re-enable the service.")
                 })
             }
         }

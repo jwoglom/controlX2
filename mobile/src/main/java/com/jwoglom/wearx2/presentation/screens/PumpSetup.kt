@@ -53,6 +53,7 @@ import com.jwoglom.wearx2.presentation.components.DialogScreen
 import com.jwoglom.wearx2.presentation.components.Line
 import com.jwoglom.wearx2.presentation.components.PumpSetupStageDescription
 import com.jwoglom.wearx2.presentation.components.PumpSetupStageProgress
+import com.jwoglom.wearx2.presentation.components.ServiceDisabledMessage
 import com.jwoglom.wearx2.presentation.navigation.Screen
 import com.jwoglom.wearx2.presentation.screens.sections.Settings
 import com.jwoglom.wearx2.presentation.theme.WearX2Theme
@@ -156,6 +157,9 @@ fun PumpSetup(
             }
         }
     ) {
+        item {
+            ServiceDisabledMessage(sendMessage = sendMessage)
+        }
         item {
             PumpSetupStageProgress(initialSetup = true)
         }
