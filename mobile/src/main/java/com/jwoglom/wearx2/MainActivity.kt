@@ -43,6 +43,7 @@ import com.jwoglom.pumpx2.pump.messages.response.currentStatus.CurrentBasalStatu
 import com.jwoglom.pumpx2.pump.messages.response.currentStatus.CurrentBatteryAbstractResponse
 import com.jwoglom.pumpx2.pump.messages.response.currentStatus.CurrentEGVGuiDataResponse
 import com.jwoglom.pumpx2.pump.messages.response.currentStatus.GlobalMaxBolusSettingsResponse
+import com.jwoglom.pumpx2.pump.messages.response.currentStatus.HistoryLogStatusResponse
 import com.jwoglom.pumpx2.pump.messages.response.currentStatus.HomeScreenMirrorResponse
 import com.jwoglom.pumpx2.pump.messages.response.currentStatus.InsulinStatusResponse
 import com.jwoglom.pumpx2.pump.messages.response.currentStatus.LastBGResponse
@@ -350,6 +351,11 @@ class MainActivity : ComponentActivity(), GoogleApiClient.ConnectionCallbacks, G
                 dataStore.pumpSetupStage.value = dataStore.pumpSetupStage.value?.nextStage(PumpSetupStage.PUMPX2_INVALID_PAIRING_CODE)
             }
 
+            "/from-pump/pump-critical-error" -> {
+                Timber.w("pump-critical-error: ${String(messageEvent.data)}")
+                dataStore.pumpCriticalError.value = Pair(String(messageEvent.data), Instant.now())
+            }
+
             "/from-pump/pump-connected" -> {
                 dataStore.pumpSetupStage.value = dataStore.pumpSetupStage.value?.nextStage(PumpSetupStage.PUMPX2_PUMP_CONNECTED)
                 dataStore.setupDeviceName.value = String(messageEvent.data)
@@ -530,6 +536,9 @@ class MainActivity : ComponentActivity(), GoogleApiClient.ConnectionCallbacks, G
             }
             is GlobalMaxBolusSettingsResponse -> {
                 dataStore.maxBolusAmount.value = message.maxBolus
+            }
+            is HistoryLogStatusResponse -> {
+                dataStore.historyLogStatus.value = message
             }
             // TODO: bolus
         }

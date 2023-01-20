@@ -1,4 +1,4 @@
-@file:OptIn(ExperimentalMaterial3Api::class)
+@file:OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3Api::class)
 
 package com.jwoglom.wearx2.presentation.screens.sections
 
@@ -7,6 +7,8 @@ import android.content.Context
 import android.content.DialogInterface
 import android.text.InputType
 import android.widget.EditText
+import android.widget.LinearLayout
+import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -25,6 +27,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Build
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material3.Divider
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -33,6 +37,7 @@ import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItem
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -45,36 +50,46 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.compose.ui.unit.toSize
 import androidx.compose.ui.window.Popup
 import androidx.core.app.ShareCompat
 import androidx.navigation.NavHostController
+import com.google.android.material.slider.Slider
 import com.google.common.base.Splitter
 import com.jwoglom.pumpx2.pump.messages.Message
 import com.jwoglom.pumpx2.pump.messages.annotations.HistoryLogProps
 import com.jwoglom.pumpx2.pump.messages.annotations.MessageProps
 import com.jwoglom.pumpx2.pump.messages.request.control.BolusPermissionReleaseRequest
-import com.jwoglom.pumpx2.pump.messages.request.control.BolusPermissionRequest
 import com.jwoglom.pumpx2.pump.messages.request.control.CancelBolusRequest
 import com.jwoglom.pumpx2.pump.messages.request.control.InitiateBolusRequest
 import com.jwoglom.pumpx2.pump.messages.request.currentStatus.BolusPermissionChangeReasonRequest
 import com.jwoglom.pumpx2.pump.messages.request.currentStatus.HistoryLogRequest
+import com.jwoglom.pumpx2.pump.messages.request.currentStatus.HistoryLogStatusRequest
 import com.jwoglom.pumpx2.pump.messages.request.currentStatus.IDPSegmentRequest
 import com.jwoglom.pumpx2.pump.messages.request.currentStatus.IDPSettingsRequest
+import com.jwoglom.pumpx2.pump.messages.response.currentStatus.HistoryLogStatusResponse
 import com.jwoglom.pumpx2.pump.messages.response.historyLog.BolusDeliveryHistoryLog
 import com.jwoglom.pumpx2.pump.messages.response.historyLog.HistoryLog
 import com.jwoglom.pumpx2.pump.messages.util.MessageHelpers
 import com.jwoglom.pumpx2.shared.JavaHelpers
 import com.jwoglom.wearx2.LocalDataStore
 import com.jwoglom.wearx2.Prefs
+import com.jwoglom.wearx2.dataStore
 import com.jwoglom.wearx2.presentation.theme.WearX2Theme
 import com.jwoglom.wearx2.shared.util.SendType
 import com.jwoglom.wearx2.shared.util.shortTimeAgo
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
 import org.json.JSONArray
 import org.json.JSONObject
@@ -82,6 +97,8 @@ import timber.log.Timber
 import java.lang.reflect.InvocationTargetException
 import java.time.Instant
 import java.util.stream.Collectors
+import kotlin.math.ceil
+import kotlin.math.min
 
 
 @Composable
@@ -335,6 +352,46 @@ fun Debug(
 
             item {
                 ListItem(
+                    headlineText = { Text("Get History Logs") },
+                    supportingText = { Text("Fetches history logs within the given range.") },
+                    leadingContent = {
+                        Icon(
+                            Icons.Filled.Build,
+                            contentDescription = null,
+                        )
+                    },
+                    modifier = Modifier.clickable {
+                        Timber.d("pressed Get History Logs")
+                        coroutineScope.launch {
+                            dataStore.historyLogStatus.value = null
+                            sendPumpCommands(SendType.STANDARD, listOf(HistoryLogStatusRequest()))
+
+                            for (i in 1..50) {
+                                Timber.d("waiting for historyLogStatus: ${dataStore.historyLogStatus}")
+                                if (dataStore.historyLogStatus.value != null) {
+                                    break
+                                }
+                                withContext(Dispatchers.IO) {
+                                    Thread.sleep(100)
+                                }
+                            }
+
+                            triggerHistoryLogRequestDialog(
+                                context,
+                                sendPumpCommands,
+                                dataStore.historyLogStatus.value
+                            )
+                        }
+                    }
+                )
+            }
+
+            item {
+                Divider()
+            }
+
+            item {
+                ListItem(
                     headlineText = { Text("View History Log Messages") },
                     supportingText = { Text("Displays pump history log messages") },
                     leadingContent = {
@@ -344,6 +401,7 @@ fun Debug(
                         )
                     },
                     modifier = Modifier.clickable {
+                        sendMessage("/to-pump/debug-historylog-cache", "".toByteArray())
                         showHistoryLogs = true
                     }
                 )
@@ -352,23 +410,24 @@ fun Debug(
                     Popup(
                         onDismissRequest = { showHistoryLogs = false }
                     ) {
-                        LaunchedEffect(Unit) {
-                            sendMessage("/to-pump/debug-historylog-cache", "".toByteArray())
-                        }
-
                         val historyLogCache = ds.historyLogCache.observeAsState()
+                        var filterToType by remember { mutableStateOf<String?>(null) }
+                        var filterFields by remember { mutableStateOf(historyLogCache.value?.entries?.map { shortHistoryLogPumpMessageTitle(it.value) }?.toSet()?.sorted()) }
+                        LaunchedEffect (historyLogCache.value) {
+                            filterFields = historyLogCache.value?.entries?.map { shortHistoryLogPumpMessageTitle(it.value) }?.toSet()?.sorted()
+                        }
                         Box(
                             modifier = Modifier
                                 .fillMaxSize()
                                 .wrapContentSize(Alignment.TopStart)
-                                .background(Color.Black.copy(alpha = 0.5f))
+                                .background(Color.DarkGray.copy(alpha = 0.3f))
                         ) {
                             LazyColumn {
                                 item {
                                     Spacer(Modifier.height(64.dp))
                                 }
                                 item {
-                                    LazyRow(Modifier.fillMaxWidth()) {
+                                    LazyRow(Modifier.fillMaxWidth(), verticalAlignment = Alignment.Bottom) {
                                         item {
                                             IconButton(
                                                 onClick = {
@@ -394,19 +453,84 @@ fun Debug(
                                         }
                                     }
                                 }
+
+                                item {
+                                    var expanded by remember { mutableStateOf(false) }
+                                    val icon = if (expanded)
+                                        Icons.Filled.KeyboardArrowUp
+                                    else
+                                        Icons.Filled.KeyboardArrowDown
+
+                                    var textFieldSize by remember { mutableStateOf(Size.Zero)}
+
+                                    Box (Modifier
+                                        .background(Color.White)
+                                        .padding(start = 16.dp, end = 16.dp)
+                                    ) {
+                                        OutlinedTextField(
+                                            value = when (filterToType) {
+                                                null -> "<All>"
+                                                else -> "$filterToType"
+                                            },
+                                            onValueChange = { filterToType = it },
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .onGloballyPositioned { coordinates ->
+                                                    // This value is used to assign to
+                                                    // the DropDown the same width
+                                                    textFieldSize = coordinates.size.toSize()
+                                                },
+                                            label = { Text("Filter") },
+                                            trailingIcon = {
+                                                Icon(icon, "contentDescription",
+                                                    Modifier.clickable { expanded = !expanded })
+                                            },
+                                            textStyle = TextStyle.Default.copy(fontSize = 16.sp),
+                                        )
+
+                                        DropdownMenu(
+                                            expanded = expanded,
+                                            onDismissRequest = { expanded = false },
+                                            modifier = Modifier
+                                                .width(with(LocalDensity.current) { textFieldSize.width.toDp() })
+                                        ) {
+                                            filterFields?.forEach { label ->
+                                                DropdownMenuItem(onClick = {
+                                                    filterToType = label
+                                                    expanded = false
+                                                }, text = {
+                                                    Text(text = label)
+                                                })
+                                            }
+                                        }
+                                    }
+                                }
+
                                 if (historyLogCache.value?.entries?.isEmpty() == true) {
                                     item {
-                                        Text("No history log entries present in cache.")
+                                        Text(
+                                            "No history log entries present in cache.",
+                                            modifier = Modifier
+                                                .background(Color.White)
+                                                .fillMaxWidth()
+                                                .padding(16.dp)
+                                        )
                                     }
                                 }
                                 historyLogCache.value?.entries?.sortedBy {
                                     it.key * -1
+                                }?.filter {
+                                    if (filterToType == null) {
+                                        true
+                                    } else {
+                                        shortHistoryLogPumpMessageTitle(it.value) == filterToType
+                                    }
                                 }?.forEach { log ->
                                     item {
                                         ListItem(
                                             headlineText = {
 //                                                // message name
-                                                Text(shortPumpMessageTitle(log.value))
+                                                Text(shortHistoryLogPumpMessageTitle(log.value))
                                             },
                                             supportingText = {
                                                 // message detail
@@ -553,34 +677,56 @@ fun triggerIDPSettingsDialog(
 fun triggerHistoryLogRequestDialog(
     context: Context,
     sendPumpCommands: (SendType, List<Message>) -> Unit,
+    historyLogStatus: HistoryLogStatusResponse? = null,
 ) {
     val builder = AlertDialog.Builder(context)
     builder.setTitle("Enter start log ID")
-    builder.setMessage("Enter the ID of the first history log item to return from")
+    builder.setMessage("Enter the ID of the first history log item to return:\n\n${historyLogStatus ?: ""}")
     val input1 = EditText(context)
     input1.inputType = InputType.TYPE_CLASS_NUMBER or InputType.TYPE_NUMBER_VARIATION_NORMAL
-    builder.setView(input1)
+    input1.width = 200
+    if (historyLogStatus != null) {
+        input1.setText("${historyLogStatus.lastSequenceNum-255}")
+    }
+    val layout = LinearLayout(context)
+    layout.addView(input1)
+
+    if (historyLogStatus != null) {
+        val slider = Slider(context)
+        slider.valueFrom = historyLogStatus.firstSequenceNum.toFloat()
+        slider.valueTo = historyLogStatus.lastSequenceNum.toFloat()
+        slider.value = (historyLogStatus.lastSequenceNum-255).toFloat()
+        slider.stepSize = 1.0f
+        slider.addOnChangeListener { slider, value, fromUser -> input1.setText("${value.toLong()}") }
+        layout.addView(slider)
+    }
+
+    builder.setView(layout)
     builder.setPositiveButton("OK") { dialog, which ->
         val startLog = input1.text.toString()
         Timber.i("startLog id: %s", startLog)
         val builder2 = AlertDialog.Builder(context)
-        builder2.setTitle("Enter number of logs ")
+        builder2.setTitle("Enter number of logs")
         builder2.setMessage("Enter the max number of logs to return")
         val input2 = EditText(context)
         input2.inputType = InputType.TYPE_CLASS_NUMBER or InputType.TYPE_NUMBER_VARIATION_NORMAL
+        if (historyLogStatus != null) {
+            input2.setText("${min(startLog.toLong()+255, historyLogStatus.lastSequenceNum)-startLog.toLong()}")
+        }
         builder2.setView(input2)
+
+        if (historyLogStatus != null) {
+            builder2.setNeutralButton("Get All") { dialog, which ->
+                triggerHistoryLogRangePrompt(context, sendPumpCommands, startLog.toLong(), historyLogStatus.lastSequenceNum)
+            }
+        }
         builder2.setPositiveButton(
             "OK"
         ) { dialog, which ->
             val maxLogs = input2.text.toString()
-            Timber.i("idp segment: %s", maxLogs)
-            sendPumpCommands(
-                SendType.DEBUG_PROMPT,
-                listOf(
-                    HistoryLogRequest(startLog.toInt().toLong(), maxLogs.toInt())
-                )
-            )
-            // tandemEventCallback.requestedHistoryLogStartId = startLog.toInt()
+            Timber.i("max logs: %s", maxLogs)
+            triggerHistoryLogRangePrompt(context, sendPumpCommands, startLog.toLong(), startLog.toLong()+maxLogs.toLong())
+
         }
         builder2.setNegativeButton(
             "Cancel"
@@ -591,6 +737,59 @@ fun triggerHistoryLogRequestDialog(
         "Cancel"
     ) { dialog, which -> dialog.cancel() }
     builder.show()
+}
+
+fun triggerHistoryLogRangePrompt(
+    context: Context,
+    sendPumpCommands: (SendType, List<Message>) -> Unit,
+    startLog: Long,
+    endLog: Long
+) {
+    if (endLog - startLog in 0..255) {
+        sendPumpCommands(
+            SendType.STANDARD,
+            listOf(
+                HistoryLogRequest(startLog, (endLog - startLog).toInt())
+            )
+        )
+        return
+    }
+
+    val chunkCount = ceil(((endLog - startLog) / 255).toDouble())
+    AlertDialog.Builder(context)
+        .setTitle("History Log Request")
+        .setMessage("Sequence number range $startLog - $endLog will require $chunkCount chunks. Continue?")
+        .setPositiveButton("OK") { dialog, which ->
+            runBlocking {
+                triggerHistoryLogRange(context, sendPumpCommands, startLog, endLog)
+            }
+        }
+        .setNegativeButton("Cancel") { dialog, which -> dialog.cancel() }
+        .show()
+}
+
+suspend fun triggerHistoryLogRange(
+    context: Context,
+    sendPumpCommands: (SendType, List<Message>) -> Unit,
+    startLog: Long,
+    endLog: Long
+)  {
+    var num = 1
+    for (i in startLog..endLog step 256) {
+        val count = if (i+255 > endLog) (endLog - i).toInt() else 255
+        Timber.i("HistoryLogRequest from $i to ${i+count} count=$count")
+        sendPumpCommands(
+            SendType.STANDARD,
+            listOf(
+                HistoryLogRequest(i, count)
+            )
+        )
+        Toast.makeText(context, "$num: Requesting $i to ${i+count}", Toast.LENGTH_SHORT).show()
+        withContext(Dispatchers.IO) {
+            Thread.sleep(5000)
+        }
+        num++
+    }
 }
 
 fun triggerInitiateBolusRequestDialog(
@@ -764,6 +963,17 @@ fun shortPumpMessageTitle(message: Any): String {
         "com.jwoglom.pumpx2.pump.messages.response.",
         ""
     )
+}
+
+fun shortHistoryLogPumpMessageTitle(message: HistoryLog): String {
+    val title = message.javaClass.name.replace(
+        "com.jwoglom.pumpx2.pump.messages.response.historyLog.",
+        ""
+    )
+    if (title == "UnknownHistoryLog") {
+        return "${title}_${message.typeId()}"
+    }
+    return title
 }
 
 fun shortPumpMessageDetail(message: Message): String {

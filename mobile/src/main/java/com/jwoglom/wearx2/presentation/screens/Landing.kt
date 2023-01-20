@@ -5,6 +5,7 @@ package com.jwoglom.wearx2.presentation.screens
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
@@ -96,6 +97,12 @@ fun Landing(
         bottomSheetState = BottomSheetState(bolusSheetState)
     )
 
+    fun showBolusWindow(): Boolean {
+        return displayBolusWindow.bottomSheetState.isExpanded ||
+            displayBolusWindow.bottomSheetState.isAnimationRunning ||
+            bolusSheetState == BottomSheetValue.Expanded
+    }
+
     Scaffold(
         topBar = {
             TopAppBar(
@@ -151,13 +158,15 @@ fun Landing(
                         modifier = Modifier
                             .padding(horizontal = 16.dp)
                             .fillMaxWidth()
-                            .fillMaxHeight(0.5F),
+                            .fillMaxHeight(0.7F),
                         content = {
                             item {
-                                if (displayBolusWindow.bottomSheetState.isExpanded ||
-                                    displayBolusWindow.bottomSheetState.isAnimationRunning ||
-                                    bolusSheetState == BottomSheetValue.Expanded)
-                                {
+                                // Fix for Android Studio preview which renders the scaffold at the
+                                // top of the screen instead of half-way.
+                                if (bolusSheetState == BottomSheetValue.Expanded) {
+                                    Spacer(Modifier.size(100.dp))
+                                }
+                                if (showBolusWindow()) {
                                     BolusWindow()
                                 }
                             }
@@ -174,30 +183,32 @@ fun Landing(
                 sheetPeekHeight = 0.dp,
                 backgroundColor = MaterialTheme.colorScheme.background,
             ) {
-                when (selectedItem) {
-                    LandingSection.DASHBOARD -> {
-                        Dashboard(
-                            innerPadding = innerPadding,
-                            navController = navController,
-                            sendMessage = sendMessage,
-                            sendPumpCommands = sendPumpCommands,
-                        )
-                    }
-                    LandingSection.DEBUG -> {
-                        Debug(
-                            innerPadding = innerPadding,
-                            navController = navController,
-                            sendMessage = sendMessage,
-                            sendPumpCommands = sendPumpCommands,
-                        )
-                    }
-                    LandingSection.SETTINGS -> {
-                        Settings(
-                            innerPadding = innerPadding,
-                            navController = navController,
-                            sendMessage = sendMessage,
-                            sendPumpCommands = sendPumpCommands,
-                        )
+                Box(Modifier.fillMaxHeight()) {
+                    when (selectedItem) {
+                        LandingSection.DASHBOARD -> {
+                            Dashboard(
+                                innerPadding = innerPadding,
+                                navController = navController,
+                                sendMessage = sendMessage,
+                                sendPumpCommands = sendPumpCommands,
+                            )
+                        }
+                        LandingSection.DEBUG -> {
+                            Debug(
+                                innerPadding = innerPadding,
+                                navController = navController,
+                                sendMessage = sendMessage,
+                                sendPumpCommands = sendPumpCommands,
+                            )
+                        }
+                        LandingSection.SETTINGS -> {
+                            Settings(
+                                innerPadding = innerPadding,
+                                navController = navController,
+                                sendMessage = sendMessage,
+                                sendPumpCommands = sendPumpCommands,
+                            )
+                        }
                     }
                 }
             }
@@ -205,32 +216,42 @@ fun Landing(
         floatingActionButton = {
             when (selectedItem) {
                 LandingSection.DASHBOARD ->
-                    ExtendedFloatingActionButton(
-                        onClick = {
-                            coroutineScope.launch {
-                                if (displayBolusWindow.bottomSheetState.isCollapsed) {
-                                    displayBolusWindow.bottomSheetState.expand()
-                                } else {
-                                    displayBolusWindow.bottomSheetState.collapse()
+                        ExtendedFloatingActionButton(
+                            onClick = {
+                                coroutineScope.launch {
+                                    if (displayBolusWindow.bottomSheetState.isCollapsed) {
+                                        displayBolusWindow.bottomSheetState.expand()
+
+                                    } else {
+                                        displayBolusWindow.bottomSheetState.collapse()
+                                    }
                                 }
+                            },
+                            icon = {
+                                if (!showBolusWindow()) {
+                                    Image(
+                                        if (isSystemInDarkTheme()) painterResource(R.drawable.bolus_icon)
+                                        else painterResource(R.drawable.bolus_icon_secondary),
+                                        "Bolus icon",
+                                        Modifier.size(24.dp)
+                                    )
+                                } else {
+                                    Image(
+                                        if (isSystemInDarkTheme()) painterResource(R.drawable.bolus_x)
+                                        else painterResource(R.drawable.bolus_x_secondary),
+                                        "Cancel bolus icon",
+                                        Modifier.size(24.dp)
+                                    )
+                                }
+                            },
+                            text = {
+                                Text(
+                                    if (!showBolusWindow()) "Bolus" else "Cancel",
+                                    color = if (isSystemInDarkTheme()) Colors.primary
+                                    else Colors.onPrimary
+                                )
                             }
-                        },
-                        icon = {
-                            Image(
-                                if (isSystemInDarkTheme()) painterResource(R.drawable.bolus_icon)
-                                else painterResource(R.drawable.bolus_icon_secondary),
-                                "Bolus icon",
-                                Modifier.size(24.dp)
-                            )
-                        },
-                        text = {
-                            Text(
-                                "Bolus",
-                                color = if (isSystemInDarkTheme()) Colors.primary
-                                else Colors.onPrimary
-                            )
-                        }
-                    )
+                        )
                 else -> {}
             }
         },

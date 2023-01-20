@@ -3,6 +3,7 @@ package com.jwoglom.wearx2.presentation
 import androidx.lifecycle.MutableLiveData
 import com.jwoglom.pumpx2.pump.messages.Message
 import com.jwoglom.pumpx2.pump.messages.response.currentStatus.BolusCalcDataSnapshotResponse
+import com.jwoglom.pumpx2.pump.messages.response.currentStatus.HistoryLogStatusResponse
 import com.jwoglom.pumpx2.pump.messages.response.currentStatus.LastBGResponse
 import com.jwoglom.pumpx2.pump.messages.response.historyLog.HistoryLog
 import com.jwoglom.wearx2.presentation.screens.PumpSetupStage
@@ -18,6 +19,7 @@ class DataStore {
     val pumpSetupStage = MutableLiveData<PumpSetupStage>(PumpSetupStage.WAITING_PUMPX2_INIT)
     val setupDeviceName = MutableLiveData<String>()
     val setupDeviceModel = MutableLiveData<String>()
+    val pumpCriticalError = MutableLiveData<Pair<String, Instant>>()
 
     val batteryPercent = MutableLiveData<Int>()
     val iobUnits = MutableLiveData<Double>()
@@ -43,6 +45,8 @@ class DataStore {
     val landingBasalDisplayedText = MutableLiveData<String>()
     val landingControlIQDisplayedText = MutableLiveData<String>()
 
+    val historyLogStatus = MutableLiveData<HistoryLogStatusResponse>()
+
     val historyLogCache = MutableLiveData<MutableMap<Long, HistoryLog>>(mutableMapOf())
     val debugMessageCache = MutableLiveData<List<Pair<Message, Instant>>>()
     val debugPromptAwaitingResponses = MutableLiveData<MutableSet<String>>()
@@ -56,6 +60,7 @@ class DataStore {
         pumpSetupStage.observeForever { t -> Timber.i("DataStore.setupStage=$t") }
         setupDeviceName.observeForever { t -> Timber.i("DataStore.setupDeviceName=$t") }
         setupDeviceModel.observeForever { t -> Timber.i("DataStore.setupDeviceModel=$t") }
+        pumpCriticalError.observeForever { t -> Timber.i("DataStore.pumpCriticalError=$t") }
 
         batteryPercent.observeForever { t -> Timber.i("DataStore.batteryPercent=$t") }
         iobUnits.observeForever { t -> Timber.i("DataStore.iobUnits=$t") }
@@ -80,6 +85,8 @@ class DataStore {
 
         landingBasalDisplayedText.observeForever { t -> Timber.i("DataStore.landingBasalDisplayedText=$t") }
         landingControlIQDisplayedText.observeForever { t -> Timber.i("DataStore.landingControlIQDisplayedText=$t") }
+
+        historyLogStatus.observeForever { t -> Timber.i("DataStore.historyLogStatus=$t") }
 
         historyLogCache.observeForever { t -> Timber.i("DataStore.historyLogCache=$t") }
         debugMessageCache.observeForever { t -> Timber.i("DataStore.debugMessageCache=$t") }

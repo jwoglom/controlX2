@@ -22,6 +22,7 @@ import com.jwoglom.wearx2.LocalDataStore
 import com.jwoglom.wearx2.Prefs
 import com.jwoglom.wearx2.presentation.screens.PumpSetupStage
 import com.jwoglom.wearx2.shared.presentation.intervalOf
+import com.jwoglom.wearx2.shared.util.shortTimeAgo
 import timber.log.Timber
 
 const val TroubleshootingStepsThresholdSeconds = 15
@@ -36,6 +37,7 @@ fun PumpSetupStageDescription(
     val setupStage = ds.pumpSetupStage.observeAsState()
     val setupDeviceName = ds.setupDeviceName.observeAsState()
     val setupDeviceModel = ds.setupDeviceModel.observeAsState()
+    val pumpCriticalError = ds.pumpCriticalError.observeAsState()
 
     var pumpConnectionWaitingSeconds by remember { mutableStateOf(0) }
 
@@ -101,6 +103,16 @@ fun PumpSetupStageDescription(
                            append("The pairing code was invalid. ")
                        }
                        append("The code was either entered incorrectly or timed out. Make sure the 'Pair Device' dialog is open on your pump.")
+                       if (!initialSetup) {
+                           withStyle(
+                               style = SpanStyle(
+                                   color = Color.Red,
+                                   fontWeight = FontWeight.Bold
+                               )
+                           ) {
+                               append("\n\nTo resolve the issue, you must re-pair the app in Settings > Reconfigure pump.")
+                           }
+                       }
                    })
                } else {
                    Line("Initial connection made to ${setupDeviceName.value}, attempting to pair...")
@@ -139,9 +151,15 @@ fun PumpSetupStageDescription(
                     Line("2. If the t:connect Android application is open, force-stop it: long-press the app, select App Info, then 'Force Stop'")
                     Line("3. Open your pump and select:")
                     Line("Options > Device Settings > Bluetooth Settings", bold = true)
-                    Line("Disable and then re-enable 'Mobile Connection'")
+                    Line("Disable and then re-enable 'Mobile Connection'.")
+                    Line("If 'Pair Device' is displayed, press it.")
                 }
             }
+        }
+        if (pumpCriticalError.value != null) {
+            Spacer(Modifier.height(16.dp))
+            Line("Connection Error${pumpCriticalError.value?.second?.let { " ${shortTimeAgo(it)}" }}:", bold = true)
+            Line("${pumpCriticalError.value?.first}")
         }
         Spacer(Modifier.height(16.dp))
         Divider()

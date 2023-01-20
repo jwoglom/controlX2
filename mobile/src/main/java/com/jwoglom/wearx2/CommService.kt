@@ -74,6 +74,7 @@ import kotlinx.coroutines.cancel
 import timber.log.Timber
 import java.time.Duration
 import java.time.Instant
+import java.util.*
 
 
 const val CacheSeconds = 30
@@ -86,8 +87,8 @@ class CommService : WearableListenerService(), GoogleApiClient.ConnectionCallbac
 
     private lateinit var mApiClient: GoogleApiClient
 
-    private var lastResponseMessage: MutableMap<Pair<Characteristic, Byte>, Pair<com.jwoglom.pumpx2.pump.messages.Message, Instant>> = mutableMapOf()
-    private var historyLogCache: MutableMap<Long, HistoryLog> = mutableMapOf()
+    private var lastResponseMessage: MutableMap<Pair<Characteristic, Byte>, Pair<com.jwoglom.pumpx2.pump.messages.Message, Instant>> = Collections.synchronizedMap(mutableMapOf())
+    private var historyLogCache: MutableMap<Long, HistoryLog> = Collections.synchronizedMap(mutableMapOf())
     private var lastTimeSinceReset: TimeSinceResetResponse? = null
 
     // Handler that receives messages from the thread
@@ -146,7 +147,7 @@ class CommService : WearableListenerService(), GoogleApiClient.ConnectionCallbac
                     is CurrentEGVGuiDataResponse -> DataClientState(context).cgmReading = Pair("${message.cgmReading}", Instant.now())
                     is HistoryLogStreamResponse -> {
                         message.historyLogs.forEach {
-                            Timber.d("added historyLog: ${it.sequenceNum}: $it")
+                            Timber.i("HISTORY-LOG-MESSAGE(${it.sequenceNum}): $it")
                             historyLogCache[it.sequenceNum] = it
                         }
                     }
@@ -288,7 +289,7 @@ class CommService : WearableListenerService(), GoogleApiClient.ConnectionCallbac
             override fun onPumpCriticalError(peripheral: BluetoothPeripheral?, reason: TandemError?) {
                 super.onPumpCriticalError(peripheral, reason)
                 Timber.w("onPumpCriticalError $reason")
-                Toast.makeText(this@CommService, "Pump Error: ${reason?.message}", Toast.LENGTH_SHORT).show()
+                Toast.makeText(this@CommService, "${reason?.name}: ${reason?.message}", Toast.LENGTH_LONG).show()
                 sendWearCommMessage("/from-pump/pump-critical-error",
                     reason?.message!!.toByteArray()
                 );
