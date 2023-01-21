@@ -434,6 +434,7 @@ fun BolusWindow(
                             bolusFinalParameters.value?.let { finalParameters ->
                                 bolusPermissionResponse.value?.let { permissionResponse ->
                                     if (permissionResponse.isPermissionGranted && finalParameters.units >= 0.05) {
+                                        showPermissionCheckDialog = false
                                         showInProgressDialog = true
                                         sendBolusRequest(
                                             dataStore.bolusFinalParameters.value,
@@ -489,12 +490,14 @@ fun BolusWindow(
 
         LaunchedEffect(bolusInitiateResponse.value) {
             if (bolusInitiateResponse.value != null) {
+                showInProgressDialog = false
                 showApprovedDialog = true
             }
         }
 
         LaunchedEffect(bolusCancelResponse.value) {
             if (bolusCancelResponse.value != null) {
+                showInProgressDialog = false
                 showCancelledDialog = true
             }
         }
@@ -525,6 +528,7 @@ fun BolusWindow(
             dismissButton = {
                 TextButton(
                     onClick = {
+                        showInProgressDialog = false
                         cancelBolus()
                     },
                     modifier = Modifier.padding(top = 16.dp)
@@ -618,6 +622,7 @@ fun BolusWindow(
             dismissButton = {
                 TextButton(
                     onClick = {
+                        showApprovedDialog = false
                         cancelBolus()
                     },
                     modifier = Modifier.padding(top = 16.dp)
@@ -711,7 +716,7 @@ fun BolusWindow(
 
         AlertDialog(
             onDismissRequest = {
-                showCancellingDialog = false
+                showCancelledDialog = false
                 resetBolusDataStoreState(dataStore)
                 closeWindow()
             },
@@ -736,7 +741,8 @@ fun BolusWindow(
                 })
             },
             text = {
-                Text(when (bolusCancelResponse.value?.status) {
+                Text(
+                    "${when (bolusCancelResponse.value?.status) {
                     CancelBolusResponse.CancelStatus.SUCCESS ->
                         "The bolus was cancelled."
                     CancelBolusResponse.CancelStatus.FAILED ->
@@ -749,21 +755,20 @@ fun BolusWindow(
                             }"
                         }
                     else -> "Please check your pump to confirm whether the bolus was cancelled."
-                })
-                Spacer(Modifier.height(16.dp))
-                Text(when {
-                    matchesBolusId() == true ->
-                        lastBolusStatusResponse.value?.deliveredVolume?.let {
-                            if (it == 0L) "A bolus was started and no insulin was delivered." else "${twoDecimalPlaces1000Unit(it)}u was delivered."
-                        } ?: ""
-                    matchesBolusId() == false -> "No insulin was delivered."
-                    else -> "Checking if any insulin was delivered..."
-                })
+                    }}\n\n${when {
+                        matchesBolusId() == true ->
+                            lastBolusStatusResponse.value?.deliveredVolume?.let {
+                                if (it == 0L) "A bolus was started and no insulin was delivered." else "${twoDecimalPlaces1000Unit(it)}u was delivered."
+                            } ?: ""
+                        matchesBolusId() == false -> "No insulin was delivered."
+                        else -> "Checking if any insulin was delivered..."
+                    }}"
+                )
             },
             confirmButton = {
                 TextButton(
                     onClick = {
-                        showCancellingDialog = false
+                        showCancelledDialog = false
                         resetBolusDataStoreState(dataStore)
                         closeWindow()
                     },
