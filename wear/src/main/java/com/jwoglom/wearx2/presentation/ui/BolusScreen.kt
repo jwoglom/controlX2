@@ -239,7 +239,7 @@ fun BolusScreen(
         sendPumpCommands(SendType.BUST_CACHE, commands)
     }
 
-    LaunchedEffect(refreshing) {
+    LaunchedEffect (refreshing) {
         waitForLoaded()
     }
 

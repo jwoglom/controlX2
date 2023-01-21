@@ -84,7 +84,7 @@ class DataStore {
         cgmSessionExpireExact.observeForever { t -> Timber.i("DataStore.cgmSessionExpireExact=$t") }
         cgmSessionExpireRelative.observeForever { t -> Timber.i("DataStore.cgmSessionExpireRelative=$t") }
         cgmTransmitterStatus.observeForever { t -> Timber.i("DataStore.cgmTransmitterStatus=$t") }
-        cgmReading.observeForever { t -> Timber.i("DataStore.cgmLastReading=$t") }
+        cgmReading.observeForever { t -> Timber.i("DataStore.cgmReading=$t") }
         cgmDelta.observeForever { t -> Timber.i("DataStore.cgmDelta=$t") }
         cgmStatusText.observeForever { t -> Timber.i("DataStore.cgmStatusText=$t") }
         cgmHighLowState.observeForever { t -> Timber.i("DataStore.cgmHighLowState=$t") }
