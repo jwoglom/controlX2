@@ -5,6 +5,7 @@ package com.jwoglom.wearx2.presentation.screens.sections
 import android.os.Handler
 import android.os.Looper
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -16,11 +17,19 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material.ExperimentalMaterialApi
+import androidx.compose.material.Icon
+import androidx.compose.material.OutlinedButton
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonColors
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Card
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -34,9 +43,14 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -112,6 +126,8 @@ fun BolusWindow(
     val bolusFinalParameters = dataStore.bolusFinalParameters.observeAsState()
     val bolusPermissionResponse = dataStore.bolusPermissionResponse.observeAsState()
 
+    val bolusConditionsPrompt = dataStore.bolusConditionsPrompt.observeAsState()
+
     var showPermissionCheckDialog by remember { mutableStateOf(false) }
     var showInProgressDialog by remember { mutableStateOf(false) }
     var showApprovedDialog by remember { mutableStateOf(false) }
@@ -174,8 +190,11 @@ fun BolusWindow(
 
     LifecycleStateObserver(
         lifecycleOwner = LocalLifecycleOwner.current,
-        onStop = {}
+        onStop = {
+            resetBolusDataStoreState(dataStore)
+        }
     ) {
+        resetBolusDataStoreState(dataStore)
         refresh()
     }
 
@@ -227,6 +246,7 @@ fun BolusWindow(
             }
             if (alreadyAcked) {
                 Timber.d("bolusCalc: Not displaying acknowledged prompt again: $conditionsAcknowledged")
+                dataStore.bolusConditionsPrompt.value = mutableListOf<BolusCalcCondition>()
             } else {
                 dataStore.bolusConditionsPrompt.value = mutableListOf<BolusCalcCondition>().let {
                     it.addAll(conditionsWithPrompt)
@@ -342,6 +362,111 @@ fun BolusWindow(
         }
 
         return true
+    }
+
+    bolusConditionsPrompt.value?.forEach {
+        Card(Modifier.fillMaxWidth()) {
+            Column(Modifier.fillMaxWidth()) {
+                Text(buildAnnotatedString {
+                    withStyle(SpanStyle(fontWeight = FontWeight.Bold)) {
+                        append("${it.msg}: ")
+                    }
+                    append(it.prompt?.promptMessage)
+                }, Modifier.padding(8.dp))
+            }
+            Row(
+                modifier = Modifier.fillMaxWidth()
+            ) {
+
+                Column(Modifier.weight(3f)) {}
+
+                Column(Modifier.weight(1f)) {
+                    OutlinedButton(
+                        onClick = {
+                            bolusConditionsPrompt.value?.let {
+                                if (dataStore.bolusConditionsPromptAcknowledged.value == null) {
+                                    dataStore.bolusConditionsPromptAcknowledged.value =
+                                        mutableListOf(it.first())
+                                } else {
+                                    dataStore.bolusConditionsPromptAcknowledged.value!!.add(it.first())
+                                }
+
+                                if (dataStore.bolusConditionsExcluded.value == null) {
+                                    dataStore.bolusConditionsExcluded.value =
+                                        mutableSetOf(it.first())
+                                } else {
+                                    dataStore.bolusConditionsExcluded.value?.add(it.first())
+                                }
+
+                                dataStore.bolusConditionsPrompt.value?.drop(0)
+                                recalculate()
+                            }
+                        },
+                        modifier = Modifier.padding(8.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Filled.Close,
+                            contentDescription = "Reject"
+                        )
+                    }
+                }
+
+
+                Column(Modifier.weight(1f)) {
+                    OutlinedButton(
+                        onClick = {
+                            bolusConditionsPrompt.value?.let {
+                                if (dataStore.bolusConditionsPromptAcknowledged.value == null) {
+                                    dataStore.bolusConditionsPromptAcknowledged.value =
+                                        mutableListOf(it.first())
+                                } else {
+                                    dataStore.bolusConditionsPromptAcknowledged.value!!.add(it.first())
+                                }
+
+                                if (dataStore.bolusConditionsExcluded.value != null) {
+                                    dataStore.bolusConditionsExcluded.value?.remove(it.first())
+                                }
+
+                                dataStore.bolusConditionsPrompt.value?.drop(0)
+                                recalculate()
+                            }
+                        },
+                        modifier = Modifier.padding(8.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Filled.Check,
+                            contentDescription = "Apply"
+                        )
+                    }
+                }
+            }
+        }
+    }
+
+
+    val bolusConditionsPromptAcknowledged = dataStore.bolusConditionsPromptAcknowledged.observeAsState()
+
+    if (bolusConditionsPromptAcknowledged.value != null && bolusConditionsPromptAcknowledged.value!!.size > 0) {
+        bolusConditionsPromptAcknowledged.value?.forEach {
+            Card(Modifier.fillMaxWidth().clickable {
+                Timber.i("bolusConditionsPromptAcknowledged click")
+                dataStore.bolusConditionsPrompt.value = mutableListOf<BolusCalcCondition>().let {
+                    it.addAll(bolusConditionsPromptAcknowledged.value!!)
+                    it
+                }
+                dataStore.bolusConditionsPromptAcknowledged.value = mutableListOf()
+                dataStore.bolusConditionsExcluded.value = mutableSetOf()
+            }) {
+                Text(buildAnnotatedString {
+                    withStyle(SpanStyle(fontWeight = FontWeight.Bold)) {
+                        when {
+                            bolusConditionsExcluded.value?.contains(it) == true -> "${it.prompt?.whenIgnoredNotice}"
+                            else -> "${it.prompt?.whenAcceptedNotice}"
+                        }
+                    }
+                }, Modifier.padding(8.dp))
+            }
+        }
     }
 
     LaunchedEffect (bolusCurrentParameters.value) {
@@ -835,6 +960,7 @@ fun rawToInt(s: String?): Int? {
 }
 
 fun resetBolusDataStoreState(dataStore: DataStore) {
+    Timber.d("bolusCalc resetBolusDataStoreState")
     dataStore.bolusPermissionResponse.value = null
     dataStore.bolusCancelResponse.value = null
     dataStore.bolusInitiateResponse.value = null
