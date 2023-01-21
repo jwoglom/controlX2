@@ -57,6 +57,10 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavHostController
 import com.jwoglom.pumpx2.pump.messages.Message
+import com.jwoglom.pumpx2.pump.messages.calculator.BolusCalcUnits
+import com.jwoglom.pumpx2.pump.messages.calculator.BolusParameters
+import com.jwoglom.pumpx2.pump.messages.response.currentStatus.BolusCalcDataSnapshotResponse
+import com.jwoglom.pumpx2.pump.messages.response.currentStatus.TimeSinceResetResponse
 import com.jwoglom.wearx2.LocalDataStore
 import com.jwoglom.wearx2.Prefs
 import com.jwoglom.wearx2.R
@@ -80,6 +84,7 @@ fun Landing(
     navController: NavHostController? = null,
     sendMessage: (String, ByteArray) -> Unit,
     sendPumpCommands: (SendType, List<Message>) -> Unit,
+    sendServiceBolusRequest: (Int, BolusParameters, BolusCalcUnits, BolusCalcDataSnapshotResponse, TimeSinceResetResponse) -> Unit,
     sectionState: LandingSection = LandingSection.DASHBOARD,
     bolusSheetState: BottomSheetValue = BottomSheetValue.Collapsed,
 ) {
@@ -174,7 +179,8 @@ fun Landing(
                                 }
                                 if (showBolusWindow()) {
                                     BolusWindow(
-                                        sendPumpCommands = sendPumpCommands
+                                        sendPumpCommands = sendPumpCommands,
+                                        sendServiceBolusRequest = sendServiceBolusRequest,
                                     )
                                 }
                             }
@@ -308,6 +314,7 @@ private fun DefaultPreview() {
             Landing(
                 sendMessage = { _, _ -> },
                 sendPumpCommands = { _, _ -> },
+                sendServiceBolusRequest = { _, _, _, _, _ -> },
             )
         }
     }
@@ -325,6 +332,7 @@ fun BolusPreview() {
             Landing(
                 sendMessage = { _, _ -> },
                 sendPumpCommands = { _, _ -> },
+                sendServiceBolusRequest = { _, _, _, _, _ -> },
                 bolusSheetState = BottomSheetValue.Expanded,
             )
         }
@@ -343,6 +351,7 @@ private fun DebugPreview() {
             Landing(
                 sendMessage = { _, _ -> },
                 sendPumpCommands = { _, _ -> },
+                sendServiceBolusRequest = { _, _, _, _, _ -> },
                 sectionState = LandingSection.DEBUG,
             )
         }
@@ -361,6 +370,7 @@ private fun SettingsPreview() {
             Landing(
                 sendMessage = { _, _ -> },
                 sendPumpCommands = { _, _ -> },
+                sendServiceBolusRequest = { _, _, _, _, _ -> },
                 sectionState = LandingSection.SETTINGS,
             )
         }

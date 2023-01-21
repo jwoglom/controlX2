@@ -170,7 +170,7 @@ class MainActivity : ComponentActivity(), MessageApi.MessageListener, GoogleApiC
                 )
 
                 Timber.i("sendPhoneBolusRequest: numUnits=$numUnits numCarbs=$numCarbs bgValue=$bgValue foodVolume=$foodVolume corrVolume=$corrVolume iobUnits=$iobUnits: bolusRequest=$bolusRequest preCommands=$preCommands")
-                this.sendMessage("/to-phone/bolus-request", PumpMessageSerializer.toBytes(bolusRequest))
+                this.sendMessage("/to-phone/bolus-request-wear", PumpMessageSerializer.toBytes(bolusRequest))
             }
 
             val sendPhoneBolusCancel: () -> Unit = {

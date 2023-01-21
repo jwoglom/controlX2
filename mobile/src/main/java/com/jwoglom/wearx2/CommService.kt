@@ -683,9 +683,13 @@ class CommService : WearableListenerService(), GoogleApiClient.ConnectionCallbac
             "/to-pump/pair" -> {
                 sendPumpPairingMessage()
             }
-            "/to-phone/bolus-request" -> {
+            "/to-phone/bolus-request-wear" -> {
                 // removed: initialized check
-                confirmBolusRequest(PumpMessageSerializer.fromBytes(messageEvent.data) as InitiateBolusRequest)
+                confirmBolusRequest(PumpMessageSerializer.fromBytes(messageEvent.data) as InitiateBolusRequest, BolusRequestSource.WEAR)
+            }
+            "/to-phone/bolus-request-phone" -> {
+                // removed: initialized check
+                confirmBolusRequest(PumpMessageSerializer.fromBytes(messageEvent.data) as InitiateBolusRequest, BolusRequestSource.PHONE)
             }
             "/to-phone/bolus-cancel" -> {
                 Timber.i("bolus state cancelled")
@@ -891,14 +895,18 @@ class CommService : WearableListenerService(), GoogleApiClient.ConnectionCallbac
 
     private var bolusNotificationId: Int = 1000
 
-
-    private fun confirmBolusRequest(request: InitiateBolusRequest) {
+    enum class BolusRequestSource(val id: String) {
+        PHONE("phone"),
+        WEAR("wear")
+    }
+    private fun confirmBolusRequest(request: InitiateBolusRequest, source: BolusRequestSource) {
         val units = twoDecimalPlaces(InsulinUnit.from1000To1(request.totalVolume))
         Timber.i("confirmBolusRequest $units: $request")
         bolusNotificationId++
         prefs(this)?.edit()
             ?.putString("initiateBolusRequest", Hex.encodeHexString(PumpMessageSerializer.toBytes(request)))
             ?.putString("initiateBolusSecret", Hex.encodeHexString(Bytes.getSecureRandom10Bytes()))
+            ?.putString("initiateBolusSource", source.id)
             ?.putLong("initiateBolusTime", Instant.now().toEpochMilli())
             ?.putInt("initiateBolusNotificationId", bolusNotificationId)
             ?.commit().let {

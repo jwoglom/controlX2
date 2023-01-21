@@ -63,7 +63,12 @@ public class BolusNotificationBroadcastReceiver : BroadcastReceiver(),
                     )
 
                     waitForApiClient()
-                    sendMessage("/to-wear/initiate-confirmed-bolus", rawBytes)
+                    val bolusSource = prefs(context)?.getString("initiateBolusSource", "") ?: ""
+                    if (bolusSource == "wear") {
+                        sendMessage("/to-wear/initiate-confirmed-bolus", rawBytes)
+                    } else if (bolusSource == "phone") {
+                        sendMessage("/to-phone/initiate-confirmed-bolus", rawBytes)
+                    }
                     if (!PumpState.actionsAffectingInsulinDeliveryEnabled()) {
                         // The same message will appear on the wearable
                         reply(

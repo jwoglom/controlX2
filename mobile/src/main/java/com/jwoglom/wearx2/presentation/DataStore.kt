@@ -3,11 +3,19 @@ package com.jwoglom.wearx2.presentation
 import androidx.lifecycle.MutableLiveData
 import com.jwoglom.pumpx2.pump.messages.Message
 import com.jwoglom.pumpx2.pump.messages.calculator.BolusCalcCondition
+import com.jwoglom.pumpx2.pump.messages.calculator.BolusCalcUnits
 import com.jwoglom.pumpx2.pump.messages.calculator.BolusCalculatorBuilder
 import com.jwoglom.pumpx2.pump.messages.calculator.BolusParameters
+import com.jwoglom.pumpx2.pump.messages.response.control.BolusPermissionResponse
+import com.jwoglom.pumpx2.pump.messages.response.control.CancelBolusResponse
+import com.jwoglom.pumpx2.pump.messages.response.control.InitiateBolusResponse
+import com.jwoglom.pumpx2.pump.messages.response.control.RemoteCarbEntryResponse
 import com.jwoglom.pumpx2.pump.messages.response.currentStatus.BolusCalcDataSnapshotResponse
+import com.jwoglom.pumpx2.pump.messages.response.currentStatus.CurrentBolusStatusResponse
 import com.jwoglom.pumpx2.pump.messages.response.currentStatus.HistoryLogStatusResponse
 import com.jwoglom.pumpx2.pump.messages.response.currentStatus.LastBGResponse
+import com.jwoglom.pumpx2.pump.messages.response.currentStatus.LastBolusStatusAbstractResponse
+import com.jwoglom.pumpx2.pump.messages.response.currentStatus.TimeSinceResetResponse
 import com.jwoglom.pumpx2.pump.messages.response.historyLog.HistoryLog
 import com.jwoglom.wearx2.presentation.screens.PumpSetupStage
 import timber.log.Timber
@@ -54,6 +62,17 @@ class DataStore {
     val bolusConditionsPrompt = MutableLiveData<MutableList<BolusCalcCondition>>()
     val bolusConditionsPromptAcknowledged = MutableLiveData<MutableList<BolusCalcCondition>>()
     val bolusConditionsExcluded = MutableLiveData<MutableSet<BolusCalcCondition>>()
+    val bolusFinalParameters = MutableLiveData<BolusParameters>()
+    val bolusFinalCalcUnits = MutableLiveData<BolusCalcUnits>()
+    val bolusFinalConditions = MutableLiveData<Set<BolusCalcCondition>>()
+
+    val timeSinceResetResponse = MutableLiveData<TimeSinceResetResponse>()
+    val bolusPermissionResponse = MutableLiveData<BolusPermissionResponse>()
+    val bolusCarbEntryResponse = MutableLiveData<RemoteCarbEntryResponse>()
+    val bolusInitiateResponse = MutableLiveData<InitiateBolusResponse>()
+    val bolusCancelResponse = MutableLiveData<CancelBolusResponse>()
+    val lastBolusStatusResponse = MutableLiveData<LastBolusStatusAbstractResponse>()
+    val bolusCurrentResponse = MutableLiveData<CurrentBolusStatusResponse>()
 
     val historyLogStatus = MutableLiveData<HistoryLogStatusResponse>()
 
@@ -102,6 +121,16 @@ class DataStore {
         bolusConditionsPrompt.observeForever { t -> Timber.i("DataStore.bolusConditionsPrompt=$t") }
         bolusConditionsPromptAcknowledged.observeForever { t -> Timber.i("DataStore.bolusConditionsPromptAcknowledged=$t") }
         bolusConditionsExcluded.observeForever { t -> Timber.i("DataStore.bolusConditionsExcluded=$t") }
+        bolusFinalParameters.observeForever { t -> Timber.i("DataStore.bolusFinalParameters=$t") }
+        bolusFinalCalcUnits.observeForever { t -> Timber.i("DataStore.bolusFinalCalcUnits=$t") }
+        bolusFinalConditions.observeForever { t -> Timber.i("DataStore.bolusFinalConditions=$t") }
+
+        timeSinceResetResponse.observeForever { t -> Timber.i("DataStore.timeSinceResetResponse=$t") }
+        bolusPermissionResponse.observeForever { t -> Timber.i("DataStore.bolusPermissionResponse=$t") }
+        bolusCarbEntryResponse.observeForever { t -> Timber.i("DataStore.bolusCarbEntryResponse=$t") }
+        bolusInitiateResponse.observeForever { t -> Timber.i("DataStore.bolusInitiateResponse=$t") }
+        bolusCancelResponse.observeForever { t -> Timber.i("DataStore.bolusCancelResponse=$t") }
+        bolusCurrentResponse.observeForever { t -> Timber.i("DataStore.bolusCurrentResponse=$t") }
 
         historyLogStatus.observeForever { t -> Timber.i("DataStore.historyLogStatus=$t") }
 

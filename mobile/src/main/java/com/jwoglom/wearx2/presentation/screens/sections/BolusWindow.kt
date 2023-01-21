@@ -13,11 +13,13 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material.ExperimentalMaterialApi
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -41,12 +43,13 @@ import com.jwoglom.pumpx2.pump.messages.calculator.BolusCalcUnits
 import com.jwoglom.pumpx2.pump.messages.calculator.BolusCalculatorBuilder
 import com.jwoglom.pumpx2.pump.messages.calculator.BolusParameters
 import com.jwoglom.pumpx2.pump.messages.models.InsulinUnit
+import com.jwoglom.pumpx2.pump.messages.request.control.BolusPermissionRequest
 import com.jwoglom.pumpx2.pump.messages.request.currentStatus.BolusCalcDataSnapshotRequest
-import com.jwoglom.pumpx2.pump.messages.request.currentStatus.GlobalMaxBolusSettingsRequest
 import com.jwoglom.pumpx2.pump.messages.request.currentStatus.LastBGRequest
 import com.jwoglom.pumpx2.pump.messages.request.currentStatus.TimeSinceResetRequest
 import com.jwoglom.pumpx2.pump.messages.response.currentStatus.BolusCalcDataSnapshotResponse
 import com.jwoglom.pumpx2.pump.messages.response.currentStatus.LastBGResponse
+import com.jwoglom.pumpx2.pump.messages.response.currentStatus.TimeSinceResetResponse
 import com.jwoglom.wearx2.LocalDataStore
 import com.jwoglom.wearx2.R
 import com.jwoglom.wearx2.presentation.screens.BolusPreview
@@ -62,7 +65,8 @@ import timber.log.Timber
 
 @Composable
 fun BolusWindow(
-    sendPumpCommands: (SendType, List<Message>) -> Unit
+    sendPumpCommands: (SendType, List<Message>) -> Unit,
+    sendServiceBolusRequest: (Int, BolusParameters, BolusCalcUnits, BolusCalcDataSnapshotResponse, TimeSinceResetResponse) -> Unit,
 ) {
     val dataStore = LocalDataStore.current
 
@@ -88,6 +92,11 @@ fun BolusWindow(
     val bolusCalcLastBG = dataStore.bolusCalcLastBG.observeAsState()
     val bolusConditionsExcluded = dataStore.bolusConditionsExcluded.observeAsState()
     val bolusCurrentParameters = dataStore.bolusCurrentParameters.observeAsState()
+    val bolusFinalParameters = dataStore.bolusFinalParameters.observeAsState()
+    val bolusPermissionResponse = dataStore.bolusPermissionResponse.observeAsState()
+
+    var showPermissionCheckDialog by remember { mutableStateOf(false) }
+    var showInProgressDialog by remember { mutableStateOf(false) }
 
     val commands = listOf(
         BolusCalcDataSnapshotRequest(),
@@ -320,9 +329,22 @@ fun BolusWindow(
         if (refreshing) {
             CircularProgressIndicator(Modifier.align(Alignment.Center))
         } else {
+            fun performPermissionCheck() {
+                showPermissionCheckDialog = true
+                sendPumpCommands(SendType.BUST_CACHE, listOf(BolusPermissionRequest()))
+            }
+
             Button(
                 onClick = {
+                    if (validBolus(bolusCurrentParameters.value)) {
+                        dataStore.bolusFinalConditions.value =
+                            bolusCalcDecision(dataStore.bolusCalculatorBuilder.value, bolusConditionsExcluded.value)?.conditions
 
+                        val pair = bolusCalcParameters(dataStore.bolusCalculatorBuilder.value, bolusConditionsExcluded.value)
+                        dataStore.bolusFinalParameters.value = pair.first
+                        dataStore.bolusFinalCalcUnits.value = pair.second
+                        performPermissionCheck()
+                    }
                 },
                 contentPadding = ButtonDefaults.ButtonWithIconContentPadding,
                 enabled = bolusButtonEnabled,
@@ -340,6 +362,107 @@ fun BolusWindow(
                 Text("Deliver ${bolusCurrentParameters.value?.units?.let { "${twoDecimalPlaces(it)}u " }}bolus", fontSize = 18.sp)
             }
         }
+    }
+
+    if (showPermissionCheckDialog) {
+        fun sendBolusRequest(bolusParameters: BolusParameters?, unitBreakdown: BolusCalcUnits?, dataSnapshot: BolusCalcDataSnapshotResponse?, timeSinceReset: TimeSinceResetResponse?) {
+            if (bolusParameters == null || dataStore.bolusPermissionResponse.value == null || dataStore.bolusCalcDataSnapshot.value == null || unitBreakdown == null || dataSnapshot == null || timeSinceReset == null) {
+                Timber.w("sendBolusRequest: null parameters")
+                return
+            }
+
+            val bolusId = dataStore.bolusPermissionResponse.value!!.bolusId
+
+            Timber.i("sendBolusRequest: sending bolus request to phone: bolusId=$bolusId bolusParameters=$bolusParameters unitBreakdown=$unitBreakdown dataSnapshot=$dataSnapshot timeSinceReset=$timeSinceReset")
+            sendServiceBolusRequest(bolusId, bolusParameters, unitBreakdown, dataSnapshot, timeSinceReset)
+        }
+
+        AlertDialog(
+            onDismissRequest = {
+                showPermissionCheckDialog = false
+            },
+            title = {
+                Text("Deliver ${bolusCurrentParameters.value?.units?.let { "${twoDecimalPlaces(it)}u " }}bolus?")
+            },
+            icon = {
+                Image(
+                    if (isSystemInDarkTheme()) painterResource(R.drawable.bolus_icon_secondary)
+                    else painterResource(R.drawable.bolus_icon),
+                    "Bolus icon",
+                    Modifier.size(ButtonDefaults.IconSize)
+                )
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = {
+                        showPermissionCheckDialog = false
+                    },
+                ) {
+                    Text("Cancel")
+                }
+
+            },
+            confirmButton = {
+                bolusFinalParameters.value?.let { finalParameters ->
+                    bolusPermissionResponse.value?.let { permissionResponse ->
+                        if (permissionResponse.isPermissionGranted && finalParameters.units >= 0.05) {
+                            TextButton(
+                                onClick = {
+                                    if (permissionResponse.isPermissionGranted && finalParameters.units >= 0.05) {
+                                        showInProgressDialog = true
+                                        sendBolusRequest(
+                                            dataStore.bolusFinalParameters.value,
+                                            dataStore.bolusFinalCalcUnits.value,
+                                            dataStore.bolusCalcDataSnapshot.value,
+                                            dataStore.timeSinceResetResponse.value,
+                                        )
+                                    }
+                                }
+                            ) {
+                                Text("Deliver")
+                            }
+                        }
+                    }
+                }
+            }
+        )
+    }
+    if (showInProgressDialog) {
+        AlertDialog(
+            onDismissRequest = {
+                showInProgressDialog = false
+            },
+            title = {
+                Text("Delivering ${bolusCurrentParameters.value?.units?.let { "${twoDecimalPlaces(it)}u " }}bolus?")
+            },
+            icon = {
+                Image(
+                    if (isSystemInDarkTheme()) painterResource(R.drawable.bolus_icon_secondary)
+                    else painterResource(R.drawable.bolus_icon),
+                    "Bolus icon",
+                    Modifier.size(ButtonDefaults.IconSize)
+                )
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = {
+                        showPermissionCheckDialog = false
+                    },
+                ) {
+                    Text("Cancel")
+                }
+
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        showPermissionCheckDialog = false
+                    },
+                ) {
+                    Text("Deliver")
+                }
+            }
+        )
     }
 }
 

@@ -1,4 +1,4 @@
-@file:OptIn(ExperimentalMaterialApi::class)
+@file:OptIn(ExperimentalMaterialApi::class, ExperimentalMaterialApi::class)
 
 package com.jwoglom.wearx2.presentation
 
@@ -11,6 +11,10 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import com.jwoglom.pumpx2.pump.messages.Message
+import com.jwoglom.pumpx2.pump.messages.calculator.BolusCalcUnits
+import com.jwoglom.pumpx2.pump.messages.calculator.BolusParameters
+import com.jwoglom.pumpx2.pump.messages.response.currentStatus.BolusCalcDataSnapshotResponse
+import com.jwoglom.pumpx2.pump.messages.response.currentStatus.TimeSinceResetResponse
 import com.jwoglom.wearx2.presentation.navigation.Screen
 import com.jwoglom.wearx2.presentation.screens.AppSetup
 import com.jwoglom.wearx2.presentation.screens.FirstLaunch
@@ -25,6 +29,7 @@ fun MobileApp(
     startDestination: String = Screen.FirstLaunch.route,
     sendMessage: (String, ByteArray) -> Unit,
     sendPumpCommands: (SendType, List<Message>) -> Unit,
+    sendServiceBolusRequest: (Int, BolusParameters, BolusCalcUnits, BolusCalcDataSnapshotResponse, TimeSinceResetResponse) -> Unit,
 ) {
     WearX2Theme {
         NavHost(
@@ -57,6 +62,7 @@ fun MobileApp(
                     navController = navController,
                     sendMessage = sendMessage,
                     sendPumpCommands = sendPumpCommands,
+                    sendServiceBolusRequest = sendServiceBolusRequest,
                 )
             }
         }
@@ -73,6 +79,7 @@ fun DefaultPreview() {
     MobileApp(
         startDestination = Screen.FirstLaunch.route,
         sendMessage = {_, _ -> },
-        sendPumpCommands = {_, _ -> }
+        sendPumpCommands = {_, _ -> },
+        sendServiceBolusRequest = {_, _, _, _, _ -> }
     )
 }

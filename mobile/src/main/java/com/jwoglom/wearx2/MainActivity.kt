@@ -34,13 +34,23 @@ import com.google.android.gms.wearable.Node
 import com.google.android.gms.wearable.Wearable
 import com.jwoglom.pumpx2.pump.PumpState
 import com.jwoglom.pumpx2.pump.messages.Message
+import com.jwoglom.pumpx2.pump.messages.calculator.BolusCalcUnits
+import com.jwoglom.pumpx2.pump.messages.calculator.BolusParameters
 import com.jwoglom.pumpx2.pump.messages.models.InsulinUnit
+import com.jwoglom.pumpx2.pump.messages.request.control.InitiateBolusRequest
+import com.jwoglom.pumpx2.pump.messages.request.control.RemoteBgEntryRequest
+import com.jwoglom.pumpx2.pump.messages.request.control.RemoteCarbEntryRequest
+import com.jwoglom.pumpx2.pump.messages.response.control.BolusPermissionResponse
+import com.jwoglom.pumpx2.pump.messages.response.control.CancelBolusResponse
+import com.jwoglom.pumpx2.pump.messages.response.control.InitiateBolusResponse
+import com.jwoglom.pumpx2.pump.messages.response.control.RemoteCarbEntryResponse
 import com.jwoglom.pumpx2.pump.messages.response.currentStatus.BolusCalcDataSnapshotResponse
 import com.jwoglom.pumpx2.pump.messages.response.currentStatus.CGMStatusResponse
 import com.jwoglom.pumpx2.pump.messages.response.currentStatus.ControlIQIOBResponse
 import com.jwoglom.pumpx2.pump.messages.response.currentStatus.ControlIQInfoAbstractResponse
 import com.jwoglom.pumpx2.pump.messages.response.currentStatus.CurrentBasalStatusResponse
 import com.jwoglom.pumpx2.pump.messages.response.currentStatus.CurrentBatteryAbstractResponse
+import com.jwoglom.pumpx2.pump.messages.response.currentStatus.CurrentBolusStatusResponse
 import com.jwoglom.pumpx2.pump.messages.response.currentStatus.CurrentEGVGuiDataResponse
 import com.jwoglom.pumpx2.pump.messages.response.currentStatus.GlobalMaxBolusSettingsResponse
 import com.jwoglom.pumpx2.pump.messages.response.currentStatus.HistoryLogStatusResponse
@@ -48,6 +58,8 @@ import com.jwoglom.pumpx2.pump.messages.response.currentStatus.HomeScreenMirrorR
 import com.jwoglom.pumpx2.pump.messages.response.currentStatus.InsulinStatusResponse
 import com.jwoglom.pumpx2.pump.messages.response.currentStatus.LastBGResponse
 import com.jwoglom.pumpx2.pump.messages.response.currentStatus.LastBolusStatusAbstractResponse
+import com.jwoglom.pumpx2.pump.messages.response.currentStatus.TimeSinceResetResponse
+import com.jwoglom.pumpx2.pump.messages.response.historyLog.BolusDeliveryHistoryLog
 import com.jwoglom.pumpx2.pump.messages.response.historyLog.HistoryLogStreamResponse
 import com.jwoglom.wearx2.presentation.DataStore
 import com.jwoglom.wearx2.presentation.MobileApp
@@ -92,6 +104,8 @@ class MainActivity : ComponentActivity(), GoogleApiClient.ConnectionCallbacks, G
                 startDestination = startDestination,
                 sendMessage = {path, message -> sendMessage(path, message) },
                 sendPumpCommands = {type, messages -> sendPumpCommands(type, messages) },
+                sendServiceBolusRequest = {bolusId, bolusParameters, unitBreakdown, dataSnapshot, timeSinceReset ->
+                    sendServiceBolusRequest(bolusId, bolusParameters, unitBreakdown, dataSnapshot, timeSinceReset) }
             )
         }
 
@@ -272,6 +286,73 @@ class MainActivity : ComponentActivity(), GoogleApiClient.ConnectionCallbacks, G
             }
         }
         sendMessage("/to-pump/${type.slug}", PumpMessageSerializer.toBulkBytes(msgs))
+    }
+
+    private fun sendServiceBolusRequest(bolusId: Int, params: BolusParameters, unitBreakdown: BolusCalcUnits, dataSnapshot: BolusCalcDataSnapshotResponse, timeSinceReset: TimeSinceResetResponse) {
+        val numUnits = InsulinUnit.from1To1000(params.units)
+        val numCarbs = params.carbsGrams
+        val bgValue = params.glucoseMgdl
+
+        val bolusTypes = mutableListOf(BolusDeliveryHistoryLog.BolusType.FOOD2)
+
+        val foodVolume = InsulinUnit.from1To1000(unitBreakdown.fromCarbs)
+        if (foodVolume > 0) {
+            bolusTypes.add(BolusDeliveryHistoryLog.BolusType.FOOD1)
+        }
+
+        var corrVolume = InsulinUnit.from1To1000(unitBreakdown.fromBG) + InsulinUnit.from1To1000(unitBreakdown.fromIOB)
+        if (corrVolume > 0) {
+            bolusTypes.add(BolusDeliveryHistoryLog.BolusType.CORRECTION)
+        } else {
+            corrVolume = 0 // negative correction volume is not passed through
+        }
+
+        val preCommands: MutableList<Message> = mutableListOf()
+        if (bgValue > 0 && timeSinceReset.pumpTimeSecondsSinceReset > 0) {
+            val autopopBg = when {
+                !dataSnapshot.isAutopopAllowed -> false
+                dataSnapshot.correctionFactor == 0 -> false
+                bgValue != dataSnapshot.correctionFactor -> false
+                else -> true
+            }
+            val remoteBgRequest = RemoteBgEntryRequest(
+                bgValue,
+                autopopBg,
+                timeSinceReset.pumpTimeSecondsSinceReset,
+                bolusId
+            )
+            Timber.i("sendServiceBolusRequest: sending remoteBgRequest=$remoteBgRequest")
+            preCommands.add(remoteBgRequest)
+        }
+
+        if (numCarbs > 0 && timeSinceReset.pumpTimeSecondsSinceReset > 0) {
+            val remoteCarbRequest = RemoteCarbEntryRequest(
+                numCarbs,
+                timeSinceReset.pumpTimeSecondsSinceReset,
+                bolusId
+            )
+            Timber.i("sendServiceBolusRequest: sending remoteCarbRequest=$remoteCarbRequest")
+            preCommands.add(remoteCarbRequest)
+        }
+
+        if (preCommands.isNotEmpty()) {
+            this.sendPumpCommands(SendType.STANDARD, preCommands)
+        }
+
+        val iobUnits = dataSnapshot.iob
+        val bolusRequest = InitiateBolusRequest(
+            numUnits,
+            bolusId,
+            BolusDeliveryHistoryLog.BolusType.toBitmask(*bolusTypes.toTypedArray()),
+            foodVolume,
+            corrVolume,
+            numCarbs,
+            bgValue,
+            iobUnits
+        )
+
+        Timber.i("sendServiceBolusRequest: numUnits=$numUnits numCarbs=$numCarbs bgValue=$bgValue foodVolume=$foodVolume corrVolume=$corrVolume iobUnits=$iobUnits: bolusRequest=$bolusRequest preCommands=$preCommands")
+        this.sendMessage("/to-phone/bolus-request-phone", PumpMessageSerializer.toBytes(bolusRequest))
     }
 
 
@@ -540,7 +621,28 @@ class MainActivity : ComponentActivity(), GoogleApiClient.ConnectionCallbacks, G
             is HistoryLogStatusResponse -> {
                 dataStore.historyLogStatus.value = message
             }
-            // TODO: bolus
+            is BolusPermissionResponse -> {
+                dataStore.bolusPermissionResponse.value = message
+            }
+            is RemoteCarbEntryResponse -> {
+                dataStore.bolusCarbEntryResponse.value = message
+            }
+            is InitiateBolusResponse -> {
+                dataStore.bolusInitiateResponse.value = message
+            }
+            is CancelBolusResponse -> {
+                if (dataStore.bolusCancelResponse.value == null || message.wasCancelled()) {
+                    dataStore.bolusCancelResponse.value = message
+                } else {
+                    Timber.w("skipping population of bolusCancelResponse: $message because a successful cancellation already existed in the state: ${dataStore.bolusCancelResponse.value}");
+                }
+            }
+            is CurrentBolusStatusResponse -> {
+                dataStore.bolusCurrentResponse.value = message
+            }
+            is TimeSinceResetResponse -> {
+                dataStore.timeSinceResetResponse.value = message
+            }
         }
     }
 
