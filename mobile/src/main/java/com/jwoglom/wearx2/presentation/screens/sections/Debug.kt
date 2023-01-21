@@ -5,6 +5,8 @@ package com.jwoglom.wearx2.presentation.screens.sections
 import android.app.AlertDialog
 import android.content.Context
 import android.content.DialogInterface
+import android.os.Handler
+import android.os.Looper
 import android.text.InputType
 import android.widget.EditText
 import android.widget.LinearLayout
@@ -402,7 +404,9 @@ fun Debug(
                     },
                     modifier = Modifier.clickable {
                         sendMessage("/to-pump/debug-historylog-cache", "".toByteArray())
-                        showHistoryLogs = true
+                        Handler(Looper.getMainLooper()).postDelayed({
+                            showHistoryLogs = true
+                        }, 500)
                     }
                 )
 
@@ -514,6 +518,19 @@ fun Debug(
                                                 .background(Color.White)
                                                 .fillMaxWidth()
                                                 .padding(16.dp)
+                                        )
+                                    }
+                                } else {
+                                    item {
+                                        Text(
+                                            "${historyLogCache.value?.size ?: 0} history log entries",
+                                            modifier = Modifier
+                                                .background(Color.White)
+                                                .fillMaxWidth()
+                                                .padding(16.dp)
+                                                .clickable {
+                                                    sendMessage("/to-pump/debug-historylog-cache", "".toByteArray())
+                                                }
                                         )
                                     }
                                 }
@@ -760,7 +777,7 @@ fun triggerHistoryLogRangePrompt(
         .setTitle("History Log Request")
         .setMessage("Sequence number range $startLog - $endLog will require $chunkCount chunks. Continue?")
         .setPositiveButton("OK") { dialog, which ->
-            runBlocking {
+            Handler(Looper.getMainLooper()).post {
                 triggerHistoryLogRange(context, sendPumpCommands, startLog, endLog)
             }
         }
@@ -768,27 +785,29 @@ fun triggerHistoryLogRangePrompt(
         .show()
 }
 
-suspend fun triggerHistoryLogRange(
+fun triggerHistoryLogRange(
     context: Context,
     sendPumpCommands: (SendType, List<Message>) -> Unit,
     startLog: Long,
     endLog: Long
 )  {
-    var num = 1
+    var num = 0
+    var totalNums = 1
     for (i in startLog..endLog step 256) {
+        val localNum = num
         val count = if (i+255 > endLog) (endLog - i).toInt() else 255
-        Timber.i("HistoryLogRequest from $i to ${i+count} count=$count")
-        sendPumpCommands(
-            SendType.STANDARD,
-            listOf(
-                HistoryLogRequest(i, count)
+        Handler(Looper.getMainLooper()).postDelayed({
+            Timber.i("HistoryLogRequest ${localNum+1} from $i to ${i+count} count=$count")
+            sendPumpCommands(
+                SendType.STANDARD,
+                listOf(
+                    HistoryLogRequest(i, count)
+                )
             )
-        )
-        Toast.makeText(context, "$num: Requesting $i to ${i+count}", Toast.LENGTH_SHORT).show()
-        withContext(Dispatchers.IO) {
-            Thread.sleep(5000)
-        }
+            Toast.makeText(context, "${localNum+1}/${totalNums}: Requesting $i to ${i+count}", Toast.LENGTH_SHORT).show()
+        }, localNum.toLong() * 5000)
         num++
+        totalNums++
     }
 }
 

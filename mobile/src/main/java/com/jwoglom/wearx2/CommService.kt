@@ -506,7 +506,21 @@ class CommService : WearableListenerService(), GoogleApiClient.ConnectionCallbac
                 }
                 CommServiceCodes.DEBUG_GET_HISTORYLOG_CACHE.ordinal -> {
                     Timber.i("pumpCommHandler debug get historylog cache: $historyLogCache")
-                    sendWearCommMessage("/from-pump/debug-historylog-cache", PumpMessageSerializer.toDebugHistoryLogCacheBytes(historyLogCache))
+                    if (historyLogCache.size <= 100) {
+                        sendWearCommMessage(
+                            "/from-pump/debug-historylog-cache",
+                            PumpMessageSerializer.toDebugHistoryLogCacheBytes(historyLogCache)
+                        )
+                    } else {
+                        historyLogCache.entries.toList().chunked(100).forEach {
+                            sendWearCommMessage(
+                                "/from-pump/debug-historylog-cache",
+                                PumpMessageSerializer.toDebugHistoryLogCacheBytes(it.associate {
+                                    Pair(it.key, it.value)
+                                })
+                            )
+                        }
+                    }
                 }
             }
         }
