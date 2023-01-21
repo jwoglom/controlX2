@@ -805,7 +805,7 @@ fun triggerHistoryLogRange(
                 )
             )
             Toast.makeText(context, "${localNum+1}/${totalNums}: Requesting $i to ${i+count}", Toast.LENGTH_SHORT).show()
-        }, localNum.toLong() * 5000)
+        }, localNum.toLong() * 7000)
         num++
         totalNums++
     }

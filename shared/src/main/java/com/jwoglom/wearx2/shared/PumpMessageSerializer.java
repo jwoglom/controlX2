@@ -6,6 +6,7 @@ import com.jwoglom.pumpx2.pump.messages.Messages;
 import com.jwoglom.pumpx2.pump.messages.bluetooth.Characteristic;
 import com.jwoglom.pumpx2.pump.messages.helpers.Bytes;
 import com.jwoglom.pumpx2.pump.messages.response.historyLog.HistoryLog;
+import com.jwoglom.pumpx2.pump.messages.response.historyLog.HistoryLogParser;
 import com.jwoglom.pumpx2.pump.messages.response.historyLog.HistoryLogStreamResponse;
 import com.jwoglom.pumpx2.shared.Hex;
 
@@ -75,6 +76,29 @@ public class PumpMessageSerializer {
         return messages;
     }
 
+    public static byte[] historyLogToBytes(HistoryLog msg) {
+        JSONObject json = new JSONObject();
+        try {
+            json.put("cargo", Hex.encodeHexString(msg.getCargo()));
+        } catch (JSONException e) {
+            Timber.e(e);
+            return null;
+        }
+        return json.toString().getBytes();
+    }
+
+    public static HistoryLog historyLogFromBytes(byte[] bytes) {
+        JSONObject json = null;
+        try {
+            json = new JSONObject(new String(bytes));
+            byte[] cargo = Hex.decodeHex(json.getString("cargo"));
+            return HistoryLogParser.parse(cargo);
+        } catch (JSONException | DecoderException e) {
+            Timber.e(e);
+            return null;
+        }
+    }
+
     public static byte[] toDebugMessageCacheBytes(Collection<Pair<Message, Instant>> messages) {
         try {
             JSONArray array = new JSONArray();
@@ -115,8 +139,7 @@ public class PumpMessageSerializer {
             for (Map.Entry<Long, HistoryLog> pair : messages.entrySet()) {
                 JSONObject obj = new JSONObject();
                 obj.put("seq", pair.getKey());
-                obj.put("message", Hex.encodeHexString(Objects.requireNonNull(toBytes(
-                        new HistoryLogStreamResponse(1, 0, ImmutableList.of(pair.getValue().getCargo()))))));
+                obj.put("message", Hex.encodeHexString(Objects.requireNonNull(historyLogToBytes(pair.getValue()))));
                 array.put(obj);
             }
             return array.toString().getBytes();
@@ -133,9 +156,9 @@ public class PumpMessageSerializer {
             array = new JSONArray(new String(bytes));
             for (int i=0; i < array.length(); i++) {
                 JSONObject obj = array.getJSONObject(i);
-                HistoryLogStreamResponse msg = (HistoryLogStreamResponse) fromBytes(Hex.decodeHex(obj.getString("message")));
+                HistoryLog msg = historyLogFromBytes(Hex.decodeHex(obj.getString("message")));
                 Long seq = obj.getLong("seq");
-                ret.put(seq, Objects.requireNonNull(msg).getHistoryLogs().get(0));
+                ret.put(seq, msg);
             }
             return ret;
         } catch (JSONException | DecoderException e) {
