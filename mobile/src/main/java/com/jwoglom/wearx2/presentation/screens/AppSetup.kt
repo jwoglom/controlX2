@@ -158,7 +158,7 @@ fun AppSetup(
                     "Enable t:connect app connection sharing",
                     bold = true,
                     modifier = Modifier.padding(start = 16.dp))
-                Line("Enables workarounds to run WearX2 and the t:connect app at the same time.")
+                Line("Enables workarounds to run ControlX2 and the t:connect app at the same time.")
             }
             Divider()
         }

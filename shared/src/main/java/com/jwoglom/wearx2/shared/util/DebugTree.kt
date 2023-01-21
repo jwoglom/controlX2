@@ -37,7 +37,7 @@ class DebugTree(
                 writeCharacteristicFailedCallback(message.removePrefix(failedForCharacteristicMsg).trim())
             }
         }
-        super.log(priority, "WearX2:${prefix}:$tag", message, t)
+        super.log(priority, "CX2:${prefix}:$tag", message, t)
         tag?.let {
             if (shouldLog(priority, it)) {
                 logFile?.appendText("${Instant.now()},$prefix,$tag,$priority,$message,$t\n")

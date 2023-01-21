@@ -66,7 +66,7 @@ class PhoneCommService : WearableListenerService(), GoogleApiClient.ConnectionCa
     }
 
     private fun createNotification(): Notification {
-        val notificationChannelId = "WearX2 Background Notification"
+        val notificationChannelId = "ControlX2 Background Notification"
 
         val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager;
         val channel = NotificationChannel(
@@ -93,10 +93,10 @@ class PhoneCommService : WearableListenerService(), GoogleApiClient.ConnectionCa
             notificationChannelId
         )
 
-        val title = "WearX2 is running: $connected"
+        val title = "ControlX2 is running: $connected"
         return builder
             .setContentTitle(title)
-            .setContentText("This notification can be hidden: open Settings > Apps > Notifications > All > WearX2 and turn Endless Service Notifications off")
+            .setContentText("This notification can be hidden: open Settings > Apps > Notifications > All > ControlX2 and turn Endless Service Notifications off")
             .setContentIntent(pendingIntent)
             .setSmallIcon(Icon.createWithResource(this, R.drawable.pump))
             .setTicker(title)
@@ -206,7 +206,7 @@ class PhoneCommService : WearableListenerService(), GoogleApiClient.ConnectionCa
             )
             val notif = NotificationCompat.Builder(this)
                 .setSmallIcon(R.drawable.comm_error)
-                .setContentTitle("WearX2 disconnected")
+                .setContentTitle("ControlX2 disconnected")
                 .setContentText(reason)
                 .setChannelId("disconnectedChannel")
                 .build()

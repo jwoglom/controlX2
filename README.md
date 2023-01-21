@@ -1,22 +1,24 @@
-# WearX2
+# ControlX2
 
 Android Wear OS and Phone companion app for controlling a Tandem pump with [PumpX2](https://github.com/jwoglom/pumpx2)
 from a wearable.
 
-<table border=0><tr valign=top><td>
-<a href="https://www.youtube.com/watch?v=jUUlqxDBQdQ">
-<b>Demo video from watch:</b>
-<br />
-<img src="https://img.youtube.com/vi/jUUlqxDBQdQ/0.jpg" width=300 alt="PumpX2 Alpha for Wear OS - December 2022" title="PumpX2 Alpha for Wear OS - December 2022" />
-</a>
-
-</td><td>
+<table border=0><tr valign=top>
+<td>
 <a href="https://www.youtube.com/watch?v=FybrFaLCs9Y">
 <b>Demo video from phone:</b>
 <br />
 <img src="https://img.youtube.com/vi/FybrFaLCs9Y/0.jpg" width=300 alt="PumpX2 Alpha for Android - December 2022" title="PumpX2 Alpha for Android - December 2022" />
 </a>
-</td></tr></table>
+</td>
+<td>
+<a href="https://www.youtube.com/watch?v=jUUlqxDBQdQ">
+<b>Demo video from watch:</b>
+<br />
+<img src="https://img.youtube.com/vi/jUUlqxDBQdQ/0.jpg" width=300 alt="PumpX2 Alpha for Wear OS - December 2022" title="PumpX2 Alpha for Wear OS - December 2022" />
+</a>
+</td>
+</tr></table>
 
 > **Warning**\
 > **This application is for EXPERIMENTAL USE ONLY and can be used to MODIFY ACTIVE INSULIN DELIVERY ON YOUR INSULIN PUMP.**\
@@ -27,13 +29,16 @@ from a wearable.
 * Viewing pump status information (IOB, cartridge amount, battery, basal rate) 
 * Viewing connected CGM information (current reading, arrow trend, sensor and transmitter status)
 * Delivering a bolus (with units, carbs, and BG amounts) from wearable
+* Delivering a bolus (with units, carbs, and BG amounts) from phone
+* Accepting/rejecting insulin corrections 
 * Bolus calculator (to compute units based on entered carbs and BG)
 * Bolus cancellation
 
 **Work in progress features:**
 
 * Watch face complications
-* Delivering a bolus (with units, carbs, and BG amounts) from phone
+* App background service stability
+* Mobile UI
 
 **Planned features:**
 
@@ -65,5 +70,5 @@ $ ./gradlew publishToMavenLocal
 
 The PumpX2 library files will be published to `$HOME/.m2/repository/com/jwoglom/pumpx2/`.
 
-If the PumpX2 libraries are rebuilt, either bump the version number in both PumpX2 and WearX2's gradle
+If the PumpX2 libraries are rebuilt, either bump the version number in both PumpX2 and ControlX2's gradle
 configurations or run `./gradlew build --refresh-dependencies`.

@@ -139,11 +139,11 @@ fun PumpSetupStageDescription(
             when (setupStage.value) {
                 PumpSetupStage.WAITING_PUMPX2_INIT -> {
                     if (!Prefs(context).serviceEnabled()) {
-                        Line("0. Enable the WearX2 service (Settings > Enable WearX2 service)")
+                        Line("0. Enable the ControlX2 service (Settings > Enable ControlX2 service)")
                     }
                     Line("1. Toggle Bluetooth on and off.")
-                    Line("2. Restart the WearX2 app: open the app switcher and long-press on the app icon to open the App Info page, then click 'Force Stop' followed by 'Open'")
-                    Line("3. Ensure the WearX2 app has sufficient permissions: on the App Info page for WearX2, ensure that Bluetooth/Connected Devices-related permissions have been granted")
+                    Line("2. Restart the ControlX2 app: open the app switcher and long-press on the app icon to open the App Info page, then click 'Force Stop' followed by 'Open'")
+                    Line("3. Ensure the ControlX2 app has sufficient permissions: on the App Info page for ControlX2, ensure that Bluetooth/Connected Devices-related permissions have been granted")
                     Line("4. If everything still isn't working, hit 'Clear Data' on the App Info page which will reset the app's settings")
                 }
                 else -> {

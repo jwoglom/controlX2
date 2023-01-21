@@ -76,7 +76,7 @@ fun ServiceDisabledMessage(
                 )
                 Text(buildAnnotatedString {
                     withStyle(SpanStyle(fontWeight = FontWeight.Bold)) {
-                        append("The background service is disabled, so WearX2 cannot connect to the pump. ")
+                        append("The background service is disabled, so ControlX2 cannot connect to the pump. ")
                     }
                     append("Press here to re-enable the service.")
                 })

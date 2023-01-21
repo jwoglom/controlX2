@@ -59,7 +59,7 @@ fun Settings(
             item {
                 if (Prefs(context).serviceEnabled()) {
                     ListItem(
-                        headlineText = { Text("Disable WearX2 service") },
+                        headlineText = { Text("Disable ControlX2 service") },
                         supportingText = { Text("Stops the background service and disables it from starting automatically when the app is opened.") },
                         leadingContent = {
                             Icon(
@@ -79,7 +79,7 @@ fun Settings(
                     )
                 } else {
                     ListItem(
-                        headlineText = { Text("Enable WearX2 service") },
+                        headlineText = { Text("Enable ControlX2 service") },
                         supportingText = { Text("Starts the background service and enables it to start automatically when the app is opened.") },
                         leadingContent = {
                             Icon(

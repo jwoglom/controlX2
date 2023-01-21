@@ -86,7 +86,7 @@ import com.jwoglom.pumpx2.shared.JavaHelpers
 import com.jwoglom.wearx2.LocalDataStore
 import com.jwoglom.wearx2.Prefs
 import com.jwoglom.wearx2.dataStore
-import com.jwoglom.wearx2.presentation.theme.WearX2Theme
+import com.jwoglom.wearx2.presentation.theme.ControlX2Theme
 import com.jwoglom.wearx2.shared.util.SendType
 import com.jwoglom.wearx2.shared.util.shortTimeAgo
 import kotlinx.coroutines.Dispatchers
@@ -305,7 +305,7 @@ fun Debug(
                                             FilledTonalButton(
                                                 onClick = {
                                                     debugMessageCache.value?.let {
-                                                        shareTextContents(messageCacheToJson(it), "WearX2 JSON debug data","text/json")
+                                                        shareTextContents(messageCacheToJson(it), "ControlX2 JSON debug data","text/json")
                                                     }
                                                 }
                                             ) {
@@ -337,7 +337,7 @@ fun Debug(
                                                 Text("${message.second} (${shortTimeAgo(message.second, nowThresholdSeconds = 1)})")
                                             },
                                             modifier = Modifier.clickable {
-                                                shareTextContents(messagePairToJson(message), "WearX2 ${shortPumpMessageTitle(message.first)} debug data","text/json")
+                                                shareTextContents(messagePairToJson(message), "ControlX2 ${shortPumpMessageTitle(message.first)} debug data","text/json")
                                             }
                                         )
                                     }
@@ -448,7 +448,7 @@ fun Debug(
                                             FilledTonalButton(
                                                 onClick = {
                                                     historyLogCache.value?.let {
-                                                        shareTextContents(historyLogCacheToJson(it), "WearX2 History Log JSON data","text/json")
+                                                        shareTextContents(historyLogCacheToJson(it), "ControlX2 History Log JSON data","text/json")
                                                     }
                                                 }
                                             ) {
@@ -558,7 +558,7 @@ fun Debug(
                                                 Text("#${log.key} ${log.value.pumpTimeSecInstant}")
                                             },
                                             modifier = Modifier.clickable {
-                                                shareTextContents(historyLogToJson(log), "WearX2 History Log Event","text/json")
+                                                shareTextContents(historyLogToJson(log), "ControlX2 History Log Event","text/json")
                                             }
                                         )
                                     }
@@ -1038,7 +1038,7 @@ fun historyLogToJson(it: Map.Entry<Long, HistoryLog>): String {
 @Preview(showBackground = true)
 @Composable
 private fun DefaultPreview() {
-    WearX2Theme() {
+    ControlX2Theme() {
         Surface(
             modifier = Modifier.fillMaxSize(),
             color = Color.White,

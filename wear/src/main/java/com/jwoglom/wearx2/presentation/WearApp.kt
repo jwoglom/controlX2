@@ -391,7 +391,7 @@ fun WearApp(
                 }
 
                 composable(Screen.BolusBlocked.route) {
-                    FullScreenText("A bolus was blocked which didn't match the units requested. This is either a bug in WearX2 or another actor is attempting to bolus via your phone and/or watch unsuccessfully.")
+                    FullScreenText("A bolus was blocked which didn't match the units requested. This is either a bug in ControlX2 or another actor is attempting to bolus via your phone and/or watch unsuccessfully.")
                     BottomText()
                 }
                 composable(Screen.BolusNotEnabled.route) {

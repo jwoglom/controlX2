@@ -767,7 +767,7 @@ class CommService : WearableListenerService(), GoogleApiClient.ConnectionCallbac
         }
 
         started = true
-        Toast.makeText(this, "WearX2 service starting", Toast.LENGTH_SHORT).show()
+        Toast.makeText(this, "ControlX2 service starting", Toast.LENGTH_SHORT).show()
 
         updateNotification("Initializing...")
 
@@ -794,7 +794,7 @@ class CommService : WearableListenerService(), GoogleApiClient.ConnectionCallbac
         super.onTaskRemoved(rootIntent)
         Timber.w("CommService onTaskRemoved")
         triggerAppReload(applicationContext)
-        Toast.makeText(this, "WearX2 service removed", Toast.LENGTH_SHORT).show()
+        Toast.makeText(this, "ControlX2 service removed", Toast.LENGTH_SHORT).show()
         stopSelf()
     }
 
@@ -1014,7 +1014,7 @@ class CommService : WearableListenerService(), GoogleApiClient.ConnectionCallbac
     override fun onDestroy() {
         super.onDestroy()
         scope.cancel()
-        Toast.makeText(this, "WearX2 service destroyed", Toast.LENGTH_SHORT).show()
+        Toast.makeText(this, "ControlX2 service destroyed", Toast.LENGTH_SHORT).show()
     }
 
     override fun onConnected(bundle: Bundle?) {
@@ -1034,7 +1034,7 @@ class CommService : WearableListenerService(), GoogleApiClient.ConnectionCallbac
 
 
     private fun createNotification(): Notification {
-        val notificationChannelId = "WearX2 Background Notification"
+        val notificationChannelId = "ControlX2 Background Notification"
 
         val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager;
         val channel = NotificationChannel(
@@ -1061,7 +1061,7 @@ class CommService : WearableListenerService(), GoogleApiClient.ConnectionCallbac
             notificationChannelId
         )
 
-        var title = "WearX2: ${currentPumpData.statusText}"
+        var title = "ControlX2: ${currentPumpData.statusText}"
         var atTime = currentPumpData.lastMessageTime
         currentPumpData.connectionTime?.let {
             if (atTime == null || it.isAfter(atTime)) atTime = it

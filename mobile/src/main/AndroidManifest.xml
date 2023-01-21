@@ -25,7 +25,7 @@
         <activity
             android:name=".MainActivity"
             android:exported="true"
-            android:label="WearX2UI"
+            android:label="@string/app_name"
             android:theme="@style/Theme.WearX2">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />

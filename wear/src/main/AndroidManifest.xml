@@ -70,7 +70,7 @@
             android:name=".complications.PumpBatteryComplicationDataSourceService"
             android:exported="true"
             android:icon="@drawable/pump"
-            android:label="WearX2 Pump Battery"
+            android:label="ControlX2 Pump Battery"
             android:permission="com.google.android.wearable.permission.BIND_COMPLICATION_PROVIDER">
             <intent-filter>
                 <action android:name="android.support.wearable.complications.ACTION_COMPLICATION_UPDATE_REQUEST" />
@@ -88,7 +88,7 @@
             android:name=".complications.PumpIOBComplicationDataSourceService"
             android:exported="true"
             android:icon="@drawable/pump"
-            android:label="WearX2 Pump IOB"
+            android:label="ControlX2 Pump IOB"
             android:permission="com.google.android.wearable.permission.BIND_COMPLICATION_PROVIDER">
             <intent-filter>
                 <action android:name="android.support.wearable.complications.ACTION_COMPLICATION_UPDATE_REQUEST" />
@@ -106,7 +106,7 @@
             android:name=".complications.CGMReadingComplicationDataSourceService"
             android:exported="true"
             android:icon="@drawable/pump"
-            android:label="WearX2 CGM Reading"
+            android:label="ControlX2 CGM Reading"
             android:permission="com.google.android.wearable.permission.BIND_COMPLICATION_PROVIDER">
             <intent-filter>
                 <action android:name="android.support.wearable.complications.ACTION_COMPLICATION_UPDATE_REQUEST" />
@@ -124,7 +124,7 @@
             android:name=".complications.BolusButtonComplicationDataSourceService"
             android:exported="true"
             android:icon="@drawable/bolus_icon"
-            android:label="WearX2 Bolus Button"
+            android:label="ControlX2 Bolus Button"
             android:permission="com.google.android.wearable.permission.BIND_COMPLICATION_PROVIDER">
             <intent-filter>
                 <action android:name="android.support.wearable.complications.ACTION_COMPLICATION_UPDATE_REQUEST" />
@@ -139,7 +139,7 @@
             android:name=".complications.PumpButtonComplicationDataSourceService"
             android:exported="true"
             android:icon="@drawable/pump"
-            android:label="WearX2 App Button"
+            android:label="ControlX2 App Button"
             android:permission="com.google.android.wearable.permission.BIND_COMPLICATION_PROVIDER">
             <intent-filter>
                 <action android:name="android.support.wearable.complications.ACTION_COMPLICATION_UPDATE_REQUEST" />

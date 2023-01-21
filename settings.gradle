@@ -18,7 +18,7 @@ dependencyResolutionManagement {
         }
     }
 }
-rootProject.name = "WearX2"
+rootProject.name = "ControlX2"
 include ':mobile'
 include ':wear'
 include ':shared'
