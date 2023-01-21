@@ -1,24 +1,14 @@
 # ControlX2
 
-Android Wear OS and Phone companion app for controlling a Tandem pump with [PumpX2](https://github.com/jwoglom/pumpx2)
-from a wearable.
+Android app for phones and Wear OS watches for controlling a Tandem pump with [PumpX2](https://github.com/jwoglom/pumpx2).
 
-<table border=0><tr valign=top>
-<td>
-<a href="https://www.youtube.com/watch?v=FybrFaLCs9Y">
-<b>Demo video from phone:</b>
-<br />
-<img src="https://img.youtube.com/vi/FybrFaLCs9Y/0.jpg" width=300 alt="PumpX2 Alpha for Android - December 2022" title="PumpX2 Alpha for Android - December 2022" />
-</a>
-</td>
-<td>
-<a href="https://www.youtube.com/watch?v=jUUlqxDBQdQ">
-<b>Demo video from watch:</b>
-<br />
-<img src="https://img.youtube.com/vi/jUUlqxDBQdQ/0.jpg" width=300 alt="PumpX2 Alpha for Wear OS - December 2022" title="PumpX2 Alpha for Wear OS - December 2022" />
-</a>
-</td>
-</tr></table>
+<div>
+<img src="https://user-images.githubusercontent.com/192620/213893867-2e08401f-ca06-4cdc-8a32-9ac2a0cc1d3b.png" alt="Bolus from phone" title="Bolus from phone" height=450 />
+<img src="https://user-images.githubusercontent.com/192620/213893894-a2e63958-3934-47cc-86f2-6eaa6d1212c9.png" alt="Bolus delivery from phone" title="Bolus delivery from phone" height=450 />
+
+<img src="https://user-images.githubusercontent.com/192620/213893946-4aba8e56-cfa5-4166-9e7b-2cd570bd6e2a.png" alt="Bolus from watch" title="Bolus from watch" height=300 />
+<img src="https://user-images.githubusercontent.com/192620/206879740-0f0b2a03-8b9d-4c63-b806-a19b23c44675.png" alt="Bolus delivery from watch" title="Bolus delivery from watch" height=300 />
+</div>
 
 > **Warning**\
 > **This application is for EXPERIMENTAL USE ONLY and can be used to MODIFY ACTIVE INSULIN DELIVERY ON YOUR INSULIN PUMP.**\
@@ -46,6 +36,35 @@ from a wearable.
 * Show CGM history graph
 * Send pump alerts/alarms as notifications
 * Upload data to Nightscout
+
+
+<table border=0><tr valign=top>
+<td>
+<a href="https://www.youtube.com/watch?v=FybrFaLCs9Y">
+<b>Demo video from phone:</b>
+<br />
+<img src="https://img.youtube.com/vi/FybrFaLCs9Y/0.jpg" width=300 alt="PumpX2 Alpha for Android - December 2022" title="PumpX2 Alpha for Android - December 2022" />
+</a>
+</td>
+<td>
+<a href="https://www.youtube.com/watch?v=jUUlqxDBQdQ">
+<b>Demo video from watch:</b>
+<br />
+<img src="https://img.youtube.com/vi/jUUlqxDBQdQ/0.jpg" width=300 alt="PumpX2 Alpha for Wear OS - December 2022" title="PumpX2 Alpha for Wear OS - December 2022" />
+</a>
+</td>
+</tr></table>
+
+### Phone Screenshots
+<div>
+<img src="https://user-images.githubusercontent.com/192620/213893772-d1fcd8e7-7e7f-41d3-ad47-3e856dfdeb93.png" alt="App home screen" title="App home screen" height=450 />
+<img src="https://user-images.githubusercontent.com/192620/213893867-2e08401f-ca06-4cdc-8a32-9ac2a0cc1d3b.png" alt="Bolus window" title="Bolus window" height=450 />
+<img src="https://user-images.githubusercontent.com/192620/213893870-9a3954db-7482-458f-955a-16e2f13a99d1.png" alt="Bolus correction" title="Bolus correction" height=450 />
+<img src="https://user-images.githubusercontent.com/192620/213893894-a2e63958-3934-47cc-86f2-6eaa6d1212c9.png" alt="Bolus delivery" title="Bolus delivery" height=450 />
+<img src="https://user-images.githubusercontent.com/192620/213893904-13b715cf-2bfa-46fb-b527-b641a4691ffa.png" alt="Bolus notification" title="Bolus notification" height=450 />
+<img src="https://user-images.githubusercontent.com/192620/213893911-fac52b14-50f3-40ab-96ea-aacd9fedd63f.png" alt="Bolus cancellation" title="Bolus cancellation" height=450 />
+<img src="https://user-images.githubusercontent.com/192620/213893923-152b07c7-3de3-45c0-b9d5-0c0d83a8af8b.png" alt="Bolus cancelled" title="Bolus cancelled" height=450 />
+</div>
 
 ### Wear OS Screenshots
 
