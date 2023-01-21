@@ -130,7 +130,7 @@ fun Debug(
         ShareCompat.IntentBuilder(context)
             .setType(mimeType)
             .setText(str)
-            .setChooserTitle("WearX2 Debug Data")
+            .setChooserTitle(label)
             .startChooser();
     }
 
