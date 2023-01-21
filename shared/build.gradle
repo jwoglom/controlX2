@@ -6,13 +6,13 @@ plugins {
 android {
     signingConfigs {
         release_testing {
-            storeFile file("${System.properties['user.home']}/repos/wearx2/debug.keystore")
+            storeFile file("${System.properties['user.home']}/repos/controlx2/debug.keystore")
             storePassword 'password'
             keyAlias 'alias_name'
             keyPassword 'password'
         }
     }
-    namespace 'com.jwoglom.wearx2.shared'
+    namespace 'com.jwoglom.controlx2.shared'
     compileSdk 33
 
     defaultConfig {

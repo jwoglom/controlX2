@@ -6,21 +6,21 @@ plugins {
 android {
     signingConfigs {
         release_testing {
-            storeFile file("${System.properties['user.home']}/repos/wearx2/debug.keystore")
+            storeFile file("${System.properties['user.home']}/repos/controlx2/debug.keystore")
             storePassword 'password'
             keyAlias 'alias_name'
             keyPassword 'password'
         }
     }
-    namespace 'com.jwoglom.wearx2'
+    namespace 'com.jwoglom.controlx2'
     compileSdk 33
 
     defaultConfig {
-        applicationId "com.jwoglom.wearx2"
+        applicationId "com.jwoglom.controlx2"
         minSdk 30
         targetSdk 33
         versionCode 1
-        versionName "${project.wearx2_version}"
+        versionName "${project.controlx2_version}"
 
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {

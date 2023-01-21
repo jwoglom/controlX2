@@ -38,8 +38,8 @@
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />
                 <data
-                    android:scheme="com_jwoglom_wearx2"
-                    android:host="wearx2"
+                    android:scheme="com_jwoglom_controlx2"
+                    android:host="controlx2"
                     android:pathPrefix="/" />
             </intent-filter>
 
