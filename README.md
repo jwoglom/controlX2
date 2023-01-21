@@ -11,7 +11,7 @@ Android app for phones and Wear OS watches which controls a Tandem t:slim X2 pum
 > **It has not been officially approved for use and is provided as a RESEARCH TOOL ONLY.**
 
 <div>
-<img src="https://user-images.githubusercontent.com/192620/213893867-2e08401f-ca06-4cdc-8a32-9ac2a0cc1d3b.png" alt="Bolus from phone" title="Bolus from phone" width=300 />
+<img src="https://user-images.githubusercontent.com/192620/213893870-9a3954db-7482-458f-955a-16e2f13a99d1.png" alt="Bolus from phone" title="Bolus from phone" width=300 />
 <img src="https://user-images.githubusercontent.com/192620/213893894-a2e63958-3934-47cc-86f2-6eaa6d1212c9.png" alt="Bolus delivery from phone" title="Bolus delivery from phone" width=300 />
 </div>
 
