@@ -342,7 +342,7 @@ fun BolusWindow(
                 value = glucoseRawValue,
                 onValueChange = {
                     glucoseRawValue = it
-                    glucoseHumanEntered = rawToInt(it)
+                    glucoseHumanEntered = if (it == "") null else it.toIntOrNull()
                 }
             )
         }
@@ -459,10 +459,10 @@ fun BolusWindow(
             }) {
                 Text(buildAnnotatedString {
                     withStyle(SpanStyle(fontWeight = FontWeight.Bold)) {
-                        when {
-                            bolusConditionsExcluded.value?.contains(it) == true -> "${it.prompt?.whenIgnoredNotice}"
-                            else -> "${it.prompt?.whenAcceptedNotice}"
-                        }
+                        append(when {
+                            bolusConditionsExcluded.value?.contains(it) == true -> it.prompt?.whenIgnoredNotice ?: it.msg
+                            else -> it.prompt?.whenAcceptedNotice ?: it.msg
+                        })
                     }
                 }, Modifier.padding(8.dp))
             }
