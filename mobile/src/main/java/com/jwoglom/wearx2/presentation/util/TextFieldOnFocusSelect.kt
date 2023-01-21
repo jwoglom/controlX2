@@ -12,6 +12,7 @@ import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.platform.debugInspectorInfo
 import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.input.TextFieldValue
+import timber.log.Timber
 
 // https://stackoverflow.com/a/72504219
 fun Modifier.onFocusSelectAll(textFieldValueState: MutableState<TextFieldValue>): Modifier =
@@ -27,6 +28,7 @@ fun Modifier.onFocusSelectAll(textFieldValueState: MutableState<TextFieldValue>)
         if (triggerEffect != null) {
             LaunchedEffect(triggerEffect) {
                 val tfv = textFieldValueState.value
+                Timber.d("tfv: $tfv oldValue: ${textFieldValueState.value}")
                 textFieldValueState.value = tfv.copy(selection = TextRange(0, tfv.text.length))
             }
         }

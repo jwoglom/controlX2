@@ -34,7 +34,7 @@ fun DecimalOutlinedText(
     }
 
     LaunchedEffect (value) {
-        textFieldValue.value = TextFieldValue(value ?: "")
+        textFieldValue.value = textFieldValue.value.copy(text = value ?: "")
     }
 
     OutlinedTextField(
@@ -44,8 +44,8 @@ fun DecimalOutlinedText(
             val text = it.text
             var filtered = text.filter { (it in '0'..'9') || it == '.' }
             val dotIndex = filtered.lastIndexOf('.')
-            if (dotIndex >= 0 && filtered.length - dotIndex > decimalPlaces+1) {
-                filtered = filtered.substring(0, dotIndex + decimalPlaces)
+            if (dotIndex >= 0 && filtered.length - dotIndex > decimalPlaces + 1) {
+                filtered = filtered.substring(0, dotIndex + decimalPlaces + 1)
             }
             error = (filtered.toDoubleOrNull() == null)
             onValueChange(filtered)
