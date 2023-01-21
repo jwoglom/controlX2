@@ -708,6 +708,10 @@ class CommService : WearableListenerService(), GoogleApiClient.ConnectionCallbac
                     sendWearCommMessage("/to-wear/blocked-bolus-signature",
                         "CommService".toByteArray()
                     )
+                    Notification.Builder(this)
+                        .setContentTitle("Bolus Blocked")
+                        .setContentText("Bolus message was blocked due to an invalid signature.")
+                        .build()
                     return
                 }
 

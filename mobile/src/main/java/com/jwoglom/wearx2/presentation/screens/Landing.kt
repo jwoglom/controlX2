@@ -1,4 +1,6 @@
-@file:OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterialApi::class)
+@file:OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterialApi::class,
+    ExperimentalMaterialApi::class
+)
 
 package com.jwoglom.wearx2.presentation.screens
 
@@ -85,6 +87,7 @@ fun Landing(
     sendMessage: (String, ByteArray) -> Unit,
     sendPumpCommands: (SendType, List<Message>) -> Unit,
     sendServiceBolusRequest: (Int, BolusParameters, BolusCalcUnits, BolusCalcDataSnapshotResponse, TimeSinceResetResponse) -> Unit,
+    sendServiceBolusCancel: () -> Unit,
     sectionState: LandingSection = LandingSection.DASHBOARD,
     bolusSheetState: BottomSheetValue = BottomSheetValue.Collapsed,
 ) {
@@ -181,6 +184,12 @@ fun Landing(
                                     BolusWindow(
                                         sendPumpCommands = sendPumpCommands,
                                         sendServiceBolusRequest = sendServiceBolusRequest,
+                                        sendServiceBolusCancel = sendServiceBolusCancel,
+                                        closeWindow = {
+                                            coroutineScope.launch {
+                                                displayBolusWindow.bottomSheetState.collapse()
+                                            }
+                                        }
                                     )
                                 }
                             }
@@ -315,6 +324,7 @@ private fun DefaultPreview() {
                 sendMessage = { _, _ -> },
                 sendPumpCommands = { _, _ -> },
                 sendServiceBolusRequest = { _, _, _, _, _ -> },
+                sendServiceBolusCancel = {},
             )
         }
     }
@@ -333,6 +343,7 @@ fun BolusPreview() {
                 sendMessage = { _, _ -> },
                 sendPumpCommands = { _, _ -> },
                 sendServiceBolusRequest = { _, _, _, _, _ -> },
+                sendServiceBolusCancel = {},
                 bolusSheetState = BottomSheetValue.Expanded,
             )
         }
@@ -352,6 +363,7 @@ private fun DebugPreview() {
                 sendMessage = { _, _ -> },
                 sendPumpCommands = { _, _ -> },
                 sendServiceBolusRequest = { _, _, _, _, _ -> },
+                sendServiceBolusCancel = {},
                 sectionState = LandingSection.DEBUG,
             )
         }
@@ -371,6 +383,7 @@ private fun SettingsPreview() {
                 sendMessage = { _, _ -> },
                 sendPumpCommands = { _, _ -> },
                 sendServiceBolusRequest = { _, _, _, _, _ -> },
+                sendServiceBolusCancel = {},
                 sectionState = LandingSection.SETTINGS,
             )
         }

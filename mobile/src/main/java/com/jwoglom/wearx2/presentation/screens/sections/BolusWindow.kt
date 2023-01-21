@@ -31,6 +31,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.tooling.preview.Preview
@@ -44,6 +45,7 @@ import com.jwoglom.pumpx2.pump.messages.calculator.BolusCalculatorBuilder
 import com.jwoglom.pumpx2.pump.messages.calculator.BolusParameters
 import com.jwoglom.pumpx2.pump.messages.models.InsulinUnit
 import com.jwoglom.pumpx2.pump.messages.request.control.BolusPermissionRequest
+import com.jwoglom.pumpx2.pump.messages.request.control.CancelBolusRequest
 import com.jwoglom.pumpx2.pump.messages.request.currentStatus.BolusCalcDataSnapshotRequest
 import com.jwoglom.pumpx2.pump.messages.request.currentStatus.LastBGRequest
 import com.jwoglom.pumpx2.pump.messages.request.currentStatus.TimeSinceResetRequest
@@ -51,6 +53,7 @@ import com.jwoglom.pumpx2.pump.messages.response.currentStatus.BolusCalcDataSnap
 import com.jwoglom.pumpx2.pump.messages.response.currentStatus.LastBGResponse
 import com.jwoglom.pumpx2.pump.messages.response.currentStatus.TimeSinceResetResponse
 import com.jwoglom.wearx2.LocalDataStore
+import com.jwoglom.wearx2.Prefs
 import com.jwoglom.wearx2.R
 import com.jwoglom.wearx2.presentation.screens.BolusPreview
 import com.jwoglom.wearx2.presentation.screens.sections.components.DecimalOutlinedText
@@ -67,7 +70,10 @@ import timber.log.Timber
 fun BolusWindow(
     sendPumpCommands: (SendType, List<Message>) -> Unit,
     sendServiceBolusRequest: (Int, BolusParameters, BolusCalcUnits, BolusCalcDataSnapshotResponse, TimeSinceResetResponse) -> Unit,
+    sendServiceBolusCancel: () -> Unit,
+    closeWindow: () -> Unit,
 ) {
+    val context = LocalContext.current
     val dataStore = LocalDataStore.current
 
     val refreshScope = rememberCoroutineScope()
@@ -97,6 +103,9 @@ fun BolusWindow(
 
     var showPermissionCheckDialog by remember { mutableStateOf(false) }
     var showInProgressDialog by remember { mutableStateOf(false) }
+    var showApprovedDialog by remember { mutableStateOf(false) }
+    var showCancellingDialog by remember { mutableStateOf(false) }
+    var showCancelledDialog by remember { mutableStateOf(false) }
 
     val commands = listOf(
         BolusCalcDataSnapshotRequest(),
@@ -427,13 +436,56 @@ fun BolusWindow(
             }
         )
     }
+
+    fun cancelBolus() {
+        fun performCancel() {
+            bolusPermissionResponse.value?.bolusId?.let { bolusId ->
+                sendPumpCommands(SendType.BUST_CACHE, listOf(CancelBolusRequest(bolusId)))
+            }
+        }
+        showCancellingDialog = true
+        refreshScope.launch {
+            var time = 0
+            while (dataStore.bolusCancelResponse.value == null) {
+                if (time >= 5000) {
+                    performCancel()
+                    time = 0
+                }
+                withContext(Dispatchers.IO) {
+                    Thread.sleep(100)
+                }
+                time += 100
+            }
+            showCancellingDialog = false
+            showCancelledDialog = true
+            dataStore.bolusFinalConditions.value = null
+            dataStore.bolusFinalParameters.value = null
+            sendServiceBolusCancel()
+        }
+    }
+
     if (showInProgressDialog) {
+        val bolusInitiateResponse = dataStore.bolusInitiateResponse.observeAsState()
+        val bolusCancelResponse = dataStore.bolusCancelResponse.observeAsState()
+
+        val bolusMinNotifyThreshold = Prefs(context).bolusConfirmationInsulinThreshold()
+
+        LaunchedEffect(bolusInitiateResponse.value) {
+            if (bolusInitiateResponse.value != null) {
+                showApprovedDialog = true
+            }
+        }
+
+        LaunchedEffect(bolusCancelResponse.value) {
+            if (bolusCancelResponse.value != null) {
+                showCancelledDialog = true
+            }
+        }
+
         AlertDialog(
-            onDismissRequest = {
-                showInProgressDialog = false
-            },
+            onDismissRequest = {},
             title = {
-                Text("Delivering ${bolusCurrentParameters.value?.units?.let { "${twoDecimalPlaces(it)}u " }}bolus?")
+                Text("Requesting ${bolusCurrentParameters.value?.units?.let { "${twoDecimalPlaces(it)}u " }}bolus")
             },
             icon = {
                 Image(
@@ -443,23 +495,32 @@ fun BolusWindow(
                     Modifier.size(ButtonDefaults.IconSize)
                 )
             },
-            dismissButton = {
+            text = {
+                Text(when {
+                    bolusInitiateResponse.value != null -> "Bolus request received by pump"
+                    bolusFinalParameters.value != null -> when {
+                        bolusFinalParameters.value!!.units >= bolusMinNotifyThreshold -> "A notification was sent to approve the request."
+                        else -> "Sending request to pump..."
+                    }
+                    else -> "Sending request to pump..."
+                })
                 TextButton(
                     onClick = {
-                        showPermissionCheckDialog = false
+
                     },
                 ) {
-                    Text("Cancel")
+                    Text("Cancel Bolus Delivery")
                 }
-
             },
+            dismissButton = {},
             confirmButton = {
                 TextButton(
                     onClick = {
-                        showPermissionCheckDialog = false
+                        showInProgressDialog = false
+                        closeWindow()
                     },
                 ) {
-                    Text("Deliver")
+                    Text("OK")
                 }
             }
         )

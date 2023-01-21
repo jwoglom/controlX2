@@ -30,6 +30,7 @@ fun MobileApp(
     sendMessage: (String, ByteArray) -> Unit,
     sendPumpCommands: (SendType, List<Message>) -> Unit,
     sendServiceBolusRequest: (Int, BolusParameters, BolusCalcUnits, BolusCalcDataSnapshotResponse, TimeSinceResetResponse) -> Unit,
+    sendServiceBolusCancel: () -> Unit,
 ) {
     WearX2Theme {
         NavHost(
@@ -63,6 +64,7 @@ fun MobileApp(
                     sendMessage = sendMessage,
                     sendPumpCommands = sendPumpCommands,
                     sendServiceBolusRequest = sendServiceBolusRequest,
+                    sendServiceBolusCancel = sendServiceBolusCancel,
                 )
             }
         }
@@ -80,6 +82,7 @@ fun DefaultPreview() {
         startDestination = Screen.FirstLaunch.route,
         sendMessage = {_, _ -> },
         sendPumpCommands = {_, _ -> },
-        sendServiceBolusRequest = {_, _, _, _, _ -> }
+        sendServiceBolusRequest = {_, _, _, _, _ -> },
+        sendServiceBolusCancel = {},
     )
 }

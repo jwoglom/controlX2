@@ -105,7 +105,8 @@ class MainActivity : ComponentActivity(), GoogleApiClient.ConnectionCallbacks, G
                 sendMessage = {path, message -> sendMessage(path, message) },
                 sendPumpCommands = {type, messages -> sendPumpCommands(type, messages) },
                 sendServiceBolusRequest = {bolusId, bolusParameters, unitBreakdown, dataSnapshot, timeSinceReset ->
-                    sendServiceBolusRequest(bolusId, bolusParameters, unitBreakdown, dataSnapshot, timeSinceReset) }
+                    sendServiceBolusRequest(bolusId, bolusParameters, unitBreakdown, dataSnapshot, timeSinceReset) },
+                sendServiceBolusCancel = { sendMessage("/to-phone/bolus-cancel", "".toByteArray()) }
             )
         }
 
