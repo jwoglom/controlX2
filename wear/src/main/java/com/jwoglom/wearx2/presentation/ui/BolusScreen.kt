@@ -221,6 +221,11 @@ fun BolusScreen(
             sinceLastFetchTime += 250
         }
         Timber.i("BolusScreen base loading done: ${baseFields.map { it.value }}")
+        if (sinceLastFetchTime == 0) {
+            withContext(Dispatchers.IO) {
+                Thread.sleep(250)
+            }
+        }
         refreshing = false
     }
 

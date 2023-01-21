@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material.ExperimentalMaterialApi
@@ -36,7 +37,6 @@ import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.res.painterResource
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -158,6 +158,11 @@ fun BolusWindow(
             sinceLastFetchTime += 250
         }
         Timber.i("BolusScreen base loading done: ${baseFields.map { it.value }}")
+        if (sinceLastFetchTime == 0) {
+            withContext(Dispatchers.IO) {
+                Thread.sleep(250)
+            }
+        }
         refreshing = false
     }
 
@@ -171,10 +176,10 @@ fun BolusWindow(
         lifecycleOwner = LocalLifecycleOwner.current,
         onStop = {}
     ) {
-        sendPumpCommands(SendType.BUST_CACHE, commands)
+        refresh()
     }
 
-    LaunchedEffect (refreshing) {
+    LaunchedEffect (refreshing, Unit) {
         waitForLoaded()
     }
 
@@ -424,11 +429,10 @@ fun BolusWindow(
 
             },
             confirmButton = {
-                bolusFinalParameters.value?.let { finalParameters ->
-                    bolusPermissionResponse.value?.let { permissionResponse ->
-                        if (permissionResponse.isPermissionGranted && finalParameters.units >= 0.05) {
-                            TextButton(
-                                onClick = {
+                    TextButton(
+                        onClick = {
+                            bolusFinalParameters.value?.let { finalParameters ->
+                                bolusPermissionResponse.value?.let { permissionResponse ->
                                     if (permissionResponse.isPermissionGranted && finalParameters.units >= 0.05) {
                                         showInProgressDialog = true
                                         sendBolusRequest(
@@ -439,13 +443,12 @@ fun BolusWindow(
                                         )
                                     }
                                 }
-                            ) {
-                                Text("Deliver")
                             }
                         }
+                    ) {
+                        Text("Deliver")
                     }
                 }
-            }
         )
     }
 
@@ -498,9 +501,6 @@ fun BolusWindow(
 
         AlertDialog(
             onDismissRequest = {},
-            title = {
-                Text("Requesting ${bolusCurrentParameters.value?.units?.let { "${twoDecimalPlaces(it)}u " }}bolus")
-            },
             icon = {
                 Image(
                     if (isSystemInDarkTheme()) painterResource(R.drawable.bolus_icon_secondary)
@@ -508,6 +508,9 @@ fun BolusWindow(
                     "Bolus icon",
                     Modifier.size(ButtonDefaults.IconSize)
                 )
+            },
+            title = {
+                Text("Requesting ${bolusCurrentParameters.value?.units?.let { "${twoDecimalPlaces(it)}u " }}bolus")
             },
             text = {
                 Text(when {
@@ -543,6 +546,14 @@ fun BolusWindow(
                 showCancellingDialog = false
                 resetBolusDataStoreState(dataStore)
                 closeWindow()
+            },
+            icon = {
+                Image(
+                    if (isSystemInDarkTheme()) painterResource(R.drawable.bolus_icon_secondary)
+                    else painterResource(R.drawable.bolus_icon),
+                    "Bolus icon",
+                    Modifier.size(ButtonDefaults.IconSize)
+                )
             },
             title = {
                 Text(when {
@@ -645,7 +656,18 @@ fun BolusWindow(
                 resetBolusDataStoreState(dataStore)
                 closeWindow()
             },
+            icon = {
+                Image(
+                    if (isSystemInDarkTheme()) painterResource(R.drawable.bolus_icon_secondary)
+                    else painterResource(R.drawable.bolus_icon),
+                    "Bolus icon",
+                    Modifier.size(ButtonDefaults.IconSize)
+                )
+            },
             title = {
+                Text("Cancelling..")
+            },
+            text = {
                 Text("The bolus is being cancelled...")
             },
             confirmButton = {}
@@ -660,6 +682,9 @@ fun BolusWindow(
         LaunchedEffect (bolusCancelResponse.value, Unit) {
             Timber.d("showCancelledDialog querying LastBolusStatus")
             sendPumpCommands(SendType.STANDARD, listOf(LastBolusStatusV2Request()))
+            mainHandler.postDelayed({
+                sendPumpCommands(SendType.STANDARD, listOf(LastBolusStatusV2Request()))
+            }, 500)
         }
 
         fun matchesBolusId(): Boolean? {
@@ -672,7 +697,7 @@ fun BolusWindow(
         }
 
         LaunchedEffect (lastBolusStatusResponse.value) {
-            Timber.d("showCancelledDialog lastBolusStatusResponse effect")
+            Timber.d("showCancelledDialog lastBolusStatusResponse effect: ${matchesBolusId()}")
             if (matchesBolusId() == false) {
                 mainHandler.postDelayed({
                     Timber.d("showCancelledDialog lastBolusStatus postDelayed")
@@ -690,7 +715,27 @@ fun BolusWindow(
                 resetBolusDataStoreState(dataStore)
                 closeWindow()
             },
+            icon = {
+                Image(
+                    if (isSystemInDarkTheme()) painterResource(R.drawable.bolus_icon_secondary)
+                    else painterResource(R.drawable.bolus_icon),
+                    "Bolus icon",
+                    Modifier.size(ButtonDefaults.IconSize)
+                )
+            },
             title = {
+                Text(when (bolusCancelResponse.value?.status) {
+                    CancelBolusResponse.CancelStatus.SUCCESS ->
+                        "Bolus Cancelled"
+                    CancelBolusResponse.CancelStatus.FAILED ->
+                        when (bolusInitiateResponse.value) {
+                            null -> "Bolus Cancelled"
+                            else -> "Could Not Be Cancelled"
+                        }
+                    else -> "Bolus Status Unknown"
+                })
+            },
+            text = {
                 Text(when (bolusCancelResponse.value?.status) {
                     CancelBolusResponse.CancelStatus.SUCCESS ->
                         "The bolus was cancelled."
@@ -705,8 +750,7 @@ fun BolusWindow(
                         }
                     else -> "Please check your pump to confirm whether the bolus was cancelled."
                 })
-            },
-            text = {
+                Spacer(Modifier.height(16.dp))
                 Text(when {
                     matchesBolusId() == true ->
                         lastBolusStatusResponse.value?.deliveredVolume?.let {

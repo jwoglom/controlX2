@@ -66,6 +66,7 @@ import com.jwoglom.pumpx2.pump.messages.response.currentStatus.TimeSinceResetRes
 import com.jwoglom.wearx2.LocalDataStore
 import com.jwoglom.wearx2.Prefs
 import com.jwoglom.wearx2.R
+import com.jwoglom.wearx2.dataStore
 import com.jwoglom.wearx2.presentation.DataStore
 import com.jwoglom.wearx2.presentation.components.Line
 import com.jwoglom.wearx2.presentation.components.ServiceDisabledMessage
@@ -76,6 +77,7 @@ import com.jwoglom.wearx2.presentation.screens.sections.Debug
 import com.jwoglom.wearx2.presentation.screens.sections.Settings
 import com.jwoglom.wearx2.presentation.screens.sections.dashboardCommands
 import com.jwoglom.wearx2.presentation.screens.sections.dashboardFields
+import com.jwoglom.wearx2.presentation.screens.sections.resetBolusDataStoreState
 import com.jwoglom.wearx2.presentation.theme.Colors
 import com.jwoglom.wearx2.presentation.theme.WearX2Theme
 import com.jwoglom.wearx2.shared.util.SendType

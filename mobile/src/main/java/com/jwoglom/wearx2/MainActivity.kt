@@ -534,6 +534,7 @@ class MainActivity : ComponentActivity(), GoogleApiClient.ConnectionCallbacks, G
             }
             is LastBolusStatusAbstractResponse -> {
                 dataStore.lastBolusStatus.value = "${twoDecimalPlaces1000Unit(message.deliveredVolume)}u at ${shortTime(pumpTimeToLocalTz(message.timestampInstant))}"
+                dataStore.lastBolusStatusResponse.value = message
             }
             is HomeScreenMirrorResponse -> {
                 dataStore.controlIQStatus.value = when (message.apControlStateIcon) {
