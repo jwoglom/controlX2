@@ -1037,7 +1037,7 @@ fun BolusScreen(
             ) {
                 Text(
                     text = when {
-                        bolusInitiateResponse.value != null -> "Bolus request received by pump"
+                        bolusInitiateResponse.value != null -> "Bolus request received by pump, waiting for response..."
                         bolusFinalParameters.value != null && bolusMinNotifyThreshold.value != null -> when {
                             bolusFinalParameters.value!!.units >= bolusMinNotifyThreshold.value!! -> "A notification was sent to approve the request."
                             else -> "Sending request to pump..."
@@ -1073,7 +1073,7 @@ fun BolusScreen(
                                 bolusInitiateResponse.value!!.wasBolusInitiated() -> "Bolus Initiated"
                                 else -> "Bolus Rejected by Pump"
                             }
-                            else -> "Bolus Status Unknown"
+                            else -> "Fetching Bolus Status..."
                         },
                         textAlign = TextAlign.Center,
                         color = MaterialTheme.colors.onBackground

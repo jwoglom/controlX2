@@ -2,6 +2,8 @@
 
 package com.jwoglom.wearx2.presentation.screens.sections
 
+import android.os.Handler
+import android.os.Looper
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Box
@@ -34,6 +36,7 @@ import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -47,20 +50,27 @@ import com.jwoglom.pumpx2.pump.messages.models.InsulinUnit
 import com.jwoglom.pumpx2.pump.messages.request.control.BolusPermissionRequest
 import com.jwoglom.pumpx2.pump.messages.request.control.CancelBolusRequest
 import com.jwoglom.pumpx2.pump.messages.request.currentStatus.BolusCalcDataSnapshotRequest
+import com.jwoglom.pumpx2.pump.messages.request.currentStatus.CurrentBolusStatusRequest
 import com.jwoglom.pumpx2.pump.messages.request.currentStatus.LastBGRequest
+import com.jwoglom.pumpx2.pump.messages.request.currentStatus.LastBolusStatusV2Request
 import com.jwoglom.pumpx2.pump.messages.request.currentStatus.TimeSinceResetRequest
+import com.jwoglom.pumpx2.pump.messages.response.control.CancelBolusResponse
 import com.jwoglom.pumpx2.pump.messages.response.currentStatus.BolusCalcDataSnapshotResponse
+import com.jwoglom.pumpx2.pump.messages.response.currentStatus.CurrentBolusStatusResponse
 import com.jwoglom.pumpx2.pump.messages.response.currentStatus.LastBGResponse
 import com.jwoglom.pumpx2.pump.messages.response.currentStatus.TimeSinceResetResponse
 import com.jwoglom.wearx2.LocalDataStore
 import com.jwoglom.wearx2.Prefs
 import com.jwoglom.wearx2.R
+import com.jwoglom.wearx2.presentation.DataStore
 import com.jwoglom.wearx2.presentation.screens.BolusPreview
 import com.jwoglom.wearx2.presentation.screens.sections.components.DecimalOutlinedText
 import com.jwoglom.wearx2.presentation.screens.sections.components.IntegerOutlinedText
 import com.jwoglom.wearx2.presentation.util.LifecycleStateObserver
 import com.jwoglom.wearx2.shared.util.SendType
+import com.jwoglom.wearx2.shared.util.snakeCaseToSpace
 import com.jwoglom.wearx2.shared.util.twoDecimalPlaces
+import com.jwoglom.wearx2.shared.util.twoDecimalPlaces1000Unit
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -73,6 +83,7 @@ fun BolusWindow(
     sendServiceBolusCancel: () -> Unit,
     closeWindow: () -> Unit,
 ) {
+    val mainHandler = Handler(Looper.getMainLooper())
     val context = LocalContext.current
     val dataStore = LocalDataStore.current
 
@@ -125,6 +136,7 @@ fun BolusWindow(
 
     @Synchronized
     fun waitForLoaded() = refreshScope.launch {
+        if (!refreshing) return@launch;
         var sinceLastFetchTime = 0
         while (true) {
             val nullBaseFields = baseFields.filter { field -> field.value == null }.toSet()
@@ -438,30 +450,32 @@ fun BolusWindow(
     }
 
     fun cancelBolus() {
+        Timber.i("cancelBolus()")
         fun performCancel() {
+            Timber.i("cancelBolus performCancel(): ${bolusPermissionResponse.value?.bolusId}")
             bolusPermissionResponse.value?.bolusId?.let { bolusId ->
                 sendPumpCommands(SendType.BUST_CACHE, listOf(CancelBolusRequest(bolusId)))
             }
         }
         showCancellingDialog = true
-        refreshScope.launch {
-            var time = 0
-            while (dataStore.bolusCancelResponse.value == null) {
+        var time = 0
+        fun checkFunc() {
+            if (dataStore.bolusCancelResponse.value == null) {
                 if (time >= 5000) {
                     performCancel()
                     time = 0
                 }
-                withContext(Dispatchers.IO) {
-                    Thread.sleep(100)
-                }
-                time += 100
+                time += 500
+                mainHandler.postDelayed({ checkFunc() }, 500)
+            } else {
+                showCancellingDialog = false
+                showCancelledDialog = true
+                dataStore.bolusFinalConditions.value = null
+                dataStore.bolusFinalParameters.value = null
+                sendServiceBolusCancel()
             }
-            showCancellingDialog = false
-            showCancelledDialog = true
-            dataStore.bolusFinalConditions.value = null
-            dataStore.bolusFinalParameters.value = null
-            sendServiceBolusCancel()
         }
+        checkFunc()
     }
 
     if (showInProgressDialog) {
@@ -497,26 +511,216 @@ fun BolusWindow(
             },
             text = {
                 Text(when {
-                    bolusInitiateResponse.value != null -> "Bolus request received by pump"
+                    bolusInitiateResponse.value != null -> "Bolus request received by pump, waiting for response..."
                     bolusFinalParameters.value != null -> when {
                         bolusFinalParameters.value!!.units >= bolusMinNotifyThreshold -> "A notification was sent to approve the request."
                         else -> "Sending request to pump..."
                     }
                     else -> "Sending request to pump..."
                 })
+            },
+            dismissButton = {
                 TextButton(
                     onClick = {
-
+                        cancelBolus()
                     },
+                    modifier = Modifier.padding(top = 16.dp)
                 ) {
                     Text("Cancel Bolus Delivery")
                 }
             },
-            dismissButton = {},
+            confirmButton = {
+            }
+        )
+    }
+
+    if (showApprovedDialog) {
+        val bolusInitiateResponse = dataStore.bolusInitiateResponse.observeAsState()
+        val bolusCurrentResponse = dataStore.bolusCurrentResponse.observeAsState()
+
+        AlertDialog(
+            onDismissRequest = {
+                showCancellingDialog = false
+                resetBolusDataStoreState(dataStore)
+                closeWindow()
+            },
+            title = {
+                Text(when {
+                    bolusInitiateResponse.value != null -> when {
+                        bolusInitiateResponse.value!!.wasBolusInitiated() -> "Bolus Initiated"
+                        else -> "Bolus Rejected by Pump"
+                    }
+                    else -> "Fetching Bolus Status..."
+                })
+            },
+            text = {
+                LaunchedEffect(Unit) {
+                    sendPumpCommands(SendType.BUST_CACHE, listOf(CurrentBolusStatusRequest()))
+                }
+
+                // When bolusCurrentResponse is updated, re-request it
+                LaunchedEffect(bolusCurrentResponse.value) {
+                    Timber.i("bolusCurrentResponse: ${bolusCurrentResponse.value}")
+                    // when a bolusId=0 is returned, the current bolus session has ended so the message
+                    // no longer contains any useful data.
+                    if (bolusCurrentResponse.value?.bolusId != 0) {
+                        mainHandler.postDelayed({
+                            sendPumpCommands(
+                                SendType.BUST_CACHE,
+                                listOf(CurrentBolusStatusRequest())
+                            )
+                        }, 1000)
+                    }
+                }
+
+                Text(
+                    text = when {
+                        bolusInitiateResponse.value != null -> when {
+                            bolusInitiateResponse.value!!.wasBolusInitiated() -> "The ${
+                                bolusFinalParameters.value?.let {
+                                    twoDecimalPlaces(
+                                        it.units
+                                    )
+                                }
+                            }u bolus ${
+                                when (bolusCurrentResponse.value) {
+                                    null -> "was requested."
+                                    else -> when (bolusCurrentResponse.value!!.status) {
+                                        CurrentBolusStatusResponse.CurrentBolusStatus.REQUESTING -> "is being prepared."
+                                        CurrentBolusStatusResponse.CurrentBolusStatus.DELIVERING -> "is being delivered."
+                                        else -> "was completed."
+                                    }
+                                }
+                            }"
+                            else -> "The bolus could not be delivered: ${
+                                bolusInitiateResponse.value?.let {
+                                    snakeCaseToSpace(
+                                        it.statusType.toString()
+                                    )
+                                }
+                            }"
+                        }
+                        else -> "The bolus status is unknown. Please check your pump to identify the status of the bolus."
+                    }
+                )
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = {
+                        cancelBolus()
+                    },
+                    modifier = Modifier.padding(top = 16.dp)
+                ) {
+                    Text("Cancel Bolus Delivery")
+                }
+            },
             confirmButton = {
                 TextButton(
                     onClick = {
-                        showInProgressDialog = false
+                        showCancellingDialog = false
+                        resetBolusDataStoreState(dataStore)
+                        closeWindow()
+                    },
+                    modifier = Modifier.padding(top = 16.dp)
+                ) {
+                    Text("OK")
+                }
+            }
+        )
+    }
+
+    if (showCancellingDialog) {
+        val bolusCancelResponse = dataStore.bolusCancelResponse.observeAsState()
+
+        LaunchedEffect(bolusCancelResponse.value) {
+            if (bolusCancelResponse.value != null) {
+                showCancellingDialog = false
+                showCancelledDialog = true
+            }
+        }
+
+        AlertDialog(
+            onDismissRequest = {
+                showCancellingDialog = false
+                resetBolusDataStoreState(dataStore)
+                closeWindow()
+            },
+            title = {
+                Text("The bolus is being cancelled...")
+            },
+            confirmButton = {}
+        )
+    }
+
+    if (showCancelledDialog) {
+        val bolusCancelResponse = dataStore.bolusCancelResponse.observeAsState()
+        val bolusInitiateResponse = dataStore.bolusInitiateResponse.observeAsState()
+        val lastBolusStatusResponse = dataStore.lastBolusStatusResponse.observeAsState()
+
+        LaunchedEffect (bolusCancelResponse.value, Unit) {
+            Timber.d("showCancelledDialog querying LastBolusStatus")
+            sendPumpCommands(SendType.STANDARD, listOf(LastBolusStatusV2Request()))
+        }
+
+        fun matchesBolusId(): Boolean? {
+            lastBolusStatusResponse.value?.let { last ->
+                bolusInitiateResponse.value?.let { initiate ->
+                    return (last.bolusId == initiate.bolusId)
+                }
+            }
+            return null
+        }
+
+        LaunchedEffect (lastBolusStatusResponse.value) {
+            Timber.d("showCancelledDialog lastBolusStatusResponse effect")
+            if (matchesBolusId() == false) {
+                mainHandler.postDelayed({
+                    Timber.d("showCancelledDialog lastBolusStatus postDelayed")
+                    sendPumpCommands(
+                        SendType.STANDARD,
+                        listOf(LastBolusStatusV2Request())
+                    )
+                }, 500)
+            }
+        }
+
+        AlertDialog(
+            onDismissRequest = {
+                showCancellingDialog = false
+                resetBolusDataStoreState(dataStore)
+                closeWindow()
+            },
+            title = {
+                Text(when (bolusCancelResponse.value?.status) {
+                    CancelBolusResponse.CancelStatus.SUCCESS ->
+                        "The bolus was cancelled."
+                    CancelBolusResponse.CancelStatus.FAILED ->
+                        when (bolusInitiateResponse.value) {
+                            null -> "A bolus request was not sent to the pump, so there is nothing to cancel."
+                            else -> "The bolus could not be cancelled: ${
+                                snakeCaseToSpace(
+                                    bolusCancelResponse.value?.reason.toString()
+                                )
+                            }"
+                        }
+                    else -> "Please check your pump to confirm whether the bolus was cancelled."
+                })
+            },
+            text = {
+                Text(when {
+                    matchesBolusId() == true ->
+                        lastBolusStatusResponse.value?.deliveredVolume?.let {
+                            if (it == 0L) "A bolus was started and no insulin was delivered." else "${twoDecimalPlaces1000Unit(it)}u was delivered."
+                        } ?: ""
+                    matchesBolusId() == false -> "No insulin was delivered."
+                    else -> "Checking if any insulin was delivered..."
+                })
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        showCancellingDialog = false
+                        resetBolusDataStoreState(dataStore)
                         closeWindow()
                     },
                 ) {
@@ -576,8 +780,25 @@ fun bolusCalcDecision(
 fun rawToDouble(s: String?): Double? {
     return if (s == "") 0.0 else s?.toDoubleOrNull()
 }
+
 fun rawToInt(s: String?): Int? {
     return if (s == "") 0 else s?.toIntOrNull()
+}
+
+fun resetBolusDataStoreState(dataStore: DataStore) {
+    dataStore.bolusPermissionResponse.value = null
+    dataStore.bolusCancelResponse.value = null
+    dataStore.bolusInitiateResponse.value = null
+    dataStore.lastBolusStatusResponse.value = null
+    dataStore.bolusCalculatorBuilder.value = null
+    dataStore.bolusCurrentParameters.value = null
+    dataStore.bolusCurrentConditions.value = null
+    dataStore.bolusConditionsPrompt.value = null
+    dataStore.bolusConditionsPromptAcknowledged.value = null
+    dataStore.bolusConditionsExcluded.value = null
+    dataStore.bolusFinalParameters.value = null
+    dataStore.bolusFinalCalcUnits.value = null
+    dataStore.bolusFinalConditions.value = null
 }
 
 @Preview
