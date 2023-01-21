@@ -1,18 +1,24 @@
 # ControlX2
 
-Android app for phones and Wear OS watches for controlling a Tandem pump with [PumpX2](https://github.com/jwoglom/pumpx2).
-
-<div>
-<img src="https://user-images.githubusercontent.com/192620/213893867-2e08401f-ca06-4cdc-8a32-9ac2a0cc1d3b.png" alt="Bolus from phone" title="Bolus from phone" height=450 />
-<img src="https://user-images.githubusercontent.com/192620/213893894-a2e63958-3934-47cc-86f2-6eaa6d1212c9.png" alt="Bolus delivery from phone" title="Bolus delivery from phone" height=450 />
-
-<img src="https://user-images.githubusercontent.com/192620/213893946-4aba8e56-cfa5-4166-9e7b-2cd570bd6e2a.png" alt="Bolus from watch" title="Bolus from watch" height=300 />
-<img src="https://user-images.githubusercontent.com/192620/206879740-0f0b2a03-8b9d-4c63-b806-a19b23c44675.png" alt="Bolus delivery from watch" title="Bolus delivery from watch" height=300 />
-</div>
+Android app for phones and Wear OS watches which controls a Tandem t:slim X2 pump with [PumpX2](https://github.com/jwoglom/pumpx2). 
 
 > **Warning**\
 > **This application is for EXPERIMENTAL USE ONLY and can be used to MODIFY ACTIVE INSULIN DELIVERY ON YOUR INSULIN PUMP.**\
-> There is NO WARRANTY IMPLIED OR EXPRESSED DUE TO USE OF THIS SOFTWARE. YOU ASSUME ALL RISK FOR ANY MALFUNCTIONS, BUGS, OR INSULIN DELIVERY ACTIONS.
+> There is NO WARRANTY IMPLIED OR EXPRESSED DUE TO USE OF THIS SOFTWARE.\
+> YOU ASSUME ALL RISK FOR ANY MALFUNCTIONS, BUGS, OR INSULIN DELIVERY ACTIONS.\
+> \
+> It is NOT AFFILIATED WITH OR SUPPORTED by Tandem, Dexcom, or any other manufacturer.\
+> **It has not been officially approved for use and is provided as a RESEARCH TOOL ONLY.**
+
+<div>
+<img src="https://user-images.githubusercontent.com/192620/213893867-2e08401f-ca06-4cdc-8a32-9ac2a0cc1d3b.png" alt="Bolus from phone" title="Bolus from phone" width=300 />
+<img src="https://user-images.githubusercontent.com/192620/213893894-a2e63958-3934-47cc-86f2-6eaa6d1212c9.png" alt="Bolus delivery from phone" title="Bolus delivery from phone" width=300 />
+</div>
+
+<div>
+<img src="https://user-images.githubusercontent.com/192620/213893946-4aba8e56-cfa5-4166-9e7b-2cd570bd6e2a.png" alt="Bolus from watch" title="Bolus from watch" height=300 />
+<img src="https://user-images.githubusercontent.com/192620/206879740-0f0b2a03-8b9d-4c63-b806-a19b23c44675.png" alt="Bolus delivery from watch" title="Bolus delivery from watch" height=300 />
+</div>
 
 **Supported features:**
 
