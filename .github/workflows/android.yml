@@ -67,3 +67,41 @@ jobs:
 
       - name: Validate Gradle wrapper
         uses: gradle/wrapper-validation-action@e6e38bacfdf1a337459f332974bb2327a31aaf4b
+
+      - name: version
+        run: echo "::set-output name=version::$(grep 'controlx2_version =' build.gradle | cut -f2 -d= | tr -d '"' | tr -d '[:space:]')"
+        id: version
+
+      - name: release
+        uses: actions/create-release@v1
+        id: create_release
+        #if: github.ref == 'refs/heads/main'
+        with:
+          draft: false
+          prerelease: true
+          release_name: ${{ steps.version.outputs.version }}
+          tag_name: ${{ github.ref }}
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+
+      - name: Upload mobile asset
+        uses: actions/upload-release-asset@v1
+        #if: github.ref == 'refs/heads/main'
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: ./mobile/build/outputs/apk/release/mobile-release.apk
+          asset_name: mobile-release.apk
+          asset_content_type: application/vnd.android.package-archive
+
+      - name: Upload wear asset
+        uses: actions/upload-release-asset@v1
+        #if: github.ref == 'refs/heads/main'
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: ./wear/build/outputs/apk/release/wear-release.apk
+          asset_name: wear-release.apk
+          asset_content_type: application/vnd.android.package-archive
