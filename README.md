@@ -84,7 +84,17 @@ Android app for phones and Wear OS watches which controls a Tandem t:slim X2 pum
 
 ## Setup
 
-Assumes that you have PumpX2 built and published to the local Maven repository. You can do this with:
+### Building from source
+Clone the repo, open in Android Studio, and build the module for:
+
+* `mobile` - Android phone application
+* `wear` - Android Wear OS application
+
+Enable ADB debugging on your phone or watch and then select "Run" using the correct module:
+<img width="350" alt="Screenshot of Android Studio" src="https://user-images.githubusercontent.com/192620/213927714-8338cda1-0b36-4023-9f21-8b84cf8fc7a5.png">
+
+### Building with local PumpX2
+Clone the PumpX2 repository and publish it to the local Maven repository. You can do this with:
 
 ```bash
 $ git clone https://github.com/jwoglom/pumpx2
@@ -95,5 +105,9 @@ $ ./gradlew publishToMavenLocal
 
 The PumpX2 library files will be published to `$HOME/.m2/repository/com/jwoglom/pumpx2/`.
 
+Then, set the `use_local_pumpx2` Gradle property `true` in either your command-line execution with `./gradlew build -Duse_local_pumpx2=true`,
+or edit your `local.properties` file for it to be reflected in Android Studio.
+
 If the PumpX2 libraries are rebuilt, either bump the version number in both PumpX2 and ControlX2's gradle
-configurations or run `./gradlew build --refresh-dependencies`.
+configurations or run `./gradlew build --refresh-dependencies` in ControlX2. Otherwise, if the version
+number was not bumped, rebuilding ControlX2 may still use a cached version of the old code from that version.

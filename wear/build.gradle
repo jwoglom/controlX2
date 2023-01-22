@@ -88,9 +88,16 @@ dependencies {
     implementation "com.google.guava:guava:31.0.1-android"
 
     // pumpx2
-    implementation files("${project.m2_repository}/com/jwoglom/pumpx2/pumpx2-android/${project.pumpx2_version}/pumpx2-android-${project.pumpx2_version}.aar")
-    implementation files("${project.m2_repository}/com/jwoglom/pumpx2/pumpx2-messages/${project.pumpx2_version}/pumpx2-messages-${project.pumpx2_version}.jar")
-    implementation files("${project.m2_repository}/com/jwoglom/pumpx2/pumpx2-shared/${project.pumpx2_version}/pumpx2-shared-${project.pumpx2_version}.jar")
+    if (project.use_local_pumpx2) {
+        implementation files("${project.m2_repository}/com/jwoglom/pumpx2/pumpx2-android/${project.pumpx2_version}/pumpx2-android-${project.pumpx2_version}.aar")
+        implementation files("${project.m2_repository}/com/jwoglom/pumpx2/pumpx2-messages/${project.pumpx2_version}/pumpx2-messages-${project.pumpx2_version}.jar")
+        implementation files("${project.m2_repository}/com/jwoglom/pumpx2/pumpx2-shared/${project.pumpx2_version}/pumpx2-shared-${project.pumpx2_version}.jar")
+    } else {
+        implementation "com.github.jwoglom.pumpX2:pumpx2-android:v${project.pumpx2_version}"
+        implementation "com.github.jwoglom.pumpX2:pumpx2-messages:v${project.pumpx2_version}"
+        implementation "com.github.jwoglom.pumpX2:pumpx2-shared:v${project.pumpx2_version}"
+    }
+
     implementation project(path: ':shared')
 
     // androidx
