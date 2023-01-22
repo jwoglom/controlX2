@@ -7,10 +7,10 @@ plugins {
 android {
     signingConfigs {
         release {
-            storeFile file(properties.getOrDefault('RELEASE_STORE_FILE', '../debug.keystore'))
-            storePassword properties.getOrDefault('RELEASE_STORE_PASSWORD', 'password')
-            keyAlias properties.getOrDefault('RELEASE_KEY_ALIAS', 'alias_name')
-            keyPassword properties.getOrDefault('RELEASE_KEY_PASSWORD', 'password')
+            storeFile file(System.properties.getOrDefault('RELEASE_STORE_FILE', '../debug.keystore'))
+            storePassword System.properties.getOrDefault('RELEASE_STORE_PASSWORD', 'password')
+            keyAlias System.properties.getOrDefault('RELEASE_KEY_ALIAS', 'alias_name')
+            keyPassword System.properties.getOrDefault('RELEASE_KEY_PASSWORD', 'password')
         }
     }
     namespace 'com.jwoglom.controlx2'
