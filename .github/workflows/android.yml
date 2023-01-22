@@ -31,14 +31,9 @@ jobs:
           echo $ENCODED_STRING | base64 -di > release.keystore
 
 
-      - uses: burrunan/gradle-cache-action@v1
-        name: Build with Gradle
-        with:
-          job-id: android
-          arguments: build
       - name: Assemble Release
         run: |
-          ./gradlew assembleRelease \
+          ./gradlew build assembleRelease \
             -DRELEASE_STORE_FILE=../release.keystore \
             -DRELEASE_STORE_PASSWORD='${{ secrets.RELEASE_STORE_PASSWORD }}' \
             -DRELEASE_KEY_ALIAS='${{ secrets.RELEASE_KEY_ALIAS }}' \
