@@ -17,3 +17,6 @@
 .cxx
 local.properties
 *.keystore
+private/
+mobile/release/
+wear/release/

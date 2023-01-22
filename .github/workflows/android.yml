@@ -23,11 +23,24 @@ jobs:
       - name: Grant execute permission for gradlew
         run: chmod +x gradlew
 
+
+      - name: Decode Keystore
+        env:
+          ENCODED_STRING: ${{ secrets.RELEASE_STORE_BASE64 }}
+        run: |
+          echo $ENCODED_STRING | base64 -di > release.keystore
+
+
       - uses: burrunan/gradle-cache-action@v1
         name: Build with Gradle
         with:
           job-id: android
-          arguments: build
+          arguments: build assembleRelease
+          properties: |
+            RELEASE_STORE_FILE=../release.keystore
+            RELEASE_STORE_PASSWORD=${{ secrets.RELEASE_STORE_PASSWORD }}
+            RELEASE_KEY_ALIAS=${{ secrets.RELEASE_KEY_ALIAS }}
+            RELEASE_KEY_PASSWORD=${{ secrets.RELEASE_KEY_PASSWORD }}
       - name: List Files
         run: find .
 
@@ -49,7 +62,7 @@ jobs:
         uses: actions/upload-artifact@v3.1.0
         with:
           name: mobile-release.apk
-          path: mobile/build/outputs/apk/release/mobile-release.apk
+          path: mobile/release/mobile-release.apk
           if-no-files-found: warn
 
       - name: Upload wear debug APK
@@ -69,7 +82,7 @@ jobs:
         uses: actions/upload-artifact@v3.1.0
         with:
           name: wear-release.apk
-          path: wear/build/outputs/apk/release/wear-release.apk
+          path: wear/release/wear-release.apk
           if-no-files-found: warn
 
       - uses: burrunan/gradle-cache-action@v1
