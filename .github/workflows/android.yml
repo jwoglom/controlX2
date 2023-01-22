@@ -41,45 +41,18 @@ jobs:
       - name: List Files
         run: find .
 
-
-      - name: Upload mobile debug APK
-        uses: actions/upload-artifact@v3.1.0
-        with:
-          name: mobile-debug.apk
-          path: mobile/build/outputs/apk/debug/mobile-debug.apk
-
-      - name: Upload release (unsigned) mobile APK
-        uses: actions/upload-artifact@v3.1.0
-        with:
-          name: mobile-release-unsigned.apk
-          path: mobile/build/outputs/apk/release/mobile-release-unsigned.apk
-          if-no-files-found: warn
-
       - name: Upload release mobile APK
         uses: actions/upload-artifact@v3.1.0
         with:
           name: mobile-release.apk
-          path: mobile/release/mobile-release.apk
-          if-no-files-found: warn
-
-      - name: Upload wear debug APK
-        uses: actions/upload-artifact@v3.1.0
-        with:
-          name: wear-debug.apk
-          path: wear/build/outputs/apk/debug/wear-debug.apk
-
-      - name: Upload release (unsigned) wear APK
-        uses: actions/upload-artifact@v3.1.0
-        with:
-          name: wear-release-unsigned.apk
-          path: wear/build/outputs/apk/release/wear-release-unsigned.apk
+          path: mobile/build/outputs/apk/release/mobile-release.apk
           if-no-files-found: warn
 
       - name: Upload release wear APK
         uses: actions/upload-artifact@v3.1.0
         with:
           name: wear-release.apk
-          path: wear/release/wear-release.apk
+          path: wear/build/outputs/apk/release/wear-release.apk
           if-no-files-found: warn
 
       - uses: burrunan/gradle-cache-action@v1
