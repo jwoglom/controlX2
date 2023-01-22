@@ -5,11 +5,11 @@ plugins {
 
 android {
     signingConfigs {
-        release_testing {
-            storeFile file("${System.properties['user.home']}/repos/controlx2/debug.keystore")
-            storePassword 'password'
-            keyAlias 'alias_name'
-            keyPassword 'password'
+        release {
+            storeFile file(properties.getOrDefault('RELEASE_STORE_FILE', '../debug.keystore'))
+            storePassword properties.getOrDefault('RELEASE_STORE_PASSWORD', 'password')
+            keyAlias properties.getOrDefault('RELEASE_KEY_ALIAS', 'alias_name')
+            keyPassword properties.getOrDefault('RELEASE_KEY_PASSWORD', 'password')
         }
     }
     namespace 'com.jwoglom.controlx2.shared'
@@ -27,7 +27,7 @@ android {
         release {
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
-            signingConfig signingConfigs.release_testing
+            signingConfig signingConfigs.release
         }
     }
     compileOptions {
