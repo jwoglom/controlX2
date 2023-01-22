@@ -17,6 +17,7 @@
 .cxx
 local.properties
 *.keystore
+!debug.keystore
 private/
 mobile/release/
 wear/release/
