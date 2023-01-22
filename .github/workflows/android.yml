@@ -35,12 +35,14 @@ jobs:
         name: Build with Gradle
         with:
           job-id: android
-          arguments: build assembleRelease
-          properties: |
-            RELEASE_STORE_FILE=../release.keystore
-            RELEASE_STORE_PASSWORD=${{ secrets.RELEASE_STORE_PASSWORD }}
-            RELEASE_KEY_ALIAS=${{ secrets.RELEASE_KEY_ALIAS }}
-            RELEASE_KEY_PASSWORD=${{ secrets.RELEASE_KEY_PASSWORD }}
+          arguments: build
+      - name: Assemble Release
+        run: |
+          ./gradlew assembleRelease \
+            -DRELEASE_STORE_FILE=../release.keystore \
+            -DRELEASE_STORE_PASSWORD='${{ secrets.RELEASE_STORE_PASSWORD }}' \
+            -DRELEASE_KEY_ALIAS='${{ secrets.RELEASE_KEY_ALIAS }}' \
+            -DRELEASE_KEY_PASSWORD='${{ secrets.RELEASE_KEY_PASSWORD }}'
       - name: List Files
         run: find .
 
