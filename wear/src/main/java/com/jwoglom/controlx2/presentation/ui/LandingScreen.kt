@@ -26,6 +26,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.text.SpanStyle
@@ -34,6 +35,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.compose.ui.zIndex
 import androidx.navigation.NavHostController
 import androidx.wear.compose.material.AutoCenteringParams
@@ -398,7 +400,7 @@ fun LandingScreen(
             item {
                 val context = LocalContext.current
                 val p = Paperwork(context)
-                androidx.compose.material3.Text(buildAnnotatedString {
+                Text(buildAnnotatedString {
                     withStyle(style = SpanStyle(fontWeight = FontWeight.Bold)) {
                         append("ControlX2 ")
                         append(BuildConfig.VERSION_NAME)
@@ -418,7 +420,7 @@ fun LandingScreen(
                     }
                     append(p.get("build_time"))
                     append("\n")
-                }, Modifier.padding(start = 16.dp, top = 16.dp))
+                }, color = Color.White, fontSize = 8.sp, modifier = Modifier.padding(start = 16.dp, top = 16.dp))
             }
 
 //            item {
