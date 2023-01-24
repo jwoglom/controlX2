@@ -5,6 +5,7 @@ package com.jwoglom.controlx2.presentation.screens.sections
 import android.app.AlertDialog
 import android.content.Context
 import android.content.DialogInterface
+import android.content.Intent
 import android.os.Handler
 import android.os.Looper
 import android.text.InputType
@@ -31,6 +32,7 @@ import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
+import androidx.compose.material.icons.filled.Send
 import androidx.compose.material3.Divider
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -64,6 +66,7 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.unit.toSize
 import androidx.compose.ui.window.Popup
 import androidx.core.app.ShareCompat
+import androidx.core.content.FileProvider
 import androidx.navigation.NavHostController
 import com.google.android.material.slider.Slider
 import com.google.common.base.Splitter
@@ -96,6 +99,7 @@ import kotlinx.coroutines.withContext
 import org.json.JSONArray
 import org.json.JSONObject
 import timber.log.Timber
+import java.io.File
 import java.lang.reflect.InvocationTargetException
 import java.time.Instant
 import java.util.stream.Collectors
@@ -132,6 +136,18 @@ fun Debug(
             .setText(str)
             .setChooserTitle(label)
             .startChooser();
+    }
+
+    fun shareDebugLog(context: Context) {
+        val filePath = File(context.filesDir, "debugLog-MUA.txt")
+        val uri = FileProvider.getUriForFile(context, context.packageName, filePath)
+        context.startActivity(ShareCompat.IntentBuilder(context)
+            .setType("text/plain")
+            .setStream(uri)
+            .intent
+            .setAction(Intent.ACTION_VIEW)
+            .setDataAndType(uri, "text/*")
+            .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION))
     }
 
     LazyColumn(
@@ -617,6 +633,26 @@ fun Debug(
                         )
                     }
                 }
+            }
+
+            item {
+                Divider()
+            }
+
+            item {
+                ListItem(
+                    headlineText = { Text("Download ControlX2 Debug Logs") },
+                    supportingText = { Text("Exports a text file with filtered logcat output.") },
+                    leadingContent = {
+                        Icon(
+                            Icons.Filled.Send,
+                            contentDescription = null,
+                        )
+                    },
+                    modifier = Modifier.clickable {
+                        shareDebugLog(context)
+                    }
+                )
             }
         }
     )
