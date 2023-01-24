@@ -26,15 +26,21 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavHostController
+import com.jwoglom.controlx2.BuildConfig
 import com.jwoglom.pumpx2.pump.messages.Message
 import com.jwoglom.controlx2.Prefs
 import com.jwoglom.controlx2.R
 import com.jwoglom.controlx2.presentation.navigation.Screen
 import com.jwoglom.controlx2.presentation.theme.ControlX2Theme
 import com.jwoglom.controlx2.shared.util.SendType
+import hu.supercluster.paperwork.Paperwork
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -56,6 +62,32 @@ fun Settings(
             .fillMaxSize()
             .padding(horizontal = 0.dp),
         content = {
+
+            item {
+                val p = Paperwork(context)
+                Text(buildAnnotatedString {
+                    withStyle(style = SpanStyle(fontWeight = FontWeight.Bold)) {
+                        append("ControlX2 ")
+                        append(BuildConfig.VERSION_NAME)
+                        append(" with PumpX2 ")
+                        append(com.jwoglom.pumpx2.BuildConfig.PUMPX2_VERSION)
+                    }
+                    append("\n")
+
+                    withStyle(style = SpanStyle(fontWeight = FontWeight.Bold)) {
+                        append("Build: ")
+                    }
+                    append(p.get("build_version"))
+                    append("\n")
+
+                    withStyle(style = SpanStyle(fontWeight = FontWeight.Bold)) {
+                        append("Build time: ")
+                    }
+                    append(p.get("build_time"))
+                    append("\n")
+                }, Modifier.padding(start = 16.dp, top = 16.dp))
+            }
+
             item {
                 if (Prefs(context).serviceEnabled()) {
                     ListItem(

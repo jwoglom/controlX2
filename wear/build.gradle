@@ -2,6 +2,7 @@ plugins {
     id 'com.android.application'
     id 'org.jetbrains.kotlin.android'
     id 'kotlin-parcelize'
+    id 'hu.supercluster.paperwork'
 }
 
 android {
@@ -44,9 +45,16 @@ android {
 
 }
 
-
+paperwork {
+    set = [
+        build_time: buildTime("yyyy-MM-dd HH:mm:ss", "UTC"),
+        build_version: gitInfo()
+    ]
+}
 
 dependencies {
+    implementation 'hu.supercluster:paperwork:1.2.7'
+
     implementation 'androidx.core:core-ktx:1.9.0'
     implementation 'com.google.android.gms:play-services-wearable:18.0.0'
     implementation 'androidx.percentlayout:percentlayout:1.0.0'

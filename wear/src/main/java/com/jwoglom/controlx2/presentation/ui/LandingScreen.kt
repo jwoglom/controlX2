@@ -26,8 +26,13 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
 import androidx.navigation.NavHostController
@@ -40,6 +45,7 @@ import androidx.wear.compose.material.ScalingLazyListState
 import androidx.wear.compose.material.Text
 import com.google.accompanist.flowlayout.FlowRow
 import com.google.android.horologist.compose.navscaffold.scrollableColumn
+import com.jwoglom.controlx2.BuildConfig
 import com.jwoglom.pumpx2.pump.PumpState
 import com.jwoglom.pumpx2.pump.messages.Message
 import com.jwoglom.pumpx2.pump.messages.builders.ControlIQInfoRequestBuilder
@@ -66,6 +72,7 @@ import com.jwoglom.controlx2.presentation.greenTheme
 import com.jwoglom.controlx2.presentation.navigation.Screen
 import com.jwoglom.controlx2.presentation.redTheme
 import com.jwoglom.controlx2.shared.util.SendType
+import hu.supercluster.paperwork.Paperwork
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
@@ -386,6 +393,32 @@ fun LandingScreen(
                         },
                     )
                 }
+            }
+
+            item {
+                val context = LocalContext.current
+                val p = Paperwork(context)
+                androidx.compose.material3.Text(buildAnnotatedString {
+                    withStyle(style = SpanStyle(fontWeight = FontWeight.Bold)) {
+                        append("ControlX2 ")
+                        append(BuildConfig.VERSION_NAME)
+                        append(" with PumpX2 ")
+                        append(com.jwoglom.pumpx2.BuildConfig.PUMPX2_VERSION)
+                    }
+                    append("\n")
+
+                    withStyle(style = SpanStyle(fontWeight = FontWeight.Bold)) {
+                        append("Build: ")
+                    }
+                    append(p.get("build_version"))
+                    append("\n")
+
+                    withStyle(style = SpanStyle(fontWeight = FontWeight.Bold)) {
+                        append("Build time: ")
+                    }
+                    append(p.get("build_time"))
+                    append("\n")
+                }, Modifier.padding(start = 16.dp, top = 16.dp))
             }
 
 //            item {
