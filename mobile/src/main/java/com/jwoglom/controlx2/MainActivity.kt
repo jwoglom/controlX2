@@ -215,14 +215,11 @@ class MainActivity : ComponentActivity(), GoogleApiClient.ConnectionCallbacks, G
                 ConnectionResult.API_UNAVAILABLE -> {
                     AlertDialog.Builder(this)
                         .setMessage(
-                            """The 'Wear OS' application is not installed on this device.
-                    This is required, even if not using a wearable, due to the current implementation of the app which uses these libraries.
-                    To resolve this issue, install the 'Wear OS' app from Google Play. This dependency will be removed in a later version.""".trimMargin()
+                            """The 'Wear OS' application is not installed on this device.\n
+                            This is required, even if not using a wearable, due to the current implementation of the app which uses these libraries.
+                            To resolve this issue, install the 'Wear OS' app from Google Play. This dependency will be removed in a later version.""".trimIndent()
                         )
-                        .setNegativeButton("Cancel") { dialog, which ->
-
-                        }
-                        .setPositiveButton("OK") { dialog, which ->
+                        .setPositiveButton("Install") { dialog, which ->
                             openPlayStore("com.google.android.wearable.app")
                         }
                         .show()
