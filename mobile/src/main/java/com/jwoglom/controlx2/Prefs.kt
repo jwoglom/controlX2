@@ -85,6 +85,17 @@ class Prefs(val context: Context) {
         prefs().edit().putLong("bolus-confirmation-insulin-threshold", InsulinUnit.from1To1000(d)).commit()
     }
 
+    /**
+     * Sends basic application version telemetry to the server and enables automatic update checks.
+     */
+    fun checkForUpdates(): Boolean {
+        return prefs().getBoolean("check-for-updates", true)
+    }
+
+    fun setCheckForUpdates(b: Boolean) {
+        prefs().edit().putBoolean("check-for-updates", b).commit()
+    }
+
     private fun prefs(): SharedPreferences {
         return context.getSharedPreferences("WearX2", WearableListenerService.MODE_PRIVATE)
     }

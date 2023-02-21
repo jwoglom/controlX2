@@ -65,7 +65,11 @@ fun AppSetup(
     var connectionSharingEnabled by remember { mutableStateOf(Prefs(context).connectionSharingEnabled()) }
     var insulinDeliveryActions by remember { mutableStateOf(Prefs(context).insulinDeliveryActions()) }
     var bolusConfirmationInsulinThreshold by remember { mutableStateOf(Prefs(context).bolusConfirmationInsulinThreshold()) }
+    var checkForUpdates by remember { mutableStateOf(Prefs(context).checkForUpdates()) }
+
     val setupComplete by remember { mutableStateOf(true) }
+    
+    val checkboxPadding = 8.dp
 
     DialogScreen(
         "App Setup",
@@ -129,7 +133,7 @@ fun AppSetup(
                         },
                         role = Role.Checkbox
                     )
-                    .padding(horizontal = 16.dp),
+                    .padding(horizontal = checkboxPadding),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Checkbox(
@@ -139,7 +143,7 @@ fun AppSetup(
                 Line(
                     "Enable t:connect app connection sharing",
                     bold = true,
-                    modifier = Modifier.padding(start = 16.dp))
+                    modifier = Modifier.padding(start = checkboxPadding))
                 Line("Enables workarounds to run ControlX2 and the t:connect app at the same time.")
             }
             Divider()
@@ -180,7 +184,7 @@ fun AppSetup(
                         },
                         role = Role.Checkbox
                     )
-                    .padding(horizontal = 16.dp),
+                    .padding(horizontal = checkboxPadding),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Checkbox(
@@ -190,10 +194,10 @@ fun AppSetup(
                 Line(
                     "Enable insulin delivery actions",
                     bold = true,
-                    modifier = Modifier.padding(start = 16.dp))
+                    modifier = Modifier.padding(start = checkboxPadding))
             }
             Line("Enabling insulin delivery actions allows you to perform remote boluses from your phone or watch.")
-            Spacer(Modifier.height(16.dp))
+            Spacer(Modifier.height(checkboxPadding))
             Divider()
         }
         item {
@@ -247,12 +251,54 @@ fun AppSetup(
                             }
                         },
                         textStyle = MaterialTheme.typography.bodySmall,
-                        modifier = Modifier.fillMaxWidth().padding(start = 16.dp),
+                        modifier = Modifier.fillMaxWidth().padding(start = checkboxPadding),
                     )
                 }
                 Spacer(Modifier.height(8.dp))
                 Divider()
             }
+        }
+        item {
+            Row(
+                Modifier
+                    .fillMaxWidth()
+                    .height(56.dp)
+                    .toggleable(
+                        value = checkForUpdates,
+                        onValueChange = {
+                            fun update() {
+                                checkForUpdates = !checkForUpdates
+                                Prefs(context).setInsulinDeliveryActions(insulinDeliveryActions)
+                            }
+                            if (checkForUpdates) {
+                                AlertDialog.Builder(context)
+                                    .setMessage("Please regularly check the ControlX2 GitHub page and subscribe to release notifications to ensure you stay up to date. Warning: by disabling this option, you will not be alerted to any new feature, security, or safety updates.")
+                                    .setNegativeButton("Cancel") { dialog, _ -> dialog.dismiss() }
+                                    .setPositiveButton("Disable") { dialog, _ ->
+                                        dialog.dismiss()
+                                        update()
+                                    }
+                                    .show()
+                            } else {
+                                update()
+                            }
+                        },
+                        role = Role.Checkbox
+                    )
+                    .padding(horizontal = checkboxPadding),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Checkbox(
+                    checked = checkForUpdates,
+                    onCheckedChange = null // null recommended for accessibility with screenreaders
+                )
+                Line(
+                    "Automatically check for ControlX2 updates",
+                    bold = true,
+                    modifier = Modifier.padding(start = checkboxPadding))
+            }
+            Spacer(Modifier.height(checkboxPadding))
+            Divider()
         }
     }
 }
