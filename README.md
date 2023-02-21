@@ -84,9 +84,15 @@ Android app for phones and Wear OS watches which controls a Tandem t:slim X2 pum
 
 ## Setup
 
-### Installing APK
+### Installing APK via GitHub Releases
 
-**This is the easiest option to get started quickly.**
+**This is the recommended installation option.**
+
+1. On the right-hand side of the GitHub page for ControlX2, select ["Releases"](https://github.com/jwoglom/controlX2/releases)
+2. Under the most recent release, download the `mobile-release.apk` file for the phone application, and optional `wear-release.apk` file for the Wear OS application.
+3. Install the APK file on your device(s).
+
+### Installing APK via GitHub Actions
 
 1. [Open this link to view the most recent GitHub Actions runs to the `main` branch.](https://github.com/jwoglom/controlX2/actions?query=branch%3Amain)
 2. Select the most recent entry from the list.
