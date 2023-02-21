@@ -20,6 +20,7 @@ import android.os.Looper
 import android.os.Message
 import android.widget.Toast
 import androidx.core.app.NotificationCompat
+import androidx.core.graphics.drawable.IconCompat
 import com.google.android.gms.common.ConnectionResult
 import com.google.android.gms.common.api.GoogleApiClient
 import com.google.android.gms.wearable.MessageEvent
@@ -722,7 +723,7 @@ class CommService : WearableListenerService(), GoogleApiClient.ConnectionCallbac
                     sendWearCommMessage("/to-wear/blocked-bolus-signature",
                         "CommService".toByteArray()
                     )
-                    Notification.Builder(this)
+                    NotificationCompat.Builder(this)
                         .setContentTitle("Bolus Blocked")
                         .setContentText("Bolus message was blocked due to an invalid signature.")
                         .build()
@@ -1056,7 +1057,7 @@ class CommService : WearableListenerService(), GoogleApiClient.ConnectionCallbac
                     PendingIntent.FLAG_IMMUTABLE)
             }
 
-        val builder: Notification.Builder = Notification.Builder(
+        val builder: NotificationCompat.Builder = NotificationCompat.Builder(
             this,
             notificationChannelId
         )
@@ -1088,9 +1089,10 @@ class CommService : WearableListenerService(), GoogleApiClient.ConnectionCallbac
             .setContentTitle(title)
             .setContentText(contentText)
             .setContentIntent(pendingIntent)
-            .setSmallIcon(Icon.createWithResource(this, R.drawable.pump_notif_1d))
+            .setSmallIcon(IconCompat.createWithResource(this, R.drawable.pump_notif_1d))
             .setTicker(currentPumpData.statusText)
-            .setPriority(Notification.PRIORITY_MAX) // for under android 26 compatibility
+            .setPriority(NotificationCompat.PRIORITY_MAX) // for under android 26 compatibility
+            .setOngoing(true)
             .build()
     }
 
@@ -1142,7 +1144,7 @@ fun confirmBolusRequestBaseNotification(context: Context?, title: String, text: 
         .setContentText(text)
         .setSmallIcon(R.drawable.bolus_icon)
         .setTicker(title)
-        .setPriority(Notification.PRIORITY_MAX) // for under android 26 compatibility
+        .setPriority(NotificationCompat.PRIORITY_MAX) // for under android 26 compatibility
         .setAutoCancel(true)
 
 }

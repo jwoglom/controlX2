@@ -13,6 +13,7 @@ import android.graphics.drawable.Icon
 import android.os.Bundle
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
+import androidx.core.graphics.drawable.IconCompat
 import com.google.android.gms.common.ConnectionResult
 import com.google.android.gms.common.api.GoogleApiClient
 import com.google.android.gms.wearable.MessageEvent
@@ -88,7 +89,7 @@ class PhoneCommService : WearableListenerService(), GoogleApiClient.ConnectionCa
                     PendingIntent.FLAG_IMMUTABLE)
             }
 
-        val builder: Notification.Builder = Notification.Builder(
+        val builder: NotificationCompat.Builder = NotificationCompat.Builder(
             this,
             notificationChannelId
         )
@@ -98,9 +99,10 @@ class PhoneCommService : WearableListenerService(), GoogleApiClient.ConnectionCa
             .setContentTitle(title)
             .setContentText("This notification can be hidden: open Settings > Apps > Notifications > All > ControlX2 and turn Endless Service Notifications off")
             .setContentIntent(pendingIntent)
-            .setSmallIcon(Icon.createWithResource(this, R.drawable.pump))
+            .setSmallIcon(IconCompat.createWithResource(this, R.drawable.pump))
             .setTicker(title)
-            .setPriority(Notification.PRIORITY_MAX) // for under android 26 compatibility
+            .setPriority(NotificationCompat.PRIORITY_MAX) // for under android 26 compatibility
+            .setOngoing(true)
             .build()
     }
 
