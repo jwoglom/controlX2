@@ -1,7 +1,7 @@
 // Top-level build file where you can add configuration options common to all sub-projects/modules.
 buildscript {
     ext {
-        controlx2_version = "1.0.0-20230124"
+        controlx2_version = "1.0.0-20230220"
         pumpx2_version = "1.2.9"
         use_local_pumpx2 = System.properties.getOrDefault('use_local_pumpx2', 'false') == 'true'
         m2_repository = "${System.properties['user.home']}/.m2/repository"
