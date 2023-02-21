@@ -7,12 +7,4 @@
   <path
       android:fillColor="@android:color/white"
       android:pathData="M 174 680 Q 161.25 680 152.63 671.38 Q 144 662.75 144 650 L 144 560 L 144 400 L 144 310 Q 144 297.25 152.63 288.63 Q 161.25 280 174 280 L 850 280 Q 862.75 280 871.38 288.63 Q 880 297.25 880 310 L 880 650 Q 880 662.75 871.38 671.38 Q 862.75 680 850 680 L 174 680 Z M 204 620 L 820 620 L 820 340 L 204 340 L 204 620 Z"/>
-  <path
-      android:pathData="M 563.24 595.48 L 496.88 529.12 L 430.52 595.48 L 383.28 548.24 L 449.64 481.88 L 383.28 415.52 L 430.52 368.28 L 496.88 434.64 L 563.24 368.28 L 610.48 415.52 L 544.12 481.88 L 610.48 548.24 L 563.24 595.48 z"
-      android:strokeLineJoin="miter"
-      android:strokeWidth="0.71"
-      android:fillColor="#FF5B64"
-      android:fillType="nonZero"
-      android:strokeColor="#00000000"
-      android:strokeLineCap="butt"/>
 </vector>

@@ -1,5 +1,7 @@
 package com.jwoglom.controlx2.presentation.screens.sections.components
 
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.height
 import androidx.compose.material3.Icon
@@ -17,7 +19,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.jwoglom.controlx2.R
 
-const val CartridgeMax = 270
+const val CartridgeMax = 200
 
 @Composable
 fun HorizCartridgeIcon(
@@ -30,12 +32,22 @@ fun HorizCartridgeIcon(
     cartridgeAmount?.let {
         val percent = (100 * it) / cartridgeMax
         Row(modifier.height(height)) {
-            Icon(
-                getPainterForCartridgePercent(percent),
-                "Pump cartridge icon",
-                tint = color,
-                modifier = modifier.height(height)
-            )
+            Box {
+                Icon(
+                    getPainterForCartridgePercent(percent),
+                    "Pump cartridge icon",
+                    tint = color,
+                    modifier = modifier.height(height)
+                )
+                if (it == 0) {
+                    Icon(
+                        painterResource(R.drawable.cartridge_horiz_x),
+                        "Pump cartridge empty",
+                        tint = Color.Red,
+                        modifier = modifier.height(height)
+                    )
+                }
+            }
             Text(
                 "${cartridgeAmount}u",
                 color = color,
