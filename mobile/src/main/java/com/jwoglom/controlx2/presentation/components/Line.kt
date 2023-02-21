@@ -23,7 +23,7 @@ fun Line(
             true -> FontWeight.Bold
             else -> FontWeight.Normal
         },
-        modifier = modifier.fillMaxWidth()
+        modifier = modifier
     )
 }
 @Composable
@@ -40,6 +40,6 @@ fun Line(
             true -> FontWeight.Bold
             else -> FontWeight.Normal
         },
-        modifier = modifier.fillMaxWidth()
+        modifier = modifier
     )
 }
