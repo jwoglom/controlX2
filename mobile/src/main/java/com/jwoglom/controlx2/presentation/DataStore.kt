@@ -1,5 +1,9 @@
 package com.jwoglom.controlx2.presentation
 
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.lifecycle.MutableLiveData
 import com.jwoglom.pumpx2.pump.messages.Message
 import com.jwoglom.pumpx2.pump.messages.calculator.BolusCalcCondition
@@ -65,6 +69,10 @@ class DataStore {
     val bolusFinalParameters = MutableLiveData<BolusParameters>()
     val bolusFinalCalcUnits = MutableLiveData<BolusCalcUnits>()
     val bolusFinalConditions = MutableLiveData<Set<BolusCalcCondition>>()
+
+    val bolusUnitsRawValue = MutableLiveData<String?>()
+    val bolusCarbsRawValue = MutableLiveData<String?>()
+    val bolusGlucoseRawValue = MutableLiveData<String?>()
 
     val timeSinceResetResponse = MutableLiveData<TimeSinceResetResponse>()
     val bolusPermissionResponse = MutableLiveData<BolusPermissionResponse>()

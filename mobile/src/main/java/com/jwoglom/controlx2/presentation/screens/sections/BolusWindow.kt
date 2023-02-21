@@ -104,9 +104,9 @@ fun BolusWindow(
     val refreshScope = rememberCoroutineScope()
     var refreshing by remember { mutableStateOf(true) }
 
-    var unitsRawValue by remember { mutableStateOf<String?>(null) }
-    var carbsRawValue by remember { mutableStateOf<String?>(null) }
-    var glucoseRawValue by remember { mutableStateOf<String?>(null) }
+    val unitsRawValue = dataStore.bolusUnitsRawValue.observeAsState()
+    val carbsRawValue = dataStore.bolusCarbsRawValue.observeAsState()
+    val glucoseRawValue = dataStore.bolusGlucoseRawValue.observeAsState()
 
     var unitsSubtitle by remember { mutableStateOf<String>("Units") }
     var carbsSubtitle by remember { mutableStateOf<String>("Carbs (g)") }
@@ -206,9 +206,9 @@ fun BolusWindow(
         dataStore.bolusCalculatorBuilder.value = buildBolusCalculator(
             bolusCalcDataSnapshot.value,
             bolusCalcLastBG.value,
-            if (unitsHumanEntered != null) rawToDouble(unitsRawValue) else null,
-            rawToInt(carbsRawValue),
-            rawToInt(glucoseRawValue)
+            if (unitsHumanEntered != null) rawToDouble(unitsRawValue.value) else null,
+            rawToInt(carbsRawValue.value),
+            rawToInt(glucoseRawValue.value)
         )
 
         dataStore.bolusCurrentParameters.value =
@@ -264,7 +264,7 @@ fun BolusWindow(
             unitsHumanEntered == null &&
             !unitsHumanFocus
         ) {
-            unitsRawValue = twoDecimalPlaces(dataStore.bolusCurrentParameters.value!!.units)
+            dataStore.bolusUnitsRawValue.value = twoDecimalPlaces(dataStore.bolusCurrentParameters.value!!.units)
         }
 
         // TODO: invalid logic for attributing override vs pre-filled units
@@ -282,7 +282,7 @@ fun BolusWindow(
             dataStore.bolusCurrentParameters.value!!.glucoseMgdl > 0 &&
             autofilledBg != null
         ) {
-            glucoseRawValue = "$autofilledBg"
+            dataStore.bolusGlucoseRawValue.value = "$autofilledBg"
         }
         glucoseSubtitle = when {
             glucoseHumanEntered != null -> "Entered (mg/dL)"
@@ -295,7 +295,7 @@ fun BolusWindow(
         refresh()
     }
 
-    LaunchedEffect (unitsRawValue, carbsRawValue, glucoseRawValue, bolusCalcDataSnapshot.value, bolusCalcLastBG.value) {
+    LaunchedEffect (unitsRawValue.value, carbsRawValue.value, glucoseRawValue.value, bolusCalcDataSnapshot.value, bolusCalcLastBG.value) {
         recalculate()
     }
 
@@ -306,9 +306,9 @@ fun BolusWindow(
         Column(Modifier.weight(1f)) {
             DecimalOutlinedText(
                 title = unitsSubtitle,
-                value = unitsRawValue,
+                value = unitsRawValue.value,
                 onValueChange = {
-                    unitsRawValue = it
+                    dataStore.bolusUnitsRawValue.value = it
                     unitsHumanEntered = if (it == "") null else it.toDoubleOrNull()
                 },
                 modifier = Modifier.onFocusChanged {
@@ -328,8 +328,8 @@ fun BolusWindow(
                 .padding(all = 8.dp)) {
             IntegerOutlinedText(
                 title = carbsSubtitle,
-                value = carbsRawValue,
-                onValueChange = { carbsRawValue = it }
+                value = carbsRawValue.value,
+                onValueChange = { dataStore.bolusCarbsRawValue.value = it }
             )
         }
 
@@ -339,9 +339,9 @@ fun BolusWindow(
                 .padding(all = 8.dp)) {
             IntegerOutlinedText(
                 title = glucoseSubtitle,
-                value = glucoseRawValue,
+                value = glucoseRawValue.value,
                 onValueChange = {
-                    glucoseRawValue = it
+                    dataStore.bolusGlucoseRawValue.value = it
                     glucoseHumanEntered = if (it == "") null else it.toIntOrNull()
                 }
             )
@@ -448,15 +448,19 @@ fun BolusWindow(
 
     if (bolusConditionsPromptAcknowledged.value != null && bolusConditionsPromptAcknowledged.value!!.size > 0) {
         bolusConditionsPromptAcknowledged.value?.forEach {
-            Card(Modifier.fillMaxWidth().clickable {
-                Timber.i("bolusConditionsPromptAcknowledged click")
-                dataStore.bolusConditionsPrompt.value = mutableListOf<BolusCalcCondition>().let {
-                    it.addAll(bolusConditionsPromptAcknowledged.value!!)
-                    it
-                }
-                dataStore.bolusConditionsPromptAcknowledged.value = mutableListOf()
-                dataStore.bolusConditionsExcluded.value = mutableSetOf()
-            }) {
+            Card(
+                Modifier
+                    .fillMaxWidth()
+                    .clickable {
+                        Timber.i("bolusConditionsPromptAcknowledged click")
+                        dataStore.bolusConditionsPrompt.value =
+                            mutableListOf<BolusCalcCondition>().let {
+                                it.addAll(bolusConditionsPromptAcknowledged.value!!)
+                                it
+                            }
+                        dataStore.bolusConditionsPromptAcknowledged.value = mutableListOf()
+                        dataStore.bolusConditionsExcluded.value = mutableSetOf()
+                    }) {
                 Text(buildAnnotatedString {
                     withStyle(SpanStyle(fontWeight = FontWeight.Bold)) {
                         append(when {
@@ -974,6 +978,9 @@ fun resetBolusDataStoreState(dataStore: DataStore) {
     dataStore.bolusFinalParameters.value = null
     dataStore.bolusFinalCalcUnits.value = null
     dataStore.bolusFinalConditions.value = null
+    dataStore.bolusUnitsRawValue.value = null
+    dataStore.bolusCarbsRawValue.value = null
+    dataStore.bolusGlucoseRawValue.value = null
 }
 
 @Preview
