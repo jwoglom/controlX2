@@ -65,9 +65,11 @@ import com.jwoglom.controlx2.shared.PumpQualifyingEventsSerializer
 import com.jwoglom.controlx2.shared.util.setupTimber
 import com.jwoglom.controlx2.shared.util.shortTime
 import com.jwoglom.controlx2.shared.util.twoDecimalPlaces
+import com.jwoglom.controlx2.util.AppVersionCheck
 import com.jwoglom.controlx2.util.DataClientState
 import com.welie.blessed.BluetoothPeripheral
 import com.welie.blessed.HciStatus
+import hu.supercluster.paperwork.Paperwork
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -622,6 +624,10 @@ class CommService : WearableListenerService(), GoogleApiClient.ConnectionCallbac
         }
     }
 
+    private var checkForUpdatesTask: Runnable = Runnable {
+        AppVersionCheck(applicationContext)
+    }
+
     override fun onCreate() {
         super.onCreate()
 
@@ -669,6 +675,7 @@ class CommService : WearableListenerService(), GoogleApiClient.ConnectionCallbac
             pumpCommHandler = PumpCommHandler(looper)
 
             pumpCommHandler?.postDelayed(periodicUpdateTask, periodicUpdateIntervalMs)
+            pumpCommHandler?.postDelayed(checkForUpdatesTask, periodicUpdateIntervalMs)
 
             Thread {
                 while (!mApiClient.isConnected) {
