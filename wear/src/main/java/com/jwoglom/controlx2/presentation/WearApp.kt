@@ -353,9 +353,13 @@ fun WearApp(
 
                 composable(Screen.BolusSelectCarbsScreen.route) {
                     val currentCarbs = LocalDataStore.current.bolusCalculatorBuilder.value?.carbsValueGrams?.orElse(null)
+                    val maxCarbAmount = LocalDataStore.current.maxCarbAmount.observeAsState()
                     SingleNumberPicker(
                         label = "Carbs",
-                        maxNumber = 100,
+                        maxNumber = when {
+                            maxCarbAmount.value != null -> maxCarbAmount.value!!
+                            else -> 100
+                        },
                         defaultNumber = when {
                             currentCarbs != null -> currentCarbs
                             bolusCarbsGramsUserInput != null -> bolusCarbsGramsUserInput!!

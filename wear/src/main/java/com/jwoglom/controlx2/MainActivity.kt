@@ -72,6 +72,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.asExecutor
 import timber.log.Timber
 import java.time.temporal.ChronoUnit
+import kotlin.math.roundToInt
 
 var dataStore = DataStore()
 val LocalDataStore = compositionLocalOf { dataStore }
@@ -455,6 +456,7 @@ class MainActivity : ComponentActivity(), MessageApi.MessageListener, GoogleApiC
                 if (!cached) {
                     dataStore.bolusCalcDataSnapshot.value = message
                 }
+                dataStore.maxCarbAmount.value = (InsulinUnit.from1000To1(message.maxBolusAmount.toLong()) * InsulinUnit.from1000To1(message.carbRatio)).roundToInt()
             }
             is LastBGResponse -> {
                 dataStore.bolusCalcLastBG.value = message
