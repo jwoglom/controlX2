@@ -34,7 +34,6 @@ fun PumpStatusBar() {
 private fun DefaultPreview() {
     ControlX2Theme() {
         Surface(
-            modifier = Modifier.fillMaxSize(),
             color = Color.White,
         ) {
             setUpPreviewState(LocalDataStore.current)

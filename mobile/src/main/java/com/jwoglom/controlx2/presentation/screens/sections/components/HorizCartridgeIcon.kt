@@ -1,7 +1,6 @@
 package com.jwoglom.controlx2.presentation.screens.sections.components
 
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Surface
@@ -18,26 +17,27 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.jwoglom.controlx2.R
 
-/**
- * @param batteryPercent from 0 to 100
- */
+const val CartridgeMax = 270
+
 @Composable
-fun HorizBatteryIcon(
-    batteryPercent: Int?,
+fun HorizCartridgeIcon(
+    cartridgeAmount: Int?,
+    cartridgeMax: Int = CartridgeMax,
     height: Dp = 24.dp,
     color: Color = Color.Unspecified,
     modifier: Modifier = Modifier
 ) {
-    batteryPercent?.let {
+    cartridgeAmount?.let {
+        val percent = (100 * it) / cartridgeMax
         Row(modifier.height(height)) {
             Icon(
-                getPainterForBatteryPercent(it),
-                "Battery icon",
+                getPainterForCartridgePercent(percent),
+                "Pump cartridge icon",
                 tint = color,
                 modifier = modifier.height(height)
             )
             Text(
-                "${batteryPercent}%",
+                "${cartridgeAmount}u",
                 color = color,
                 textAlign = TextAlign.Center,
                 modifier = modifier.height(height),
@@ -48,15 +48,15 @@ fun HorizBatteryIcon(
 }
 
 @Composable
-fun getPainterForBatteryPercent(batteryPercent: Int): Painter {
+fun getPainterForCartridgePercent(percent: Int): Painter {
     return painterResource(
         when {
-            batteryPercent >= 80 -> R.drawable.battery_horiz_100
-            batteryPercent >= 60 -> R.drawable.battery_horiz_075
-            batteryPercent >= 40 -> R.drawable.battery_horiz_050
-            batteryPercent >= 25 -> R.drawable.battery_horiz_025
-            batteryPercent >= 10 -> R.drawable.battery_horiz_010
-            else -> R.drawable.battery_horiz_000
+            percent >= 80 -> R.drawable.cartridge_horiz_100
+            percent >= 60 -> R.drawable.cartridge_horiz_075
+            percent >= 40 -> R.drawable.cartridge_horiz_050
+            percent >= 25 -> R.drawable.cartridge_horiz_025
+            percent >= 10 -> R.drawable.cartridge_horiz_010
+            else -> R.drawable.cartridge_horiz_000
         }
     )
 }
@@ -67,7 +67,7 @@ private fun Preview0() {
     Surface(
         color = Color.White,
     ) {
-        HorizBatteryIcon(0)
+        HorizCartridgeIcon(0)
     }
 }
 
@@ -77,7 +77,7 @@ private fun Preview20() {
     Surface(
         color = Color.White,
     ) {
-        HorizBatteryIcon(20)
+        HorizCartridgeIcon((0.20 * CartridgeMax).toInt())
     }
 }
 
@@ -87,7 +87,7 @@ private fun Preview30() {
     Surface(
         color = Color.White,
     ) {
-        HorizBatteryIcon(30)
+        HorizCartridgeIcon((0.30 * CartridgeMax).toInt())
     }
 }
 
@@ -97,7 +97,7 @@ private fun Preview40() {
     Surface(
         color = Color.White,
     ) {
-        HorizBatteryIcon(40)
+        HorizCartridgeIcon((0.40 * CartridgeMax).toInt())
     }
 }
 
@@ -107,7 +107,7 @@ private fun Preview60() {
     Surface(
         color = Color.White,
     ) {
-        HorizBatteryIcon(60)
+        HorizCartridgeIcon((0.60 * CartridgeMax).toInt())
     }
 }
 
@@ -117,6 +117,6 @@ private fun Preview80() {
     Surface(
         color = Color.White,
     ) {
-        HorizBatteryIcon(80)
+        HorizCartridgeIcon((0.80 * CartridgeMax).toInt())
     }
 }
