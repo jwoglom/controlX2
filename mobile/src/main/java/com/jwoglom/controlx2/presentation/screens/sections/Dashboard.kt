@@ -160,7 +160,6 @@ fun Dashboard(
             content = {
                 item {
                     ServiceDisabledMessage(sendMessage = sendMessage)
-                    LastConnectionUpdatedTimestamp()
                     PumpSetupStageProgress(initialSetup = false)
                     PumpSetupStageDescription(initialSetup = false)
 
@@ -171,7 +170,9 @@ fun Dashboard(
                 }
 
                 item {
-                    PumpStatusBar()
+                    PumpStatusBar(middleContent = {
+                        LastConnectionUpdatedTimestamp()
+                    })
                 }
 
                 item {

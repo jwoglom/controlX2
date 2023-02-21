@@ -75,6 +75,7 @@ import com.jwoglom.controlx2.presentation.theme.Colors
 import com.jwoglom.controlx2.presentation.theme.ControlX2Theme
 import com.jwoglom.controlx2.shared.util.SendType
 import kotlinx.coroutines.launch
+import java.time.Instant
 
 @Composable
 fun Landing(
@@ -299,6 +300,7 @@ fun setUpPreviewState(ds: DataStore) {
     ds.setupDeviceName.value = "tslim X2 ***789"
     ds.setupDeviceModel.value = "X2"
     ds.pumpConnected.value = true
+    ds.pumpLastConnectionTimestamp.value = Instant.now().minusSeconds(120)
     ds.cgmReading.value = 123
     ds.cgmDeltaArrow.value = "⬈"
     ds.batteryPercent.value = 50

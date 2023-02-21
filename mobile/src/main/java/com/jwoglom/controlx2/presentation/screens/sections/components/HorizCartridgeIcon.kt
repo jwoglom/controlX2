@@ -32,6 +32,13 @@ fun HorizCartridgeIcon(
     cartridgeAmount?.let {
         val percent = (100 * it) / cartridgeMax
         Row(modifier.height(height)) {
+            Text(
+                "${cartridgeAmount}u",
+                color = color,
+                textAlign = TextAlign.Center,
+                modifier = modifier.height(height),
+                fontSize = 16.sp
+            )
             Box {
                 Icon(
                     getPainterForCartridgePercent(percent),
@@ -48,13 +55,6 @@ fun HorizCartridgeIcon(
                     )
                 }
             }
-            Text(
-                "${cartridgeAmount}u",
-                color = color,
-                textAlign = TextAlign.Center,
-                modifier = modifier.height(height),
-                fontSize = 16.sp
-            )
         }
     }
 }
