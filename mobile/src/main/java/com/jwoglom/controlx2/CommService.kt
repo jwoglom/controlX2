@@ -1062,7 +1062,7 @@ class CommService : WearableListenerService(), GoogleApiClient.ConnectionCallbac
             notificationChannelId
         )
 
-        var title = "ControlX2: ${currentPumpData.statusText}"
+        var title = "${currentPumpData.statusText}"
         var atTime = currentPumpData.lastMessageTime
         currentPumpData.connectionTime?.let {
             if (atTime == null || it.isAfter(atTime)) atTime = it
