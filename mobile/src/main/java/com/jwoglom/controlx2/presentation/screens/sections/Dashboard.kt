@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.material.ExperimentalMaterialApi
 import androidx.compose.material.pullrefresh.PullRefreshIndicator
 import androidx.compose.material.pullrefresh.pullRefresh
@@ -53,6 +54,7 @@ import com.jwoglom.controlx2.presentation.components.Line
 import com.jwoglom.controlx2.presentation.components.PumpSetupStageDescription
 import com.jwoglom.controlx2.presentation.components.PumpSetupStageProgress
 import com.jwoglom.controlx2.presentation.components.ServiceDisabledMessage
+import com.jwoglom.controlx2.presentation.screens.sections.components.PumpStatusBar
 import com.jwoglom.controlx2.presentation.screens.setUpPreviewState
 import com.jwoglom.controlx2.presentation.theme.ControlX2Theme
 import com.jwoglom.controlx2.presentation.util.LifecycleStateObserver
@@ -169,6 +171,10 @@ fun Dashboard(
                 }
 
                 item {
+                    PumpStatusBar()
+                }
+
+                item {
                     val cgmReading = ds.cgmReading.observeAsState()
                     val cgmDeltaArrow = ds.cgmDeltaArrow.observeAsState()
                     Line(
@@ -179,7 +185,7 @@ fun Dashboard(
                                 else -> cgmReading.value
                             }
                         } ${cgmDeltaArrow.value ?: ""}",
-                        style = MaterialTheme.typography.headlineLarge,
+                        style = MaterialTheme.typography.displayMedium,
                     )
                 }
 
