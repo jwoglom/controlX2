@@ -8,6 +8,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.painter.Painter
@@ -32,13 +33,17 @@ fun HorizCartridgeIcon(
     cartridgeAmount?.let {
         val percent = (100 * it) / cartridgeMax
         Row(modifier.height(height)) {
-            Text(
-                "${cartridgeAmount}u",
-                color = color,
-                textAlign = TextAlign.Center,
-                modifier = modifier.height(height),
-                fontSize = 16.sp
-            )
+            // HACK: text should be aligned with the icon as-is...
+            Box(
+                contentAlignment = Alignment.Center,
+                modifier = Modifier.height(height - 2.dp)
+            ) {
+                Text(
+                    "${cartridgeAmount}u",
+                    color = color,
+                    textAlign = TextAlign.Center
+                )
+            }
             Box {
                 Icon(
                     getPainterForCartridgePercent(percent),

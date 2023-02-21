@@ -1,5 +1,6 @@
 package com.jwoglom.controlx2.presentation.screens.sections.components
 
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
@@ -7,6 +8,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.painter.Painter
@@ -36,13 +38,17 @@ fun HorizBatteryIcon(
                 tint = color,
                 modifier = modifier.height(height)
             )
-            Text(
-                "${batteryPercent}%",
-                color = color,
-                textAlign = TextAlign.Center,
-                modifier = modifier.height(height),
-                fontSize = 16.sp
-            )
+            // HACK: text should be aligned with the icon as-is...
+            Box(
+                contentAlignment = Alignment.Center,
+                modifier = Modifier.height(height - 2.dp)
+            ) {
+                Text(
+                    "${batteryPercent}%",
+                    color = color,
+                    textAlign = TextAlign.Center
+                )
+            }
         }
     }
 }
