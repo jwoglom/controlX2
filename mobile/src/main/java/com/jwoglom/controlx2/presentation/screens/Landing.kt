@@ -64,6 +64,7 @@ import com.jwoglom.pumpx2.pump.messages.response.currentStatus.TimeSinceResetRes
 import com.jwoglom.controlx2.LocalDataStore
 import com.jwoglom.controlx2.Prefs
 import com.jwoglom.controlx2.R
+import com.jwoglom.controlx2.dataStore
 import com.jwoglom.controlx2.presentation.DataStore
 import com.jwoglom.controlx2.presentation.screens.sections.BolusWindow
 import com.jwoglom.controlx2.presentation.screens.sections.Dashboard
@@ -71,6 +72,7 @@ import com.jwoglom.controlx2.presentation.screens.sections.Debug
 import com.jwoglom.controlx2.presentation.screens.sections.Settings
 import com.jwoglom.controlx2.presentation.screens.sections.dashboardCommands
 import com.jwoglom.controlx2.presentation.screens.sections.dashboardFields
+import com.jwoglom.controlx2.presentation.screens.sections.resetBolusDataStoreState
 import com.jwoglom.controlx2.presentation.theme.Colors
 import com.jwoglom.controlx2.presentation.theme.ControlX2Theme
 import com.jwoglom.controlx2.shared.util.SendType
@@ -184,9 +186,12 @@ fun Landing(
                                         closeWindow = {
                                             coroutineScope.launch {
                                                 displayBolusWindow.bottomSheetState.collapse()
+                                                resetBolusDataStoreState(dataStore)
                                             }
                                         }
                                     )
+                                } else {
+                                    resetBolusDataStoreState(dataStore)
                                 }
                             }
                             item {
