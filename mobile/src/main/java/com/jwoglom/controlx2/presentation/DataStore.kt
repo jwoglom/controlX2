@@ -39,6 +39,7 @@ class DataStore {
     val batteryPercent = MutableLiveData<Int>()
     val iobUnits = MutableLiveData<Double>()
     val cartridgeRemainingUnits = MutableLiveData<Int>()
+    val cartridgeRemainingEstimate = MutableLiveData<Boolean>()
     val lastBolusStatus = MutableLiveData<String>()
     val controlIQStatus = MutableLiveData<String>()
     val controlIQMode = MutableLiveData<String>()
@@ -102,6 +103,7 @@ class DataStore {
         batteryPercent.observeForever { t -> Timber.i("DataStore.batteryPercent=$t") }
         iobUnits.observeForever { t -> Timber.i("DataStore.iobUnits=$t") }
         cartridgeRemainingUnits.observeForever { t -> Timber.i("DataStore.cartridgeRemainingUnits=$t") }
+        cartridgeRemainingEstimate.observeForever { t -> Timber.i("DataStore.cartridgeRemainingEstimate=$t") }
         lastBolusStatus.observeForever { t -> Timber.i("DataStore.lastBolusStatus=$t") }
         controlIQStatus.observeForever { t -> Timber.i("DataStore.controlIQStatus=$t") }
         controlIQMode.observeForever { t -> Timber.i("DataStore.controlIQMode=$t") }

@@ -26,12 +26,14 @@ const val CartridgeMax = 200
 fun HorizCartridgeIcon(
     cartridgeAmount: Int?,
     cartridgeMax: Int = CartridgeMax,
+    cartridgeAmountEstimate: Boolean = false,
     height: Dp = 24.dp,
     color: Color = Color.Unspecified,
     modifier: Modifier = Modifier
 ) {
     cartridgeAmount?.let {
         val percent = (100 * it) / cartridgeMax
+        val suffix = if (cartridgeAmountEstimate) "+" else ""
         Row(modifier.height(height)) {
             // HACK: text should be aligned with the icon as-is...
             Box(
@@ -39,7 +41,7 @@ fun HorizCartridgeIcon(
                 modifier = Modifier.height(height - 2.dp)
             ) {
                 Text(
-                    "${cartridgeAmount}u",
+                    "${cartridgeAmount}u${suffix}",
                     color = color,
                     textAlign = TextAlign.Center
                 )
@@ -68,12 +70,12 @@ fun HorizCartridgeIcon(
 fun getPainterForCartridgePercent(percent: Int): Painter {
     return painterResource(
         when {
-            percent >= 80 -> R.drawable.cartridge_horiz_100
-            percent >= 60 -> R.drawable.cartridge_horiz_075
-            percent >= 40 -> R.drawable.cartridge_horiz_050
-            percent >= 25 -> R.drawable.cartridge_horiz_025
-            percent >= 10 -> R.drawable.cartridge_horiz_010
-            else -> R.drawable.cartridge_horiz_000
+            percent >= 80 -> R.drawable.cartridge_horiz_100 // 160u+
+            percent >= 60 -> R.drawable.cartridge_horiz_075 // 120u - 160u
+            percent >= 40 -> R.drawable.cartridge_horiz_050 // 80u - 120u
+            percent >= 25 -> R.drawable.cartridge_horiz_025 // 50u - 80u
+            percent >= 10 -> R.drawable.cartridge_horiz_010 // 20u - 50u
+            else -> R.drawable.cartridge_horiz_000          // 0 - 20u
         }
     )
 }
@@ -135,5 +137,15 @@ private fun Preview80() {
         color = Color.White,
     ) {
         HorizCartridgeIcon((0.80 * CartridgeMax).toInt())
+    }
+}
+
+@Preview
+@Composable
+private fun PreviewPlus() {
+    Surface(
+        color = Color.White,
+    ) {
+        HorizCartridgeIcon((0.60 * CartridgeMax).toInt(), cartridgeAmountEstimate = true)
     }
 }

@@ -569,6 +569,7 @@ class MainActivity : ComponentActivity(), GoogleApiClient.ConnectionCallbacks, G
                     HomeScreenMirrorResponse.BasalStatusIcon.ATTENUATED_BASAL -> "Reduced"
                     else -> ""
                 }
+                dataStore.cartridgeRemainingEstimate.value = message.remainingInsulinPlusIcon
             }
             is CurrentBasalStatusResponse -> {
                 dataStore.basalRate.value = "${twoDecimalPlaces1000Unit(message.currentBasalRate)}u"

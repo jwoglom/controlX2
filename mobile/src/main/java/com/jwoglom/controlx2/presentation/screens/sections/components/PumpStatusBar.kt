@@ -36,7 +36,9 @@ fun PumpStatusBar(middleContent: @Composable () -> Unit = {}) {
 
         Box (Modifier.padding(horizontal = 8.dp)) {
             val cartridgeRemainingUnits = ds.cartridgeRemainingUnits.observeAsState()
-            HorizCartridgeIcon(cartridgeRemainingUnits.value)
+            val cartridgeRemainingEstimate = ds.cartridgeRemainingEstimate.observeAsState()
+            HorizCartridgeIcon(cartridgeRemainingUnits.value,
+                cartridgeAmountEstimate = cartridgeRemainingEstimate.value == true)
         }
     }
 
