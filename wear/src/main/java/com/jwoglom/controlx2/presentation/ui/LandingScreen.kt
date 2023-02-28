@@ -211,6 +211,7 @@ fun LandingScreen(
                     val batteryPercent = dataStore.batteryPercent.observeAsState()
                     val iobUnits = dataStore.iobUnits.observeAsState()
                     val cartridgeRemainingUnits = dataStore.cartridgeRemainingUnits.observeAsState()
+                    val cartridgeRemainingEstimate = dataStore.cartridgeRemainingEstimate.observeAsState()
 
                     FirstRowChip(
                         labelText = when(batteryPercent.value) {
@@ -240,7 +241,7 @@ fun LandingScreen(
                     FirstRowChip(
                         labelText = when(cartridgeRemainingUnits.value) {
                             null -> "?"
-                            else -> "${cartridgeRemainingUnits.value}u"
+                            else -> "${cartridgeRemainingUnits.value}u${if (cartridgeRemainingEstimate.value == true) "+" else ""}"
                         },
                         secondaryLabelText = "Cartridge",
                         theme = when {

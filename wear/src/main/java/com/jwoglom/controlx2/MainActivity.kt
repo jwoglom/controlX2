@@ -414,6 +414,7 @@ class MainActivity : ComponentActivity(), MessageApi.MessageListener, GoogleApiC
                     BasalStatusIcon.ATTENUATED_BASAL -> "Reduced"
                     else -> ""
                 }
+                dataStore.cartridgeRemainingEstimate.value = message.remainingInsulinPlusIcon
             }
             is CurrentBasalStatusResponse -> {
                 dataStore.basalRate.value = "${twoDecimalPlaces1000Unit(message.currentBasalRate)}u"
