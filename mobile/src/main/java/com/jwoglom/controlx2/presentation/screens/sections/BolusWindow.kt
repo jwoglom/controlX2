@@ -558,27 +558,31 @@ fun BolusWindow(
 
             },
             confirmButton = {
-                    TextButton(
-                        onClick = {
-                            bolusFinalParameters.value?.let { finalParameters ->
-                                bolusPermissionResponse.value?.let { permissionResponse ->
-                                    if (permissionResponse.isPermissionGranted && finalParameters.units >= 0.05) {
-                                        showPermissionCheckDialog = false
-                                        showInProgressDialog = true
-                                        sendBolusRequest(
-                                            dataStore.bolusFinalParameters.value,
-                                            dataStore.bolusFinalCalcUnits.value,
-                                            dataStore.bolusCalcDataSnapshot.value,
-                                            dataStore.timeSinceResetResponse.value,
-                                        )
-                                    }
+                TextButton(
+                    onClick = {
+                        bolusFinalParameters.value?.let { finalParameters ->
+                            bolusPermissionResponse.value?.let { permissionResponse ->
+                                if (permissionResponse.isPermissionGranted && finalParameters.units >= 0.05) {
+                                    showPermissionCheckDialog = false
+                                    showInProgressDialog = true
+                                    sendBolusRequest(
+                                        dataStore.bolusFinalParameters.value,
+                                        dataStore.bolusFinalCalcUnits.value,
+                                        dataStore.bolusCalcDataSnapshot.value,
+                                        dataStore.timeSinceResetResponse.value,
+                                    )
                                 }
                             }
                         }
-                    ) {
-                        Text("Deliver")
-                    }
+                    },
+                    enabled = (
+                        bolusPermissionResponse.value?.isPermissionGranted == true &&
+                        bolusFinalParameters.value?.takeIf { it.units >= 0.05 } != null
+                    )
+                ) {
+                    Text("Deliver")
                 }
+            }
         )
     }
 
