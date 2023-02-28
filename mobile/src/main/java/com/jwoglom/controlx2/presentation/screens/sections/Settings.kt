@@ -32,6 +32,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.navigation.NavHostController
 import com.jwoglom.controlx2.Prefs
 import com.jwoglom.controlx2.R
@@ -65,12 +66,14 @@ fun Settings(
             item {
                 val ver = AppVersionInfo(context)
                 Text(buildAnnotatedString {
-                    withStyle(style = SpanStyle(fontWeight = FontWeight.Bold)) {
+                    withStyle(style = SpanStyle(fontWeight = FontWeight.Bold, fontSize = 20.sp)) {
                         append("ControlX2 ")
                         append(ver.version)
-                        append(" with PumpX2 ")
-                        append(ver.pumpX2)
                     }
+                }, Modifier.padding(start = 16.dp, top = 16.dp))
+                Text(buildAnnotatedString {
+                    append("with PumpX2 ")
+                    append(ver.pumpX2)
                     append("\n")
 
                     withStyle(style = SpanStyle(fontWeight = FontWeight.Bold)) {
@@ -84,7 +87,7 @@ fun Settings(
                     }
                     append(ver.buildTime)
                     append("\n")
-                }, Modifier.padding(start = 16.dp, top = 16.dp))
+                }, lineHeight = 20.sp, fontSize = 14.sp, modifier = Modifier.padding(start = 16.dp))
             }
 
             item {

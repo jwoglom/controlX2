@@ -402,12 +402,14 @@ fun LandingScreen(
                 val context = LocalContext.current
                 val p = Paperwork(context)
                 Text(buildAnnotatedString {
-                    withStyle(style = SpanStyle(fontWeight = FontWeight.Bold)) {
+                    withStyle(style = SpanStyle(fontWeight = FontWeight.Bold, fontSize = 12.sp)) {
                         append("ControlX2 ")
                         append(BuildConfig.VERSION_NAME)
-                        append(" with PumpX2 ")
-                        append(com.jwoglom.pumpx2.BuildConfig.PUMPX2_VERSION)
                     }
+
+                    append("\n")
+                    append("with PumpX2 ")
+                    append(com.jwoglom.pumpx2.BuildConfig.PUMPX2_VERSION)
                     append("\n")
 
                     withStyle(style = SpanStyle(fontWeight = FontWeight.Bold)) {
@@ -421,7 +423,7 @@ fun LandingScreen(
                     }
                     append(p.get("build_time"))
                     append("\n")
-                }, color = Color.White, fontSize = 8.sp, modifier = Modifier.padding(start = 16.dp, top = 16.dp))
+                }, color = Color.White, fontSize = 8.sp, modifier = Modifier.padding(start = 16.dp))
             }
 
 //            item {
