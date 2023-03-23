@@ -10,6 +10,7 @@ import androidx.core.app.NotificationCompat
 import com.android.volley.Request
 import com.android.volley.toolbox.JsonObjectRequest
 import com.google.common.base.Strings
+import com.jwoglom.controlx2.R
 import org.json.JSONObject
 import timber.log.Timber
 import java.util.*
@@ -35,6 +36,7 @@ fun AppVersionCheck(context: Context) {
     val version = AppVersionInfo(context)
     val data = buildAppVersionCheckData(version)
 
+    Timber.i("AppVersionCheck init: $data")
     val req = JsonObjectRequest(
         Request.Method.GET,
         "${AppVersionCheckUrl}${version.version}",
@@ -91,10 +93,14 @@ fun notifyForUpdate(context: Context, description: String, newVersion: String) {
     val pendingIntent = PendingIntent.getActivity(context, 0, notificationIntent,
         PendingIntent.FLAG_ONE_SHOT or PendingIntent.FLAG_IMMUTABLE)
 
-    NotificationCompat.Builder(context, notificationChannelId)
+    val notif = NotificationCompat.Builder(context, notificationChannelId)
+        .setSmallIcon(R.drawable.pump)
         .setContentTitle("ControlX2 Update Available: $newVersion")
+        .setTicker("ControlX2 Update Available: $newVersion")
         .setContentText(description)
         .setContentIntent(pendingIntent)
         .setPriority(NotificationCompat.PRIORITY_HIGH)
         .build()
+
+    notificationManager.notify(100, notif)
 }

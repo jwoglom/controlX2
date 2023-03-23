@@ -624,6 +624,7 @@ class CommService : WearableListenerService(), GoogleApiClient.ConnectionCallbac
         }
     }
 
+    private val checkForUpdatesDelayMs: Long = 1000 * 30 // 30 seconds
     private var checkForUpdatesTask: Runnable = Runnable {
         AppVersionCheck(applicationContext)
     }
@@ -645,7 +646,7 @@ class CommService : WearableListenerService(), GoogleApiClient.ConnectionCallbac
                 logToFile = true,
                 shouldLog = ShouldLogToFile(this),
                 writeCharacteristicFailedCallback = handleWriteCharacteristicFailedCallback)
-            Timber.d("service onCreate")
+            Timber.i("service onCreate")
 
             // Listen to BLE state changes
             val intentFilter = IntentFilter()
@@ -675,7 +676,7 @@ class CommService : WearableListenerService(), GoogleApiClient.ConnectionCallbac
             pumpCommHandler = PumpCommHandler(looper)
 
             pumpCommHandler?.postDelayed(periodicUpdateTask, periodicUpdateIntervalMs)
-            pumpCommHandler?.postDelayed(checkForUpdatesTask, periodicUpdateIntervalMs)
+            pumpCommHandler?.postDelayed(checkForUpdatesTask, checkForUpdatesDelayMs)
 
             Thread {
                 while (!mApiClient.isConnected) {
