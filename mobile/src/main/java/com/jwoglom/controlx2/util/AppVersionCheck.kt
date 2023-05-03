@@ -25,6 +25,7 @@ const val AppOpenUrl = "https://github.com/jwoglom/controlx2/releases"
  *    - PumpX2 software version
  *    - Current timezone of the phone
  *    - Current region name in the locale
+ *    - A device-generated UUID stored in SharedPreferences
  *  2. Parse the response, identifying whether there is an updated version available.
  *  3. If an updated version is available, sends a system notification which, when clicked,
  *     opens the GitHub releases page to download the update.
@@ -34,11 +35,12 @@ const val AppOpenUrl = "https://github.com/jwoglom/controlx2/releases"
  */
 fun AppVersionCheck(context: Context) {
     val version = AppVersionInfo(context)
-    val data = buildAppVersionCheckData(version)
+    val data = buildAppVersionCheckData(context, version)
 
-    Timber.i("AppVersionCheck init: $data")
+    Timber.i("AppVersionCheck init: using server $AppVersionCheckUrl")
+    Timber.i("AppVersionCheck data: $data")
     val req = JsonObjectRequest(
-        Request.Method.GET,
+        Request.Method.POST,
         "${AppVersionCheckUrl}${version.version}",
         data,
         { response ->
@@ -59,17 +61,32 @@ fun AppVersionCheck(context: Context) {
     VolleyQueue.getInstance(context).add(req)
 }
 
-fun buildAppVersionCheckData(version: AppVersionInfo): JSONObject {
+fun buildAppVersionCheckData(context: Context, version: AppVersionInfo): JSONObject {
     val o = JSONObject()
-    o.put("version", version)
+    o.put("version", version.toJsonObject())
 
     val u = JSONObject()
     u.put("timezone", TimeZone.getDefault().id)
     u.put("countryCode", Locale.getDefault().country)
+    u.put("deviceUuid", getDeviceUuid(context))
 
     o.put("user", u)
 
     return o
+}
+
+/**
+ * deviceUuid is a random UUID used to help approximate the total users of ControlX2
+ * when checking for version updates, given that the same device may check-in multiple times.
+ */
+fun getDeviceUuid(context: Context): String {
+    val prefs = context.getSharedPreferences("WearX2", Context.MODE_PRIVATE)
+    var uuid = prefs.getString("appInstanceUuid", "") ?: ""
+    if (Strings.isNullOrEmpty(uuid)) {
+        uuid = UUID.randomUUID().toString()
+        prefs.edit().putString("appInstanceUuid", uuid).apply()
+    }
+    return uuid
 }
 
 fun notifyForUpdate(context: Context, description: String, newVersion: String) {

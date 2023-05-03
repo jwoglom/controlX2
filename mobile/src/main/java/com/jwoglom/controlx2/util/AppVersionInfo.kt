@@ -1,9 +1,12 @@
 package com.jwoglom.controlx2.util
 
 import android.content.Context
+import android.content.Context.MODE_PRIVATE
+import com.google.common.base.Strings
 import com.jwoglom.controlx2.BuildConfig
 import hu.supercluster.paperwork.Paperwork
 import org.json.JSONObject
+import java.util.UUID
 
 class AppVersionInfo(val context: Context) {
     val version: String

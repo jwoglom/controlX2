@@ -2,6 +2,7 @@
 
 package com.jwoglom.controlx2.presentation.screens.sections
 
+import android.widget.Toast
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.PaddingValues
@@ -39,6 +40,7 @@ import com.jwoglom.controlx2.R
 import com.jwoglom.controlx2.presentation.navigation.Screen
 import com.jwoglom.controlx2.presentation.theme.ControlX2Theme
 import com.jwoglom.controlx2.shared.util.SendType
+import com.jwoglom.controlx2.util.AppVersionCheck
 import com.jwoglom.controlx2.util.AppVersionInfo
 import com.jwoglom.pumpx2.pump.messages.Message
 import kotlinx.coroutines.Dispatchers
@@ -87,7 +89,10 @@ fun Settings(
                     }
                     append(ver.buildTime)
                     append("\n")
-                }, lineHeight = 20.sp, fontSize = 14.sp, modifier = Modifier.padding(start = 16.dp))
+                }, lineHeight = 20.sp, fontSize = 14.sp, modifier = Modifier.padding(start = 16.dp).clickable {
+                    Toast.makeText(context, "Checking for version update", Toast.LENGTH_SHORT).show()
+                    AppVersionCheck(context)
+                })
             }
 
             item {
