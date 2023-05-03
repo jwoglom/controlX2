@@ -144,8 +144,8 @@ fun AppSetup(
                     "Enable t:connect app connection sharing",
                     bold = true,
                     modifier = Modifier.padding(start = checkboxPadding))
-                Line("Enables workarounds to run ControlX2 and the t:connect app at the same time.")
             }
+            Line("Enables workarounds to run ControlX2 and the t:connect app at the same time.")
             Divider()
         }
         item {
