@@ -1,5 +1,6 @@
 package com.jwoglom.controlx2.presentation.components
 
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
@@ -16,6 +17,7 @@ import androidx.compose.material3.TopAppBarColors
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import com.jwoglom.controlx2.presentation.theme.Colors
 
@@ -34,7 +36,8 @@ fun DialogScreen(
                     Text(title)
                 },
                 actions = actionContent,
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = Colors.primary)
+                colors = if (isSystemInDarkTheme()) TopAppBarDefaults.topAppBarColors(containerColor = Colors.primary, titleContentColor = Color.Black)
+                    else TopAppBarDefaults.topAppBarColors(containerColor = Colors.primary)
             )
         },
         content = { innerPadding ->
@@ -48,7 +51,9 @@ fun DialogScreen(
         bottomBar = {
             Row(
                 horizontalArrangement = Arrangement.SpaceBetween,
-                modifier = Modifier.fillMaxWidth().padding(16.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp),
                 content = buttonContent
             )
         }
