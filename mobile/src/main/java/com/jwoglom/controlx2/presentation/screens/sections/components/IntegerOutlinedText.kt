@@ -1,12 +1,15 @@
 package com.jwoglom.controlx2.presentation.screens.sections.components
 
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.input.KeyboardType
 
@@ -38,6 +41,9 @@ fun IntegerOutlinedText(
             Text(title)
         },
         isError = error,
+        colors = if (isSystemInDarkTheme())
+            TextFieldDefaults.outlinedTextFieldColors(textColor = Color.DarkGray, placeholderColor = Color.DarkGray)
+        else TextFieldDefaults.outlinedTextFieldColors(),
         modifier = Modifier.fillMaxWidth()
     )
 }
