@@ -503,18 +503,21 @@ fun BolusWindow(
                 },
                 contentPadding = ButtonDefaults.ButtonWithIconContentPadding,
                 enabled = bolusButtonEnabled,
-                colors = ButtonDefaults.filledTonalButtonColors(),
+                colors = if (isSystemInDarkTheme()) ButtonDefaults.filledTonalButtonColors(containerColor = Color.LightGray) else ButtonDefaults.filledTonalButtonColors(),
                 modifier = Modifier.align(Alignment.Center)
 
             ) {
                 Image(
-                    if (isSystemInDarkTheme()) painterResource(R.drawable.bolus_icon_secondary)
-                    else painterResource(R.drawable.bolus_icon),
+                    painterResource(R.drawable.bolus_icon),
                     "Bolus icon",
                     Modifier.size(ButtonDefaults.IconSize)
                 )
                 Spacer(Modifier.size(ButtonDefaults.IconSpacing))
-                Text("Deliver ${bolusCurrentParameters.value?.units?.let { "${twoDecimalPlaces(it)}u " }}bolus", fontSize = 18.sp)
+                Text(
+                    "Deliver ${bolusCurrentParameters.value?.units?.let { "${twoDecimalPlaces(it)}u " }}bolus",
+                    fontSize = 18.sp,
+                    color = if (isSystemInDarkTheme()) Color.Black else Color.Unspecified
+                )
             }
         }
     }
