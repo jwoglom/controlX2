@@ -150,6 +150,19 @@ fun Debug(
             .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION))
     }
 
+    fun clearDebugLog(context: Context) {
+        AlertDialog.Builder(context)
+            .setMessage("Are you sure you want to clear the saved debug logs?")
+            .setNegativeButton("Cancel") { dialog, _ -> dialog.dismiss() }
+            .setPositiveButton("Delete") { dialog, _ ->
+                dialog.dismiss()
+                val filePath = File(context.filesDir, "debugLog-MUA.txt")
+                filePath.delete()
+
+            }
+            .show()
+    }
+
     LazyColumn(
         contentPadding = innerPadding,
         verticalArrangement = Arrangement.spacedBy(0.dp),
@@ -651,6 +664,26 @@ fun Debug(
                     },
                     modifier = Modifier.clickable {
                         shareDebugLog(context)
+                    }
+                )
+            }
+
+            item {
+                Divider()
+            }
+
+            item {
+                ListItem(
+                    headlineText = { Text("Clear Debug Logs") },
+                    supportingText = { Text("Clears the saved debug logs.") },
+                    leadingContent = {
+                        Icon(
+                            Icons.Filled.Close,
+                            contentDescription = null,
+                        )
+                    },
+                    modifier = Modifier.clickable {
+                        clearDebugLog(context)
                     }
                 )
             }
