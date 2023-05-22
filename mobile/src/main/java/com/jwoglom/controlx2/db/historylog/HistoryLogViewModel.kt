@@ -8,14 +8,13 @@ import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.launch
 import timber.log.Timber
 
-class HistoryLogViewModel(private val repo: HistoryLogRepo): ViewModel() {
-    fun all(pumpSid: Int): LiveData<List<HistoryLogItem>> {
-        return repo.getAll(pumpSid).asLiveData()
-    }
+class HistoryLogViewModel(private val repo: HistoryLogRepo, private val pumpSid: Int): ViewModel() {
+    val all: LiveData<List<HistoryLogItem>> = repo.getAll(pumpSid).asLiveData()
+    val latest: LiveData<HistoryLogItem?> = repo.getLatest(pumpSid).asLiveData()
+    val oldest: LiveData<HistoryLogItem?> = repo.getOldest(pumpSid).asLiveData()
 
-    fun latest(pumpSid: Int): LiveData<HistoryLogItem?> {
-        Timber.i("HistoryLogViewModel.latest($pumpSid)")
-        return repo.getLatest(pumpSid).asLiveData()
+    fun latestForType(typeId: Int): LiveData<HistoryLogItem?> {
+        return repo.getLatestForType(pumpSid, typeId).asLiveData()
     }
 
     fun insert(historyLogItem: HistoryLogItem) = viewModelScope.launch {
@@ -23,11 +22,12 @@ class HistoryLogViewModel(private val repo: HistoryLogRepo): ViewModel() {
     }
 }
 
-class HistoryLogViewModelFactory(private val repo: HistoryLogRepo) : ViewModelProvider.Factory {
+class HistoryLogViewModelFactory(private val repo: HistoryLogRepo, private val pumpSid: Int) : ViewModelProvider.Factory {
     override fun <T : ViewModel> create(modelClass: Class<T>): T {
         if (modelClass.isAssignableFrom(HistoryLogViewModel::class.java)) {
+            Timber.i("HistoryLogViewModel created with pumpSid=$pumpSid")
             @Suppress("UNCHECKED_CAST")
-            return HistoryLogViewModel(repo) as T
+            return HistoryLogViewModel(repo, pumpSid) as T
         }
         throw IllegalArgumentException("Unknown ViewModel class")
     }

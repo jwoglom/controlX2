@@ -60,6 +60,8 @@ import com.jwoglom.controlx2.presentation.theme.ControlX2Theme
 import com.jwoglom.controlx2.presentation.util.LifecycleStateObserver
 import com.jwoglom.controlx2.shared.presentation.intervalOf
 import com.jwoglom.controlx2.shared.util.SendType
+import com.jwoglom.pumpx2.pump.messages.response.historyLog.CGMHistoryLog
+import com.jwoglom.pumpx2.pump.messages.response.historyLog.HistoryLogParser.LOG_MESSAGE_IDS
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
@@ -283,19 +285,28 @@ fun Dashboard(
                 }
 
                 item {
-                    Line("HistoryLogViewModel: ${ds.pumpSid.value?.let {
-                        historyLogViewModel?.latest(it)?.value
-                    }} pumpSid: ${ds.pumpSid.value}")
+                    Line("")
+                }
 
-                    historyLogViewModel?.let { viewModel ->
-                        ds.pumpSid.value?.let { sid ->
-                            viewModel.latest(sid).value?.let {
-                                Line("Latest history log reading: ${it.seqId},${it.pumpSid}")
-                                Line("${it.typeId} ${it.parse()}")
-                                Line("Added: ${it.addedTime}")
-                            }
-                        }
-                    }
+                item {
+                    val latestHistoryLog = historyLogViewModel?.latest?.observeAsState()
+                    Line("${latestHistoryLog?.value?.let {
+                        "Latest history log reading: ${it.seqId}: ${LOG_MESSAGE_IDS[it.typeId]?.let { m -> shortPumpMessageTitle(m)}} (${it.typeId}) at ${it.addedTime}"
+                    }}")
+                }
+
+                item {
+                    val latestHistoryLog = historyLogViewModel?.oldest?.observeAsState()
+                    Line("${latestHistoryLog?.value?.let {
+                        "Oldest history log reading: ${it.seqId}: ${LOG_MESSAGE_IDS[it.typeId]?.let { m -> shortPumpMessageTitle(m)}} (${it.typeId}) at ${it.addedTime}"
+                    }}")
+                }
+
+                item {
+                    val latestHistoryLog = historyLogViewModel?.latestForType(CGMHistoryLog().typeId())?.observeAsState()
+                    Line("${latestHistoryLog?.value?.let {
+                        "Latest CGM history log reading: ${it.seqId}: ${LOG_MESSAGE_IDS[it.typeId]?.let { m -> shortPumpMessageTitle(m)}} (${it.typeId}) at ${it.addedTime}: ${(it.parse() as CGMHistoryLog).currentGlucoseDisplayValue}mgdl"
+                    }}")
                 }
             }
         )

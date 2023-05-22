@@ -96,6 +96,18 @@ class Prefs(val context: Context) {
         prefs().edit().putBoolean("check-for-updates", b).commit()
     }
 
+    /**
+     * The current pumpSid for use when initializing the database ViewModel
+     */
+    fun currentPumpSid(): Int {
+        return prefs().getInt("current-pump-sid", -1)
+    }
+
+    fun setCurrentPumpSid(v: Int) {
+        if (currentPumpSid() == v) return
+        prefs().edit().putInt("current-pump-sid", v).commit()
+    }
+
     private fun prefs(): SharedPreferences {
         return context.getSharedPreferences("WearX2", WearableListenerService.MODE_PRIVATE)
     }

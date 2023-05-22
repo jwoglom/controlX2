@@ -253,6 +253,7 @@ class CommService : WearableListenerService(), GoogleApiClient.ConnectionCallbac
 
                 extractPumpSid(peripheral?.name ?: "")?.let {
                     pumpSid = it
+                    Prefs(applicationContext).setCurrentPumpSid(it)
                 }
 
                 var numResponses = -99999

@@ -3,14 +3,23 @@ package com.jwoglom.controlx2.db.historylog
 import androidx.annotation.WorkerThread
 import com.jwoglom.pumpx2.pump.messages.response.historyLog.HistoryLog
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.flatMapLatest
 import timber.log.Timber
 import java.time.LocalDateTime
 
 class HistoryLogRepo(private val historyLogDao: HistoryLogDao) {
     fun getAll(pumpSid: Int): Flow<List<HistoryLogItem>> = historyLogDao.getAll(pumpSid)
 
+    fun getOldest(pumpSid: Int): Flow<HistoryLogItem?> {
+        return historyLogDao.getOldest(pumpSid)
+    }
+
     fun getLatest(pumpSid: Int): Flow<HistoryLogItem?> {
         return historyLogDao.getLatest(pumpSid)
+    }
+
+    fun getLatestForType(pumpSid: Int, typeId: Int): Flow<HistoryLogItem?> {
+        return historyLogDao.getLatestForType(pumpSid, typeId)
     }
 
     fun allForType(pumpSid: Int, typeId: Int): Flow<List<HistoryLogItem>> {

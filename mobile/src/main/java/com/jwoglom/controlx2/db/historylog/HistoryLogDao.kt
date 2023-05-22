@@ -48,6 +48,23 @@ interface HistoryLogDao {
     """)
     fun getLatest(pumpSid: Int): Flow<HistoryLogItem?>
 
+    @Query("""
+        SELECT * FROM $HistoryLogTable
+        WHERE pumpSid = :pumpSid
+        AND typeId = :typeId
+        ORDER BY seqId DESC
+        LIMIT 1
+    """)
+    fun getLatestForType(pumpSid: Int, typeId: Int): Flow<HistoryLogItem?>
+
+    @Query("""
+        SELECT * FROM $HistoryLogTable
+        WHERE pumpSid = :pumpSid
+        ORDER BY seqId ASC
+        LIMIT 1
+    """)
+    fun getOldest(pumpSid: Int): Flow<HistoryLogItem?>
+
     @Insert(onConflict = OnConflictStrategy.IGNORE)
     suspend fun insert(historyLogItem: HistoryLogItem)
 }

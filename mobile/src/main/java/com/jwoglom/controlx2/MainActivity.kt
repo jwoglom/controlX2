@@ -97,8 +97,9 @@ class MainActivity : ComponentActivity(), GoogleApiClient.ConnectionCallbacks, G
     private val applicationScope = CoroutineScope(SupervisorJob())
     private val historyLogDb by lazy { HistoryLogDatabase.getDatabase(this) }
     private val historyLogRepo by lazy { HistoryLogRepo(historyLogDb.historyLogDao()) }
+    // hack: the ViewModel references the current pumpSid, so that streaming works in the UI, which we store lazily in the app preferences
     private val historyLogViewModel: HistoryLogViewModel by viewModels {
-        HistoryLogViewModelFactory(historyLogRepo)
+        HistoryLogViewModelFactory(historyLogRepo, Prefs(applicationContext).currentPumpSid())
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
