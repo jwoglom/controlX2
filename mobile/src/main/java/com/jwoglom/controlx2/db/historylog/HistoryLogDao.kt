@@ -67,4 +67,7 @@ interface HistoryLogDao {
 
     @Insert(onConflict = OnConflictStrategy.IGNORE)
     suspend fun insert(historyLogItem: HistoryLogItem)
+
+    @Query("DELETE FROM $HistoryLogTable")
+    suspend fun deleteAll()
 }

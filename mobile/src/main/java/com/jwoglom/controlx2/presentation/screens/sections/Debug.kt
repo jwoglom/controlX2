@@ -89,6 +89,8 @@ import com.jwoglom.pumpx2.shared.JavaHelpers
 import com.jwoglom.controlx2.LocalDataStore
 import com.jwoglom.controlx2.Prefs
 import com.jwoglom.controlx2.dataStore
+import com.jwoglom.controlx2.db.historylog.HistoryLogDatabase
+import com.jwoglom.controlx2.db.historylog.HistoryLogRepo
 import com.jwoglom.controlx2.presentation.theme.ControlX2Theme
 import com.jwoglom.controlx2.shared.util.SendType
 import com.jwoglom.controlx2.shared.util.shortTimeAgo
@@ -159,6 +161,21 @@ fun Debug(
                 val filePath = File(context.filesDir, "debugLog-MUA.txt")
                 filePath.delete()
 
+            }
+            .show()
+    }
+
+    fun emptyDatabase(context: Context) {
+        AlertDialog.Builder(context)
+            .setMessage("Are you sure you want to empty the database?")
+            .setNegativeButton("Cancel") { dialog, _ -> dialog.dismiss() }
+            .setPositiveButton("Delete") { dialog, _ ->
+                dialog.dismiss()
+                coroutineScope.launch {
+                    val historyLogDb = HistoryLogDatabase.getDatabase(context)
+                    val historyLogDao = historyLogDb.historyLogDao()
+                    historyLogDao.deleteAll()
+                }
             }
             .show()
     }
@@ -684,6 +701,22 @@ fun Debug(
                     },
                     modifier = Modifier.clickable {
                         clearDebugLog(context)
+                    }
+                )
+            }
+
+            item {
+                ListItem(
+                    headlineText = { Text("Empty database") },
+                    supportingText = { Text("Removes all saved history logs in sqlite.") },
+                    leadingContent = {
+                        Icon(
+                            Icons.Filled.Close,
+                            contentDescription = null,
+                        )
+                    },
+                    modifier = Modifier.clickable {
+                        emptyDatabase(context)
                     }
                 )
             }
