@@ -8,7 +8,6 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.material.ExperimentalMaterialApi
 import androidx.compose.material.pullrefresh.PullRefreshIndicator
 import androidx.compose.material.pullrefresh.pullRefresh
@@ -49,6 +48,7 @@ import com.jwoglom.pumpx2.pump.messages.request.currentStatus.InsulinStatusReque
 import com.jwoglom.controlx2.LocalDataStore
 import com.jwoglom.controlx2.Prefs
 import com.jwoglom.controlx2.dataStore
+import com.jwoglom.controlx2.db.historylog.HistoryLogViewModel
 import com.jwoglom.controlx2.presentation.components.LastConnectionUpdatedTimestamp
 import com.jwoglom.controlx2.presentation.components.Line
 import com.jwoglom.controlx2.presentation.components.PumpSetupStageDescription
@@ -72,6 +72,7 @@ fun Dashboard(
     navController: NavHostController? = null,
     sendMessage: (String, ByteArray) -> Unit,
     sendPumpCommands: (SendType, List<Message>) -> Unit,
+    historyLogViewModel: HistoryLogViewModel? = null,
 ) {
     val context = LocalContext.current
     val ds = LocalDataStore.current
@@ -279,6 +280,22 @@ fun Dashboard(
                     Line(cgmTransmitterStatus.value?.let {
                         "CGM Transmitter Battery: ${cgmTransmitterStatus.value}"
                     } ?: "")
+                }
+
+                item {
+                    Line("HistoryLogViewModel: ${ds.pumpSid.value?.let {
+                        historyLogViewModel?.latest(it)?.value
+                    }} pumpSid: ${ds.pumpSid.value}")
+
+                    historyLogViewModel?.let { viewModel ->
+                        ds.pumpSid.value?.let { sid ->
+                            viewModel.latest(sid).value?.let {
+                                Line("Latest history log reading: ${it.seqId},${it.pumpSid}")
+                                Line("${it.typeId} ${it.parse()}")
+                                Line("Added: ${it.addedTime}")
+                            }
+                        }
+                    }
                 }
             }
         )

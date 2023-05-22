@@ -33,6 +33,7 @@ class DataStore {
 
     val pumpSetupStage = MutableLiveData<PumpSetupStage>(PumpSetupStage.WAITING_PUMPX2_INIT)
     val setupDeviceName = MutableLiveData<String>()
+    val pumpSid = MutableLiveData<Int>()
     val setupDeviceModel = MutableLiveData<String>()
     val pumpCriticalError = MutableLiveData<Pair<String, Instant>>()
 

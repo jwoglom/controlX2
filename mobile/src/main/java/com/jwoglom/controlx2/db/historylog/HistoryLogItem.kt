@@ -1,23 +1,20 @@
 package com.jwoglom.controlx2.db.historylog
 
 import androidx.room.Entity
-import androidx.room.PrimaryKey
 import com.jwoglom.pumpx2.pump.messages.response.historyLog.HistoryLog
 import com.jwoglom.pumpx2.pump.messages.response.historyLog.HistoryLogParser
-import java.time.Instant
 import java.time.LocalDateTime
 
 const val HistoryLogTable = "pumpdata_historylog"
 
 @Entity(
     tableName = HistoryLogTable,
-    primaryKeys = ["seqId", "pumpSerial"]
+    primaryKeys = ["seqId", "pumpSid"]
 )
 class HistoryLogItem(
     val seqId: Long,
-    // pumpSerial is not the full serial, it is just the final 3 digits of the serial number
-    // from the bluetooth device name, since that allows DB initialization to occur earlier.
-    val pumpSerial: Int = 0,
+    // pumpSid is the short pump serial: the final 3 digits of the serial number from the BT device name
+    val pumpSid: Int = 0,
     val typeId: Int,
     val cargo: ByteArray,
     val addedTime: LocalDateTime

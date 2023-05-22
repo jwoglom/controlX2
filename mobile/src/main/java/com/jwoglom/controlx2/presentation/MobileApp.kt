@@ -10,6 +10,7 @@ import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import com.jwoglom.controlx2.db.historylog.HistoryLogViewModel
 import com.jwoglom.pumpx2.pump.messages.Message
 import com.jwoglom.pumpx2.pump.messages.calculator.BolusCalcUnits
 import com.jwoglom.pumpx2.pump.messages.calculator.BolusParameters
@@ -31,6 +32,7 @@ fun MobileApp(
     sendPumpCommands: (SendType, List<Message>) -> Unit,
     sendServiceBolusRequest: (Int, BolusParameters, BolusCalcUnits, BolusCalcDataSnapshotResponse, TimeSinceResetResponse) -> Unit,
     sendServiceBolusCancel: () -> Unit,
+    historyLogViewModel: HistoryLogViewModel? = null,
 ) {
     ControlX2Theme {
         NavHost(
@@ -65,6 +67,7 @@ fun MobileApp(
                     sendPumpCommands = sendPumpCommands,
                     sendServiceBolusRequest = sendServiceBolusRequest,
                     sendServiceBolusCancel = sendServiceBolusCancel,
+                    historyLogViewModel = historyLogViewModel,
                 )
             }
         }

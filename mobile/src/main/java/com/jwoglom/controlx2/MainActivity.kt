@@ -18,11 +18,11 @@ import android.os.Build
 import android.os.Bundle
 import android.os.IBinder
 import android.provider.Settings
-import android.util.Log
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.activity.viewModels
 import androidx.compose.runtime.compositionLocalOf
 import androidx.core.app.ActivityCompat
 import com.google.android.gms.common.ConnectionResult
@@ -32,6 +32,10 @@ import com.google.android.gms.wearable.MessageApi
 import com.google.android.gms.wearable.MessageEvent
 import com.google.android.gms.wearable.Node
 import com.google.android.gms.wearable.Wearable
+import com.jwoglom.controlx2.db.historylog.HistoryLogDatabase
+import com.jwoglom.controlx2.db.historylog.HistoryLogRepo
+import com.jwoglom.controlx2.db.historylog.HistoryLogViewModel
+import com.jwoglom.controlx2.db.historylog.HistoryLogViewModelFactory
 import com.jwoglom.pumpx2.pump.PumpState
 import com.jwoglom.pumpx2.pump.messages.Message
 import com.jwoglom.pumpx2.pump.messages.calculator.BolusCalcUnits
@@ -60,7 +64,6 @@ import com.jwoglom.pumpx2.pump.messages.response.currentStatus.LastBGResponse
 import com.jwoglom.pumpx2.pump.messages.response.currentStatus.LastBolusStatusAbstractResponse
 import com.jwoglom.pumpx2.pump.messages.response.currentStatus.TimeSinceResetResponse
 import com.jwoglom.pumpx2.pump.messages.response.historyLog.BolusDeliveryHistoryLog
-import com.jwoglom.pumpx2.pump.messages.response.historyLog.HistoryLogStreamResponse
 import com.jwoglom.controlx2.presentation.DataStore
 import com.jwoglom.controlx2.presentation.MobileApp
 import com.jwoglom.controlx2.presentation.navigation.Screen
@@ -75,6 +78,9 @@ import com.jwoglom.controlx2.shared.util.setupTimber
 import com.jwoglom.controlx2.shared.util.shortTime
 import com.jwoglom.controlx2.shared.util.shortTimeAgo
 import com.jwoglom.controlx2.shared.util.twoDecimalPlaces1000Unit
+import com.jwoglom.controlx2.util.extractPumpSid
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.SupervisorJob
 import timber.log.Timber
 import java.time.Instant
 import java.time.temporal.ChronoUnit
@@ -87,6 +93,13 @@ val LocalDataStore = compositionLocalOf { dataStore }
 
 class MainActivity : ComponentActivity(), GoogleApiClient.ConnectionCallbacks, GoogleApiClient.OnConnectionFailedListener, MessageApi.MessageListener {
     private lateinit var mApiClient: GoogleApiClient
+
+    private val applicationScope = CoroutineScope(SupervisorJob())
+    private val historyLogDb by lazy { HistoryLogDatabase.getDatabase(this) }
+    private val historyLogRepo by lazy { HistoryLogRepo(historyLogDb.historyLogDao()) }
+    private val historyLogViewModel: HistoryLogViewModel by viewModels {
+        HistoryLogViewModelFactory(historyLogRepo)
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         Timber.d("mobile UIActivity onCreate $savedInstanceState")
@@ -106,7 +119,8 @@ class MainActivity : ComponentActivity(), GoogleApiClient.ConnectionCallbacks, G
                 sendPumpCommands = {type, messages -> sendPumpCommands(type, messages) },
                 sendServiceBolusRequest = {bolusId, bolusParameters, unitBreakdown, dataSnapshot, timeSinceReset ->
                     sendServiceBolusRequest(bolusId, bolusParameters, unitBreakdown, dataSnapshot, timeSinceReset) },
-                sendServiceBolusCancel = { sendMessage("/to-phone/bolus-cancel", "".toByteArray()) }
+                sendServiceBolusCancel = { sendMessage("/to-phone/bolus-cancel", "".toByteArray()) },
+                historyLogViewModel = historyLogViewModel
             )
         }
 
@@ -409,6 +423,9 @@ class MainActivity : ComponentActivity(), GoogleApiClient.ConnectionCallbacks, G
             "/from-pump/pump-discovered" -> {
                 dataStore.pumpSetupStage.value = dataStore.pumpSetupStage.value?.nextStage(PumpSetupStage.PUMPX2_PUMP_DISCOVERED)
                 dataStore.setupDeviceName.value = String(messageEvent.data)
+                extractPumpSid(String(messageEvent.data))?.let {
+                    dataStore.pumpSid.value = it
+                }
             }
 
             "/from-pump/pump-model" -> {
@@ -418,6 +435,9 @@ class MainActivity : ComponentActivity(), GoogleApiClient.ConnectionCallbacks, G
 
             "/from-pump/initial-pump-connection" -> {
                 dataStore.setupDeviceName.value = String(messageEvent.data)
+                extractPumpSid(String(messageEvent.data))?.let {
+                    dataStore.pumpSid.value = it
+                }
                 dataStore.pumpSetupStage.value = dataStore.pumpSetupStage.value?.nextStage(PumpSetupStage.PUMPX2_INITIAL_PUMP_CONNECTION)
             }
 
@@ -438,6 +458,9 @@ class MainActivity : ComponentActivity(), GoogleApiClient.ConnectionCallbacks, G
             "/from-pump/pump-connected" -> {
                 dataStore.pumpSetupStage.value = dataStore.pumpSetupStage.value?.nextStage(PumpSetupStage.PUMPX2_PUMP_CONNECTED)
                 dataStore.setupDeviceName.value = String(messageEvent.data)
+                extractPumpSid(String(messageEvent.data))?.let {
+                    dataStore.pumpSid.value = it
+                }
                 dataStore.pumpConnected.value = true
                 dataStore.pumpLastConnectionTimestamp.value = Instant.now()
             }

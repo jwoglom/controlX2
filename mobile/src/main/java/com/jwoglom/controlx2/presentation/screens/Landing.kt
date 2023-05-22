@@ -65,6 +65,7 @@ import com.jwoglom.controlx2.LocalDataStore
 import com.jwoglom.controlx2.Prefs
 import com.jwoglom.controlx2.R
 import com.jwoglom.controlx2.dataStore
+import com.jwoglom.controlx2.db.historylog.HistoryLogViewModel
 import com.jwoglom.controlx2.presentation.DataStore
 import com.jwoglom.controlx2.presentation.screens.sections.BolusWindow
 import com.jwoglom.controlx2.presentation.screens.sections.Dashboard
@@ -88,6 +89,7 @@ fun Landing(
     sendServiceBolusCancel: () -> Unit,
     sectionState: LandingSection = LandingSection.DASHBOARD,
     bolusSheetState: BottomSheetValue = BottomSheetValue.Collapsed,
+    historyLogViewModel: HistoryLogViewModel? = null,
 ) {
     val context = LocalContext.current
     val ds = LocalDataStore.current
@@ -215,6 +217,7 @@ fun Landing(
                                 navController = navController,
                                 sendMessage = sendMessage,
                                 sendPumpCommands = sendPumpCommands,
+                                historyLogViewModel = historyLogViewModel,
                             )
                         }
                         LandingSection.DEBUG -> {

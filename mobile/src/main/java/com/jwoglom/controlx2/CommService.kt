@@ -69,6 +69,7 @@ import com.jwoglom.controlx2.shared.util.shortTime
 import com.jwoglom.controlx2.shared.util.twoDecimalPlaces
 import com.jwoglom.controlx2.util.AppVersionCheck
 import com.jwoglom.controlx2.util.DataClientState
+import com.jwoglom.controlx2.util.extractPumpSid
 import com.welie.blessed.BluetoothPeripheral
 import com.welie.blessed.HciStatus
 import hu.supercluster.paperwork.Paperwork
@@ -98,7 +99,7 @@ class CommService : WearableListenerService(), GoogleApiClient.ConnectionCallbac
     private var lastTimeSinceReset: TimeSinceResetResponse? = null
 
     val historyLogDb by lazy { HistoryLogDatabase.getDatabase(this) }
-    var historyLogRepo: HistoryLogRepo? = null
+    val historyLogRepo by lazy { HistoryLogRepo(historyLogDb.historyLogDao()) }
 
     // Handler that receives messages from the thread
     private inner class PumpCommHandler(looper: Looper) : Handler(looper) {
@@ -108,6 +109,7 @@ class CommService : WearableListenerService(), GoogleApiClient.ConnectionCallbac
         private inner class Pump() : TandemPump(applicationContext) {
             var lastPeripheral: BluetoothPeripheral? = null
             var isConnected = false
+            var pumpSid: Int? = null
 
             init {
                 if (Prefs(applicationContext).connectionSharingEnabled()) {
@@ -159,7 +161,9 @@ class CommService : WearableListenerService(), GoogleApiClient.ConnectionCallbac
                             Timber.i("HISTORY-LOG-MESSAGE(${it.sequenceNum}): $it")
                             historyLogCache[it.sequenceNum] = it
                             scope.launch {
-                                historyLogRepo?.insert(it)
+                                pumpSid?.let { sid ->
+                                    historyLogRepo.insert(it, sid)
+                                }
                             }
                         }
                     }
@@ -247,10 +251,8 @@ class CommService : WearableListenerService(), GoogleApiClient.ConnectionCallbac
             override fun onPumpConnected(peripheral: BluetoothPeripheral?) {
                 lastPeripheral = peripheral
 
-                val serial = peripheral?.name?.substringAfterLast("*")?.toInt()
-                serial?.let {
-                    Timber.i("Initialized HistoryLogRepo")
-                    historyLogRepo = HistoryLogRepo(historyLogDb.historyLogDao(), it)
+                extractPumpSid(peripheral?.name ?: "")?.let {
+                    pumpSid = it
                 }
 
                 var numResponses = -99999

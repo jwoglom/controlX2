@@ -6,9 +6,17 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.asLiveData
 import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.launch
+import timber.log.Timber
 
 class HistoryLogViewModel(private val repo: HistoryLogRepo): ViewModel() {
-    val all: LiveData<List<HistoryLogItem>> = repo.all.asLiveData()
+    fun all(pumpSid: Int): LiveData<List<HistoryLogItem>> {
+        return repo.getAll(pumpSid).asLiveData()
+    }
+
+    fun latest(pumpSid: Int): LiveData<HistoryLogItem?> {
+        Timber.i("HistoryLogViewModel.latest($pumpSid)")
+        return repo.getLatest(pumpSid).asLiveData()
+    }
 
     fun insert(historyLogItem: HistoryLogItem) = viewModelScope.launch {
         repo.insert(historyLogItem)

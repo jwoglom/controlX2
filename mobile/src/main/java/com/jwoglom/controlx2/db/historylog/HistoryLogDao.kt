@@ -10,35 +10,43 @@ import kotlinx.coroutines.flow.Flow
 interface HistoryLogDao {
     @Query("""
         SELECT * FROM $HistoryLogTable
-        WHERE pumpSerial = :pumpSerial
+        WHERE pumpSid = :pumpSid
         ORDER BY seqId ASC
     """)
-    fun getAll(pumpSerial: Int): Flow<List<HistoryLogItem>>
+    fun getAll(pumpSid: Int): Flow<List<HistoryLogItem>>
 
     @Query("""
         SELECT * FROM $HistoryLogTable
-        WHERE pumpSerial = :pumpSerial
+        WHERE pumpSid = :pumpSid
         AND typeId = :typeId
         ORDER BY seqId ASC
     """)
-    fun getAllForType(pumpSerial: Int, typeId: Int): Flow<List<HistoryLogItem>>
+    fun getAllForType(pumpSid: Int, typeId: Int): Flow<List<HistoryLogItem>>
 
     @Query("""
         SELECT * FROM $HistoryLogTable
-        WHERE pumpSerial = :pumpSerial
+        WHERE pumpSid = :pumpSid
         AND seqId BETWEEN :seqIdMin AND :seqIdMax
         ORDER BY seqId ASC
     """)
-    fun getRange(pumpSerial: Int, seqIdMin: Long, seqIdMax: Long): Flow<List<HistoryLogItem>>
+    fun getRange(pumpSid: Int, seqIdMin: Long, seqIdMax: Long): Flow<List<HistoryLogItem>>
 
     @Query("""
         SELECT * FROM $HistoryLogTable
-        WHERE pumpSerial = :pumpSerial
+        WHERE pumpSid = :pumpSid
         AND typeId = :typeId
         AND seqId BETWEEN :seqIdMin AND :seqIdMax
         ORDER BY seqId ASC
     """)
-    fun getRangeForType(pumpSerial: Int, typeId: Int, seqIdMin: Long, seqIdMax: Long): Flow<List<HistoryLogItem>>
+    fun getRangeForType(pumpSid: Int, typeId: Int, seqIdMin: Long, seqIdMax: Long): Flow<List<HistoryLogItem>>
+
+    @Query("""
+        SELECT * FROM $HistoryLogTable
+        WHERE pumpSid = :pumpSid
+        ORDER BY seqId DESC
+        LIMIT 1
+    """)
+    fun getLatest(pumpSid: Int): Flow<HistoryLogItem?>
 
     @Insert(onConflict = OnConflictStrategy.IGNORE)
     suspend fun insert(historyLogItem: HistoryLogItem)
