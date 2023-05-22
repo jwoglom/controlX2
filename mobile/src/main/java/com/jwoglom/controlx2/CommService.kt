@@ -642,7 +642,9 @@ class CommService : WearableListenerService(), GoogleApiClient.ConnectionCallbac
 
     private val checkForUpdatesDelayMs: Long = 1000 * 30 // 30 seconds
     private var checkForUpdatesTask: Runnable = Runnable {
-        AppVersionCheck(applicationContext)
+        if (Prefs(applicationContext).checkForUpdates()) {
+            AppVersionCheck(applicationContext)
+        }
     }
 
     override fun onCreate() {

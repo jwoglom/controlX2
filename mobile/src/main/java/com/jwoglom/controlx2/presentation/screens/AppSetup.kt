@@ -268,7 +268,7 @@ fun AppSetup(
                         onValueChange = {
                             fun update() {
                                 checkForUpdates = !checkForUpdates
-                                Prefs(context).setInsulinDeliveryActions(insulinDeliveryActions)
+                                Prefs(context).setCheckForUpdates(checkForUpdates)
                             }
                             if (checkForUpdates) {
                                 AlertDialog.Builder(context)
