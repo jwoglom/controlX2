@@ -5,6 +5,7 @@ import com.jwoglom.pumpx2.pump.messages.response.historyLog.HistoryLog
 import kotlinx.coroutines.flow.Flow
 import timber.log.Timber
 import java.time.Instant
+import java.time.LocalDateTime
 
 class HistoryLogRepo(private val historyLogDao: HistoryLogDao, private val pumpSerial: Int) {
     val all: Flow<List<HistoryLogItem>> = historyLogDao.getAll(pumpSerial)
@@ -34,7 +35,7 @@ class HistoryLogRepo(private val historyLogDao: HistoryLogDao, private val pumpS
             pumpSerial = pumpSerial,
             typeId = historyLog.typeId(),
             cargo = historyLog.cargo,
-            addedTime = Instant.now()
+            addedTime = LocalDateTime.now()
         )
         insert(historyLogItem)
     }
