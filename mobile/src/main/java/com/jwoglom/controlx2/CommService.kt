@@ -27,6 +27,8 @@ import com.google.android.gms.wearable.MessageEvent
 import com.google.android.gms.wearable.Node
 import com.google.android.gms.wearable.Wearable
 import com.google.android.gms.wearable.WearableListenerService
+import com.jwoglom.controlx2.db.historylog.HistoryLogDatabase
+import com.jwoglom.controlx2.db.historylog.HistoryLogRepo
 import com.jwoglom.pumpx2.pump.PumpState
 import com.jwoglom.pumpx2.pump.TandemError
 import com.jwoglom.pumpx2.pump.bluetooth.TandemBluetoothHandler
@@ -74,6 +76,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.launch
 import timber.log.Timber
 import java.time.Duration
 import java.time.Instant
@@ -93,6 +96,9 @@ class CommService : WearableListenerService(), GoogleApiClient.ConnectionCallbac
     private var lastResponseMessage: MutableMap<Pair<Characteristic, Byte>, Pair<com.jwoglom.pumpx2.pump.messages.Message, Instant>> = Collections.synchronizedMap(mutableMapOf())
     private var historyLogCache: MutableMap<Long, HistoryLog> = Collections.synchronizedMap(mutableMapOf())
     private var lastTimeSinceReset: TimeSinceResetResponse? = null
+
+    val historyLogDb by lazy { HistoryLogDatabase.getDatabase(this) }
+    var historyLogRepo: HistoryLogRepo? = null
 
     // Handler that receives messages from the thread
     private inner class PumpCommHandler(looper: Looper) : Handler(looper) {
@@ -152,6 +158,9 @@ class CommService : WearableListenerService(), GoogleApiClient.ConnectionCallbac
                         message.historyLogs.forEach {
                             Timber.i("HISTORY-LOG-MESSAGE(${it.sequenceNum}): $it")
                             historyLogCache[it.sequenceNum] = it
+                            scope.launch {
+                                historyLogRepo?.insert(it)
+                            }
                         }
                     }
                 }
@@ -237,6 +246,13 @@ class CommService : WearableListenerService(), GoogleApiClient.ConnectionCallbac
 
             override fun onPumpConnected(peripheral: BluetoothPeripheral?) {
                 lastPeripheral = peripheral
+
+                val serial = peripheral?.name?.substringAfterLast("*")?.toInt()
+                serial?.let {
+                    Timber.i("Initialized HistoryLogRepo")
+                    historyLogRepo = HistoryLogRepo(historyLogDb.historyLogDao(), it)
+                }
+
                 var numResponses = -99999
                 while (PumpState.processedResponseMessages != numResponses) {
                     numResponses = PumpState.processedResponseMessages
