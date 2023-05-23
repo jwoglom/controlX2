@@ -299,21 +299,21 @@ fun Dashboard(
                 item {
                     val latestHistoryLog = historyLogViewModel?.latest?.observeAsState()
                     Line(latestHistoryLog?.value?.let {
-                        "Latest history log reading: ${it.seqId}: ${LOG_MESSAGE_IDS[it.typeId]?.let { m -> shortPumpMessageTitle(m.javaClass)}} (${it.typeId}) at ${it.addedTime}"
+                        "Latest history log reading: ${it.seqId} at ${it.pumpTime} added ${it.addedTime}"
                     } ?: "")
                 }
 
                 item {
                     val latestHistoryLog = historyLogViewModel?.oldest?.observeAsState()
                     Line(latestHistoryLog?.value?.let {
-                        "Oldest history log reading: ${it.seqId}: ${LOG_MESSAGE_IDS[it.typeId]?.let { m -> shortPumpMessageTitle(m.javaClass)}} (${it.typeId}) at ${it.addedTime}"
+                        "Oldest history log reading: ${it.seqId} at ${it.pumpTime} added ${it.addedTime}"
                     } ?: "")
                 }
 
                 item {
                     val latestHistoryLog = historyLogViewModel?.latestForType(CGMHistoryLog().typeId())?.observeAsState()
                     Line(latestHistoryLog?.value?.let {
-                        "Latest CGM history log reading: ${it.seqId}: ${LOG_MESSAGE_IDS[it.typeId]?.let { m -> shortPumpMessageTitle(m.javaClass)}} (${it.typeId}) at ${it.addedTime}: ${(it.parse() as CGMHistoryLog).currentGlucoseDisplayValue}mgdl"
+                        "Latest CGM history log reading: ${it.seqId}: ${LOG_MESSAGE_IDS[it.typeId]?.let { m -> shortPumpMessageTitle(m)}} (${it.typeId}) at ${it.addedTime}: ${(it.parse() as CGMHistoryLog).currentGlucoseDisplayValue}mgdl"
                     } ?: "")
                 }
             }

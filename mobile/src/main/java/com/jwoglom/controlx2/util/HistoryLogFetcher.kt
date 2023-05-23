@@ -1,19 +1,23 @@
 package com.jwoglom.controlx2.util
 
 import android.content.Context
+import android.util.LruCache
 import com.jwoglom.controlx2.CommService
 import com.jwoglom.pumpx2.pump.bluetooth.TandemPump
 import com.jwoglom.pumpx2.pump.messages.request.currentStatus.HistoryLogRequest
 import com.jwoglom.pumpx2.pump.messages.response.currentStatus.HistoryLogStatusResponse
 import com.jwoglom.pumpx2.pump.messages.response.historyLog.HistoryLog
 import com.welie.blessed.BluetoothPeripheral
+import kotlinx.coroutines.flow.count
 import kotlinx.coroutines.flow.firstOrNull
 import timber.log.Timber
 import java.lang.Long.max
 
 const val InitialHistoryLogCount = 5000
+const val FetchGroupTimeoutMs = 7000
 
 class HistoryLogFetcher(val context: Context, val pump: TandemPump, val peripheral: BluetoothPeripheral, val pumpSid: Int) {
+    private var recentSeqIds = LruCache<Long, Long>(256)
     private var latestSeqId: Long = 0
 
     private val historyLogRepo by lazy { (context as CommService).historyLogRepo }
@@ -33,20 +37,22 @@ class HistoryLogFetcher(val context: Context, val pump: TandemPump, val peripher
             totalNums++
         }
         for (i in startLog..endLog step 256) {
-            val count = if (i+255 > endLog) (endLog - i).toInt() else 255
-            Timber.i("HistoryLogFetcher.triggerRangeStart $i - ${i+count}")
+            val count = if (i+255 > endLog) (endLog - i + 1).toInt() else 255
+            val endI = i+count-1
+            Timber.i("HistoryLogFetcher.triggerRangeStart $i - $endI")
+
             request(i, count)
 
             var waitTimeMs = 0
-            while (latestSeqId < i+count) {
+            while (recentSeqIds[endI] == null) {
                 Thread.sleep(100)
                 waitTimeMs += 100
-                if (waitTimeMs > 7000) {
-                    Timber.i("HistoryLogRequest subset $i - ${i+count} timed out: latest=$latestSeqId waitTime=$waitTimeMs")
+                if (waitTimeMs > FetchGroupTimeoutMs) {
+                    Timber.i("HistoryLogRequest subset $i - $endI timed out: latest=$latestSeqId waitTime=$waitTimeMs")
                     break
                 }
             }
-            Timber.i("HistoryLogFetcher.triggerRangeDone $i - ${i+count}: latest=$latestSeqId")
+            Timber.i("HistoryLogFetcher.triggerRangeDone $i - $endI: latest=$latestSeqId")
             num++
         }
     }
@@ -61,19 +67,55 @@ class HistoryLogFetcher(val context: Context, val pump: TandemPump, val peripher
             startId = message.lastSequenceNum - InitialHistoryLogCount
         }
 
-        // TODO: re-check any missed numbers
         val missingCount = message.lastSequenceNum - startId
 
         Timber.i("HistoryLogFetcher.onStatusResponse: db: $dbLatestId start: $startId pump: ${message.lastSequenceNum} missingCount: $missingCount")
 
-        if (missingCount > 0) {
-            triggerRange(startId, message.lastSequenceNum)
+        val missingIds = historyLogRepo.getMissingIds(pumpSid, startId, message.lastSequenceNum)
+        Timber.i("HistoryLogFetcher.onStatusResponse: missingIds=${missingIds.count()} $missingIds")
+
+        val missingRanges = idsToRanges(missingIds)
+        Timber.i("HistoryLogFetcher.onStatusResponse: missingRanges=$missingRanges")
+
+        var finalRangeNum = startId
+        missingRanges.forEach {
+            triggerRange(it.first, it.second)
+            finalRangeNum = it.second
         }
+
+        if (finalRangeNum < message.lastSequenceNum) {
+            Timber.i("HistoryLogFetcher.onStatusResponse: additionalRange=${finalRangeNum+1} - ${message.lastSequenceNum}")
+            triggerRange(finalRangeNum+1, message.lastSequenceNum)
+        }
+
+    }
+
+    private fun idsToRanges(rawIds: List<Long>): List<Pair<Long, Long>> {
+        if (rawIds.isEmpty()) return listOf()
+        val ids = rawIds.sorted()
+        val pairs = mutableListOf<Pair<Long, Long>>()
+        var curPair = Pair(ids[0], ids[0])
+        if (ids.size == 1) {
+            return listOf(curPair)
+        }
+        for (i in 1 until ids.size) {
+            if (ids[i] == curPair.first + 1) {
+                curPair = Pair(curPair.first, ids[i])
+            } else {
+                pairs.add(curPair)
+                curPair = Pair(ids[i], ids[i])
+            }
+        }
+        if (curPair.first == curPair.second) {
+            pairs.add(curPair)
+        }
+        return pairs
 
     }
 
     suspend fun onStreamResponse(log: HistoryLog) {
         historyLogRepo.insert(log, pumpSid)
+        recentSeqIds.put(log.sequenceNum, log.sequenceNum)
         latestSeqId = max(latestSeqId, log.sequenceNum)
     }
 }
