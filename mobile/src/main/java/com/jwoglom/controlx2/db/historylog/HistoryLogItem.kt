@@ -1,6 +1,7 @@
 package com.jwoglom.controlx2.db.historylog
 
 import androidx.room.Entity
+import androidx.room.Ignore
 import com.jwoglom.pumpx2.pump.messages.response.historyLog.HistoryLog
 import com.jwoglom.pumpx2.pump.messages.response.historyLog.HistoryLogParser
 import java.time.LocalDateTime
@@ -20,7 +21,14 @@ class HistoryLogItem(
     val pumpTime: LocalDateTime,
     val addedTime: LocalDateTime
 ) {
+
+    @Ignore
+    private var cachedObj: HistoryLog? = null
+
+    @Ignore
     fun parse(): HistoryLog {
-        return HistoryLogParser.parse(cargo)
+        if (cachedObj != null) return cachedObj!!
+        cachedObj = HistoryLogParser.parse(cargo)
+        return cachedObj!!
     }
 }
