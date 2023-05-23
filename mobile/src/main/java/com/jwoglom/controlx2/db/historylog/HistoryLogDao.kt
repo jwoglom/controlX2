@@ -15,20 +15,14 @@ interface HistoryLogDao {
     fun getCount(pumpSid: Int): Flow<Long?>
 
     @Query("""
-        SELECT DISTINCT seqId+1
+        SELECT DISTINCT seqId
         FROM $HistoryLogTable
         WHERE pumpSid = :pumpSid
         AND seqId + 1 >= :min
         AND seqId + 1 <= :max
-        AND seqId + 1 NOT IN (
-            SELECT DISTINCT seqId
-            FROM $HistoryLogTable
-            WHERE pumpSid = :pumpSid
-            AND seqId >= :min
-            AND seqId <= :max
-        )
+        ORDER BY seqId ASC
     """)
-    fun getMissingIds(pumpSid: Int, min: Long, max: Long): List<Long>
+    fun getAllIds(pumpSid: Int, min: Long, max: Long): List<Long>
 
     @Query("""
         SELECT * FROM $HistoryLogTable

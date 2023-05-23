@@ -75,42 +75,16 @@ class HistoryLogFetcher(val context: Context, val pump: TandemPump, val peripher
 
         Timber.i("HistoryLogFetcher.onStatusResponse: db: $dbLatestId start: $startId pump: ${message.lastSequenceNum} missingCount: $missingCount")
 
-        val missingIds = historyLogRepo.getMissingIds(pumpSid, startId, message.lastSequenceNum)
+        val allIds = historyLogRepo.getAllIds(pumpSid, startId, message.lastSequenceNum)
+        val missingIds = getMissingIds(allIds, startId, message.lastSequenceNum)
         Timber.i("HistoryLogFetcher.onStatusResponse: missingIds=${missingIds.count()} $missingIds")
 
-        val missingRanges = idsToRanges(missingIds)
-        Timber.i("HistoryLogFetcher.onStatusResponse: missingRanges=$missingRanges")
-
-        val ranges = mutableListOf<Pair<Long, Long>>()
-        var rangeMin = Long.MAX_VALUE
-        var rangeMax = Long.MIN_VALUE
-        missingRanges.forEach {
-            ranges.add(it)
-            rangeMin = min(rangeMin, it.first)
-            rangeMax = max(rangeMax, it.second)
-        }
-
-        if (dbLatestId != null && rangeMin > dbLatestId) {
-            ranges.add(0, Pair(dbLatestId, rangeMin))
-            Timber.i("HistoryLogFetcher.onStatusResponse: add min range: $dbLatestId - $rangeMin")
-
-        }
-        if (rangeMax < message.lastSequenceNum) {
-            rangeMin = max(rangeMax + 1, startId)
-            Timber.i("HistoryLogFetcher.onStatusResponse: add max range: $rangeMin - ${message.lastSequenceNum}")
-            ranges.add(0, Pair(rangeMin, message.lastSequenceNum))
-        }
-
-        if (rangeMin == Long.MAX_VALUE || rangeMax == Long.MIN_VALUE) {
-            throw RuntimeException("Invalid rangeMin and rangeMax: rangeMin=$rangeMin rangeMax=$rangeMax missingRanges=$missingRanges ranges=$ranges missingIds=$missingIds")
-        }
-
         scope.launch {
-            Timber.i("HistoryLogFetcher.onStatusResponse: launching ranges: $ranges (dbCount=$dbCount)")
+            Timber.i("HistoryLogFetcher.onStatusResponse: launching ranges: $missingIds (dbCount=$dbCount)")
             var cnt: Long = 0
-            ranges.forEach {
-                triggerRange(it.first, it.second)
-                cnt += (it.second - it.first + 1)
+            missingIds.forEach {
+                triggerRange(it.first, it.last)
+                cnt += (it.last - it.first + 1)
             }
             Timber.i("HistoryLogFetcher.onStatusResponse: completed, fetched $cnt")
             val finalDbCount = historyLogRepo.getCount(pumpSid).firstOrNull() ?: 0
@@ -118,32 +92,31 @@ class HistoryLogFetcher(val context: Context, val pump: TandemPump, val peripher
         }
     }
 
-    private fun idsToRanges(rawIds: List<Long>): List<Pair<Long, Long>> {
-        if (rawIds.isEmpty()) return listOf()
-        val ids = rawIds.sorted()
-        val pairs = mutableListOf<Pair<Long, Long>>()
-        var curPair = Pair(ids[0], ids[0])
-        if (ids.size == 1) {
-            return listOf(curPair)
-        }
-        for (i in 1 until ids.size) {
-            if (ids[i] == curPair.first + 1) {
-                curPair = Pair(curPair.first, ids[i])
-            } else {
-                pairs.add(curPair)
-                curPair = Pair(ids[i], ids[i])
-            }
-        }
-        if (curPair.first == curPair.second) {
-            pairs.add(curPair)
-        }
-        return pairs
-
-    }
-
     suspend fun onStreamResponse(log: HistoryLog) {
         historyLogRepo.insert(log, pumpSid)
         latestSeqId = max(latestSeqId, log.sequenceNum)
         recentSeqIds.put(log.sequenceNum, log.sequenceNum)
     }
+}
+
+fun getMissingIds(present: List<Long>, min: Long, max: Long): List<LongRange> {
+    if (present.isEmpty()) {
+        return listOf(min..max)
+    }
+    val missing = mutableListOf<LongRange>()
+    if (present[0] > min) {
+        missing.add(min until present[0])
+    }
+    var prev: Long = present[0]
+    for ((k, i) in present.withIndex()) {
+        if (k == 0) continue
+        if (i > prev + 1) {
+            missing.add(prev+1..i-1)
+        }
+        prev = i
+    }
+    if (prev < max) {
+        missing.add(prev+1..max)
+    }
+    return missing
 }
