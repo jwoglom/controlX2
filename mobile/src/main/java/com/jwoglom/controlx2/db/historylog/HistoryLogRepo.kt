@@ -6,6 +6,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flatMapLatest
 import timber.log.Timber
 import java.time.LocalDateTime
+import java.time.ZoneId
 
 class HistoryLogRepo(private val historyLogDao: HistoryLogDao) {
     fun getCount(pumpSid: Int): Flow<Long?> = historyLogDao.getCount(pumpSid)
@@ -48,6 +49,7 @@ class HistoryLogRepo(private val historyLogDao: HistoryLogDao) {
             pumpSid = pumpSid,
             typeId = historyLog.typeId(),
             cargo = historyLog.cargo,
+            pumpTime = LocalDateTime.ofInstant(historyLog.pumpTimeSecInstant, ZoneId.systemDefault()),
             addedTime = LocalDateTime.now()
         )
         insert(historyLogItem)

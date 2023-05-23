@@ -17,6 +17,7 @@ class HistoryLogItem(
     val pumpSid: Int = 0,
     val typeId: Int,
     val cargo: ByteArray,
+    val pumpTime: LocalDateTime,
     val addedTime: LocalDateTime
 ) {
     fun parse(): HistoryLog {
