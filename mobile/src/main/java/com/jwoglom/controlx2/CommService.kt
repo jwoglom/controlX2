@@ -167,8 +167,8 @@ class CommService : WearableListenerService(), GoogleApiClient.ConnectionCallbac
                     is HistoryLogStatusResponse -> {
                         Timber.i("HistoryLogStatusResponse: $message")
                         scope.launch {
-                            Timber.i("HistoryLogStatusResponse: in scope $message $historyLogFetcher")
-                            historyLogFetcher?.onStatusResponse(message)
+                            Timber.i("HistoryLogStatusResponse: launching in scope $message")
+                            historyLogFetcher?.onStatusResponse(message, scope)
                         }
                     }
                     is HistoryLogStreamResponse -> {
