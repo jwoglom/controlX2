@@ -11,6 +11,8 @@ import kotlinx.coroutines.flow.firstOrNull
 import timber.log.Timber
 import java.lang.Long.max
 
+const val InitialHistoryLogCount = 5000
+
 class HistoryLogFetcher(val context: Context, val pump: TandemPump, val peripheral: BluetoothPeripheral, val pumpSid: Int) {
     private var latestSeqId: Long = 0
 
@@ -52,18 +54,20 @@ class HistoryLogFetcher(val context: Context, val pump: TandemPump, val peripher
     suspend fun onStatusResponse(message: HistoryLogStatusResponse) {
         Timber.i("HistoryLogFetcher.onStatusResponse")
         val dbLatest = historyLogRepo.getLatest(pumpSid).firstOrNull()
-        Timber.i("HistoryLogFetcher.onStatusResponse dbLatest=$dbLatest")
-        val dbLatestId = dbLatest?.seqId ?: (message.lastSequenceNum - 5000)
-        Timber.i("HistoryLogFetcher.onStatusResponse dbLatestId=$dbLatestId")
-        // TODO: re-check any missed numbers
-        val missingCount = message.lastSequenceNum - dbLatestId
-        Timber.i("HistoryLogFetcher.onStatusResponse missingCount=$missingCount")
-        Timber.i("HistoryLogFetcher.onStatusResponse message=${message.lastSequenceNum}")
+        val dbLatestId = dbLatest?.seqId
 
-        Timber.i("HistoryLogFetcher.onStatusResponse: db: $dbLatestId pump: ${message.lastSequenceNum} missingCount: $missingCount")
+        var startId = dbLatestId ?: (message.lastSequenceNum - InitialHistoryLogCount)
+        if ((dbLatestId ?: 0) > message.lastSequenceNum - InitialHistoryLogCount) {
+            startId = message.lastSequenceNum - InitialHistoryLogCount
+        }
+
+        // TODO: re-check any missed numbers
+        val missingCount = message.lastSequenceNum - startId
+
+        Timber.i("HistoryLogFetcher.onStatusResponse: db: $dbLatestId start: $startId pump: ${message.lastSequenceNum} missingCount: $missingCount")
 
         if (missingCount > 0) {
-            triggerRange(dbLatestId, message.lastSequenceNum)
+            triggerRange(startId, message.lastSequenceNum)
         }
 
     }
