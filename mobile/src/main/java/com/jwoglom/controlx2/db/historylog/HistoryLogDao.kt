@@ -9,6 +9,12 @@ import kotlinx.coroutines.flow.Flow
 @Dao
 interface HistoryLogDao {
     @Query("""
+        SELECT COUNT(*) FROM $HistoryLogTable
+        WHERE pumpSid = :pumpSid
+    """)
+    fun getCount(pumpSid: Int): Flow<Long?>
+
+    @Query("""
         SELECT * FROM $HistoryLogTable
         WHERE pumpSid = :pumpSid
         ORDER BY seqId ASC

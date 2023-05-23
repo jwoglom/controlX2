@@ -60,6 +60,7 @@ import com.jwoglom.controlx2.presentation.theme.ControlX2Theme
 import com.jwoglom.controlx2.presentation.util.LifecycleStateObserver
 import com.jwoglom.controlx2.shared.presentation.intervalOf
 import com.jwoglom.controlx2.shared.util.SendType
+import com.jwoglom.pumpx2.pump.messages.request.currentStatus.HistoryLogStatusRequest
 import com.jwoglom.pumpx2.pump.messages.response.historyLog.CGMHistoryLog
 import com.jwoglom.pumpx2.pump.messages.response.historyLog.HistoryLogParser.LOG_MESSAGE_IDS
 import kotlinx.coroutines.Dispatchers
@@ -289,6 +290,13 @@ fun Dashboard(
                 }
 
                 item {
+                    val historyLogCount = historyLogViewModel?.count?.observeAsState()
+                    Line(historyLogCount?.value?.let {
+                        "History log count: $it"
+                    } ?: "")
+                }
+
+                item {
                     val latestHistoryLog = historyLogViewModel?.latest?.observeAsState()
                     Line(latestHistoryLog?.value?.let {
                         "Latest history log reading: ${it.seqId}: ${LOG_MESSAGE_IDS[it.typeId]?.let { m -> shortPumpMessageTitle(m.javaClass)}} (${it.typeId}) at ${it.addedTime}"
@@ -331,7 +339,9 @@ val dashboardCommands = listOf(
     CurrentBasalStatusRequest(),
     CGMStatusRequest(),
     CurrentEGVGuiDataRequest(),
-    GlobalMaxBolusSettingsRequest()
+    GlobalMaxBolusSettingsRequest(),
+    // trigger HistoryLogFetcher
+    HistoryLogStatusRequest()
 )
 
 val dashboardFields = listOf(

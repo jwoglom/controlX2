@@ -69,7 +69,11 @@ import com.jwoglom.controlx2.shared.util.shortTime
 import com.jwoglom.controlx2.shared.util.twoDecimalPlaces
 import com.jwoglom.controlx2.util.AppVersionCheck
 import com.jwoglom.controlx2.util.DataClientState
+import com.jwoglom.controlx2.util.HistoryLogFetcher
 import com.jwoglom.controlx2.util.extractPumpSid
+import com.jwoglom.pumpx2.pump.messages.request.currentStatus.HistoryLogRequest
+import com.jwoglom.pumpx2.pump.messages.request.currentStatus.HistoryLogStatusRequest
+import com.jwoglom.pumpx2.pump.messages.response.currentStatus.HistoryLogStatusResponse
 import com.welie.blessed.BluetoothPeripheral
 import com.welie.blessed.HciStatus
 import hu.supercluster.paperwork.Paperwork
@@ -77,6 +81,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.flow.lastOrNull
 import kotlinx.coroutines.launch
 import timber.log.Timber
 import java.time.Duration
@@ -87,7 +92,8 @@ import java.util.*
 const val CacheSeconds = 30
 
 class CommService : WearableListenerService(), GoogleApiClient.ConnectionCallbacks, GoogleApiClient.OnConnectionFailedListener {
-    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
+    private val supervisorJob = SupervisorJob()
+    private val scope = CoroutineScope(supervisorJob + Dispatchers.Main.immediate)
 
     private var serviceLooper: Looper? = null
     private var pumpCommHandler: PumpCommHandler? = null
@@ -100,6 +106,7 @@ class CommService : WearableListenerService(), GoogleApiClient.ConnectionCallbac
 
     val historyLogDb by lazy { HistoryLogDatabase.getDatabase(this) }
     val historyLogRepo by lazy { HistoryLogRepo(historyLogDb.historyLogDao()) }
+    private var historyLogFetcher: HistoryLogFetcher? = null
 
     // Handler that receives messages from the thread
     private inner class PumpCommHandler(looper: Looper) : Handler(looper) {
@@ -107,6 +114,7 @@ class CommService : WearableListenerService(), GoogleApiClient.ConnectionCallbac
         private lateinit var tandemBTHandler: TandemBluetoothHandler
 
         private inner class Pump() : TandemPump(applicationContext) {
+            private val scope = CoroutineScope(SupervisorJob(parent = supervisorJob) + Dispatchers.IO)
             var lastPeripheral: BluetoothPeripheral? = null
             var isConnected = false
             var pumpSid: Int? = null
@@ -156,14 +164,19 @@ class CommService : WearableListenerService(), GoogleApiClient.ConnectionCallbac
                     is InsulinStatusResponse -> DataClientState(context).pumpCartridgeUnits = Pair("${message.currentInsulinAmount}", Instant.now())
                     is CurrentBasalStatusResponse -> DataClientState(context).pumpCurrentBasal = Pair("${InsulinUnit.from1000To1(message.currentBasalRate)}", Instant.now())
                     is CurrentEGVGuiDataResponse -> DataClientState(context).cgmReading = Pair("${message.cgmReading}", Instant.now())
+                    is HistoryLogStatusResponse -> {
+                        Timber.i("HistoryLogStatusResponse: $message")
+                        scope.launch {
+                            Timber.i("HistoryLogStatusResponse: in scope $message $historyLogFetcher")
+                            historyLogFetcher?.onStatusResponse(message)
+                        }
+                    }
                     is HistoryLogStreamResponse -> {
                         message.historyLogs.forEach {
                             Timber.i("HISTORY-LOG-MESSAGE(${it.sequenceNum}): $it")
                             historyLogCache[it.sequenceNum] = it
                             scope.launch {
-                                pumpSid?.let { sid ->
-                                    historyLogRepo.insert(it, sid)
-                                }
+                                historyLogFetcher?.onStreamResponse(it)
                             }
                         }
                     }
@@ -256,6 +269,9 @@ class CommService : WearableListenerService(), GoogleApiClient.ConnectionCallbac
                     Prefs(applicationContext).setCurrentPumpSid(it)
                 }
 
+                historyLogFetcher = HistoryLogFetcher(this@CommService, pump, peripheral!!, pumpSid!!)
+                Timber.i("HistoryLogFetcher initialized")
+
                 var numResponses = -99999
                 while (PumpState.processedResponseMessages != numResponses) {
                     numResponses = PumpState.processedResponseMessages
@@ -298,6 +314,7 @@ class CommService : WearableListenerService(), GoogleApiClient.ConnectionCallbac
                 Timber.i("service onPumpDisconnected: isConnected=false")
                 lastPeripheral = null
                 lastResponseMessage.clear()
+                historyLogFetcher = null
                 lastTimeSinceReset = null
                 isConnected = false
                 sendWearCommMessage("/from-pump/pump-disconnected",
@@ -620,7 +637,7 @@ class CommService : WearableListenerService(), GoogleApiClient.ConnectionCallbac
         }
     }
 
-    private val periodicUpdateIntervalMs: Long = 1000 * 60 * 9 // 9 minutes
+    private val periodicUpdateIntervalMs: Long = 1000 * 60 * 5 // 5 minutes
     private var periodicUpdateTask: Runnable = Runnable {}
     init {
         periodicUpdateTask = Runnable {
@@ -639,6 +656,7 @@ class CommService : WearableListenerService(), GoogleApiClient.ConnectionCallbac
                 CurrentBatteryRequestBuilder.create(apiVersion()),
                 ControlIQIOBRequest(),
                 InsulinStatusRequest(),
+                HistoryLogStatusRequest()
             )))
         }
     }

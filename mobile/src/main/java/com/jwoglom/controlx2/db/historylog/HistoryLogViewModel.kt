@@ -9,6 +9,7 @@ import kotlinx.coroutines.launch
 import timber.log.Timber
 
 class HistoryLogViewModel(private val repo: HistoryLogRepo, private val pumpSid: Int): ViewModel() {
+    val count: LiveData<Long?> = repo.getCount(pumpSid).asLiveData()
     val all: LiveData<List<HistoryLogItem>> = repo.getAll(pumpSid).asLiveData()
     val latest: LiveData<HistoryLogItem?> = repo.getLatest(pumpSid).asLiveData()
     val oldest: LiveData<HistoryLogItem?> = repo.getOldest(pumpSid).asLiveData()

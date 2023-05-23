@@ -8,6 +8,7 @@ import timber.log.Timber
 import java.time.LocalDateTime
 
 class HistoryLogRepo(private val historyLogDao: HistoryLogDao) {
+    fun getCount(pumpSid: Int): Flow<Long?> = historyLogDao.getCount(pumpSid)
     fun getAll(pumpSid: Int): Flow<List<HistoryLogItem>> = historyLogDao.getAll(pumpSid)
 
     fun getOldest(pumpSid: Int): Flow<HistoryLogItem?> {
