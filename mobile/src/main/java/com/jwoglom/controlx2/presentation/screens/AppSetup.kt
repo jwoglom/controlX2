@@ -66,6 +66,7 @@ fun AppSetup(
     var insulinDeliveryActions by remember { mutableStateOf(Prefs(context).insulinDeliveryActions()) }
     var bolusConfirmationInsulinThreshold by remember { mutableStateOf(Prefs(context).bolusConfirmationInsulinThreshold()) }
     var checkForUpdates by remember { mutableStateOf(Prefs(context).checkForUpdates()) }
+    var autoFetchHistoryLogs by remember { mutableStateOf(Prefs(context).autoFetchHistoryLogs()) }
 
     val setupComplete by remember { mutableStateOf(true) }
     
@@ -294,6 +295,37 @@ fun AppSetup(
                 )
                 Line(
                     "Automatically check for ControlX2 updates",
+                    bold = true,
+                    modifier = Modifier.padding(start = checkboxPadding))
+            }
+            Spacer(Modifier.height(checkboxPadding))
+            Divider()
+        }
+        item {
+            Row(
+                Modifier
+                    .fillMaxWidth()
+                    .height(56.dp)
+                    .toggleable(
+                        value = autoFetchHistoryLogs,
+                        onValueChange = {
+                            fun update() {
+                                autoFetchHistoryLogs = !autoFetchHistoryLogs
+                                Prefs(context).setAutoFetchHistoryLogs(autoFetchHistoryLogs)
+                            }
+                            update()
+                        },
+                        role = Role.Checkbox
+                    )
+                    .padding(horizontal = checkboxPadding),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Checkbox(
+                    checked = autoFetchHistoryLogs,
+                    onCheckedChange = null // null recommended for accessibility with screenreaders
+                )
+                Line(
+                    "Automatically fetch history logs (ALPHA)",
                     bold = true,
                     modifier = Modifier.padding(start = checkboxPadding))
             }

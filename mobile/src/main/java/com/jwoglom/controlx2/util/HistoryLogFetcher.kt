@@ -3,6 +3,7 @@ package com.jwoglom.controlx2.util
 import android.content.Context
 import android.util.LruCache
 import com.jwoglom.controlx2.CommService
+import com.jwoglom.controlx2.Prefs
 import com.jwoglom.pumpx2.pump.bluetooth.TandemPump
 import com.jwoglom.pumpx2.pump.messages.request.currentStatus.HistoryLogRequest
 import com.jwoglom.pumpx2.pump.messages.response.currentStatus.HistoryLogStatusResponse
@@ -81,6 +82,7 @@ class HistoryLogFetcher(val context: Context, val pump: TandemPump, val peripher
         }
     }
     suspend fun onStatusResponse(message: HistoryLogStatusResponse, scope: CoroutineScope) {
+        if (!Prefs(context).autoFetchHistoryLogs()) return;
         statusResponseLock.withLock {
             Timber.i("HistoryLogFetcher.onStatusResponse<lock>")
             onStatusResponseInternal(message, scope)

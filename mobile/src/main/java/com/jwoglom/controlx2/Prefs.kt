@@ -108,6 +108,17 @@ class Prefs(val context: Context) {
         prefs().edit().putInt("current-pump-sid", v).commit()
     }
 
+    /**
+     * Whether to run history log fetching in background
+     */
+    fun autoFetchHistoryLogs(): Boolean {
+        return prefs().getBoolean("auto-fetch-history-logs", false)
+    }
+
+    fun setAutoFetchHistoryLogs(b: Boolean) {
+        prefs().edit().putBoolean("auto-fetch-history-logs", b).commit()
+    }
+
     private fun prefs(): SharedPreferences {
         return context.getSharedPreferences("WearX2", WearableListenerService.MODE_PRIVATE)
     }
