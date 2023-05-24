@@ -9,17 +9,25 @@ import kotlinx.coroutines.flow.Flow
 @Dao
 interface HistoryLogDao {
     @Query("""
-        SELECT COUNT(*) FROM $HistoryLogTable
+        SELECT COUNT(seqId) FROM $HistoryLogTable
         WHERE pumpSid = :pumpSid
     """)
     fun getCount(pumpSid: Int): Flow<Long?>
 
     @Query("""
+        SELECT COUNT(seqId) FROM $HistoryLogTable
+        WHERE pumpSid = :pumpSid
+        AND seqId >= :min
+        AND seqId <= :max
+    """)
+    fun getCount(pumpSid: Int, min: Long, max: Long): Flow<Long?>
+
+    @Query("""
         SELECT DISTINCT seqId
         FROM $HistoryLogTable
         WHERE pumpSid = :pumpSid
-        AND seqId + 1 >= :min
-        AND seqId + 1 <= :max
+        AND seqId >= :min
+        AND seqId <= :max
         ORDER BY seqId ASC
     """)
     fun getAllIds(pumpSid: Int, min: Long, max: Long): List<Long>
@@ -59,7 +67,10 @@ interface HistoryLogDao {
     @Query("""
         SELECT * FROM $HistoryLogTable
         WHERE pumpSid = :pumpSid
-        ORDER BY seqId DESC
+        AND seqId = (
+            SELECT MAX(seqId) FROM $HistoryLogTable
+            WHERE pumpSid = :pumpSid
+        )
         LIMIT 1
     """)
     fun getLatest(pumpSid: Int): Flow<HistoryLogItem?>
