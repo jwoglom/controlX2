@@ -1,10 +1,13 @@
 package com.jwoglom.controlx2.db.historylog
 
+import android.util.LruCache
 import androidx.room.Entity
 import androidx.room.Ignore
 import com.jwoglom.pumpx2.pump.messages.response.historyLog.HistoryLog
 import com.jwoglom.pumpx2.pump.messages.response.historyLog.HistoryLogParser
 import java.time.LocalDateTime
+
+val itemLruCache = LruCache<Pair<Long, Int>, HistoryLog>(500)
 
 const val HistoryLogTable = "pumpdata_historylog"
 
@@ -23,12 +26,12 @@ class HistoryLogItem(
 ) {
 
     @Ignore
-    private var cachedObj: HistoryLog? = null
-
-    @Ignore
     fun parse(): HistoryLog {
-        if (cachedObj != null) return cachedObj!!
-        cachedObj = HistoryLogParser.parse(cargo)
-        return cachedObj!!
+        itemLruCache[Pair(seqId, pumpSid)]?.let {
+            return it
+        }
+        val cachedObj = HistoryLogParser.parse(cargo)
+        itemLruCache.put(Pair(seqId, pumpSid), cachedObj)
+        return cachedObj
     }
 }
