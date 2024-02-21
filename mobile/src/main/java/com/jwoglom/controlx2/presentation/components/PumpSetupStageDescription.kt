@@ -49,7 +49,9 @@ fun PumpSetupStageDescription(
             }
         } else {
             pumpConnectionWaitingSeconds += 1
-            Timber.d("PumpSetupStageProgress pumpConnectionWaitingSeconds=$pumpConnectionWaitingSeconds")
+            if (pumpConnectionWaitingSeconds % 20 == 0) {
+                Timber.d("PumpSetupStageProgress pumpConnectionWaitingSeconds=$pumpConnectionWaitingSeconds")
+            }
         }
     }
 
