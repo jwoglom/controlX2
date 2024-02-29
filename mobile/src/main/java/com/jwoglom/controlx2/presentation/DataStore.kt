@@ -10,6 +10,7 @@ import com.jwoglom.pumpx2.pump.messages.calculator.BolusCalcCondition
 import com.jwoglom.pumpx2.pump.messages.calculator.BolusCalcUnits
 import com.jwoglom.pumpx2.pump.messages.calculator.BolusCalculatorBuilder
 import com.jwoglom.pumpx2.pump.messages.calculator.BolusParameters
+import com.jwoglom.pumpx2.pump.messages.models.PairingCodeType
 import com.jwoglom.pumpx2.pump.messages.response.control.BolusPermissionResponse
 import com.jwoglom.pumpx2.pump.messages.response.control.CancelBolusResponse
 import com.jwoglom.pumpx2.pump.messages.response.control.InitiateBolusResponse
@@ -31,8 +32,10 @@ class DataStore {
     val pumpLastMessageTimestamp = MutableLiveData<Instant>()
     val watchConnected = MutableLiveData<Boolean>()
 
-    val pumpSetupStage = MutableLiveData<PumpSetupStage>(PumpSetupStage.WAITING_PUMPX2_INIT)
+    val pumpSetupStage = MutableLiveData<PumpSetupStage>(PumpSetupStage.WAITING_PUMP_FINDER_INIT)
+    val pumpFinderPumps = MutableLiveData<List<Pair<String, String>>>() // pump name, pump MAC
     val setupDeviceName = MutableLiveData<String>()
+    val setupPairingCodeType = MutableLiveData<PairingCodeType>()
     val pumpSid = MutableLiveData<Int>()
     val setupDeviceModel = MutableLiveData<String>()
     val pumpCriticalError = MutableLiveData<Pair<String, Instant>>()

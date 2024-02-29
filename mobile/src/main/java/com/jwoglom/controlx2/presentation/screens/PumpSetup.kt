@@ -1,5 +1,7 @@
 package com.jwoglom.controlx2.presentation.screens
 
+import android.os.Handler
+import android.os.Looper
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
@@ -51,6 +53,7 @@ import com.jwoglom.controlx2.presentation.components.PumpSetupStageProgress
 import com.jwoglom.controlx2.presentation.components.ServiceDisabledMessage
 import com.jwoglom.controlx2.presentation.navigation.Screen
 import com.jwoglom.controlx2.presentation.theme.ControlX2Theme
+import com.jwoglom.pumpx2.pump.messages.models.PairingCodeType
 import timber.log.Timber
 
 @Composable
@@ -74,7 +77,7 @@ fun PumpSetup(
                 PumpSetupStage.PERMISSIONS_NOT_GRANTED -> {
                     Button(
                         onClick = {
-                            sendMessage("/to-phone/start-comm", "skip_notif_permission".toByteArray())
+                            sendMessage("/to-phone/start-pump-finder", "skip_notif_permission".toByteArray())
                         }
                     ) {
                         Text("Continue Without Permission")
@@ -84,7 +87,7 @@ fun PumpSetup(
                     Button(
                         onClick = {
                             when (ds.pumpSetupStage.value) {
-                                PumpSetupStage.WAITING_PUMPX2_INIT -> {
+                                PumpSetupStage.WAITING_PUMP_FINDER_INIT -> {
                                     if (navController?.popBackStack() == false) {
                                         navController.navigate(Screen.FirstLaunch.route)
                                     }
@@ -105,17 +108,35 @@ fun PumpSetup(
                 PumpSetupStage.PERMISSIONS_NOT_GRANTED -> {
                     Button(
                         onClick = {
-                            sendMessage("/to-phone/start-comm", "".toByteArray())
+                            sendMessage("/to-phone/start-pump-finder", "".toByteArray())
                         }
                     ) {
                         Text("Retry")
+                    }
+                }
+                PumpSetupStage.PUMP_FINDER_ENTER_PAIRING_CODE -> {
+                    Button(
+                        onClick = {
+                            try {
+                                val code = PumpChallengeRequestBuilder.processPairingCode(pairingCodeText, ds.setupPairingCodeType.value)
+                                // sanity check builder
+                                PumpChallengeRequestBuilder.create(0, code, ByteArray(0))
+                                sendMessage("/to-phone/set-pairing-code", code.toByteArray())
+                                ds.pumpSetupStage.value = setupStage.value!!.nextStage(PumpSetupStage.WAITING_PUMP_FINDER_CLEANUP)
+                            } catch (e: Exception) {
+                                Timber.w("pairingCodeInput: $e")
+                            }
+                        }
+                    ) {
+                        Text("Pair")
                     }
                 }
                 PumpSetupStage.PUMPX2_WAITING_FOR_PAIRING_CODE, PumpSetupStage.PUMPX2_INVALID_PAIRING_CODE -> {
                     Button(
                         onClick = {
                             try {
-                                val code = PumpChallengeRequestBuilder.processPairingCode(pairingCodeText)
+                                val code = PumpChallengeRequestBuilder.processPairingCode(pairingCodeText, ds.setupPairingCodeType.value)
+                                // sanity check builder
                                 PumpChallengeRequestBuilder.create(0, code, ByteArray(0))
                                 sendMessage("/to-phone/set-pairing-code", code.toByteArray())
                                 ds.pumpSetupStage.value = setupStage.value!!.nextStage(PumpSetupStage.PUMPX2_WAITING_TO_PAIR)
@@ -159,6 +180,7 @@ fun PumpSetup(
         }
         item {
             val setupDeviceName = ds.setupDeviceName.observeAsState()
+            val setupPairingCodeType = ds.setupPairingCodeType.observeAsState()
             PumpSetupStageDescription(
                 initialSetup = true,
                 pairingCodeStage = {
@@ -176,7 +198,7 @@ fun PumpSetup(
                             append("The code was either entered incorrectly or timed out. Make sure the 'Pair Device' dialog is open on your pump.")
                         })
                     } else {
-                        Line("Initial connection made to '${setupDeviceName.value}'")
+                        Line("Connecting to '${setupDeviceName.value}'")
                     }
                     Spacer(Modifier.height(16.dp))
                     Line("Please enter the pairing code displayed at:")
@@ -189,76 +211,147 @@ fun PumpSetup(
                             focusRequester.requestFocus()
                         }
                     }
-                    BasicTextField(
-                        value = pairingCodeText,
-                        onValueChange = {
-                            fun filterPairingCode(text: String): String {
-                                var processed = ""
-                                for (c in text.toCharArray()) {
-                                    if (c in 'a'..'z' || c in 'A'..'Z' || c in '0'..'9') {
-                                        processed += c
+
+                    when (setupPairingCodeType.value) {
+                        PairingCodeType.LONG_16CHAR -> {
+                            BasicTextField(
+                                value = pairingCodeText,
+                                onValueChange = {
+                                    fun filterPairingCode(text: String): String {
+                                        var processed = ""
+                                        for (c in text.toCharArray()) {
+                                            if (c in 'a'..'z' || c in 'A'..'Z' || c in '0'..'9') {
+                                                processed += c
+                                            }
+                                        }
+                                        return processed
                                     }
-                                }
-                                return processed
-                            }
 
-                            val newPairingCode = filterPairingCode(it)
-                            if (pairingCodeText.length < 16 && newPairingCode.length == 16) {
-                                focusManager.clearFocus()
-                            }
+                                    val newPairingCode = filterPairingCode(it)
+                                    if (pairingCodeText.length < 16 && newPairingCode.length == 16) {
+                                        focusManager.clearFocus()
+                                    }
 
-                            pairingCodeText = newPairingCode
-                        },
-                        keyboardOptions = KeyboardOptions(
-                            autoCorrect = false,
-                            capitalization = KeyboardCapitalization.None,
-                            keyboardType = KeyboardType.Ascii,
-                        ),
-                        modifier = Modifier
-                            .focusRequester(focusRequester),
-                        decorationBox = {
-                            Row(
-                                horizontalArrangement = Arrangement.Center,
+                                    pairingCodeText = newPairingCode
+                                },
+                                keyboardOptions = KeyboardOptions(
+                                    autoCorrect = false,
+                                    capitalization = KeyboardCapitalization.None,
+                                    keyboardType = KeyboardType.Ascii,
+                                ),
                                 modifier = Modifier
-                                    .focusRequester(focusRequester)
-                                    .fillMaxWidth()
-                            ) {
-                                repeat(4) { index ->
-                                    val chars = when {
-                                        4*index >= pairingCodeText.length -> ""
-                                        4*(index+1) >= pairingCodeText.length -> pairingCodeText.substring(4 * index)
-                                        else -> pairingCodeText.substring(4 * index, 4 * (index+1))
-                                    }
-                                    val isFocused = index == pairingCodeText.length / 4
-                                    Text(
-                                        text = chars,
-                                        style = MaterialTheme.typography.headlineSmall,
-                                        fontFamily = FontFamily.Monospace,
-                                        color = Color.DarkGray,
-                                        textAlign = TextAlign.Center,
+                                    .focusRequester(focusRequester),
+                                decorationBox = {
+                                    Row(
+                                        horizontalArrangement = Arrangement.Center,
                                         modifier = Modifier
-                                            .width(70.dp)
-                                            .border(
-                                                if (isFocused) 2.dp else 1.dp,
-                                                if (isFocused) Color.DarkGray else Color.LightGray,
-                                                RoundedCornerShape(8.dp)
+                                            .focusRequester(focusRequester)
+                                            .fillMaxWidth()
+                                    ) {
+                                        repeat(4) { index ->
+                                            val chars = when {
+                                                4*index >= pairingCodeText.length -> ""
+                                                4*(index+1) >= pairingCodeText.length -> pairingCodeText.substring(4 * index)
+                                                else -> pairingCodeText.substring(4 * index, 4 * (index+1))
+                                            }
+                                            val isFocused = index == pairingCodeText.length / 4
+                                            Text(
+                                                text = chars,
+                                                style = MaterialTheme.typography.headlineSmall,
+                                                fontFamily = FontFamily.Monospace,
+                                                color = Color.DarkGray,
+                                                textAlign = TextAlign.Center,
+                                                modifier = Modifier
+                                                    .width(70.dp)
+                                                    .border(
+                                                        if (isFocused) 2.dp else 1.dp,
+                                                        if (isFocused) Color.DarkGray else Color.LightGray,
+                                                        RoundedCornerShape(8.dp)
+                                                    )
+                                                    .padding(2.dp),
                                             )
-                                            .padding(2.dp),
-                                    )
-                                    Spacer(modifier = Modifier.width(8.dp))
-                                    if (index != 3) {
-                                        Text(
-                                            text = "-",
-                                            style = MaterialTheme.typography.headlineSmall,
-                                            color = Color.DarkGray,
-                                            textAlign = TextAlign.Center,
-                                        )
+                                            Spacer(modifier = Modifier.width(8.dp))
+                                            if (index != 3) {
+                                                Text(
+                                                    text = "-",
+                                                    style = MaterialTheme.typography.headlineSmall,
+                                                    color = Color.DarkGray,
+                                                    textAlign = TextAlign.Center,
+                                                )
+                                            }
+                                            Spacer(modifier = Modifier.width(8.dp))
+                                        }
                                     }
-                                    Spacer(modifier = Modifier.width(8.dp))
                                 }
-                            }
+                            )
                         }
-                    )
+                        PairingCodeType.SHORT_6CHAR -> {
+                            BasicTextField(
+                                value = pairingCodeText,
+                                onValueChange = {
+                                    fun filterPairingCode(text: String): String {
+                                        var processed = ""
+                                        for (c in text.toCharArray()) {
+                                            if (c in '0'..'9') {
+                                                processed += c
+                                            }
+                                        }
+                                        return processed
+                                    }
+
+                                    val newPairingCode = filterPairingCode(it)
+                                    if (pairingCodeText.length < 6 && newPairingCode.length == 6) {
+                                        focusManager.clearFocus()
+                                    }
+
+                                    pairingCodeText = newPairingCode
+                                },
+                                keyboardOptions = KeyboardOptions(
+                                    autoCorrect = false,
+                                    capitalization = KeyboardCapitalization.None,
+                                    keyboardType = KeyboardType.Number,
+                                ),
+                                modifier = Modifier
+                                    .focusRequester(focusRequester),
+                                decorationBox = {
+                                    Row(
+                                        horizontalArrangement = Arrangement.Center,
+                                        modifier = Modifier
+                                            .focusRequester(focusRequester)
+                                            .fillMaxWidth()
+                                    ) {
+                                        repeat(6) { index ->
+                                            val chars = when {
+                                                1*index >= pairingCodeText.length -> ""
+                                                1*(index+1) >= pairingCodeText.length -> pairingCodeText.substring(1 * index)
+                                                else -> pairingCodeText.substring(1 * index, 1 * (index+1))
+                                            }
+                                            val isFocused = index == pairingCodeText.length / 1
+                                            Text(
+                                                text = chars,
+                                                style = MaterialTheme.typography.headlineMedium,
+                                                fontFamily = FontFamily.Monospace,
+                                                color = Color.DarkGray,
+                                                textAlign = TextAlign.Center,
+                                                modifier = Modifier
+                                                    .width(30.dp)
+                                                    .border(
+                                                        if (isFocused) 2.dp else 1.dp,
+                                                        if (isFocused) Color.DarkGray else Color.LightGray,
+                                                        RoundedCornerShape(8.dp)
+                                                    )
+                                                    .padding(2.dp),
+                                            )
+                                            Spacer(modifier = Modifier.width(8.dp))
+                                            Spacer(modifier = Modifier.width(8.dp))
+                                        }
+                                    }
+                                }
+                            )
+
+                        }
+                        null -> {}
+                    }
 
                     LaunchedEffect(Unit) {
                         focusRequester.requestFocus()
@@ -271,16 +364,22 @@ fun PumpSetup(
 
 enum class PumpSetupStage(val step: Int, val description: String) {
     PERMISSIONS_NOT_GRANTED(0, "Permissions not granted"),
-    WAITING_PUMPX2_INIT(1, "Waiting for PumpX2 init"),
-    PUMPX2_SEARCHING_FOR_PUMP(1, "Searching for pump"),
-    PUMPX2_PUMP_DISCONNECTED(2, "Pump disconnected, reconnecting"),
-    PUMPX2_PUMP_DISCOVERED(2, "Pump discovered, connecting"),
-    PUMPX2_PUMP_MODEL_METADATA(3, "Initial pump metadata received"),
-    PUMPX2_INITIAL_PUMP_CONNECTION(3, "Initial connection established"),
-    PUMPX2_WAITING_FOR_PAIRING_CODE(4, "Waiting for pairing code"),
+    WAITING_PUMP_FINDER_INIT(1, "Waiting for PumpFinder init"),
+    PUMP_FINDER_SEARCHING_FOR_PUMPS(1, "Searching for Tandem pumps"),
+    PUMP_FINDER_SELECT_PUMP(2, "Select a pump to connect to"),
+    PUMP_FINDER_CHOOSE_PAIRING_CODE_TYPE(3, "Choose pairing code type"),
+    PUMP_FINDER_ENTER_PAIRING_CODE(4, "Enter pairing code"),
+    WAITING_PUMP_FINDER_CLEANUP(5, "Establishing connection: Waiting for PumpFinder to clean up"),
+    WAITING_PUMPX2_INIT(5, "Establishing connection: Waiting for PumpX2 init"),
+    PUMPX2_SEARCHING_FOR_PUMP(5, "Establishing connection: Searching for pump"),
+    PUMPX2_PUMP_DISCONNECTED(5, "Pump disconnected, reconnecting"),
+    PUMPX2_PUMP_DISCOVERED(5, "Establishing connection: Pump discovered, connecting"),
+    PUMPX2_PUMP_MODEL_METADATA(5, "Establishing connection: Initial pump metadata received"),
+    PUMPX2_INITIAL_PUMP_CONNECTION(6, "Establishing connection: Initial connection established"),
+    PUMPX2_WAITING_FOR_PAIRING_CODE(6, "Establishing connection: Sending pairing code"),
     PUMPX2_INVALID_PAIRING_CODE(4, "Invalid pairing code"),
-    PUMPX2_WAITING_TO_PAIR(4, "Waiting to pair"),
-    PUMPX2_PUMP_CONNECTED(5, "Pairing code accepted"),
+    PUMPX2_WAITING_TO_PAIR(6, "Establishing connection: Waiting to pair"),
+    PUMPX2_PUMP_CONNECTED(7, "Pairing code accepted"),
     ;
 
     fun nextStage(stage: PumpSetupStage): PumpSetupStage {

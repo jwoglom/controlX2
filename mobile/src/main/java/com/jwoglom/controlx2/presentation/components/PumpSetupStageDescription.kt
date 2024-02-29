@@ -2,7 +2,9 @@ package com.jwoglom.controlx2.presentation.components
 
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.height
+import androidx.compose.material3.Button
 import androidx.compose.material3.Divider
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -23,6 +25,7 @@ import com.jwoglom.controlx2.Prefs
 import com.jwoglom.controlx2.presentation.screens.PumpSetupStage
 import com.jwoglom.controlx2.shared.presentation.intervalOf
 import com.jwoglom.controlx2.shared.util.shortTimeAgo
+import com.jwoglom.pumpx2.pump.messages.models.PairingCodeType
 import timber.log.Timber
 
 const val TroubleshootingStepsThresholdSeconds = 15
@@ -35,6 +38,7 @@ fun PumpSetupStageDescription(
     val context = LocalContext.current
     val ds = LocalDataStore.current
     val setupStage = ds.pumpSetupStage.observeAsState()
+    val pumpFinderPumps = ds.pumpFinderPumps.observeAsState()
     val setupDeviceName = ds.setupDeviceName.observeAsState()
     val setupDeviceModel = ds.setupDeviceModel.observeAsState()
     val pumpCriticalError = ds.pumpCriticalError.observeAsState()
@@ -59,12 +63,12 @@ fun PumpSetupStageDescription(
         PumpSetupStage.PERMISSIONS_NOT_GRANTED -> {
             Line("Notification permissions weren't granted, which are needed to make remote boluses.")
         }
-        PumpSetupStage.WAITING_PUMPX2_INIT -> {
-            if (Prefs(context).serviceEnabled()) {
-                Line("Waiting for library initialization...")
+        PumpSetupStage.WAITING_PUMP_FINDER_INIT -> {
+            if (Prefs(context).pumpFinderServiceEnabled()) {
+                Line("Waiting for PumpFinder library initialization...")
             }
         }
-        PumpSetupStage.PUMPX2_SEARCHING_FOR_PUMP -> {
+        PumpSetupStage.PUMP_FINDER_SEARCHING_FOR_PUMPS, PumpSetupStage.PUMPX2_SEARCHING_FOR_PUMP -> {
             if (initialSetup) {
                 Line("Open your pump and select:")
                 Line("Options > Device Settings > Bluetooth Settings", bold = true)
@@ -78,6 +82,86 @@ fun PumpSetupStageDescription(
                 Line("Ensure the 'Mobile Connection' option is enabled.")
             }
         }
+        PumpSetupStage.PUMP_FINDER_SELECT_PUMP -> {
+            Line("Select a pump to connect to:")
+            Line("")
+            pumpFinderPumps.value?.forEach {
+                Button(
+                    onClick = {
+                        Prefs(context).setPumpFinderPumpMac(it.second)
+                        ds.pumpSetupStage.value = ds.pumpSetupStage.value?.nextStage(PumpSetupStage.PUMP_FINDER_CHOOSE_PAIRING_CODE_TYPE)
+                        ds.setupDeviceName.value = it.first
+                    }
+                ) {
+                    Text("${it.first} (MAC: ${it.second})")
+                }
+                Line("")
+            }
+            Line("")
+        }
+        PumpSetupStage.PUMP_FINDER_CHOOSE_PAIRING_CODE_TYPE -> {
+            Line("Choose the correct pairing code type:")
+            Line("")
+            Button(
+                onClick = {
+                    Prefs(context).setPumpFinderPairingCodeType(PairingCodeType.LONG_16CHAR.label)
+                    ds.setupPairingCodeType.value = PairingCodeType.LONG_16CHAR
+                    ds.pumpSetupStage.value = ds.pumpSetupStage.value?.nextStage(PumpSetupStage.PUMP_FINDER_ENTER_PAIRING_CODE)
+                }
+            ) {
+                Text("LONG: 16 alphanumeric characters")
+            }
+
+            Line("")
+
+            Button(
+                onClick = {
+                    Prefs(context).setPumpFinderPairingCodeType(PairingCodeType.SHORT_6CHAR.label)
+                    ds.setupPairingCodeType.value = PairingCodeType.SHORT_6CHAR
+                    ds.pumpSetupStage.value = ds.pumpSetupStage.value?.nextStage(PumpSetupStage.PUMP_FINDER_ENTER_PAIRING_CODE)
+                }
+            ) {
+                Text("SHORT: 6 numbers")
+            }
+            Line("")
+            Line("Open the pairing code generated under Bluetooth Settings > Pairing Code on your pump now.")
+        }
+        PumpSetupStage.PUMP_FINDER_ENTER_PAIRING_CODE, PumpSetupStage.PUMPX2_WAITING_FOR_PAIRING_CODE, PumpSetupStage.PUMPX2_INVALID_PAIRING_CODE -> {
+            if (initialSetup) {
+                pairingCodeStage()
+            } else {
+                if (setupStage.value == PumpSetupStage.PUMPX2_INVALID_PAIRING_CODE) {
+                    Line(buildAnnotatedString {
+                        withStyle(
+                            style = SpanStyle(
+                                color = Color.Red,
+                                fontWeight = FontWeight.Bold
+                            )
+                        ) {
+                            append("The pairing code was invalid. ")
+                        }
+                        append("The code was either entered incorrectly or timed out. Make sure the 'Pair Device' dialog is open on your pump.")
+                        if (!initialSetup) {
+                            withStyle(
+                                style = SpanStyle(
+                                    color = Color.Red,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            ) {
+                                append("\n\nTo resolve the issue, you must re-pair the app in Settings > Reconfigure pump.")
+                            }
+                        }
+                    })
+                } else {
+                    Line("Initial connection made to ${setupDeviceName.value}, attempting to pair...")
+                }
+            }
+        }
+        PumpSetupStage.WAITING_PUMPX2_INIT -> {
+            if (Prefs(context).serviceEnabled()) {
+                Line("Waiting for library initialization...")
+            }
+        }
         PumpSetupStage.PUMPX2_PUMP_DISCONNECTED -> {
             Line("Disconnected from '${setupDeviceName.value}', reconnecting...")
         }
@@ -89,37 +173,6 @@ fun PumpSetupStageDescription(
         }
         PumpSetupStage.PUMPX2_INITIAL_PUMP_CONNECTION -> {
             Line("Initial connection made to ${setupDeviceName.value}")
-        }
-        PumpSetupStage.PUMPX2_WAITING_FOR_PAIRING_CODE, PumpSetupStage.PUMPX2_INVALID_PAIRING_CODE -> {
-           if (initialSetup) {
-               pairingCodeStage()
-           } else {
-               if (setupStage.value == PumpSetupStage.PUMPX2_INVALID_PAIRING_CODE) {
-                   Line(buildAnnotatedString {
-                       withStyle(
-                           style = SpanStyle(
-                               color = Color.Red,
-                               fontWeight = FontWeight.Bold
-                           )
-                       ) {
-                           append("The pairing code was invalid. ")
-                       }
-                       append("The code was either entered incorrectly or timed out. Make sure the 'Pair Device' dialog is open on your pump.")
-                       if (!initialSetup) {
-                           withStyle(
-                               style = SpanStyle(
-                                   color = Color.Red,
-                                   fontWeight = FontWeight.Bold
-                               )
-                           ) {
-                               append("\n\nTo resolve the issue, you must re-pair the app in Settings > Reconfigure pump.")
-                           }
-                       }
-                   })
-               } else {
-                   Line("Initial connection made to ${setupDeviceName.value}, attempting to pair...")
-               }
-           }
         }
         PumpSetupStage.PUMPX2_WAITING_TO_PAIR -> {
             Line("Pairing with ${setupDeviceName.value}...")

@@ -41,7 +41,8 @@ fun FirstLaunch(
                     navController?.navigate(Screen.PumpSetup.route)
                     Prefs(context).setTosAccepted(true)
                     Prefs(context).setServiceEnabled(true)
-                    sendMessage("/to-phone/start-comm", "".toByteArray())
+                    Prefs(context).setPumpFinderServiceEnabled(true)
+                    sendMessage("/to-phone/start-pump-finder", "".toByteArray())
                 }
             ) {
                 Text("Agree")

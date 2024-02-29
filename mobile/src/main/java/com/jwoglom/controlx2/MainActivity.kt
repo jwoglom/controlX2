@@ -404,11 +404,57 @@ class MainActivity : ComponentActivity(), GoogleApiClient.ConnectionCallbacks, G
                 dataStore.pumpSetupStage.value = dataStore.pumpSetupStage.value?.nextStage(PumpSetupStage.PUMPX2_SEARCHING_FOR_PUMP)
             }
 
+            "/to-phone/start-pump-finder" -> {
+                when (String(messageEvent.data)) {
+                    "skip_notif_permission" -> {
+                        startBTPermissionsCheck()
+                        startCommServiceWithPreconditions()
+                        dataStore.pumpSetupStage.value =
+                            dataStore.pumpSetupStage.value?.nextStage(PumpSetupStage.WAITING_PUMP_FINDER_INIT)
+                    }
+                    else -> {
+                        requestNotificationCallback = { isGranted ->
+                            if (isGranted) {
+                                startBTPermissionsCheck()
+                                startCommServiceWithPreconditions()
+                                dataStore.pumpSetupStage.value =
+                                    dataStore.pumpSetupStage.value?.nextStage(PumpSetupStage.WAITING_PUMP_FINDER_INIT)
+                            } else {
+                                dataStore.pumpSetupStage.value =
+                                    dataStore.pumpSetupStage.value?.nextStage(PumpSetupStage.PERMISSIONS_NOT_GRANTED)
+                            }
+                        }
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                            requestNotificationPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
+                        }
+                    }
+                }
+            }
+
+            "/to-phone/pump-finder-started" -> {
+                dataStore.pumpSetupStage.value = dataStore.pumpSetupStage.value?.nextStage(PumpSetupStage.PUMP_FINDER_SEARCHING_FOR_PUMPS)
+            }
+
+            "/from-pump/pump-finder-found-pumps" -> {
+                dataStore.pumpFinderPumps.value = String(messageEvent.data).split(";").map {
+                    Pair(it.substringBefore("="), it.substringAfter("="))
+                }
+                if (dataStore.pumpSetupStage.value == PumpSetupStage.PUMP_FINDER_SEARCHING_FOR_PUMPS) {
+                    dataStore.pumpSetupStage.value = dataStore.pumpSetupStage.value?.nextStage(PumpSetupStage.PUMP_FINDER_SELECT_PUMP)
+                }
+            }
+
             "/to-phone/set-pairing-code" -> {
                 val pairingCodeText = String(messageEvent.data)
                 PumpState.setPairingCode(applicationContext, pairingCodeText)
                 Toast.makeText(applicationContext, "Set pairing code: $pairingCodeText", Toast.LENGTH_SHORT).show()
-                if (dataStore.pumpSetupStage.value == PumpSetupStage.PUMPX2_WAITING_FOR_PAIRING_CODE) {
+
+                if (dataStore.pumpSetupStage.value == PumpSetupStage.PUMP_FINDER_ENTER_PAIRING_CODE ||
+                    dataStore.pumpSetupStage.value == PumpSetupStage.WAITING_PUMP_FINDER_CLEANUP)
+                {
+                    Prefs(applicationContext).setPumpFinderServiceEnabled(false)
+                    sendMessage("/to-phone/stop-pump-finder", "init_comm".toByteArray())
+                } else if (dataStore.pumpSetupStage.value == PumpSetupStage.PUMPX2_WAITING_FOR_PAIRING_CODE) {
                     sendMessage("/to-pump/pair", "".toByteArray())
                 }
             }

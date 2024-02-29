@@ -12,7 +12,6 @@ import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
 import android.content.SharedPreferences
-import android.graphics.drawable.Icon
 import android.media.RingtoneManager
 import android.os.Bundle
 import android.os.Handler
@@ -71,17 +70,15 @@ import com.jwoglom.controlx2.util.AppVersionCheck
 import com.jwoglom.controlx2.util.DataClientState
 import com.jwoglom.controlx2.util.HistoryLogFetcher
 import com.jwoglom.controlx2.util.extractPumpSid
-import com.jwoglom.pumpx2.pump.messages.request.currentStatus.HistoryLogRequest
+import com.jwoglom.pumpx2.pump.bluetooth.TandemPumpFinder
 import com.jwoglom.pumpx2.pump.messages.request.currentStatus.HistoryLogStatusRequest
 import com.jwoglom.pumpx2.pump.messages.response.currentStatus.HistoryLogStatusResponse
 import com.welie.blessed.BluetoothPeripheral
 import com.welie.blessed.HciStatus
-import hu.supercluster.paperwork.Paperwork
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
-import kotlinx.coroutines.flow.lastOrNull
 import kotlinx.coroutines.launch
 import timber.log.Timber
 import java.time.Duration
@@ -97,6 +94,7 @@ class CommService : WearableListenerService(), GoogleApiClient.ConnectionCallbac
 
     private var serviceLooper: Looper? = null
     private var pumpCommHandler: PumpCommHandler? = null
+    private var pumpFinderCommHandler: PumpFinderCommHandler? = null
 
     private lateinit var mApiClient: GoogleApiClient
 
@@ -573,6 +571,87 @@ class CommService : WearableListenerService(), GoogleApiClient.ConnectionCallbac
         }
     }
 
+    private inner class PumpFinderCommHandler(looper: Looper) : Handler(looper) {
+
+        private lateinit var pumpFinder: PumpFinder
+        private var pumpFinderActive = false
+        private var foundPumps = mutableListOf<String>()
+
+        private inner class PumpFinder() : TandemPumpFinder(applicationContext) {
+            init {
+                Timber.i("PumpFinder init")
+            }
+
+            override fun toString(): String {
+                return "PumpFinder(pumpFinderActive=${pumpFinderActive},foundPumps=${foundPumps.joinToString(";")})"
+            }
+
+            override fun onDiscoveredPump(peripheral: BluetoothPeripheral?, scanResult: ScanResult?) {
+                var key = "${peripheral?.name}=${peripheral?.address}"
+                // onDiscoveredPump is typically called quite extensively, each time it sees
+                // a BT packet, which can be quite spamy
+                if (foundPumps.contains(key)) {
+                    return
+                }
+                sendWearCommMessage(
+                    "/from-pump/pump-finder-pump-discovered",
+                    key.toByteArray()
+                )
+                foundPumps.add(key)
+                sendWearCommMessage("/from-pump/pump-finder-found-pumps",
+                    foundPumps.joinToString(";").toByteArray()
+                )
+            }
+
+            override fun onBluetoothState(bluetoothEnabled: Boolean) {
+                sendWearCommMessage(
+                    "/from-pump/pump-finder-bluetooth-state",
+                    "${bluetoothEnabled}".toByteArray()
+                )
+            }
+        }
+
+        override fun handleMessage(msg: Message) {
+            when (msg.what) {
+                CommServiceCodes.INIT_PUMP_FINDER_COMM.ordinal -> {
+                    Timber.i("pumpFinderCommHandler: init_pump_comm")
+                    try {
+                        pumpFinder = PumpFinder()
+                    } catch (e: SecurityException) {
+                        Timber.e("pumpFinderCommHandler: SecurityException starting pump $e")
+                    }
+                    while (true) {
+                        try {
+                            Timber.i("pumpFinderCommHandler: Starting scan...")
+                            pumpFinder.startScan()
+                            pumpFinderActive = true
+                            break
+                        } catch (e: SecurityException) {
+                            Timber.e("pumpFinderCommHandler: Waiting for BT permissions $e")
+                            Thread.sleep(500)
+                        }
+                    }
+                }
+                CommServiceCodes.STOP_PUMP_FINDER_COMM.ordinal -> {
+                    pumpFinder.stop()
+                    pumpFinderActive = false
+                    foundPumps.clear()
+                }
+                CommServiceCodes.CHECK_PUMP_FINDER_FOUND_PUMPS.ordinal -> {
+                    if (pumpFinderActive) {
+                        sendWearCommMessage("/from-pump/pump-finder-found-pumps",
+                            foundPumps.joinToString(";").toByteArray()
+                        )
+                    }
+                }
+            }
+        }
+
+        fun sendWearCommMessage(path: String, message: ByteArray) {
+            this@CommService.sendWearCommMessage(path, message)
+        }
+    }
+
     fun sendWearCommMessage(path: String, message: ByteArray) {
         Timber.i("service sendMessage: $path ${String(message)}")
         fun inner(node: Node) {
@@ -712,18 +791,29 @@ class CommService : WearableListenerService(), GoogleApiClient.ConnectionCallbac
             mApiClient.connect()
             // Get the HandlerThread's Looper and use it for our Handler
             serviceLooper = looper
-            pumpCommHandler = PumpCommHandler(looper)
 
-            pumpCommHandler?.postDelayed(periodicUpdateTask, periodicUpdateIntervalMs)
-            pumpCommHandler?.postDelayed(checkForUpdatesTask, checkForUpdatesDelayMs)
+            if (Prefs(applicationContext).pumpFinderServiceEnabled()) {
+                pumpFinderCommHandler = PumpFinderCommHandler(looper)
+            } else {
+                pumpCommHandler = PumpCommHandler(looper)
+
+                pumpCommHandler?.postDelayed(periodicUpdateTask, periodicUpdateIntervalMs)
+                pumpCommHandler?.postDelayed(checkForUpdatesTask, checkForUpdatesDelayMs)
+            }
+
 
             Thread {
                 while (!mApiClient.isConnected) {
                     Timber.d("waiting for mApiClient in CommService")
                     Thread.sleep(100)
                 }
+                Timber.d("mApiClient established")
 
-                sendWearCommMessage("/to-phone/comm-started", "".toByteArray())
+                if (Prefs(applicationContext).pumpFinderServiceEnabled()) {
+                    sendWearCommMessage("/to-phone/pump-finder-started", "".toByteArray())
+                } else {
+                    sendWearCommMessage("/to-phone/comm-started", "".toByteArray())
+                }
             }.start()
 //        }
     }
@@ -734,6 +824,18 @@ class CommService : WearableListenerService(), GoogleApiClient.ConnectionCallbac
             "/to-phone/force-reload" -> {
                 Timber.i("force-reload")
                 triggerAppReload(applicationContext)
+            }
+            "/to-phone/stop-pump-finder" -> {
+                Timber.i("stop-pump-finder")
+                sendStopPumpFinderComm()
+                if (String(messageEvent.data) == "init_comm") {
+                    pumpCommHandler = PumpCommHandler(looper)
+                    sendInitPumpComm()
+                }
+            }
+            "/to-phone/check-pump-finder-found-pumps" -> {
+                Timber.i("check-pump-finder-found-pumps")
+                sendCheckPumpFinderFoundPumps()
             }
             "/to-phone/stop-comm" -> {
                 Timber.w("stop-comm")
@@ -819,11 +921,14 @@ class CommService : WearableListenerService(), GoogleApiClient.ConnectionCallbac
 
         updateNotification("Initializing...")
 
+        Timber.d("onStartCommand has pumpFinderCommHandler=${pumpFinderCommHandler} pumpCommHandler=${pumpCommHandler}")
+
         // For each start request, send a message to start a job and deliver the
         // start ID so we know which request we're stopping when we finish the job
-        pumpCommHandler?.obtainMessage()?.also { msg ->
-            msg.what = CommServiceCodes.INIT_PUMP_COMM.ordinal
-            pumpCommHandler?.sendMessage(msg)
+        if (Prefs(applicationContext).pumpFinderServiceEnabled()) {
+            sendInitPumpFinderComm()
+        } else {
+            sendInitPumpComm()
         }
 
         // If we get killed, after returning from here, restart
@@ -876,6 +981,34 @@ class CommService : WearableListenerService(), GoogleApiClient.ConnectionCallbac
         if (changed) {
             currentPumpData.lastMessageTime = Instant.now()
             updateNotification()
+        }
+    }
+
+    private fun sendInitPumpFinderComm() {
+        pumpFinderCommHandler?.obtainMessage()?.also { msg ->
+            msg.what = CommServiceCodes.INIT_PUMP_FINDER_COMM.ordinal
+            pumpFinderCommHandler?.sendMessage(msg)
+        }
+    }
+
+    private fun sendStopPumpFinderComm() {
+        pumpFinderCommHandler?.obtainMessage()?.also { msg ->
+            msg.what = CommServiceCodes.STOP_PUMP_FINDER_COMM.ordinal
+            pumpCommHandler?.sendMessage(msg)
+        }
+    }
+
+    private fun sendCheckPumpFinderFoundPumps() {
+        pumpFinderCommHandler?.obtainMessage()?.also { msg ->
+            msg.what = CommServiceCodes.CHECK_PUMP_FINDER_FOUND_PUMPS.ordinal
+            pumpCommHandler?.sendMessage(msg)
+        }
+    }
+
+    private fun sendInitPumpComm() {
+        pumpCommHandler?.obtainMessage()?.also { msg ->
+            msg.what = CommServiceCodes.INIT_PUMP_COMM.ordinal
+            pumpCommHandler?.sendMessage(msg)
         }
     }
     

@@ -23,6 +23,30 @@ class Prefs(val context: Context) {
         prefs().edit().putBoolean("service-enabled", b).commit()
     }
 
+    fun pumpFinderServiceEnabled(): Boolean {
+        return prefs().getBoolean("pumpfinder-service-enabled", false)
+    }
+
+    fun setPumpFinderServiceEnabled(b: Boolean) {
+        prefs().edit().putBoolean("pumpfinder-service-enabled", b).commit()
+    }
+
+    fun pumpFinderPumpMac(): String? {
+        return prefs().getString("pumpfinder-pump-mac", null)
+    }
+
+    fun setPumpFinderPumpMac(s: String) {
+        prefs().edit().putString("pumpfinder-pump-mac", s).commit()
+    }
+
+    fun pumpFinderPairingCodeType(): String? {
+        return prefs().getString("pumpfinder-pairing-code-type", null)
+    }
+
+    fun setPumpFinderPairingCodeType(s: String) {
+        prefs().edit().putString("pumpfinder-pairing-code-type", s).commit()
+    }
+
     fun connectionSharingEnabled(): Boolean {
         return prefs().getBoolean("connection-sharing-enabled", false)
     }
