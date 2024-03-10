@@ -84,6 +84,8 @@ import timber.log.Timber
 import java.time.Duration
 import java.time.Instant
 import java.util.*
+import kotlin.jvm.optionals.getOrDefault
+import kotlin.jvm.optionals.getOrElse
 
 
 const val CacheSeconds = 30
@@ -111,7 +113,7 @@ class CommService : WearableListenerService(), GoogleApiClient.ConnectionCallbac
         private lateinit var pump: Pump
         private lateinit var tandemBTHandler: TandemBluetoothHandler
 
-        private inner class Pump() : TandemPump(applicationContext) {
+        private inner class Pump(var filterToBluetoothMac: Optional<String>) : TandemPump(applicationContext, filterToBluetoothMac) {
             private val scope = CoroutineScope(SupervisorJob(parent = supervisorJob) + Dispatchers.IO)
             var lastPeripheral: BluetoothPeripheral? = null
             var isConnected = false
@@ -391,9 +393,13 @@ class CommService : WearableListenerService(), GoogleApiClient.ConnectionCallbac
                         Timber.w("pumpCommHandler: init_pump_comm already run, ignoring")
                         return
                     }
-                    Timber.i("pumpCommHandler: init_pump_comm")
                     try {
-                        pump = Pump()
+                        var filterToBluetoothMac = Optional.empty<String>()
+                        if (msg.obj == null && msg.obj != "") {
+                            filterToBluetoothMac = Optional.of(msg.obj as String)
+                        }
+                        Timber.i("pumpCommHandler: init_pump_comm: $filterToBluetoothMac")
+                        pump = Pump(filterToBluetoothMac)
                         tandemBTHandler =
                             TandemBluetoothHandler.getInstance(applicationContext, pump, null)
                     } catch (e: SecurityException) {
@@ -830,7 +836,11 @@ class CommService : WearableListenerService(), GoogleApiClient.ConnectionCallbac
                 sendStopPumpFinderComm()
                 if (String(messageEvent.data) == "init_comm") {
                     pumpCommHandler = PumpCommHandler(looper)
-                    sendInitPumpComm()
+                    val filterToMac = Prefs(applicationContext).pumpFinderPumpMac().orEmpty()
+                    Prefs(applicationContext).setPumpFinderServiceEnabled(false)
+                    Timber.i("stop-pump-finder-next: filterToMac=$filterToMac")
+                    triggerAppReload(applicationContext)
+                    //sendInitPumpComm()
                 }
             }
             "/to-phone/check-pump-finder-found-pumps" -> {
@@ -921,14 +931,18 @@ class CommService : WearableListenerService(), GoogleApiClient.ConnectionCallbac
 
         updateNotification("Initializing...")
 
-        Timber.d("onStartCommand has pumpFinderCommHandler=${pumpFinderCommHandler} pumpCommHandler=${pumpCommHandler}")
+        Timber.i("CommService onStartCommand has pumpFinderCommHandler=${pumpFinderCommHandler} pumpCommHandler=${pumpCommHandler}")
 
         // For each start request, send a message to start a job and deliver the
         // start ID so we know which request we're stopping when we finish the job
         if (Prefs(applicationContext).pumpFinderServiceEnabled()) {
+            Timber.i("Starting CommService in PumpFinder mode")
             sendInitPumpFinderComm()
         } else {
-            sendInitPumpComm()
+            val filterToMac = Prefs(applicationContext).pumpFinderPumpMac().orEmpty()
+            Timber.i("Starting CommService in standard mode: filterToMac=$filterToMac")
+
+            sendInitPumpComm(filterToMac)
         }
 
         // If we get killed, after returning from here, restart
@@ -1005,9 +1019,10 @@ class CommService : WearableListenerService(), GoogleApiClient.ConnectionCallbac
         }
     }
 
-    private fun sendInitPumpComm() {
+    private fun sendInitPumpComm(filterToBluetoothMac: String) {
         pumpCommHandler?.obtainMessage()?.also { msg ->
             msg.what = CommServiceCodes.INIT_PUMP_COMM.ordinal
+            msg.obj = filterToBluetoothMac
             pumpCommHandler?.sendMessage(msg)
         }
     }
