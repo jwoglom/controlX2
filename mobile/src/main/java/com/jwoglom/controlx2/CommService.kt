@@ -74,6 +74,7 @@ import com.jwoglom.pumpx2.pump.bluetooth.TandemConfig
 import com.jwoglom.pumpx2.pump.bluetooth.TandemPumpFinder
 import com.jwoglom.pumpx2.pump.messages.models.PairingCodeType
 import com.jwoglom.pumpx2.pump.messages.request.currentStatus.HistoryLogStatusRequest
+import com.jwoglom.pumpx2.pump.messages.response.authentication.AbstractCentralChallengeResponse
 import com.jwoglom.pumpx2.pump.messages.response.currentStatus.HistoryLogStatusResponse
 import com.welie.blessed.BluetoothPeripheral
 import com.welie.blessed.HciStatus
@@ -201,10 +202,10 @@ class CommService : WearableListenerService(), GoogleApiClient.ConnectionCallbac
                 sendWearCommMessage("/from-pump/receive-qualifying-event", PumpQualifyingEventsSerializer.toBytes(events))
             }
 
-            var pairingCodeCentralChallenge: CentralChallengeResponse? = null
+            var pairingCodeCentralChallenge: AbstractCentralChallengeResponse? = null
             override fun onWaitingForPairingCode(
                 peripheral: BluetoothPeripheral?,
-                centralChallengeResponse: CentralChallengeResponse?
+                centralChallengeResponse: AbstractCentralChallengeResponse?
             ) {
                 pairingCodeCentralChallenge = centralChallengeResponse
                 performPairing(peripheral, centralChallengeResponse, false)
@@ -220,7 +221,7 @@ class CommService : WearableListenerService(), GoogleApiClient.ConnectionCallbac
 
             fun performPairing(
                 peripheral: BluetoothPeripheral?,
-                centralChallengeResponse: CentralChallengeResponse?,
+                centralChallengeResponse: AbstractCentralChallengeResponse?,
                 manuallyTriggered: Boolean
             ) {
                 Timber.i("performPairing manuallyTriggered=$manuallyTriggered")
