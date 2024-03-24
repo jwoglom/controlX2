@@ -1,7 +1,6 @@
 package com.jwoglom.controlx2.presentation.screens
 
-import android.os.Handler
-import android.os.Looper
+import android.widget.Toast
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
@@ -119,6 +118,7 @@ fun PumpSetup(
                     Button(
                         onClick = {
                             try {
+                                Timber.i("enterPairingCode: $pairingCodeText ${ds.setupPairingCodeType.value} (${PumpState.getPairingCode(context)})")
                                 val code = PumpChallengeRequestBuilder.processPairingCode(pairingCodeText, ds.setupPairingCodeType.value)
                                 // sanity check builder
                                 PumpChallengeRequestBuilder.create(CentralChallengeResponse(), code)
@@ -126,6 +126,7 @@ fun PumpSetup(
                                 ds.pumpSetupStage.value = setupStage.value!!.nextStage(PumpSetupStage.WAITING_PUMP_FINDER_CLEANUP)
                             } catch (e: Exception) {
                                 Timber.w("pairingCodeInput: $e")
+                                Toast.makeText(context, e.toString().replaceBefore("$", ""), Toast.LENGTH_SHORT).show()
                             }
                         }
                     ) {
@@ -136,6 +137,7 @@ fun PumpSetup(
                     Button(
                         onClick = {
                             try {
+                                Timber.i("enterPairingCode(waiting/invalid): $pairingCodeText ${ds.setupPairingCodeType.value} (${PumpState.getPairingCode(context)})")
                                 val code = PumpChallengeRequestBuilder.processPairingCode(pairingCodeText, ds.setupPairingCodeType.value)
                                 // sanity check builder
                                 PumpChallengeRequestBuilder.create(CentralChallengeResponse(), code)
@@ -143,6 +145,7 @@ fun PumpSetup(
                                 ds.pumpSetupStage.value = setupStage.value!!.nextStage(PumpSetupStage.PUMPX2_WAITING_TO_PAIR)
                             } catch (e: Exception) {
                                 Timber.w("pairingCodeInput: $e")
+                                Toast.makeText(context, e.toString().replaceBefore("$", ""), Toast.LENGTH_SHORT).show()
                             }
                         }
                     ) {
@@ -218,7 +221,7 @@ fun PumpSetup(
                             BasicTextField(
                                 value = pairingCodeText,
                                 onValueChange = {
-                                    fun filterPairingCode(text: String): String {
+                                    fun filterLongPairingCode(text: String): String {
                                         var processed = ""
                                         for (c in text.toCharArray()) {
                                             if (c in 'a'..'z' || c in 'A'..'Z' || c in '0'..'9') {
@@ -228,12 +231,14 @@ fun PumpSetup(
                                         return processed
                                     }
 
-                                    val newPairingCode = filterPairingCode(it)
+                                    val newPairingCode = filterLongPairingCode(it)
                                     if (pairingCodeText.length < 16 && newPairingCode.length == 16) {
                                         focusManager.clearFocus()
                                     }
 
                                     pairingCodeText = newPairingCode
+                                    Timber.i("newPairingCode(LONG_16CHAR): $newPairingCode")
+                                    PumpState.setPairingCode(context, newPairingCode)
                                 },
                                 keyboardOptions = KeyboardOptions(
                                     autoCorrect = false,
@@ -290,7 +295,7 @@ fun PumpSetup(
                             BasicTextField(
                                 value = pairingCodeText,
                                 onValueChange = {
-                                    fun filterPairingCode(text: String): String {
+                                    fun filterShortPairingCode(text: String): String {
                                         var processed = ""
                                         for (c in text.toCharArray()) {
                                             if (c in '0'..'9') {
@@ -300,12 +305,14 @@ fun PumpSetup(
                                         return processed
                                     }
 
-                                    val newPairingCode = filterPairingCode(it)
+                                    val newPairingCode = filterShortPairingCode(it)
                                     if (pairingCodeText.length < 6 && newPairingCode.length == 6) {
                                         focusManager.clearFocus()
                                     }
 
                                     pairingCodeText = newPairingCode
+                                    Timber.i("newPairingCode(SHORT_6CHAR): $newPairingCode")
+                                    PumpState.setPairingCode(context, newPairingCode)
                                 },
                                 keyboardOptions = KeyboardOptions(
                                     autoCorrect = false,
