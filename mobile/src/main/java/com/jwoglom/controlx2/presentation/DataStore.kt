@@ -100,7 +100,10 @@ class DataStore {
         watchConnected.observeForever { t -> Timber.i("DataStore.watchConnected=$t") }
 
         pumpSetupStage.observeForever { t -> Timber.i("DataStore.setupStage=$t") }
+        pumpFinderPumps.observeForever { t -> Timber.i("DataStore.pumpFinderPumps=$t") }
         setupDeviceName.observeForever { t -> Timber.i("DataStore.setupDeviceName=$t") }
+        setupPairingCodeType.observeForever { t -> Timber.i("DataStore.setupPairingCodeType=$t") }
+        pumpSid.observeForever { t -> Timber.i("DataStore.pumpSid=$t") }
         setupDeviceModel.observeForever { t -> Timber.i("DataStore.setupDeviceModel=$t") }
         pumpCriticalError.observeForever { t -> Timber.i("DataStore.pumpCriticalError=$t") }
 
@@ -114,8 +117,8 @@ class DataStore {
         basalRate.observeForever { t -> Timber.i("DataStore.basalRate=$t") }
         basalStatus.observeForever { t -> Timber.i("DataStore.basalStatus=$t") }
         cgmSessionState.observeForever { t -> Timber.i("DataStore.cgmSessionState=$t") }
-        cgmSessionExpireExact.observeForever { t -> Timber.i("DataStore.cgmSessionExpireExact=$t") }
         cgmSessionExpireRelative.observeForever { t -> Timber.i("DataStore.cgmSessionExpireRelative=$t") }
+        cgmSessionExpireExact.observeForever { t -> Timber.i("DataStore.cgmSessionExpireExact=$t") }
         cgmTransmitterStatus.observeForever { t -> Timber.i("DataStore.cgmTransmitterStatus=$t") }
         cgmReading.observeForever { t -> Timber.i("DataStore.cgmReading=$t") }
         cgmDelta.observeForever { t -> Timber.i("DataStore.cgmDelta=$t") }
@@ -138,6 +141,10 @@ class DataStore {
         bolusFinalParameters.observeForever { t -> Timber.i("DataStore.bolusFinalParameters=$t") }
         bolusFinalCalcUnits.observeForever { t -> Timber.i("DataStore.bolusFinalCalcUnits=$t") }
         bolusFinalConditions.observeForever { t -> Timber.i("DataStore.bolusFinalConditions=$t") }
+
+        bolusUnitsRawValue.observeForever { t -> Timber.i("DataStore.bolusUnitsRawValue=$t") }
+        bolusCarbsRawValue.observeForever { t -> Timber.i("DataStore.bolusCarbsRawValue=$t") }
+        bolusGlucoseRawValue.observeForever { t -> Timber.i("DataStore.bolusGlucoseRawValue=$t") }
 
         timeSinceResetResponse.observeForever { t -> Timber.i("DataStore.timeSinceResetResponse=$t") }
         bolusPermissionResponse.observeForever { t -> Timber.i("DataStore.bolusPermissionResponse=$t") }
