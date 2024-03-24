@@ -70,7 +70,9 @@ import com.jwoglom.controlx2.util.AppVersionCheck
 import com.jwoglom.controlx2.util.DataClientState
 import com.jwoglom.controlx2.util.HistoryLogFetcher
 import com.jwoglom.controlx2.util.extractPumpSid
+import com.jwoglom.pumpx2.pump.bluetooth.TandemConfig
 import com.jwoglom.pumpx2.pump.bluetooth.TandemPumpFinder
+import com.jwoglom.pumpx2.pump.messages.models.PairingCodeType
 import com.jwoglom.pumpx2.pump.messages.request.currentStatus.HistoryLogStatusRequest
 import com.jwoglom.pumpx2.pump.messages.response.currentStatus.HistoryLogStatusResponse
 import com.welie.blessed.BluetoothPeripheral
@@ -394,12 +396,21 @@ class CommService : WearableListenerService(), GoogleApiClient.ConnectionCallbac
                         return
                     }
                     try {
-                        var filterToBluetoothMac = Optional.empty<String>()
+                        var pairingCodeType: PairingCodeType? = null
+                        var filterToBluetoothMac: String? = null
                         if (msg.obj == null && msg.obj != "") {
-                            filterToBluetoothMac = Optional.of(msg.obj as String)
+                            var parts = (msg.obj as String).split(" ")
+                            pairingCodeType = PairingCodeType.fromLabel(parts[0])
+                            if (parts.size == 2) {
+                                filterToBluetoothMac = parts[1]
+                            }
                         }
-                        Timber.i("pumpCommHandler: init_pump_comm: filterToBluetoothMac=$filterToBluetoothMac")
-                        val cfg = TandemConfig().withFilterToBluetoothMac(filterToBluetoothMac)
+
+                        Timber.i("pumpCommHandler: init_pump_comm: pairingCodeType=$pairingCodeType filterToBluetoothMac=$filterToBluetoothMac")
+                        val cfg = TandemConfig()
+                            .withFilterToBluetoothMac(filterToBluetoothMac)
+                            .withPairingCodeType(pairingCodeType)
+
                         pump = Pump(cfg)
                         tandemBTHandler =
                             TandemBluetoothHandler.getInstance(applicationContext, pump, null)
@@ -940,10 +951,11 @@ class CommService : WearableListenerService(), GoogleApiClient.ConnectionCallbac
             Timber.i("Starting CommService in PumpFinder mode")
             sendInitPumpFinderComm()
         } else {
+            val pairingCodeType = Prefs(applicationContext).pumpFinderPairingCodeType().orEmpty()
             val filterToMac = Prefs(applicationContext).pumpFinderPumpMac().orEmpty()
             Timber.i("Starting CommService in standard mode: filterToMac=$filterToMac")
 
-            sendInitPumpComm(filterToMac)
+            sendInitPumpComm(PairingCodeType.fromLabel(pairingCodeType), filterToMac)
         }
 
         // If we get killed, after returning from here, restart
@@ -1020,10 +1032,14 @@ class CommService : WearableListenerService(), GoogleApiClient.ConnectionCallbac
         }
     }
 
-    private fun sendInitPumpComm(filterToBluetoothMac: String) {
+    private fun sendInitPumpComm(pairingCodeType: PairingCodeType, filterToBluetoothMac: String) {
         pumpCommHandler?.obtainMessage()?.also { msg ->
             msg.what = CommServiceCodes.INIT_PUMP_COMM.ordinal
-            msg.obj = filterToBluetoothMac
+            if (filterToBluetoothMac.length > 0) {
+                msg.obj = "${pairingCodeType.label} $filterToBluetoothMac"
+            } else {
+                msg.obj = "${pairingCodeType.label}"
+            }
             pumpCommHandler?.sendMessage(msg)
         }
     }
