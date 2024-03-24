@@ -113,7 +113,7 @@ class CommService : WearableListenerService(), GoogleApiClient.ConnectionCallbac
         private lateinit var pump: Pump
         private lateinit var tandemBTHandler: TandemBluetoothHandler
 
-        private inner class Pump(var filterToBluetoothMac: Optional<String>) : TandemPump(applicationContext, filterToBluetoothMac) {
+        private inner class Pump(var tandemConfig: TandemConfig) : TandemPump(applicationContext, tandemConfig) {
             private val scope = CoroutineScope(SupervisorJob(parent = supervisorJob) + Dispatchers.IO)
             var lastPeripheral: BluetoothPeripheral? = null
             var isConnected = false
@@ -398,8 +398,9 @@ class CommService : WearableListenerService(), GoogleApiClient.ConnectionCallbac
                         if (msg.obj == null && msg.obj != "") {
                             filterToBluetoothMac = Optional.of(msg.obj as String)
                         }
-                        Timber.i("pumpCommHandler: init_pump_comm: $filterToBluetoothMac")
-                        pump = Pump(filterToBluetoothMac)
+                        Timber.i("pumpCommHandler: init_pump_comm: filterToBluetoothMac=$filterToBluetoothMac")
+                        val cfg = TandemConfig().withFilterToBluetoothMac(filterToBluetoothMac)
+                        pump = Pump(cfg)
                         tandemBTHandler =
                             TandemBluetoothHandler.getInstance(applicationContext, pump, null)
                     } catch (e: SecurityException) {

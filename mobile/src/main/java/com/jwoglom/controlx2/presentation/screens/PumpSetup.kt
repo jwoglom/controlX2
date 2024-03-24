@@ -54,6 +54,7 @@ import com.jwoglom.controlx2.presentation.components.ServiceDisabledMessage
 import com.jwoglom.controlx2.presentation.navigation.Screen
 import com.jwoglom.controlx2.presentation.theme.ControlX2Theme
 import com.jwoglom.pumpx2.pump.messages.models.PairingCodeType
+import com.jwoglom.pumpx2.pump.messages.response.authentication.CentralChallengeResponse
 import timber.log.Timber
 
 @Composable
@@ -120,7 +121,7 @@ fun PumpSetup(
                             try {
                                 val code = PumpChallengeRequestBuilder.processPairingCode(pairingCodeText, ds.setupPairingCodeType.value)
                                 // sanity check builder
-                                PumpChallengeRequestBuilder.create(0, code, ByteArray(0))
+                                PumpChallengeRequestBuilder.create(CentralChallengeResponse(), code)
                                 sendMessage("/to-phone/set-pairing-code", code.toByteArray())
                                 ds.pumpSetupStage.value = setupStage.value!!.nextStage(PumpSetupStage.WAITING_PUMP_FINDER_CLEANUP)
                             } catch (e: Exception) {
@@ -137,7 +138,7 @@ fun PumpSetup(
                             try {
                                 val code = PumpChallengeRequestBuilder.processPairingCode(pairingCodeText, ds.setupPairingCodeType.value)
                                 // sanity check builder
-                                PumpChallengeRequestBuilder.create(0, code, ByteArray(0))
+                                PumpChallengeRequestBuilder.create(CentralChallengeResponse(), code)
                                 sendMessage("/to-phone/set-pairing-code", code.toByteArray())
                                 ds.pumpSetupStage.value = setupStage.value!!.nextStage(PumpSetupStage.PUMPX2_WAITING_TO_PAIR)
                             } catch (e: Exception) {
