@@ -28,36 +28,6 @@ import com.google.android.gms.wearable.Wearable
 import com.google.android.gms.wearable.WearableListenerService
 import com.jwoglom.controlx2.db.historylog.HistoryLogDatabase
 import com.jwoglom.controlx2.db.historylog.HistoryLogRepo
-import com.jwoglom.pumpx2.pump.PumpState
-import com.jwoglom.pumpx2.pump.TandemError
-import com.jwoglom.pumpx2.pump.bluetooth.TandemBluetoothHandler
-import com.jwoglom.pumpx2.pump.bluetooth.TandemPump
-import com.jwoglom.pumpx2.pump.messages.Packetize
-import com.jwoglom.pumpx2.pump.messages.bluetooth.Characteristic
-import com.jwoglom.pumpx2.pump.messages.bluetooth.CharacteristicUUID
-import com.jwoglom.pumpx2.pump.messages.builders.CurrentBatteryRequestBuilder
-import com.jwoglom.pumpx2.pump.messages.helpers.Bytes
-import com.jwoglom.pumpx2.pump.messages.models.ApiVersion
-import com.jwoglom.pumpx2.pump.messages.models.InsulinUnit
-import com.jwoglom.pumpx2.pump.messages.models.KnownApiVersion
-import com.jwoglom.pumpx2.pump.messages.request.control.InitiateBolusRequest
-import com.jwoglom.pumpx2.pump.messages.request.currentStatus.ApiVersionRequest
-import com.jwoglom.pumpx2.pump.messages.request.currentStatus.ControlIQIOBRequest
-import com.jwoglom.pumpx2.pump.messages.request.currentStatus.InsulinStatusRequest
-import com.jwoglom.pumpx2.pump.messages.request.currentStatus.TimeSinceResetRequest
-import com.jwoglom.pumpx2.pump.messages.response.authentication.CentralChallengeResponse
-import com.jwoglom.pumpx2.pump.messages.response.authentication.PumpChallengeResponse
-import com.jwoglom.pumpx2.pump.messages.response.control.InitiateBolusResponse
-import com.jwoglom.pumpx2.pump.messages.response.currentStatus.ControlIQIOBResponse
-import com.jwoglom.pumpx2.pump.messages.response.currentStatus.CurrentBasalStatusResponse
-import com.jwoglom.pumpx2.pump.messages.response.currentStatus.CurrentBatteryAbstractResponse
-import com.jwoglom.pumpx2.pump.messages.response.currentStatus.CurrentEGVGuiDataResponse
-import com.jwoglom.pumpx2.pump.messages.response.currentStatus.InsulinStatusResponse
-import com.jwoglom.pumpx2.pump.messages.response.currentStatus.TimeSinceResetResponse
-import com.jwoglom.pumpx2.pump.messages.response.historyLog.HistoryLog
-import com.jwoglom.pumpx2.pump.messages.response.historyLog.HistoryLogStreamResponse
-import com.jwoglom.pumpx2.pump.messages.response.qualifyingEvent.QualifyingEvent
-import com.jwoglom.pumpx2.shared.Hex
 import com.jwoglom.controlx2.presentation.util.ShouldLogToFile
 import com.jwoglom.controlx2.shared.CommServiceCodes
 import com.jwoglom.controlx2.shared.InitiateConfirmedBolusSerializer
@@ -70,12 +40,41 @@ import com.jwoglom.controlx2.util.AppVersionCheck
 import com.jwoglom.controlx2.util.DataClientState
 import com.jwoglom.controlx2.util.HistoryLogFetcher
 import com.jwoglom.controlx2.util.extractPumpSid
+import com.jwoglom.pumpx2.pump.PumpState
+import com.jwoglom.pumpx2.pump.TandemError
+import com.jwoglom.pumpx2.pump.bluetooth.TandemBluetoothHandler
 import com.jwoglom.pumpx2.pump.bluetooth.TandemConfig
+import com.jwoglom.pumpx2.pump.bluetooth.TandemPump
 import com.jwoglom.pumpx2.pump.bluetooth.TandemPumpFinder
+import com.jwoglom.pumpx2.pump.messages.Packetize
+import com.jwoglom.pumpx2.pump.messages.bluetooth.Characteristic
+import com.jwoglom.pumpx2.pump.messages.bluetooth.CharacteristicUUID
+import com.jwoglom.pumpx2.pump.messages.builders.CurrentBatteryRequestBuilder
+import com.jwoglom.pumpx2.pump.messages.helpers.Bytes
+import com.jwoglom.pumpx2.pump.messages.models.ApiVersion
+import com.jwoglom.pumpx2.pump.messages.models.InsulinUnit
+import com.jwoglom.pumpx2.pump.messages.models.KnownApiVersion
 import com.jwoglom.pumpx2.pump.messages.models.PairingCodeType
+import com.jwoglom.pumpx2.pump.messages.request.control.InitiateBolusRequest
+import com.jwoglom.pumpx2.pump.messages.request.currentStatus.ApiVersionRequest
+import com.jwoglom.pumpx2.pump.messages.request.currentStatus.ControlIQIOBRequest
 import com.jwoglom.pumpx2.pump.messages.request.currentStatus.HistoryLogStatusRequest
+import com.jwoglom.pumpx2.pump.messages.request.currentStatus.InsulinStatusRequest
+import com.jwoglom.pumpx2.pump.messages.request.currentStatus.TimeSinceResetRequest
 import com.jwoglom.pumpx2.pump.messages.response.authentication.AbstractCentralChallengeResponse
+import com.jwoglom.pumpx2.pump.messages.response.authentication.PumpChallengeResponse
+import com.jwoglom.pumpx2.pump.messages.response.control.InitiateBolusResponse
+import com.jwoglom.pumpx2.pump.messages.response.currentStatus.ControlIQIOBResponse
+import com.jwoglom.pumpx2.pump.messages.response.currentStatus.CurrentBasalStatusResponse
+import com.jwoglom.pumpx2.pump.messages.response.currentStatus.CurrentBatteryAbstractResponse
+import com.jwoglom.pumpx2.pump.messages.response.currentStatus.CurrentEGVGuiDataResponse
 import com.jwoglom.pumpx2.pump.messages.response.currentStatus.HistoryLogStatusResponse
+import com.jwoglom.pumpx2.pump.messages.response.currentStatus.InsulinStatusResponse
+import com.jwoglom.pumpx2.pump.messages.response.currentStatus.TimeSinceResetResponse
+import com.jwoglom.pumpx2.pump.messages.response.historyLog.HistoryLog
+import com.jwoglom.pumpx2.pump.messages.response.historyLog.HistoryLogStreamResponse
+import com.jwoglom.pumpx2.pump.messages.response.qualifyingEvent.QualifyingEvent
+import com.jwoglom.pumpx2.shared.Hex
 import com.welie.blessed.BluetoothPeripheral
 import com.welie.blessed.HciStatus
 import kotlinx.coroutines.CoroutineScope
@@ -83,12 +82,12 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
+import org.bouncycastle.jce.provider.BouncyCastleProvider
 import timber.log.Timber
+import java.security.Security
 import java.time.Duration
 import java.time.Instant
 import java.util.*
-import kotlin.jvm.optionals.getOrDefault
-import kotlin.jvm.optionals.getOrElse
 
 
 const val CacheSeconds = 30
@@ -224,17 +223,28 @@ class CommService : WearableListenerService(), GoogleApiClient.ConnectionCallbac
                 centralChallengeResponse: AbstractCentralChallengeResponse?,
                 manuallyTriggered: Boolean
             ) {
+
+                if (Security.getProvider(BouncyCastleProvider.PROVIDER_NAME) != null) {
+                    Security.removeProvider(BouncyCastleProvider.PROVIDER_NAME)
+                }
+                Security.addProvider(BouncyCastleProvider())
+
                 Timber.i("performPairing manuallyTriggered=$manuallyTriggered")
+                var challengeBytes = byteArrayOf()
+                if (centralChallengeResponse != null) {
+                    challengeBytes = PumpMessageSerializer.toBytes(centralChallengeResponse)
+                }
                 PumpState.getPairingCode(context)?.let {
                     Timber.i("Pairing with saved code: $it centralChallenge: $centralChallengeResponse")
                     pair(peripheral, centralChallengeResponse, it)
                     sendWearCommMessage(
                         "/from-pump/entered-pairing-code",
-                        PumpMessageSerializer.toBytes(centralChallengeResponse))
+                        challengeBytes)
                 } ?: run {
+                    Timber.i("Pairing without saved code: centralChallenge: $centralChallengeResponse")
                     sendWearCommMessage(
                         "/from-pump/missing-pairing-code",
-                        PumpMessageSerializer.toBytes(centralChallengeResponse))
+                        challengeBytes)
                 }
             }
 
@@ -399,7 +409,7 @@ class CommService : WearableListenerService(), GoogleApiClient.ConnectionCallbac
                     try {
                         var pairingCodeType: PairingCodeType? = null
                         var filterToBluetoothMac: String? = null
-                        if (msg.obj == null && msg.obj != "") {
+                        if (msg.obj != null && msg.obj != "") {
                             var parts = (msg.obj as String).split(" ")
                             pairingCodeType = PairingCodeType.fromLabel(parts[0])
                             if (parts.size == 2) {
@@ -407,7 +417,7 @@ class CommService : WearableListenerService(), GoogleApiClient.ConnectionCallbac
                             }
                         }
 
-                        Timber.i("pumpCommHandler: init_pump_comm: pairingCodeType=$pairingCodeType filterToBluetoothMac=$filterToBluetoothMac")
+                        Timber.i("pumpCommHandler: init_pump_comm: msg.obj=${msg.obj as String} pairingCodeType=$pairingCodeType filterToBluetoothMac=$filterToBluetoothMac")
                         val cfg = TandemConfig()
                             .withFilterToBluetoothMac(filterToBluetoothMac)
                             .withPairingCodeType(pairingCodeType)
@@ -954,7 +964,7 @@ class CommService : WearableListenerService(), GoogleApiClient.ConnectionCallbac
         } else {
             val pairingCodeType = Prefs(applicationContext).pumpFinderPairingCodeType().orEmpty()
             val filterToMac = Prefs(applicationContext).pumpFinderPumpMac().orEmpty()
-            Timber.i("Starting CommService in standard mode: filterToMac=$filterToMac")
+            Timber.i("Starting CommService in standard mode: filterToMac=$filterToMac pairingCodeType=$pairingCodeType")
 
             sendInitPumpComm(PairingCodeType.fromLabel(pairingCodeType), filterToMac)
         }

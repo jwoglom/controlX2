@@ -120,13 +120,11 @@ fun PumpSetup(
                             try {
                                 Timber.i("enterPairingCode: $pairingCodeText ${ds.setupPairingCodeType.value} (${PumpState.getPairingCode(context)})")
                                 val code = PumpChallengeRequestBuilder.processPairingCode(pairingCodeText, ds.setupPairingCodeType.value)
-                                // sanity check builder
-                                PumpChallengeRequestBuilder.create(CentralChallengeResponse(), code)
                                 sendMessage("/to-phone/set-pairing-code", code.toByteArray())
                                 ds.pumpSetupStage.value = setupStage.value!!.nextStage(PumpSetupStage.WAITING_PUMP_FINDER_CLEANUP)
                             } catch (e: Exception) {
                                 Timber.w("pairingCodeInput: $e")
-                                Toast.makeText(context, e.toString().replaceBefore("$", ""), Toast.LENGTH_SHORT).show()
+                                Toast.makeText(context, e.toString().replaceBefore("$", "").substring(1), Toast.LENGTH_SHORT).show()
                             }
                         }
                     ) {
@@ -139,13 +137,11 @@ fun PumpSetup(
                             try {
                                 Timber.i("enterPairingCode(waiting/invalid): $pairingCodeText ${ds.setupPairingCodeType.value} (${PumpState.getPairingCode(context)})")
                                 val code = PumpChallengeRequestBuilder.processPairingCode(pairingCodeText, ds.setupPairingCodeType.value)
-                                // sanity check builder
-                                PumpChallengeRequestBuilder.create(CentralChallengeResponse(), code)
                                 sendMessage("/to-phone/set-pairing-code", code.toByteArray())
                                 ds.pumpSetupStage.value = setupStage.value!!.nextStage(PumpSetupStage.PUMPX2_WAITING_TO_PAIR)
                             } catch (e: Exception) {
                                 Timber.w("pairingCodeInput: $e")
-                                Toast.makeText(context, e.toString().replaceBefore("$", ""), Toast.LENGTH_SHORT).show()
+                                Toast.makeText(context, e.toString().replaceBefore("$", "").substring(1), Toast.LENGTH_SHORT).show()
                             }
                         }
                     ) {
