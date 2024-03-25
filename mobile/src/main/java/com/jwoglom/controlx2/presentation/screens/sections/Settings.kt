@@ -38,6 +38,7 @@ import androidx.navigation.NavHostController
 import com.jwoglom.controlx2.Prefs
 import com.jwoglom.controlx2.R
 import com.jwoglom.controlx2.presentation.navigation.Screen
+import com.jwoglom.controlx2.presentation.screens.sections.components.VersionInfo
 import com.jwoglom.controlx2.presentation.theme.ControlX2Theme
 import com.jwoglom.controlx2.shared.util.SendType
 import com.jwoglom.controlx2.util.AppVersionCheck
@@ -66,33 +67,7 @@ fun Settings(
         content = {
 
             item {
-                val ver = AppVersionInfo(context)
-                Text(buildAnnotatedString {
-                    withStyle(style = SpanStyle(fontWeight = FontWeight.Bold, fontSize = 20.sp)) {
-                        append("ControlX2 ")
-                        append(ver.version)
-                    }
-                }, Modifier.padding(start = 16.dp, top = 16.dp))
-                Text(buildAnnotatedString {
-                    append("with PumpX2 ")
-                    append(ver.pumpX2)
-                    append("\n")
-
-                    withStyle(style = SpanStyle(fontWeight = FontWeight.Bold)) {
-                        append("Build: ")
-                    }
-                    append(ver.buildVersion)
-                    append("\n")
-
-                    withStyle(style = SpanStyle(fontWeight = FontWeight.Bold)) {
-                        append("Build time: ")
-                    }
-                    append(ver.buildTime)
-                    append("\n")
-                }, lineHeight = 20.sp, fontSize = 14.sp, modifier = Modifier.padding(start = 16.dp).clickable {
-                    Toast.makeText(context, "Checking for version update", Toast.LENGTH_SHORT).show()
-                    AppVersionCheck(context)
-                })
+                VersionInfo(context)
             }
 
             item {

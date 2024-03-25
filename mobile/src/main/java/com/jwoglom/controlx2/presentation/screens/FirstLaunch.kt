@@ -15,6 +15,7 @@ import androidx.navigation.NavHostController
 import com.jwoglom.controlx2.Prefs
 import com.jwoglom.controlx2.presentation.components.DialogScreen
 import com.jwoglom.controlx2.presentation.navigation.Screen
+import com.jwoglom.controlx2.presentation.screens.sections.components.VersionInfo
 import com.jwoglom.controlx2.presentation.theme.ControlX2Theme
 import kotlin.system.exitProcess
 
@@ -62,6 +63,12 @@ fun FirstLaunch(
                 modifier = Modifier
                     .fillMaxWidth()
             )
+        }
+        item {
+            Text("")
+        }
+        item {
+            VersionInfo(context)
         }
     }
 }

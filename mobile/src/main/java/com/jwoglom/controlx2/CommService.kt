@@ -335,6 +335,7 @@ class CommService : WearableListenerService(), GoogleApiClient.ConnectionCallbac
                 )
                 currentPumpData.connectionTime = Instant.now()
                 updateNotification("Disconnected from pump")
+                Toast.makeText(this@CommService, "Pump disconnected: $status", Toast.LENGTH_SHORT).show();
                 return super.onPumpDisconnected(peripheral, status)
             }
 
