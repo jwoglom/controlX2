@@ -50,6 +50,12 @@ fun VersionInfo(
         }
         append(ver.buildTime)
         append("\n")
+
+        withStyle(style = SpanStyle(fontWeight = FontWeight.Bold)) {
+            append("PumpX2 build time: ")
+        }
+        append(ver.pumpX2BuildTime)
+        append("\n")
     }, lineHeight = 20.sp, fontSize = 14.sp, modifier = Modifier.padding(start = 16.dp).clickable {
         Toast.makeText(context, "Checking for version update", Toast.LENGTH_SHORT).show()
         AppVersionCheck(context)

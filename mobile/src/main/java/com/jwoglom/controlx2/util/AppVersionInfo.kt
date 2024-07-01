@@ -15,6 +15,9 @@ class AppVersionInfo(val context: Context) {
     val pumpX2: String
         get() = com.jwoglom.pumpx2.BuildConfig.PUMPX2_VERSION
 
+    val pumpX2BuildTime: String
+        get() = com.jwoglom.pumpx2.BuildConfig.PUMPX2_BUILD_TIME
+
     val buildVersion: String
         get() = Paperwork(context).get("build_version")
 
@@ -25,6 +28,7 @@ class AppVersionInfo(val context: Context) {
         val o = JSONObject()
         o.put("version", version)
         o.put("pumpX2", pumpX2)
+        o.put("pumpX2BuildTime", pumpX2BuildTime)
         o.put("buildVersion", buildVersion)
         o.put("buildTime", buildTime)
 
