@@ -114,7 +114,7 @@ fun PumpSetup(
                         Text("Retry")
                     }
                 }
-                PumpSetupStage.PUMP_FINDER_ENTER_PAIRING_CODE -> {
+                PumpSetupStage.PUMP_FINDER_ENTER_PAIRING_CODE, PumpSetupStage.PUMPX2_WAITING_FOR_PAIRING_CODE -> {
                     Button(
                         onClick = {
                             try {
@@ -131,21 +131,13 @@ fun PumpSetup(
                         Text("Pair")
                     }
                 }
-                PumpSetupStage.PUMPX2_WAITING_FOR_PAIRING_CODE, PumpSetupStage.PUMPX2_INVALID_PAIRING_CODE -> {
+                PumpSetupStage.PUMPX2_INVALID_PAIRING_CODE -> {
                     Button(
                         onClick = {
-                            try {
-                                Timber.i("enterPairingCode(waiting/invalid): $pairingCodeText ${ds.setupPairingCodeType.value} (${PumpState.getPairingCode(context)})")
-                                val code = PumpChallengeRequestBuilder.processPairingCode(pairingCodeText, ds.setupPairingCodeType.value)
-                                sendMessage("/to-phone/set-pairing-code", code.toByteArray())
-                                ds.pumpSetupStage.value = setupStage.value!!.nextStage(PumpSetupStage.PUMPX2_WAITING_TO_PAIR)
-                            } catch (e: Exception) {
-                                Timber.w("pairingCodeInput: $e")
-                                Toast.makeText(context, e.toString().replaceBefore("$", "").substring(1), Toast.LENGTH_SHORT).show()
-                            }
+                            sendMessage("/to-phone/restart-pump-finder", "".toByteArray())
                         }
                     ) {
-                        Text("Pair")
+                        Text("Retry")
                     }
                 }
                 PumpSetupStage.PUMPX2_PUMP_CONNECTED -> {
@@ -189,7 +181,7 @@ fun PumpSetup(
 
                     if (setupStage.value == PumpSetupStage.PUMPX2_INVALID_PAIRING_CODE) {
                         LaunchedEffect(Unit) {
-                            pairingCodeText = ""
+                            PumpState.setPairingCode(context, "")
                         }
                         Line(buildAnnotatedString {
                             withStyle(style = SpanStyle(color = Color.Red, fontWeight = FontWeight.Bold)) {
@@ -206,11 +198,6 @@ fun PumpSetup(
 
                     Spacer(Modifier.height(32.dp))
 
-                    LaunchedEffect (Unit) {
-                        if (pairingCodeText.isEmpty()) {
-                            focusRequester.requestFocus()
-                        }
-                    }
 
                     when (setupPairingCodeType.value) {
                         PairingCodeType.LONG_16CHAR -> {
@@ -358,7 +345,11 @@ fun PumpSetup(
                     }
 
                     LaunchedEffect(Unit) {
-                        focusRequester.requestFocus()
+                        try {
+                            focusRequester.requestFocus()
+                        } catch (e: IllegalStateException) {
+                            Timber.w(e);
+                        }
                     }
                 }
             )
@@ -380,9 +371,9 @@ enum class PumpSetupStage(val step: Int, val description: String) {
     PUMPX2_PUMP_DISCOVERED(5, "Establishing connection: Pump discovered, connecting"),
     PUMPX2_PUMP_MODEL_METADATA(5, "Establishing connection: Initial pump metadata received"),
     PUMPX2_INITIAL_PUMP_CONNECTION(6, "Establishing connection: Initial connection established"),
-    PUMPX2_WAITING_FOR_PAIRING_CODE(6, "Establishing connection: Sending pairing code"),
+    PUMPX2_WAITING_FOR_PAIRING_CODE(6, "Establishing connection: Waiting to send pairing code"),
+    PUMPX2_SENDING_PAIRING_CODE(6, "Establishing connection: Sending pairing code"),
     PUMPX2_INVALID_PAIRING_CODE(4, "Invalid pairing code"),
-    PUMPX2_WAITING_TO_PAIR(6, "Establishing connection: Waiting to pair"),
     PUMPX2_PUMP_CONNECTED(7, "Pairing code accepted"),
     ;
 
@@ -390,6 +381,10 @@ enum class PumpSetupStage(val step: Int, val description: String) {
         Timber.d("PumpSetupStage.nextStage(%s) from %s", stage, this)
         if (stage == PUMPX2_INVALID_PAIRING_CODE) {
             return stage
+        }
+
+        if (this == PUMPX2_SENDING_PAIRING_CODE && stage == PUMPX2_PUMP_DISCONNECTED) {
+            return PUMPX2_INVALID_PAIRING_CODE
         }
 
         if (this == PUMPX2_INVALID_PAIRING_CODE && stage.ordinal < PUMPX2_INVALID_PAIRING_CODE.ordinal) {

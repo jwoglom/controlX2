@@ -62,7 +62,7 @@ import com.jwoglom.pumpx2.pump.messages.request.currentStatus.HistoryLogStatusRe
 import com.jwoglom.pumpx2.pump.messages.request.currentStatus.InsulinStatusRequest
 import com.jwoglom.pumpx2.pump.messages.request.currentStatus.TimeSinceResetRequest
 import com.jwoglom.pumpx2.pump.messages.response.authentication.AbstractCentralChallengeResponse
-import com.jwoglom.pumpx2.pump.messages.response.authentication.PumpChallengeResponse
+import com.jwoglom.pumpx2.pump.messages.response.authentication.AbstractPumpChallengeResponse
 import com.jwoglom.pumpx2.pump.messages.response.control.InitiateBolusResponse
 import com.jwoglom.pumpx2.pump.messages.response.currentStatus.ControlIQIOBResponse
 import com.jwoglom.pumpx2.pump.messages.response.currentStatus.CurrentBasalStatusResponse
@@ -212,7 +212,7 @@ class CommService : WearableListenerService(), GoogleApiClient.ConnectionCallbac
 
             override fun onInvalidPairingCode(
                 peripheral: BluetoothPeripheral?,
-                resp: PumpChallengeResponse?
+                resp: AbstractPumpChallengeResponse?
             ) {
                 sendWearCommMessage("/from-pump/invalid-pairing-code", "".toByteArray())
                 super.onInvalidPairingCode(peripheral, resp)
@@ -866,6 +866,15 @@ class CommService : WearableListenerService(), GoogleApiClient.ConnectionCallbac
                     triggerAppReload(applicationContext)
                     //sendInitPumpComm()
                 }
+            }
+            "/to-phone/restart-pump-finder" -> {
+                Timber.i("restart-pump-finder")
+                sendStopPumpFinderComm()
+                pumpCommHandler = PumpCommHandler(looper)
+                Prefs(applicationContext).setPumpFinderServiceEnabled(true)
+                Timber.i("restart-pump-finder")
+                triggerAppReload(applicationContext)
+                //sendInitPumpComm()
             }
             "/to-phone/check-pump-finder-found-pumps" -> {
                 Timber.i("check-pump-finder-found-pumps")

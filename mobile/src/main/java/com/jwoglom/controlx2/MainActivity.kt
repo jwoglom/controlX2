@@ -450,6 +450,7 @@ class MainActivity : ComponentActivity(), GoogleApiClient.ConnectionCallbacks, G
                 Toast.makeText(applicationContext, "Set pairing code: $pairingCodeText", Toast.LENGTH_SHORT).show()
 
                 if (dataStore.pumpSetupStage.value == PumpSetupStage.PUMP_FINDER_ENTER_PAIRING_CODE ||
+                    dataStore.pumpSetupStage.value == PumpSetupStage.PUMPX2_INVALID_PAIRING_CODE ||
                     dataStore.pumpSetupStage.value == PumpSetupStage.WAITING_PUMP_FINDER_CLEANUP)
                 {
                     Prefs(applicationContext).setPumpFinderServiceEnabled(false)
@@ -488,13 +489,19 @@ class MainActivity : ComponentActivity(), GoogleApiClient.ConnectionCallbacks, G
                 dataStore.pumpSetupStage.value = dataStore.pumpSetupStage.value?.nextStage(PumpSetupStage.PUMPX2_INITIAL_PUMP_CONNECTION)
             }
 
+            "/from-pump/entered-pairing-code" -> {
+                dataStore.pumpSetupStage.value = dataStore.pumpSetupStage.value?.nextStage(PumpSetupStage.PUMPX2_SENDING_PAIRING_CODE)
+            }
+
             "/from-pump/missing-pairing-code" -> {
                 dataStore.pumpSetupStage.value = dataStore.pumpSetupStage.value?.nextStage(PumpSetupStage.PUMPX2_WAITING_FOR_PAIRING_CODE)
             }
 
             "/from-pump/invalid-pairing-code" -> {
                 Timber.w("invalid-pairing-code with code: ${PumpState.getPairingCode(applicationContext)}")
+                PumpState.setPairingCode(applicationContext, "")
                 dataStore.pumpSetupStage.value = dataStore.pumpSetupStage.value?.nextStage(PumpSetupStage.PUMPX2_INVALID_PAIRING_CODE)
+                sendMessage("/to-phone/stop-comm", "invalid_pairing_code".toByteArray())
             }
 
             "/from-pump/pump-critical-error" -> {

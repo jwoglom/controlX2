@@ -141,7 +141,16 @@ fun PumpSetupStageDescription(
                             append("The pairing code was invalid. ")
                         }
                         append("The code was either entered incorrectly or timed out. Make sure the 'Pair Device' dialog is open on your pump.")
-                        if (!initialSetup) {
+                        if (initialSetup) {
+                            withStyle(
+                                style = SpanStyle(
+                                    color = Color.Red,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            ) {
+                                append("\n\nTo resolve the issue, press the Retry button below and enter the correct pairing code.")
+                            }
+                        } else {
                             withStyle(
                                 style = SpanStyle(
                                     color = Color.Red,
@@ -173,9 +182,6 @@ fun PumpSetupStageDescription(
         }
         PumpSetupStage.PUMPX2_INITIAL_PUMP_CONNECTION -> {
             Line("Initial connection made to ${setupDeviceName.value}")
-        }
-        PumpSetupStage.PUMPX2_WAITING_TO_PAIR -> {
-            Line("Pairing with ${setupDeviceName.value}...")
         }
         PumpSetupStage.PUMPX2_PUMP_CONNECTED -> {
             if (initialSetup) {
