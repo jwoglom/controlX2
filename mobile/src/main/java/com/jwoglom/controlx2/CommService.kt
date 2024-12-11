@@ -54,6 +54,7 @@ import com.jwoglom.pumpx2.pump.messages.helpers.Bytes
 import com.jwoglom.pumpx2.pump.messages.models.ApiVersion
 import com.jwoglom.pumpx2.pump.messages.models.InsulinUnit
 import com.jwoglom.pumpx2.pump.messages.models.KnownApiVersion
+import com.jwoglom.pumpx2.pump.messages.models.KnownDeviceModel
 import com.jwoglom.pumpx2.pump.messages.models.PairingCodeType
 import com.jwoglom.pumpx2.pump.messages.request.control.InitiateBolusRequest
 import com.jwoglom.pumpx2.pump.messages.request.currentStatus.ApiVersionRequest
@@ -312,11 +313,11 @@ class CommService : WearableListenerService(), GoogleApiClient.ConnectionCallbac
                 updateNotification("Connected to pump")
             }
 
-            override fun onPumpModel(peripheral: BluetoothPeripheral?, modelNumber: String?) {
-                super.onPumpModel(peripheral, modelNumber)
+            override fun onPumpModel(peripheral: BluetoothPeripheral?, model: KnownDeviceModel?) {
+                super.onPumpModel(peripheral, model)
                 Timber.i("service onPumpModel")
                 sendWearCommMessage("/from-pump/pump-model",
-                    modelNumber!!.toByteArray()
+                    model!!.name.toByteArray()
                 )
             }
 

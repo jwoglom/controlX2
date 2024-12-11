@@ -43,6 +43,7 @@ import com.jwoglom.controlx2.presentation.theme.ControlX2Theme
 import com.jwoglom.controlx2.shared.util.SendType
 import com.jwoglom.controlx2.util.AppVersionCheck
 import com.jwoglom.controlx2.util.AppVersionInfo
+import com.jwoglom.pumpx2.pump.PumpState
 import com.jwoglom.pumpx2.pump.messages.Message
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -196,16 +197,23 @@ fun Settings(
                     },
                     modifier = Modifier.clickable {
                         Prefs(context).setPumpSetupComplete(false)
+                        PumpState.setPairingCode(context, "")
+                        PumpState.setJpakeDerivedSecret(context, "")
+                        PumpState.setJpakeServerNonce(context, "")
+                        PumpState.setSavedBluetoothMAC(context, "")
                         coroutineScope.launch {
                             withContext(Dispatchers.IO) {
-                                Thread.sleep(250)
+                                Thread.sleep(500)
                             }
                             sendMessage(
                                 "/to-phone/app-reload",
                                 "".toByteArray()
                             )
+                            withContext(Dispatchers.IO) {
+                                Thread.sleep(500)
+                            }
+                            navController?.navigate(Screen.PumpSetup.route)
                         }
-                        navController?.navigate(Screen.PumpSetup.route)
                     }
                 )
                 Divider()

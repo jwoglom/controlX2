@@ -52,6 +52,8 @@ import com.jwoglom.controlx2.presentation.components.PumpSetupStageProgress
 import com.jwoglom.controlx2.presentation.components.ServiceDisabledMessage
 import com.jwoglom.controlx2.presentation.navigation.Screen
 import com.jwoglom.controlx2.presentation.theme.ControlX2Theme
+import com.jwoglom.controlx2.util.determinePumpModel
+import com.jwoglom.pumpx2.pump.messages.models.KnownDeviceModel
 import com.jwoglom.pumpx2.pump.messages.models.PairingCodeType
 import com.jwoglom.pumpx2.pump.messages.response.authentication.CentralChallengeResponse
 import timber.log.Timber
@@ -187,14 +189,52 @@ fun PumpSetup(
                             withStyle(style = SpanStyle(color = Color.Red, fontWeight = FontWeight.Bold)) {
                                 append("The pairing code was invalid. ")
                             }
-                            append("The code was either entered incorrectly or timed out. Make sure the 'Pair Device' dialog is open on your pump.")
+                            append("The code was either entered incorrectly or timed out.")
+                        })
+                        Line(buildAnnotatedString {
+                            withStyle(
+                                style = SpanStyle(
+                                    fontWeight = FontWeight.Bold
+                                )
+                            ) {
+                                append("For t:slim X2: ")
+                            }
+                            append("Make sure the 'Pair Device' dialog is open on your pump.")
                         })
                     } else {
                         Line("Connecting to '${setupDeviceName.value}'")
                     }
                     Spacer(Modifier.height(16.dp))
-                    Line("Please enter the pairing code displayed at:")
-                    Line("Bluetooth Settings > Pair Device", bold = true)
+                    when (ds.setupDeviceName.value?.let { determinePumpModel(it) }) {
+                        KnownDeviceModel.TSLIM_X2 -> {
+                            Line(buildAnnotatedString {
+                                withStyle(
+                                    style = SpanStyle(
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                ) {
+                                    append("For t:slim X2: ")
+                                }
+
+                                append("Please enter the pairing code displayed at:")
+                            })
+                            Line("Bluetooth Settings > Pair Device", bold = true)
+                        }
+                        KnownDeviceModel.MOBI -> {
+                            Line(buildAnnotatedString {
+                                withStyle(
+                                    style = SpanStyle(
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                ) {
+                                    append("For Mobi: ")
+                                }
+                                append("Please enter the pairing PIN located adjacent to the cartridge area.")
+                                Line("Once you hit Pair, press the pump button twice until you hear a beep to accept the connection.", bold = true)
+                            })
+                        }
+                        else -> {}
+                    }
 
                     Spacer(Modifier.height(32.dp))
 

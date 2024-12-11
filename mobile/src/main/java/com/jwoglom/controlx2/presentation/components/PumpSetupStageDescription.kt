@@ -25,6 +25,8 @@ import com.jwoglom.controlx2.Prefs
 import com.jwoglom.controlx2.presentation.screens.PumpSetupStage
 import com.jwoglom.controlx2.shared.presentation.intervalOf
 import com.jwoglom.controlx2.shared.util.shortTimeAgo
+import com.jwoglom.controlx2.util.determinePumpModel
+import com.jwoglom.pumpx2.pump.messages.models.KnownDeviceModel
 import com.jwoglom.pumpx2.pump.messages.models.PairingCodeType
 import timber.log.Timber
 
@@ -70,16 +72,54 @@ fun PumpSetupStageDescription(
         }
         PumpSetupStage.PUMP_FINDER_SEARCHING_FOR_PUMPS, PumpSetupStage.PUMPX2_SEARCHING_FOR_PUMP -> {
             if (initialSetup) {
-                Line("Open your pump and select:")
+                Line(buildAnnotatedString {
+                    withStyle(
+                        style = SpanStyle(
+                            fontWeight = FontWeight.Bold
+                        )
+                    ) {
+                        append("For t:slim X2: ")
+                    }
+                    append("Open your pump and select:")
+                })
                 Line("Options > Device Settings > Bluetooth Settings", bold = true)
-                Spacer(Modifier.height(16.dp))
                 Line("Enable the 'Mobile Connection' option and press 'Pair Device.' If already paired, press 'Unpair Device' first.")
+                Spacer(Modifier.height(16.dp))
+                Line(buildAnnotatedString {
+                    withStyle(
+                        style = SpanStyle(
+                            fontWeight = FontWeight.Bold
+                        )
+                    ) {
+                        append("For Mobi: ")
+                    }
+                    append("Place the pump on the wireless charger.")
+                })
             } else {
                 Line("Searching for pump...")
-                Line("If your pump isn't appearing, open it and select:")
+                Line(buildAnnotatedString {
+                    withStyle(
+                        style = SpanStyle(
+                            fontWeight = FontWeight.Bold
+                        )
+                    ) {
+                        append("For t:slim X2: ")
+                    }
+                    append("If your pump isn't appearing, open it and select:")
+                })
                 Line("Options > Device Settings > Bluetooth Settings", bold = true)
-                Spacer(Modifier.height(16.dp))
                 Line("Ensure the 'Mobile Connection' option is enabled.")
+                Spacer(Modifier.height(16.dp))
+                Line(buildAnnotatedString {
+                    withStyle(
+                        style = SpanStyle(
+                            fontWeight = FontWeight.Bold
+                        )
+                    ) {
+                        append("For Mobi: ")
+                    }
+                    append("Place the pump on the wireless charger.")
+                })
             }
         }
         PumpSetupStage.PUMP_FINDER_SELECT_PUMP -> {
@@ -102,17 +142,21 @@ fun PumpSetupStageDescription(
         PumpSetupStage.PUMP_FINDER_CHOOSE_PAIRING_CODE_TYPE -> {
             Line("Choose the correct pairing code type:")
             Line("")
-            Button(
-                onClick = {
-                    Prefs(context).setPumpFinderPairingCodeType(PairingCodeType.LONG_16CHAR.label)
-                    ds.setupPairingCodeType.value = PairingCodeType.LONG_16CHAR
-                    ds.pumpSetupStage.value = ds.pumpSetupStage.value?.nextStage(PumpSetupStage.PUMP_FINDER_ENTER_PAIRING_CODE)
-                }
-            ) {
-                Text("LONG: 16 alphanumeric characters")
-            }
 
-            Line("")
+            if (ds.setupDeviceName.value?.let { determinePumpModel(it) } == KnownDeviceModel.TSLIM_X2) {
+                Button(
+                    onClick = {
+                        Prefs(context).setPumpFinderPairingCodeType(PairingCodeType.LONG_16CHAR.label)
+                        ds.setupPairingCodeType.value = PairingCodeType.LONG_16CHAR
+                        ds.pumpSetupStage.value =
+                            ds.pumpSetupStage.value?.nextStage(PumpSetupStage.PUMP_FINDER_ENTER_PAIRING_CODE)
+                    }
+                ) {
+                    Text("LONG: 16 alphanumeric characters")
+                }
+
+                Line("")
+            }
 
             Button(
                 onClick = {
@@ -124,7 +168,34 @@ fun PumpSetupStageDescription(
                 Text("SHORT: 6 numbers")
             }
             Line("")
-            Line("Open the pairing code generated under Bluetooth Settings > Pairing Code on your pump now.")
+            when (ds.setupDeviceName.value?.let { determinePumpModel(it) }) {
+                KnownDeviceModel.TSLIM_X2 -> {
+                    Line(buildAnnotatedString {
+                        withStyle(
+                            style = SpanStyle(
+                                fontWeight = FontWeight.Bold
+                            )
+                        ) {
+                            append("For t:slim X2: ")
+                        }
+                        append("Open the pairing code generated under Bluetooth Settings > Pairing Code on your pump now.")
+                    })
+                }
+                KnownDeviceModel.MOBI -> {
+                    Line(buildAnnotatedString {
+                        withStyle(
+                            style = SpanStyle(
+                                fontWeight = FontWeight.Bold
+                            )
+                        ) {
+                            append("For Mobi: ")
+                        }
+                        append("Take the pump off of its charger now.")
+                    })
+                }
+                else -> {}
+            }
+
         }
         PumpSetupStage.PUMP_FINDER_ENTER_PAIRING_CODE, PumpSetupStage.PUMPX2_WAITING_FOR_PAIRING_CODE, PumpSetupStage.PUMPX2_INVALID_PAIRING_CODE -> {
             if (initialSetup) {
@@ -178,7 +249,7 @@ fun PumpSetupStageDescription(
             Line("Connecting to ${setupDeviceName.value}")
         }
         PumpSetupStage.PUMPX2_PUMP_MODEL_METADATA -> {
-            Line("Connecting to ${setupDeviceName.value} (t:slim ${setupDeviceModel.value})")
+            Line("Connecting to ${setupDeviceName.value} (${setupDeviceModel.value})")
         }
         PumpSetupStage.PUMPX2_INITIAL_PUMP_CONNECTION -> {
             Line("Initial connection made to ${setupDeviceName.value}")
