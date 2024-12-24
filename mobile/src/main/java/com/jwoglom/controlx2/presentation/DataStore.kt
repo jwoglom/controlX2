@@ -23,6 +23,8 @@ import com.jwoglom.pumpx2.pump.messages.response.currentStatus.LastBolusStatusAb
 import com.jwoglom.pumpx2.pump.messages.response.currentStatus.TimeSinceResetResponse
 import com.jwoglom.pumpx2.pump.messages.response.historyLog.HistoryLog
 import com.jwoglom.controlx2.presentation.screens.PumpSetupStage
+import com.jwoglom.controlx2.shared.enums.BasalStatus
+import com.jwoglom.controlx2.shared.enums.UserMode
 import timber.log.Timber
 import java.time.Instant
 
@@ -46,9 +48,9 @@ class DataStore {
     val cartridgeRemainingEstimate = MutableLiveData<Boolean>()
     val lastBolusStatus = MutableLiveData<String>()
     val controlIQStatus = MutableLiveData<String>()
-    val controlIQMode = MutableLiveData<String>()
+    val controlIQMode = MutableLiveData<UserMode>()
     val basalRate = MutableLiveData<String>()
-    var basalStatus = MutableLiveData<String>()
+    var basalStatus = MutableLiveData<BasalStatus>()
     val cgmSessionState = MutableLiveData<String>()
     val cgmSessionExpireRelative = MutableLiveData<String>()
     val cgmSessionExpireExact = MutableLiveData<String>()

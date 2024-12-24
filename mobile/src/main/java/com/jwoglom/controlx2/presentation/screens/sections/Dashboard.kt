@@ -58,6 +58,8 @@ import com.jwoglom.controlx2.presentation.screens.sections.components.PumpStatus
 import com.jwoglom.controlx2.presentation.screens.setUpPreviewState
 import com.jwoglom.controlx2.presentation.theme.ControlX2Theme
 import com.jwoglom.controlx2.presentation.util.LifecycleStateObserver
+import com.jwoglom.controlx2.shared.enums.BasalStatus
+import com.jwoglom.controlx2.shared.enums.UserMode
 import com.jwoglom.controlx2.shared.presentation.intervalOf
 import com.jwoglom.controlx2.shared.util.SendType
 import com.jwoglom.pumpx2.pump.messages.request.currentStatus.HistoryLogStatusRequest
@@ -231,7 +233,7 @@ fun Dashboard(
 
                     LaunchedEffect(basalRate.value, basalStatus.value) {
                         dataStore.landingBasalDisplayedText.value = when (basalStatus.value) {
-                            "On", "Zero", "Increased", "Reduced", null -> when (basalRate.value) {
+                            BasalStatus.ON, BasalStatus.ZERO, BasalStatus.CONTROLIQ_INCREASED, BasalStatus.CONTROLIQ_REDUCED, BasalStatus.UNKNOWN, null -> when (basalRate.value) {
                                 null -> null
                                 else -> "${basalRate.value}"
                             }
@@ -255,7 +257,7 @@ fun Dashboard(
 
                     LaunchedEffect(controlIQStatus.value, controlIQMode.value) {
                         dataStore.landingControlIQDisplayedText.value = when (controlIQMode.value) {
-                            "Sleep", "Exercise" -> "${controlIQMode.value}"
+                            UserMode.SLEEP, UserMode.EXERCISE -> "${controlIQMode.value}"
                             else -> when (controlIQStatus.value) {
                                 null -> null
                                 else -> "${controlIQStatus.value}"

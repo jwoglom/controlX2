@@ -72,6 +72,8 @@ import com.jwoglom.controlx2.presentation.screens.sections.messagePairToJson
 import com.jwoglom.controlx2.presentation.screens.sections.verbosePumpMessage
 import com.jwoglom.controlx2.presentation.util.ShouldLogToFile
 import com.jwoglom.controlx2.shared.PumpMessageSerializer
+import com.jwoglom.controlx2.shared.enums.BasalStatus
+import com.jwoglom.controlx2.shared.enums.UserMode
 import com.jwoglom.controlx2.shared.util.SendType
 import com.jwoglom.controlx2.shared.util.pumpTimeToLocalTz
 import com.jwoglom.controlx2.shared.util.setupTimber
@@ -598,9 +600,10 @@ class MainActivity : ComponentActivity(), GoogleApiClient.ConnectionCallbacks, G
             }
             is ControlIQInfoAbstractResponse -> {
                 dataStore.controlIQMode.value = when (message.currentUserModeType) {
-                    ControlIQInfoAbstractResponse.UserModeType.SLEEP -> "Sleep"
-                    ControlIQInfoAbstractResponse.UserModeType.EXERCISE -> "Exercise"
-                    else -> ""
+                    ControlIQInfoAbstractResponse.UserModeType.STANDARD -> UserMode.NONE
+                    ControlIQInfoAbstractResponse.UserModeType.SLEEP -> UserMode.SLEEP
+                    ControlIQInfoAbstractResponse.UserModeType.EXERCISE -> UserMode.EXERCISE
+                    else -> UserMode.UNKNOWN
                 }
             }
             is InsulinStatusResponse -> {
@@ -636,15 +639,15 @@ class MainActivity : ComponentActivity(), GoogleApiClient.ConnectionCallbacks, G
                 }
                 dataStore.cgmDeltaArrow.value = message.cgmTrendIcon.arrow()
                 dataStore.basalStatus.value = when (message.basalStatusIcon) {
-                    HomeScreenMirrorResponse.BasalStatusIcon.BASAL -> "On"
-                    HomeScreenMirrorResponse.BasalStatusIcon.ZERO_BASAL -> "Zero"
-                    HomeScreenMirrorResponse.BasalStatusIcon.TEMP_RATE -> "Temp Rate"
-                    HomeScreenMirrorResponse.BasalStatusIcon.ZERO_TEMP_RATE -> "Zero Temp Rate"
-                    HomeScreenMirrorResponse.BasalStatusIcon.SUSPEND -> "Suspended"
-                    HomeScreenMirrorResponse.BasalStatusIcon.HYPO_SUSPEND_BASAL_IQ -> "Suspended from BG"
-                    HomeScreenMirrorResponse.BasalStatusIcon.INCREASE_BASAL -> "Increased"
-                    HomeScreenMirrorResponse.BasalStatusIcon.ATTENUATED_BASAL -> "Reduced"
-                    else -> ""
+                    HomeScreenMirrorResponse.BasalStatusIcon.BASAL -> BasalStatus.ON
+                    HomeScreenMirrorResponse.BasalStatusIcon.ZERO_BASAL -> BasalStatus.ZERO
+                    HomeScreenMirrorResponse.BasalStatusIcon.TEMP_RATE -> BasalStatus.TEMP_RATE
+                    HomeScreenMirrorResponse.BasalStatusIcon.ZERO_TEMP_RATE -> BasalStatus.ZERO_TEMP_RATE
+                    HomeScreenMirrorResponse.BasalStatusIcon.SUSPEND -> BasalStatus.PUMP_SUSPENDED
+                    HomeScreenMirrorResponse.BasalStatusIcon.HYPO_SUSPEND_BASAL_IQ -> BasalStatus.BASALIQ_SUSPENDED
+                    HomeScreenMirrorResponse.BasalStatusIcon.INCREASE_BASAL -> BasalStatus.CONTROLIQ_INCREASED
+                    HomeScreenMirrorResponse.BasalStatusIcon.ATTENUATED_BASAL -> BasalStatus.CONTROLIQ_REDUCED
+                    else -> BasalStatus.UNKNOWN
                 }
                 dataStore.cartridgeRemainingEstimate.value = message.remainingInsulinPlusIcon
             }

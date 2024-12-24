@@ -60,6 +60,8 @@ import com.jwoglom.controlx2.presentation.ui.resetBolusDataStoreState
 import com.jwoglom.controlx2.shared.InitiateConfirmedBolusSerializer
 import com.jwoglom.controlx2.shared.PumpMessageSerializer
 import com.jwoglom.controlx2.shared.PumpQualifyingEventsSerializer
+import com.jwoglom.controlx2.shared.enums.BasalStatus
+import com.jwoglom.controlx2.shared.enums.UserMode
 import com.jwoglom.controlx2.shared.util.SendType
 import com.jwoglom.controlx2.shared.util.pumpTimeToLocalTz
 import com.jwoglom.controlx2.shared.util.setupTimber
@@ -366,9 +368,10 @@ class MainActivity : ComponentActivity(), MessageApi.MessageListener, GoogleApiC
             }
             is ControlIQInfoAbstractResponse -> {
                 dataStore.controlIQMode.value = when (message.currentUserModeType) {
-                    UserModeType.SLEEP -> "Sleep"
-                    UserModeType.EXERCISE -> "Exercise"
-                    else -> ""
+                    UserModeType.STANDARD -> UserMode.NONE
+                    UserModeType.SLEEP -> UserMode.SLEEP
+                    UserModeType.EXERCISE -> UserMode.EXERCISE
+                    else -> UserMode.UNKNOWN
                 }
             }
             is InsulinStatusResponse -> {
@@ -404,15 +407,15 @@ class MainActivity : ComponentActivity(), MessageApi.MessageListener, GoogleApiC
                 }
                 dataStore.cgmDeltaArrow.value = message.cgmTrendIcon.arrow()
                 dataStore.basalStatus.value = when (message.basalStatusIcon) {
-                    BasalStatusIcon.BASAL -> "On"
-                    BasalStatusIcon.ZERO_BASAL -> "Zero"
-                    BasalStatusIcon.TEMP_RATE -> "Temp Rate"
-                    BasalStatusIcon.ZERO_TEMP_RATE -> "Zero Temp Rate"
-                    BasalStatusIcon.SUSPEND -> "Suspended"
-                    BasalStatusIcon.HYPO_SUSPEND_BASAL_IQ -> "Suspended from BG"
-                    BasalStatusIcon.INCREASE_BASAL -> "Increased"
-                    BasalStatusIcon.ATTENUATED_BASAL -> "Reduced"
-                    else -> ""
+                    BasalStatusIcon.BASAL -> BasalStatus.ON
+                    BasalStatusIcon.ZERO_BASAL -> BasalStatus.ZERO
+                    BasalStatusIcon.TEMP_RATE -> BasalStatus.TEMP_RATE
+                    BasalStatusIcon.ZERO_TEMP_RATE -> BasalStatus.ZERO_TEMP_RATE
+                    BasalStatusIcon.SUSPEND -> BasalStatus.PUMP_SUSPENDED
+                    BasalStatusIcon.HYPO_SUSPEND_BASAL_IQ -> BasalStatus.BASALIQ_SUSPENDED
+                    BasalStatusIcon.INCREASE_BASAL -> BasalStatus.CONTROLIQ_INCREASED
+                    BasalStatusIcon.ATTENUATED_BASAL -> BasalStatus.CONTROLIQ_REDUCED
+                    else -> BasalStatus.UNKNOWN
                 }
                 dataStore.cartridgeRemainingEstimate.value = message.remainingInsulinPlusIcon
             }

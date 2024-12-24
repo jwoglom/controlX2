@@ -37,6 +37,7 @@ import androidx.compose.ui.unit.sp
 import androidx.navigation.NavHostController
 import com.jwoglom.controlx2.Prefs
 import com.jwoglom.controlx2.R
+import com.jwoglom.controlx2.presentation.components.HeaderLine
 import com.jwoglom.controlx2.presentation.navigation.Screen
 import com.jwoglom.controlx2.presentation.screens.sections.components.VersionInfo
 import com.jwoglom.controlx2.presentation.theme.ControlX2Theme
@@ -66,9 +67,13 @@ fun Settings(
             .fillMaxSize()
             .padding(horizontal = 0.dp),
         content = {
+            item {
+                HeaderLine("Settings")
+            }
 
             item {
                 VersionInfo(context)
+                Divider()
             }
 
             item {

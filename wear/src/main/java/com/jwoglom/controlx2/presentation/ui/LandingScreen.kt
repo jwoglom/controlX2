@@ -73,6 +73,8 @@ import com.jwoglom.controlx2.presentation.defaultTheme
 import com.jwoglom.controlx2.presentation.greenTheme
 import com.jwoglom.controlx2.presentation.navigation.Screen
 import com.jwoglom.controlx2.presentation.redTheme
+import com.jwoglom.controlx2.shared.enums.BasalStatus
+import com.jwoglom.controlx2.shared.enums.UserMode
 import com.jwoglom.controlx2.shared.util.SendType
 import hu.supercluster.paperwork.Paperwork
 import kotlinx.coroutines.Dispatchers
@@ -292,7 +294,7 @@ fun LandingScreen(
 
                 LaunchedEffect (basalRate.value, basalStatus.value) {
                     dataStore.landingBasalDisplayedText.value = when (basalStatus.value) {
-                        "On", "Zero", "Increased", "Reduced", null -> when (basalRate.value) {
+                        BasalStatus.ON, BasalStatus.ZERO, BasalStatus.CONTROLIQ_INCREASED, BasalStatus.CONTROLIQ_REDUCED, BasalStatus.UNKNOWN, null -> when (basalRate.value) {
                             null -> null
                             else -> "${basalRate.value}"
                         }
@@ -319,7 +321,7 @@ fun LandingScreen(
 
                 LaunchedEffect (controlIQStatus.value, controlIQMode.value) {
                     dataStore.landingControlIQDisplayedText.value = when (controlIQMode.value) {
-                        "Sleep", "Exercise" -> "${controlIQMode.value}"
+                        UserMode.SLEEP, UserMode.EXERCISE -> "${controlIQMode.value}"
                         else -> when (controlIQStatus.value) {
                             null -> "?"
                             else -> "${controlIQStatus.value}"

@@ -1,6 +1,8 @@
 package com.jwoglom.controlx2.presentation
 
 import androidx.lifecycle.MutableLiveData
+import com.jwoglom.controlx2.shared.enums.BasalStatus
+import com.jwoglom.controlx2.shared.enums.UserMode
 import com.jwoglom.pumpx2.pump.messages.calculator.BolusCalcCondition
 import com.jwoglom.pumpx2.pump.messages.calculator.BolusCalcUnits
 import com.jwoglom.pumpx2.pump.messages.calculator.BolusCalculatorBuilder
@@ -25,9 +27,9 @@ class DataStore {
     val cartridgeRemainingEstimate = MutableLiveData<Boolean>()
     val lastBolusStatus = MutableLiveData<String>()
     val controlIQStatus = MutableLiveData<String>()
-    val controlIQMode = MutableLiveData<String>()
+    val controlIQMode = MutableLiveData<UserMode>()
     val basalRate = MutableLiveData<String>()
-    var basalStatus = MutableLiveData<String>()
+    var basalStatus = MutableLiveData<BasalStatus>()
     val cgmSessionState = MutableLiveData<String>()
     val cgmSessionExpireRelative = MutableLiveData<String>()
     val cgmSessionExpireExact = MutableLiveData<String>()

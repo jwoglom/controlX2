@@ -91,6 +91,7 @@ import com.jwoglom.controlx2.Prefs
 import com.jwoglom.controlx2.dataStore
 import com.jwoglom.controlx2.db.historylog.HistoryLogDatabase
 import com.jwoglom.controlx2.db.historylog.HistoryLogRepo
+import com.jwoglom.controlx2.presentation.components.HeaderLine
 import com.jwoglom.controlx2.presentation.theme.ControlX2Theme
 import com.jwoglom.controlx2.shared.util.SendType
 import com.jwoglom.controlx2.shared.util.shortTimeAgo
@@ -187,6 +188,9 @@ fun Debug(
             .fillMaxSize()
             .padding(horizontal = 0.dp),
         content = {
+            item {
+                HeaderLine("Debug")
+            }
             item {
                 Box(
                     modifier = Modifier

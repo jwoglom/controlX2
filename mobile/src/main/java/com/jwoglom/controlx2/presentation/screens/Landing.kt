@@ -24,6 +24,7 @@ import androidx.compose.material.BottomSheetValue
 import androidx.compose.material.ExperimentalMaterialApi
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Build
+import androidx.compose.material.icons.filled.Create
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Settings
@@ -67,6 +68,7 @@ import com.jwoglom.controlx2.R
 import com.jwoglom.controlx2.dataStore
 import com.jwoglom.controlx2.db.historylog.HistoryLogViewModel
 import com.jwoglom.controlx2.presentation.DataStore
+import com.jwoglom.controlx2.presentation.screens.sections.Actions
 import com.jwoglom.controlx2.presentation.screens.sections.BolusWindow
 import com.jwoglom.controlx2.presentation.screens.sections.Dashboard
 import com.jwoglom.controlx2.presentation.screens.sections.Debug
@@ -76,6 +78,8 @@ import com.jwoglom.controlx2.presentation.screens.sections.dashboardFields
 import com.jwoglom.controlx2.presentation.screens.sections.resetBolusDataStoreState
 import com.jwoglom.controlx2.presentation.theme.Colors
 import com.jwoglom.controlx2.presentation.theme.ControlX2Theme
+import com.jwoglom.controlx2.shared.enums.BasalStatus
+import com.jwoglom.controlx2.shared.enums.UserMode
 import com.jwoglom.controlx2.shared.util.SendType
 import kotlinx.coroutines.launch
 import java.time.Instant
@@ -220,6 +224,15 @@ fun Landing(
                                 historyLogViewModel = historyLogViewModel,
                             )
                         }
+                        LandingSection.ACTIONS -> {
+                            Actions(
+                                innerPadding = innerPadding,
+                                navController = navController,
+                                sendMessage = sendMessage,
+                                sendPumpCommands = sendPumpCommands,
+                                historyLogViewModel = historyLogViewModel,
+                            )
+                        }
                         LandingSection.DEBUG -> {
                             Debug(
                                 innerPadding = innerPadding,
@@ -299,6 +312,7 @@ fun Landing(
 
 enum class LandingSection(val label: String, val icon: ImageVector) {
     DASHBOARD("Dashboard", Icons.Filled.Info),
+    ACTIONS("Actions", Icons.Filled.Create),
     DEBUG("Debug", Icons.Filled.Build),
     SETTINGS("Settings", Icons.Filled.Settings),
     ;
@@ -314,6 +328,8 @@ fun setUpPreviewState(ds: DataStore) {
     ds.batteryPercent.value = 50
     ds.iobUnits.value = 0.5
     ds.cartridgeRemainingUnits.value = 100
+    ds.basalStatus.value = BasalStatus.ON
+    ds.controlIQMode.value = UserMode.EXERCISE
 }
 
 @Preview(showBackground = true)
