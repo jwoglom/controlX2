@@ -77,6 +77,7 @@ import com.jwoglom.controlx2.LocalDataStore
 import com.jwoglom.controlx2.Prefs
 import com.jwoglom.controlx2.R
 import com.jwoglom.controlx2.presentation.DataStore
+import com.jwoglom.controlx2.presentation.components.HeaderLine
 import com.jwoglom.controlx2.presentation.screens.BolusPreview
 import com.jwoglom.controlx2.presentation.screens.sections.components.DecimalOutlinedText
 import com.jwoglom.controlx2.presentation.screens.sections.components.IntegerOutlinedText
@@ -298,6 +299,8 @@ fun BolusWindow(
     LaunchedEffect (unitsRawValue.value, carbsRawValue.value, glucoseRawValue.value, bolusCalcDataSnapshot.value, bolusCalcLastBG.value) {
         recalculate()
     }
+
+    HeaderLine("Bolus")
 
     Row(
         modifier = Modifier.fillMaxWidth()

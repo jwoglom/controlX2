@@ -190,6 +190,7 @@ fun Debug(
         content = {
             item {
                 HeaderLine("Debug")
+                Divider()
             }
             item {
                 Box(

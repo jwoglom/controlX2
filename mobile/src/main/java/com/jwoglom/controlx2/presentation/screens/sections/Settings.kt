@@ -69,6 +69,7 @@ fun Settings(
         content = {
             item {
                 HeaderLine("Settings")
+                Divider()
             }
 
             item {

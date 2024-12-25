@@ -25,6 +25,7 @@ import com.jwoglom.pumpx2.pump.messages.response.historyLog.HistoryLog
 import com.jwoglom.controlx2.presentation.screens.PumpSetupStage
 import com.jwoglom.controlx2.shared.enums.BasalStatus
 import com.jwoglom.controlx2.shared.enums.UserMode
+import com.jwoglom.pumpx2.pump.messages.response.currentStatus.TempRateResponse
 import timber.log.Timber
 import java.time.Instant
 
@@ -51,6 +52,8 @@ class DataStore {
     val controlIQMode = MutableLiveData<UserMode>()
     val basalRate = MutableLiveData<String>()
     var basalStatus = MutableLiveData<BasalStatus>()
+    var tempRateActive = MutableLiveData<Boolean>()
+    var tempRateDetails = MutableLiveData<TempRateResponse>()
     val cgmSessionState = MutableLiveData<String>()
     val cgmSessionExpireRelative = MutableLiveData<String>()
     val cgmSessionExpireExact = MutableLiveData<String>()
@@ -80,6 +83,10 @@ class DataStore {
     val bolusUnitsRawValue = MutableLiveData<String?>()
     val bolusCarbsRawValue = MutableLiveData<String?>()
     val bolusGlucoseRawValue = MutableLiveData<String?>()
+
+    val tempRatePercentRawValue = MutableLiveData<String?>()
+    val tempRateMinutesRawValue = MutableLiveData<String?>()
+    val tempRateHoursRawValue = MutableLiveData<String?>()
 
     val timeSinceResetResponse = MutableLiveData<TimeSinceResetResponse>()
     val bolusPermissionResponse = MutableLiveData<BolusPermissionResponse>()
@@ -118,6 +125,8 @@ class DataStore {
         controlIQMode.observeForever { t -> Timber.i("DataStore.controlIQMode=$t") }
         basalRate.observeForever { t -> Timber.i("DataStore.basalRate=$t") }
         basalStatus.observeForever { t -> Timber.i("DataStore.basalStatus=$t") }
+        tempRateActive.observeForever { t -> Timber.i("DataStore.tempRateActive=$t") }
+        tempRateDetails.observeForever { t -> Timber.i("DataStore.tempRateDetails=$t") }
         cgmSessionState.observeForever { t -> Timber.i("DataStore.cgmSessionState=$t") }
         cgmSessionExpireRelative.observeForever { t -> Timber.i("DataStore.cgmSessionExpireRelative=$t") }
         cgmSessionExpireExact.observeForever { t -> Timber.i("DataStore.cgmSessionExpireExact=$t") }
@@ -147,6 +156,10 @@ class DataStore {
         bolusUnitsRawValue.observeForever { t -> Timber.i("DataStore.bolusUnitsRawValue=$t") }
         bolusCarbsRawValue.observeForever { t -> Timber.i("DataStore.bolusCarbsRawValue=$t") }
         bolusGlucoseRawValue.observeForever { t -> Timber.i("DataStore.bolusGlucoseRawValue=$t") }
+
+        tempRatePercentRawValue.observeForever { t -> Timber.i("DataStore.tempRatePercentRawValue=$t") }
+        tempRateMinutesRawValue.observeForever { t -> Timber.i("DataStore.tempRateMinutesRawValue=$t") }
+        tempRateHoursRawValue.observeForever { t -> Timber.i("DataStore.tempRateHoursRawValue=$t") }
 
         timeSinceResetResponse.observeForever { t -> Timber.i("DataStore.timeSinceResetResponse=$t") }
         bolusPermissionResponse.observeForever { t -> Timber.i("DataStore.bolusPermissionResponse=$t") }

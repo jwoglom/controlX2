@@ -18,7 +18,8 @@ import androidx.compose.ui.text.input.KeyboardType
 fun IntegerOutlinedText(
     title: String,
     value: String?,
-    onValueChange: (String) -> Unit
+    onValueChange: (String) -> Unit,
+    modifier: Modifier = Modifier
 ) {
     var error = false
 
@@ -44,6 +45,6 @@ fun IntegerOutlinedText(
         colors = if (isSystemInDarkTheme())
             TextFieldDefaults.outlinedTextFieldColors(textColor = Color.DarkGray, placeholderColor = Color.DarkGray)
         else TextFieldDefaults.outlinedTextFieldColors(),
-        modifier = Modifier.fillMaxWidth()
+        modifier = modifier.fillMaxWidth()
     )
 }

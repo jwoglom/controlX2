@@ -81,6 +81,7 @@ import com.jwoglom.controlx2.shared.util.shortTime
 import com.jwoglom.controlx2.shared.util.shortTimeAgo
 import com.jwoglom.controlx2.shared.util.twoDecimalPlaces1000Unit
 import com.jwoglom.controlx2.util.extractPumpSid
+import com.jwoglom.pumpx2.pump.messages.response.currentStatus.TempRateResponse
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.SupervisorJob
 import timber.log.Timber
@@ -653,6 +654,10 @@ class MainActivity : ComponentActivity(), GoogleApiClient.ConnectionCallbacks, G
             }
             is CurrentBasalStatusResponse -> {
                 dataStore.basalRate.value = "${twoDecimalPlaces1000Unit(message.currentBasalRate)}u"
+            }
+            is TempRateResponse -> {
+                dataStore.tempRateActive.value = message.active
+                dataStore.tempRateDetails.value = message
             }
             is CGMStatusResponse -> {
                 dataStore.cgmSessionState.value = when (message.sessionState) {

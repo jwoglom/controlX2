@@ -14,17 +14,20 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.wrapContentSize
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.material.BottomSheetState
+import androidx.compose.material.BottomSheetValue
 import androidx.compose.material.ExperimentalMaterialApi
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.pullrefresh.PullRefreshIndicator
 import androidx.compose.material.pullrefresh.pullRefresh
 import androidx.compose.material.pullrefresh.rememberPullRefreshState
+import androidx.compose.material.rememberBottomSheetScaffoldState
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Divider
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -58,6 +61,7 @@ import com.jwoglom.controlx2.dataStore
 import com.jwoglom.controlx2.db.historylog.HistoryLogViewModel
 import com.jwoglom.controlx2.presentation.components.HeaderLine
 import com.jwoglom.controlx2.presentation.components.Line
+import com.jwoglom.controlx2.presentation.screens.TempRatePreview
 import com.jwoglom.controlx2.presentation.screens.setUpPreviewState
 import com.jwoglom.controlx2.presentation.theme.ControlX2Theme
 import com.jwoglom.controlx2.presentation.util.LifecycleStateObserver
@@ -65,12 +69,15 @@ import com.jwoglom.controlx2.shared.enums.BasalStatus
 import com.jwoglom.controlx2.shared.enums.UserMode
 import com.jwoglom.controlx2.shared.presentation.intervalOf
 import com.jwoglom.controlx2.shared.util.SendType
+import com.jwoglom.controlx2.util.determinePumpModel
 import com.jwoglom.pumpx2.pump.messages.builders.ControlIQInfoRequestBuilder
+import com.jwoglom.pumpx2.pump.messages.models.KnownDeviceModel
 import com.jwoglom.pumpx2.pump.messages.request.control.ResumePumpingRequest
 import com.jwoglom.pumpx2.pump.messages.request.control.SetModesRequest
+import com.jwoglom.pumpx2.pump.messages.request.control.StopTempRateRequest
 import com.jwoglom.pumpx2.pump.messages.request.control.SuspendPumpingRequest
-import com.jwoglom.pumpx2.pump.messages.request.currentStatus.CurrentBolusStatusRequest
 import com.jwoglom.pumpx2.pump.messages.request.currentStatus.HomeScreenMirrorRequest
+import com.jwoglom.pumpx2.pump.messages.request.currentStatus.TempRateRequest
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
@@ -84,16 +91,20 @@ fun Actions(
     sendMessage: (String, ByteArray) -> Unit,
     sendPumpCommands: (SendType, List<Message>) -> Unit,
     historyLogViewModel: HistoryLogViewModel? = null,
-    resumeInsulinMenuState: Boolean = false,
-    suspendInsulinMenuState: Boolean = false
+    _resumeInsulinMenuState: Boolean = false,
+    _suspendInsulinMenuState: Boolean = false,
+    _stopTempRateMenuState: Boolean = false,
+    openTempRateWindow: () -> Unit
 ) {
     val coroutineScope = rememberCoroutineScope()
 
-    var showResumeInsulinMenu by remember { mutableStateOf(resumeInsulinMenuState) }
-    var showSuspendInsulinMenu by remember { mutableStateOf(suspendInsulinMenuState) }
+    var showResumeInsulinMenu by remember { mutableStateOf(_resumeInsulinMenuState) }
+    var showSuspendInsulinMenu by remember { mutableStateOf(_suspendInsulinMenuState) }
+    var showStopTempRateMenu by remember { mutableStateOf(_stopTempRateMenuState) }
 
     val context = LocalContext.current
     val ds = LocalDataStore.current
+    val deviceName = ds.setupDeviceName.observeAsState()
 
     val refreshScope = rememberCoroutineScope()
     var refreshing by remember { mutableStateOf(true) }
@@ -174,6 +185,13 @@ fun Actions(
             content = {
                 item {
                     HeaderLine("Actions")
+                    Divider()
+
+                    val model = determinePumpModel(deviceName.value ?: "")
+                    if (model == KnownDeviceModel.TSLIM_X2) {
+                        Line("Actions are not supported on this device model (${model}). Only remote bolus is supported.")
+                        Line("")
+                    }
                 }
                 item {
                     val basalStatus = ds.basalStatus.observeAsState()
@@ -261,9 +279,6 @@ fun Actions(
                                                 }
                                             }
                                         },
-                                        colors = ButtonDefaults.textButtonColors(
-                                            containerColor = Color.Green.copy(alpha = 0.5F)
-                                        ),
                                         modifier = Modifier.padding(top = 16.dp)
                                     ) {
                                         Text("Resume insulin")
@@ -312,9 +327,6 @@ fun Actions(
                                                 }
                                             }
                                         },
-                                        colors = ButtonDefaults.textButtonColors(
-                                            containerColor = Color.Red.copy(alpha = 0.5F)
-                                        ),
                                         modifier = Modifier.padding(top = 16.dp)
                                     ) {
                                         Text("Stop insulin")
@@ -445,18 +457,113 @@ fun Actions(
                         )
                     }
                 }
+
+                item {
+                    Line("\n")
+                }
+
+
+                item {
+                    val tempRateActive = ds.tempRateActive.observeAsState()
+                    val tempRateDetails = ds.tempRateDetails.observeAsState()
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .wrapContentSize(Alignment.TopStart)
+                    ) {
+                        ListItem(
+                            headlineText = { Text(
+                                when (tempRateActive.value) {
+                                    true -> "Stop Temp Rate"
+                                    else -> "Start Temp Rate"
+                                }
+                            )},
+                            supportingText = { 
+                                when (tempRateActive.value) {
+                                    true -> Text("Active: ${tempRateDetails.value?.percentage}% for ${tempRateDetails.value?.duration}")
+                                    else -> null
+                                }
+                            },
+                            leadingContent = {
+                                Icon(
+                                    when (tempRateActive.value) {
+                                        true -> Icons.Filled.Close
+                                        else -> Icons.Filled.Settings
+                                    },
+                                    contentDescription = null,
+                                )
+                            },
+                            modifier = Modifier.clickable {
+                                when (tempRateActive.value) {
+                                    true -> { showStopTempRateMenu = true }
+                                    else -> { openTempRateWindow() }
+                                }
+                            }
+                        )
+                        DropdownMenu(
+                            expanded = showStopTempRateMenu,
+                            onDismissRequest = { showStopTempRateMenu = false },
+                            modifier = Modifier.fillMaxWidth(),
+                        ) {
+
+                            AlertDialog(
+                                onDismissRequest = {},
+                                title = {
+                                    Text("Stop Temp Rate")
+                                },
+                                text = {
+                                    Text("Stop the active temp rate: ${tempRateDetails.value?.percentage}% for ${tempRateDetails.value?.duration} beginning ${tempRateDetails.value?.startTime}")
+                                },
+                                dismissButton = {
+                                    TextButton(
+                                        onClick = {
+                                            showStopTempRateMenu = false
+                                        },
+                                        modifier = Modifier.padding(top = 16.dp)
+                                    ) {
+                                        Text("Cancel")
+                                    }
+                                },
+                                confirmButton = {
+                                    TextButton(
+                                        onClick = {
+                                            showStopTempRateMenu = false
+                                            sendPumpCommands(SendType.BUST_CACHE, listOf(StopTempRateRequest()))
+                                            refreshScope.launch {
+                                                repeat(5) {
+                                                    Thread.sleep(1000)
+                                                    sendPumpCommands(
+                                                        SendType.BUST_CACHE,
+                                                        listOf(TempRateRequest())
+                                                    )
+                                                }
+                                            }
+                                        },
+                                        modifier = Modifier.padding(top = 16.dp)
+                                    ) {
+                                        Text("Stop temp rate")
+                                    }
+                                }
+                            )
+
+                        }
+                    }
+                }
             }
         )
     }
 }
 val actionsCommands = listOf(
     HomeScreenMirrorRequest(),
-    ControlIQInfoRequestBuilder.create(apiVersion())
+    ControlIQInfoRequestBuilder.create(apiVersion()),
+    TempRateRequest()
 )
 
 val actionsFields = listOf(
     dataStore.basalStatus,
-    dataStore.controlIQMode
+    dataStore.controlIQMode,
+    dataStore.tempRateActive,
+    dataStore.tempRateDetails
 )
 
 @Preview(showBackground = true)
@@ -471,6 +578,7 @@ private fun DefaultPreviewInsulinActive() {
             Actions(
                 sendMessage = { _, _ -> },
                 sendPumpCommands = { _, _ -> },
+                openTempRateWindow = {}
             )
         }
     }
@@ -488,7 +596,8 @@ private fun DefaultPreviewInsulinActive_StopMenuOpen() {
             Actions(
                 sendMessage = { _, _ -> },
                 sendPumpCommands = { _, _ -> },
-                suspendInsulinMenuState = true
+                _suspendInsulinMenuState = true,
+                openTempRateWindow = {}
             )
         }
     }
@@ -507,10 +616,12 @@ private fun DefaultPreviewInsulinSuspended() {
             Actions(
                 sendMessage = { _, _ -> },
                 sendPumpCommands = { _, _ -> },
+                openTempRateWindow = {}
             )
         }
     }
 }
+
 @Preview(showBackground = true)
 @Composable
 private fun DefaultPreviewInsulinSuspended_ResumeMenuOpen() {
@@ -524,8 +635,15 @@ private fun DefaultPreviewInsulinSuspended_ResumeMenuOpen() {
             Actions(
                 sendMessage = { _, _ -> },
                 sendPumpCommands = { _, _ -> },
-                resumeInsulinMenuState = true
+                _resumeInsulinMenuState = true,
+                openTempRateWindow = {}
             )
         }
     }
+}
+
+@Preview(showBackground = true)
+@Composable
+private fun DefaultPreview_StartTempRate() {
+    TempRatePreview()
 }

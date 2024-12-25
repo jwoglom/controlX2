@@ -12,5 +12,4 @@ fun HeaderLine(
     text: String
 ) {
     Line(text, style = MaterialTheme.typography.headlineMedium, modifier = Modifier.padding(all = 20.dp))
-    Divider()
 }

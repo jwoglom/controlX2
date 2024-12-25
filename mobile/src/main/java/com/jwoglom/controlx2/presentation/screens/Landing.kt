@@ -73,9 +73,11 @@ import com.jwoglom.controlx2.presentation.screens.sections.BolusWindow
 import com.jwoglom.controlx2.presentation.screens.sections.Dashboard
 import com.jwoglom.controlx2.presentation.screens.sections.Debug
 import com.jwoglom.controlx2.presentation.screens.sections.Settings
+import com.jwoglom.controlx2.presentation.screens.sections.TempRateWindow
 import com.jwoglom.controlx2.presentation.screens.sections.dashboardCommands
 import com.jwoglom.controlx2.presentation.screens.sections.dashboardFields
 import com.jwoglom.controlx2.presentation.screens.sections.resetBolusDataStoreState
+import com.jwoglom.controlx2.presentation.screens.sections.resetTempRateDataStoreState
 import com.jwoglom.controlx2.presentation.theme.Colors
 import com.jwoglom.controlx2.presentation.theme.ControlX2Theme
 import com.jwoglom.controlx2.shared.enums.BasalStatus
@@ -92,7 +94,8 @@ fun Landing(
     sendServiceBolusRequest: (Int, BolusParameters, BolusCalcUnits, BolusCalcDataSnapshotResponse, TimeSinceResetResponse) -> Unit,
     sendServiceBolusCancel: () -> Unit,
     sectionState: LandingSection = LandingSection.DASHBOARD,
-    bolusSheetState: BottomSheetValue = BottomSheetValue.Collapsed,
+    bottomScaffoldDisplayState: BottomSheetValue = BottomSheetValue.Collapsed,
+    _bottomScaffoldState: BottomScaffoldState = BottomScaffoldState.NONE,
     historyLogViewModel: HistoryLogViewModel? = null,
 ) {
     val context = LocalContext.current
@@ -106,14 +109,15 @@ fun Landing(
     val deviceName = ds.setupDeviceName.observeAsState()
 
     var selectedItem by remember { mutableStateOf(sectionState) }
-    val displayBolusWindow = rememberBottomSheetScaffoldState(
-        bottomSheetState = BottomSheetState(bolusSheetState)
+    val displayBottomScaffold = rememberBottomSheetScaffoldState(
+        bottomSheetState = BottomSheetState(bottomScaffoldDisplayState)
     )
+    var bottomScaffoldState by remember { mutableStateOf(_bottomScaffoldState) }
 
-    fun showBolusWindow(): Boolean {
-        return displayBolusWindow.bottomSheetState.isExpanded ||
-            displayBolusWindow.bottomSheetState.isAnimationRunning ||
-            bolusSheetState == BottomSheetValue.Expanded
+    fun showBottomScaffold(): Boolean {
+        return displayBottomScaffold.bottomSheetState.isExpanded ||
+            displayBottomScaffold.bottomSheetState.isAnimationRunning ||
+            _bottomScaffoldState != BottomScaffoldState.NONE
     }
 
     Scaffold(
@@ -163,7 +167,7 @@ fun Landing(
         },
         content = { innerPadding ->
             BottomSheetScaffold(
-                scaffoldState = displayBolusWindow,
+                scaffoldState = displayBottomScaffold,
                 sheetContent = {
                     LazyColumn(
                         contentPadding = PaddingValues(all = 16.dp),
@@ -181,23 +185,38 @@ fun Landing(
                             item {
                                 // Fix for Android Studio preview which renders the scaffold at the
                                 // top of the screen instead of half-way.
-                                if (bolusSheetState == BottomSheetValue.Expanded) {
+                                if (bottomScaffoldDisplayState == BottomSheetValue.Expanded) {
                                     Spacer(Modifier.size(100.dp))
                                 }
-                                if (showBolusWindow()) {
+                                if (bottomScaffoldState == BottomScaffoldState.BOLUS_WINDOW) {
                                     BolusWindow(
                                         sendPumpCommands = sendPumpCommands,
                                         sendServiceBolusRequest = sendServiceBolusRequest,
                                         sendServiceBolusCancel = sendServiceBolusCancel,
                                         closeWindow = {
                                             coroutineScope.launch {
-                                                displayBolusWindow.bottomSheetState.collapse()
+                                                displayBottomScaffold.bottomSheetState.collapse()
                                                 resetBolusDataStoreState(dataStore)
+                                                bottomScaffoldState = BottomScaffoldState.NONE
                                             }
                                         }
                                     )
                                 } else {
                                     resetBolusDataStoreState(dataStore)
+                                }
+                                if (bottomScaffoldState == BottomScaffoldState.TEMP_RATE_WINDOW) {
+                                    TempRateWindow(
+                                        sendPumpCommands = sendPumpCommands,
+                                        closeWindow = {
+                                            coroutineScope.launch {
+                                                displayBottomScaffold.bottomSheetState.collapse()
+                                                resetTempRateDataStoreState(dataStore)
+                                                bottomScaffoldState = BottomScaffoldState.NONE
+                                            }
+                                        }
+                                    )
+                                } else {
+                                    resetTempRateDataStoreState(dataStore)
                                 }
                             }
                             item {
@@ -231,6 +250,12 @@ fun Landing(
                                 sendMessage = sendMessage,
                                 sendPumpCommands = sendPumpCommands,
                                 historyLogViewModel = historyLogViewModel,
+                                openTempRateWindow = {
+                                    coroutineScope.launch {
+                                        bottomScaffoldState = BottomScaffoldState.BOLUS_WINDOW
+                                        displayBottomScaffold.bottomSheetState.expand()
+                                    }
+                                }
                             )
                         }
                         LandingSection.DEBUG -> {
@@ -259,16 +284,18 @@ fun Landing(
                         ExtendedFloatingActionButton(
                             onClick = {
                                 coroutineScope.launch {
-                                    if (displayBolusWindow.bottomSheetState.isCollapsed) {
-                                        displayBolusWindow.bottomSheetState.expand()
+                                    if (displayBottomScaffold.bottomSheetState.isCollapsed) {
+                                        bottomScaffoldState = BottomScaffoldState.BOLUS_WINDOW
+                                        displayBottomScaffold.bottomSheetState.expand()
 
                                     } else {
-                                        displayBolusWindow.bottomSheetState.collapse()
+                                        displayBottomScaffold.bottomSheetState.collapse()
+                                        bottomScaffoldState = BottomScaffoldState.NONE
                                     }
                                 }
                             },
                             icon = {
-                                if (!showBolusWindow()) {
+                                if (!showBottomScaffold() || bottomScaffoldState != BottomScaffoldState.BOLUS_WINDOW) {
                                     Image(
                                         if (isSystemInDarkTheme()) painterResource(R.drawable.bolus_icon)
                                         else painterResource(R.drawable.bolus_icon_secondary),
@@ -286,7 +313,7 @@ fun Landing(
                             },
                             text = {
                                 Text(
-                                    if (!showBolusWindow()) "Bolus" else "Cancel",
+                                    if (!showBottomScaffold() || bottomScaffoldState != BottomScaffoldState.BOLUS_WINDOW) "Bolus" else "Cancel",
                                     color = if (isSystemInDarkTheme()) Colors.primary
                                     else Colors.onPrimary
                                 )
@@ -316,6 +343,12 @@ enum class LandingSection(val label: String, val icon: ImageVector) {
     DEBUG("Debug", Icons.Filled.Build),
     SETTINGS("Settings", Icons.Filled.Settings),
     ;
+}
+
+enum class BottomScaffoldState {
+    NONE,
+    BOLUS_WINDOW,
+    TEMP_RATE_WINDOW
 }
 
 fun setUpPreviewState(ds: DataStore) {
@@ -365,7 +398,30 @@ fun BolusPreview() {
                 sendPumpCommands = { _, _ -> },
                 sendServiceBolusRequest = { _, _, _, _, _ -> },
                 sendServiceBolusCancel = {},
-                bolusSheetState = BottomSheetValue.Expanded,
+                bottomScaffoldDisplayState = BottomSheetValue.Expanded,
+                _bottomScaffoldState = BottomScaffoldState.BOLUS_WINDOW
+            )
+        }
+    }
+}
+
+@Preview(showBackground = true)
+@Composable
+fun TempRatePreview() {
+    ControlX2Theme() {
+        Surface(
+            modifier = Modifier.fillMaxSize(),
+            color = Color.White,
+        ) {
+            setUpPreviewState(LocalDataStore.current)
+            Landing(
+                sendMessage = { _, _ -> },
+                sendPumpCommands = { _, _ -> },
+                sendServiceBolusRequest = { _, _, _, _, _ -> },
+                sendServiceBolusCancel = {},
+                bottomScaffoldDisplayState = BottomSheetValue.Expanded,
+                _bottomScaffoldState = BottomScaffoldState.TEMP_RATE_WINDOW,
+                sectionState = LandingSection.ACTIONS,
             )
         }
     }
