@@ -82,6 +82,11 @@ import com.jwoglom.controlx2.shared.util.shortTime
 import com.jwoglom.controlx2.shared.util.shortTimeAgo
 import com.jwoglom.controlx2.shared.util.twoDecimalPlaces1000Unit
 import com.jwoglom.controlx2.util.extractPumpSid
+import com.jwoglom.pumpx2.pump.messages.response.control.SetG6TransmitterIdResponse
+import com.jwoglom.pumpx2.pump.messages.response.control.SetModesResponse
+import com.jwoglom.pumpx2.pump.messages.response.control.SetTempRateResponse
+import com.jwoglom.pumpx2.pump.messages.response.control.StartG6SensorSessionResponse
+import com.jwoglom.pumpx2.pump.messages.response.control.StopG6SensorSessionResponse
 import com.jwoglom.pumpx2.pump.messages.response.currentStatus.TempRateResponse
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.SupervisorJob
@@ -729,7 +734,32 @@ class MainActivity : ComponentActivity(), GoogleApiClient.ConnectionCallbacks, G
             is TimeSinceResetResponse -> {
                 dataStore.timeSinceResetResponse.value = message
             }
+
+            // error handlers
+            is SetModesResponse -> {
+                if (message.status != 0) unsuccessfulAlert("SetModes")
+            }
+            is SetTempRateResponse -> {
+                if (message.status != 0) unsuccessfulAlert("SetTempRate")
+            }
+            is SetG6TransmitterIdResponse -> {
+                if (message.status != 0) unsuccessfulAlert("SetG6TransmitterId")
+            }
+            is StartG6SensorSessionResponse -> {
+                if (message.status != 0) unsuccessfulAlert("StartG6SensorSession")
+            }
+            is StopG6SensorSessionResponse -> {
+                if (message.status != 0) unsuccessfulAlert("StopG6SensorSession")
+            }
         }
+    }
+
+    private fun unsuccessfulAlert(req: String) {
+        AlertDialog.Builder(this)
+            .setTitle("Failed Pump Request")
+            .setMessage("$req was not successful. The pump returned an error fulfilling the request.")
+            .setPositiveButton("OK", null)
+            .create()
     }
 
     /**

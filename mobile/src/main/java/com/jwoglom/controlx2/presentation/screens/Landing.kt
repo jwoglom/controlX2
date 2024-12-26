@@ -210,8 +210,8 @@ fun Landing(
                                         closeWindow = {
                                             coroutineScope.launch {
                                                 displayBottomScaffold.bottomSheetState.collapse()
-                                                resetTempRateDataStoreState(dataStore)
                                                 bottomScaffoldState = BottomScaffoldState.NONE
+                                                resetTempRateDataStoreState(dataStore)
                                             }
                                         }
                                     )
@@ -252,7 +252,7 @@ fun Landing(
                                 historyLogViewModel = historyLogViewModel,
                                 openTempRateWindow = {
                                     coroutineScope.launch {
-                                        bottomScaffoldState = BottomScaffoldState.BOLUS_WINDOW
+                                        bottomScaffoldState = BottomScaffoldState.TEMP_RATE_WINDOW
                                         displayBottomScaffold.bottomSheetState.expand()
                                     }
                                 }

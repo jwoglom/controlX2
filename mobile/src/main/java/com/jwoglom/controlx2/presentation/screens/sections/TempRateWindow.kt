@@ -47,9 +47,11 @@ import com.jwoglom.controlx2.presentation.components.HeaderLine
 import com.jwoglom.controlx2.presentation.screens.TempRatePreview
 import com.jwoglom.controlx2.presentation.screens.sections.components.IntegerOutlinedText
 import com.jwoglom.controlx2.presentation.util.LifecycleStateObserver
+import com.jwoglom.controlx2.shared.enums.BasalStatus
 import com.jwoglom.controlx2.shared.util.SendType
 import com.jwoglom.pumpx2.pump.messages.Message
 import com.jwoglom.pumpx2.pump.messages.request.control.SetTempRateRequest
+import com.jwoglom.pumpx2.pump.messages.request.currentStatus.HomeScreenMirrorRequest
 import com.jwoglom.pumpx2.pump.messages.request.currentStatus.TempRateRequest
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -67,6 +69,7 @@ fun TempRateWindow(
 
     val refreshScope = rememberCoroutineScope()
     var refreshing by remember { mutableStateOf(true) }
+    var sending by remember { mutableStateOf(false) }
 
     val percentRawValue = dataStore.tempRatePercentRawValue.observeAsState()
     val hoursRawValue = dataStore.tempRateHoursRawValue.observeAsState()
@@ -177,7 +180,7 @@ fun TempRateWindow(
             return null
         }
 
-        if (hours < 0 || hours > 72 || minutes < 0 || minutes >= 60) {
+        if (hours < 0 || hours > 72 || minutes < 15 || minutes >= 60) {
             return null
         }
 
@@ -185,11 +188,15 @@ fun TempRateWindow(
             return null
         }
 
-        return SetTempRateRequest(
-            60*hours + minutes,
-            rawPercent
+        try {
+            return SetTempRateRequest(
+                60 * hours + minutes,
+                rawPercent
 
-        )
+            )
+        } catch (e: IllegalArgumentException) {
+            return null
+        }
     }
 
     LaunchedEffect (percentRawValue.value, hoursRawValue.value, minutesRawValue.value) {
@@ -258,6 +265,8 @@ fun TempRateWindow(
             .padding(top = 16.dp)) {
         if (refreshing) {
             CircularProgressIndicator(Modifier.align(Alignment.Center))
+        } else if (sending) {
+            /* */
         } else {
 
             Button(
@@ -296,6 +305,7 @@ fun TempRateWindow(
             }
 
             sendPumpCommands(SendType.BUST_CACHE, listOf(tempRate as Message))
+
         }
 
         fun prettyDuration(minutes: Int?): String {
@@ -331,13 +341,30 @@ fun TempRateWindow(
             confirmButton = {
                 TextButton(
                     onClick = {
-                        sendTempRateRequest()
+                        refreshScope.launch {
+                            showPermissionCheckDialog = false
+                            sending = true
+                            sendTempRateRequest()
+                            closeWindow()
+                        }
+                        refreshScope.launch {
+                            withContext(Dispatchers.IO) {
+                                Thread.sleep(250)
+                            }
+                        }
+                        refreshScope.launch {
+                            sendPumpCommands(
+                                SendType.BUST_CACHE, listOf(
+                                    TempRateRequest()
+                                )
+                            )
+                        }
                     },
                     enabled = (
                         tempRate != null
                     )
                 ) {
-                    Text("Deliver")
+                    Text("Set temp rate")
                 }
             }
         )

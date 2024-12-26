@@ -17,7 +17,6 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.ExperimentalMaterialApi
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Settings
@@ -32,6 +31,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -51,7 +51,6 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
 import androidx.navigation.NavHostController
-import com.jwoglom.pumpx2.pump.messages.Message
 import com.jwoglom.controlx2.LocalDataStore
 import com.jwoglom.controlx2.Prefs
 import com.jwoglom.controlx2.dataStore
@@ -70,12 +69,14 @@ import com.jwoglom.controlx2.shared.enums.UserMode
 import com.jwoglom.controlx2.shared.presentation.intervalOf
 import com.jwoglom.controlx2.shared.util.SendType
 import com.jwoglom.controlx2.util.determinePumpModel
+import com.jwoglom.pumpx2.pump.messages.Message
 import com.jwoglom.pumpx2.pump.messages.builders.ControlIQInfoRequestBuilder
 import com.jwoglom.pumpx2.pump.messages.models.KnownDeviceModel
 import com.jwoglom.pumpx2.pump.messages.request.control.ResumePumpingRequest
 import com.jwoglom.pumpx2.pump.messages.request.control.SetG6TransmitterIdRequest
 import com.jwoglom.pumpx2.pump.messages.request.control.SetModesRequest
 import com.jwoglom.pumpx2.pump.messages.request.control.StartG6SensorSessionRequest
+import com.jwoglom.pumpx2.pump.messages.request.control.StopG6SensorSessionRequest
 import com.jwoglom.pumpx2.pump.messages.request.control.StopTempRateRequest
 import com.jwoglom.pumpx2.pump.messages.request.control.SuspendPumpingRequest
 import com.jwoglom.pumpx2.pump.messages.request.currentStatus.CGMStatusRequest
@@ -366,44 +367,64 @@ fun Actions(
                                     else -> "Enable Exercise Mode"
                                 }
                             )},
-                            supportingText = {  },
                             leadingContent = {
                                 Icon(
                                     Icons.Filled.Person,
                                     contentDescription = null,
                                 )
                             },
-                            modifier = Modifier.clickable {
-                                when (controlIQMode.value) {
-                                    UserMode.EXERCISE -> {
-                                        // Disable
-                                        sendPumpCommands(SendType.BUST_CACHE, listOf(
-                                            SetModesRequest(SetModesRequest.ModeCommand.EXERCISE_MODE_OFF)
-                                        ))
-                                    }
-                                    UserMode.NONE -> {
-                                        // Enable
-                                        sendPumpCommands(SendType.BUST_CACHE, listOf(
-                                            SetModesRequest(SetModesRequest.ModeCommand.EXERCISE_MODE_ON)
-                                        ))
-                                    }
-                                    else -> {
-                                        Toast.makeText(context, "Exercise mode cannot be enabled because another user mode is active", Toast.LENGTH_LONG).show()
-                                    }
-                                }
+                            trailingContent = {
+                                Switch(
+                                    checked = controlIQMode.value == UserMode.EXERCISE,
+                                    onCheckedChange = { checked ->
+                                        if (checked) {
+                                            // User toggling to ON
+                                            if (controlIQMode.value == UserMode.NONE) {
+                                                sendPumpCommands(
+                                                    SendType.BUST_CACHE,
+                                                    listOf(
+                                                        SetModesRequest(SetModesRequest.ModeCommand.EXERCISE_MODE_ON)
+                                                    )
+                                                )
+                                            } else {
+                                                Toast.makeText(
+                                                    context,
+                                                    "Exercise mode cannot be enabled because another user mode is active",
+                                                    Toast.LENGTH_LONG
+                                                ).show()
+                                            }
+                                        } else {
+                                            // User toggling to OFF
+                                            if (controlIQMode.value == UserMode.EXERCISE) {
+                                                sendPumpCommands(
+                                                    SendType.BUST_CACHE,
+                                                    listOf(
+                                                        SetModesRequest(SetModesRequest.ModeCommand.EXERCISE_MODE_OFF)
+                                                    )
+                                                )
+                                            } else {
+                                                Toast.makeText(
+                                                    context,
+                                                    "Cannot disable Exercise Mode unless it’s currently active",
+                                                    Toast.LENGTH_LONG
+                                                ).show()
+                                            }
+                                        }
 
-                                refreshScope.launch {
-                                    repeat(5) {
-                                        Thread.sleep(1000)
-                                        sendPumpCommands(
-                                            SendType.BUST_CACHE,
-                                            listOf(ControlIQInfoRequestBuilder.create(apiVersion()))
-                                        )
+                                        // Refresh logic
+                                        refreshScope.launch {
+                                            repeat(5) {
+                                                Thread.sleep(1000)
+                                                sendPumpCommands(
+                                                    SendType.BUST_CACHE,
+                                                    listOf(ControlIQInfoRequestBuilder.create(apiVersion()))
+                                                )
+                                            }
+                                        }
                                     }
-                                }
+                                )
                             }
                         )
-
                     }
                 }
 
@@ -426,41 +447,62 @@ fun Actions(
                                     else -> "Enable Sleep Mode"
                                 }
                             )},
-                            supportingText = {  },
                             leadingContent = {
                                 Icon(
-                                    Icons.Filled.Home,
+                                    Icons.Filled.Person,
                                     contentDescription = null,
                                 )
                             },
-                            modifier = Modifier.clickable {
-                                when (controlIQMode.value) {
-                                    UserMode.SLEEP -> {
-                                        // Disable
-                                        sendPumpCommands(SendType.BUST_CACHE, listOf(
-                                            SetModesRequest(SetModesRequest.ModeCommand.SLEEP_MODE_OFF)
-                                        ))
-                                    }
-                                    UserMode.NONE -> {
-                                        // Enable
-                                        sendPumpCommands(SendType.BUST_CACHE, listOf(
-                                            SetModesRequest(SetModesRequest.ModeCommand.SLEEP_MODE_ON)
-                                        ))
-                                    }
-                                    else -> {
-                                        Toast.makeText(context, "Exercise mode cannot be enabled because another user mode is active", Toast.LENGTH_LONG).show()
-                                    }
-                                }
+                            trailingContent = {
+                                Switch(
+                                    checked = controlIQMode.value == UserMode.SLEEP,
+                                    onCheckedChange = { checked ->
+                                        if (checked) {
+                                            // User toggling to ON
+                                            if (controlIQMode.value == UserMode.NONE) {
+                                                sendPumpCommands(
+                                                    SendType.BUST_CACHE,
+                                                    listOf(
+                                                        SetModesRequest(SetModesRequest.ModeCommand.SLEEP_MODE_ON)
+                                                    )
+                                                )
+                                            } else {
+                                                Toast.makeText(
+                                                    context,
+                                                    "Sleep mode cannot be enabled because another user mode is active",
+                                                    Toast.LENGTH_LONG
+                                                ).show()
+                                            }
+                                        } else {
+                                            // User toggling to OFF
+                                            if (controlIQMode.value == UserMode.SLEEP) {
+                                                sendPumpCommands(
+                                                    SendType.BUST_CACHE,
+                                                    listOf(
+                                                        SetModesRequest(SetModesRequest.ModeCommand.SLEEP_MODE_OFF)
+                                                    )
+                                                )
+                                            } else {
+                                                Toast.makeText(
+                                                    context,
+                                                    "Cannot disable Sleep Mode unless it’s currently active",
+                                                    Toast.LENGTH_LONG
+                                                ).show()
+                                            }
+                                        }
 
-                                refreshScope.launch {
-                                    repeat(5) {
-                                        Thread.sleep(1000)
-                                        sendPumpCommands(
-                                            SendType.BUST_CACHE,
-                                            listOf(ControlIQInfoRequestBuilder.create(apiVersion()))
-                                        )
+                                        // Refresh logic
+                                        refreshScope.launch {
+                                            withContext(Dispatchers.IO) {
+                                                Thread.sleep(250)
+                                            }
+                                            sendPumpCommands(
+                                                SendType.BUST_CACHE,
+                                                listOf(ControlIQInfoRequestBuilder.create(apiVersion()))
+                                            )
+                                        }
                                     }
-                                }
+                                )
                             }
                         )
                     }
@@ -479,6 +521,10 @@ fun Actions(
                             .fillMaxSize()
                             .wrapContentSize(Alignment.TopStart)
                     ) {
+                        fun prettyDuration(minutes: Long?): String {
+                            return "${minutes?.div(60)}h${minutes?.rem(60)}m"
+                        }
+
                         ListItem(
                             headlineText = { Text(
                                 when (tempRateActive.value) {
@@ -488,7 +534,7 @@ fun Actions(
                             )},
                             supportingText = { 
                                 when (tempRateActive.value) {
-                                    true -> Text("Active: ${tempRateDetails.value?.percentage}% for ${tempRateDetails.value?.duration}")
+                                    true -> Text("Active: ${tempRateDetails.value?.percentage}% for ${prettyDuration(tempRateDetails.value?.duration?.div(60))} at ${tempRateDetails.value?.startTimeInstant}")
                                     else -> null
                                 }
                             },
@@ -504,7 +550,8 @@ fun Actions(
                             modifier = Modifier.clickable {
                                 when (tempRateActive.value) {
                                     true -> { showStopTempRateMenu = true }
-                                    else -> { openTempRateWindow() }
+                                    false -> { openTempRateWindow() }
+                                    else -> {}
                                 }
                             }
                         )
@@ -515,12 +562,12 @@ fun Actions(
                         ) {
 
                             AlertDialog(
-                                onDismissRequest = {},
+                                onDismissRequest = { showStopTempRateMenu = false },
                                 title = {
                                     Text("Stop Temp Rate")
                                 },
                                 text = {
-                                    Text("Stop the active temp rate: ${tempRateDetails.value?.percentage}% for ${tempRateDetails.value?.duration} beginning ${tempRateDetails.value?.startTimeInstant}")
+                                    Text("Stop the active temp rate: ${tempRateDetails.value?.percentage}% for ${prettyDuration(tempRateDetails.value?.duration?.div(60))} beginning ${tempRateDetails.value?.startTimeInstant}")
                                 },
                                 dismissButton = {
                                     TextButton(
@@ -535,16 +582,16 @@ fun Actions(
                                 confirmButton = {
                                     TextButton(
                                         onClick = {
-                                            showStopTempRateMenu = false
-                                            sendPumpCommands(SendType.BUST_CACHE, listOf(StopTempRateRequest()))
                                             refreshScope.launch {
-                                                repeat(5) {
-                                                    Thread.sleep(1000)
-                                                    sendPumpCommands(
-                                                        SendType.BUST_CACHE,
-                                                        listOf(TempRateRequest())
-                                                    )
+                                                showStopTempRateMenu = false
+                                                sendPumpCommands(SendType.BUST_CACHE, listOf(StopTempRateRequest()))
+                                                withContext(Dispatchers.IO) {
+                                                    Thread.sleep(250)
                                                 }
+                                                sendPumpCommands(
+                                                    SendType.BUST_CACHE,
+                                                    listOf(TempRateRequest())
+                                                )
                                             }
                                         },
                                         modifier = Modifier.padding(top = 16.dp)
@@ -604,7 +651,7 @@ fun Actions(
                             val cgmSetupG6SensorCode = ds.cgmSetupG6SensorCode.observeAsState()
 
                             AlertDialog(
-                                onDismissRequest = {},
+                                onDismissRequest = {showStartCgmSessionMenu = false},
                                 title = {
                                     Text("Start G6 CGM Session")
                                 },
@@ -658,7 +705,7 @@ fun Actions(
                                 dismissButton = {
                                     TextButton(
                                         onClick = {
-                                            showStopTempRateMenu = false
+                                            showStartCgmSessionMenu = false
                                         },
                                         modifier = Modifier.padding(top = 16.dp)
                                     ) {
@@ -676,8 +723,10 @@ fun Actions(
                                                 ))
 
                                                 run repeatBlock@{
-                                                    repeat(10) {
-                                                        Thread.sleep(500)
+                                                    repeat(3) {
+                                                        withContext(Dispatchers.IO) {
+                                                            Thread.sleep(250)
+                                                        }
                                                         if (cgmSetupG6SensorCode.value == startCgmSessionInProgressTxId) {
                                                             return@repeatBlock
                                                         }
@@ -691,8 +740,60 @@ fun Actions(
                                                 ))
 
                                                 showStartCgmSessionMenu = false
-                                                repeat(5) {
-                                                    Thread.sleep(500)
+                                                withContext(Dispatchers.IO) {
+                                                    Thread.sleep(250)
+                                                }
+                                                sendPumpCommands(
+                                                    SendType.BUST_CACHE,
+                                                    listOf(CGMStatusRequest())
+                                                )
+                                            }
+                                        },
+                                        enabled = startCgmSessionInProgressTxId == null,
+                                        modifier = Modifier.padding(top = 16.dp)
+                                    ) {
+                                        Text("Start Sensor")
+                                    }
+                                }
+                            )
+
+                        }
+
+                        DropdownMenu(
+                            expanded = showStopCgmSessionMenu,
+                            onDismissRequest = { showStopCgmSessionMenu = false },
+                            modifier = Modifier.fillMaxWidth(),
+                        ) {
+
+                            AlertDialog(
+                                onDismissRequest = {showStopCgmSessionMenu = false},
+                                title = {
+                                    Text("Stop G6 CGM Session")
+                                },
+                                text = {
+                                    Text("The Dexcom G6 sensor will be stopped.")
+                                },
+                                dismissButton = {
+                                    TextButton(
+                                        onClick = {
+                                            showStopCgmSessionMenu = false
+                                        },
+                                        modifier = Modifier.padding(top = 16.dp)
+                                    ) {
+                                        Text("Cancel")
+                                    }
+                                },
+                                confirmButton = {
+                                    TextButton(
+                                        onClick = {
+                                            refreshScope.launch {
+                                                sendPumpCommands(SendType.BUST_CACHE, listOf(
+                                                    StopG6SensorSessionRequest()
+                                                ))
+
+                                                showStopCgmSessionMenu = false
+                                                repeat(3) {
+                                                    Thread.sleep(250)
                                                     sendPumpCommands(
                                                         SendType.BUST_CACHE,
                                                         listOf(CGMStatusRequest())
@@ -700,10 +801,9 @@ fun Actions(
                                                 }
                                             }
                                         },
-                                        enabled = startCgmSessionInProgressTxId == null,
                                         modifier = Modifier.padding(top = 16.dp)
                                     ) {
-                                        Text("Start Sensor")
+                                        Text("Stop Sensor")
                                     }
                                 }
                             )
