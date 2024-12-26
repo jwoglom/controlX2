@@ -1,9 +1,5 @@
 package com.jwoglom.controlx2.presentation
 
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.lifecycle.MutableLiveData
 import com.jwoglom.pumpx2.pump.messages.Message
 import com.jwoglom.pumpx2.pump.messages.calculator.BolusCalcCondition
@@ -24,6 +20,7 @@ import com.jwoglom.pumpx2.pump.messages.response.currentStatus.TimeSinceResetRes
 import com.jwoglom.pumpx2.pump.messages.response.historyLog.HistoryLog
 import com.jwoglom.controlx2.presentation.screens.PumpSetupStage
 import com.jwoglom.controlx2.shared.enums.BasalStatus
+import com.jwoglom.controlx2.shared.enums.CGMSessionState
 import com.jwoglom.controlx2.shared.enums.UserMode
 import com.jwoglom.pumpx2.pump.messages.response.currentStatus.TempRateResponse
 import timber.log.Timber
@@ -54,7 +51,7 @@ class DataStore {
     var basalStatus = MutableLiveData<BasalStatus>()
     var tempRateActive = MutableLiveData<Boolean>()
     var tempRateDetails = MutableLiveData<TempRateResponse>()
-    val cgmSessionState = MutableLiveData<String>()
+    val cgmSessionState = MutableLiveData<CGMSessionState>()
     val cgmSessionExpireRelative = MutableLiveData<String>()
     val cgmSessionExpireExact = MutableLiveData<String>()
     val cgmTransmitterStatus = MutableLiveData<String>()
@@ -63,6 +60,8 @@ class DataStore {
     val cgmStatusText = MutableLiveData<String>()
     val cgmHighLowState = MutableLiveData<String>()
     val cgmDeltaArrow = MutableLiveData<String>()
+    val cgmSetupG6TxId = MutableLiveData<String>()
+    val cgmSetupG6SensorCode = MutableLiveData<String>()
     val bolusCalcDataSnapshot = MutableLiveData<BolusCalcDataSnapshotResponse>()
     val bolusCalcLastBG = MutableLiveData<LastBGResponse>()
     val maxBolusAmount = MutableLiveData<Int>()
@@ -136,6 +135,8 @@ class DataStore {
         cgmStatusText.observeForever { t -> Timber.i("DataStore.cgmStatusText=$t") }
         cgmHighLowState.observeForever { t -> Timber.i("DataStore.cgmHighLowState=$t") }
         cgmDeltaArrow.observeForever { t -> Timber.i("DataStore.cgmDeltaArrow=$t") }
+        cgmSetupG6TxId.observeForever { t -> Timber.i("DataStore.cgmSetupG6TxId=$t") }
+        cgmSetupG6SensorCode.observeForever { t -> Timber.i("DataStore.cgmSetupG6SensorId=$t") }
         bolusCalcDataSnapshot.observeForever { t -> Timber.i("DataStore.bolusCalcDataSnapshot=$t") }
         bolusCalcLastBG.observeForever { t -> Timber.i("DataStore.bolusCalcLastBG=$t") }
         maxBolusAmount.observeForever { t -> Timber.i("DataStore.maxBolusAmount=$t") }

@@ -73,6 +73,7 @@ import com.jwoglom.controlx2.presentation.screens.sections.verbosePumpMessage
 import com.jwoglom.controlx2.presentation.util.ShouldLogToFile
 import com.jwoglom.controlx2.shared.PumpMessageSerializer
 import com.jwoglom.controlx2.shared.enums.BasalStatus
+import com.jwoglom.controlx2.shared.enums.CGMSessionState
 import com.jwoglom.controlx2.shared.enums.UserMode
 import com.jwoglom.controlx2.shared.util.SendType
 import com.jwoglom.controlx2.shared.util.pumpTimeToLocalTz
@@ -661,11 +662,11 @@ class MainActivity : ComponentActivity(), GoogleApiClient.ConnectionCallbacks, G
             }
             is CGMStatusResponse -> {
                 dataStore.cgmSessionState.value = when (message.sessionState) {
-                    CGMStatusResponse.SessionState.SESSION_ACTIVE -> "Active"
-                    CGMStatusResponse.SessionState.SESSION_STOPPED -> "Stopped"
-                    CGMStatusResponse.SessionState.SESSION_START_PENDING -> "Starting"
-                    CGMStatusResponse.SessionState.SESSION_STOP_PENDING -> "Stopping"
-                    else -> "Unknown"
+                    CGMStatusResponse.SessionState.SESSION_ACTIVE -> CGMSessionState.ACTIVE
+                    CGMStatusResponse.SessionState.SESSION_STOPPED -> CGMSessionState.STOPPED
+                    CGMStatusResponse.SessionState.SESSION_START_PENDING -> CGMSessionState.STARTING
+                    CGMStatusResponse.SessionState.SESSION_STOP_PENDING -> CGMSessionState.STOPPING
+                    else -> null
                 }
                 dataStore.cgmSessionExpireRelative.value = when (message.sessionState) {
                     CGMStatusResponse.SessionState.SESSION_ACTIVE -> shortTimeAgo(
