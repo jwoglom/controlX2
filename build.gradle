@@ -2,7 +2,7 @@
 buildscript {
     ext {
         controlx2_version = "1.0.0-20241225"
-        pumpx2_version = "1.4.3"
+        pumpx2_version = "1.4.4"
         use_local_pumpx2 = System.properties.getOrDefault('use_local_pumpx2', 'false') == 'true'
         if (!use_local_pumpx2) {
             Properties properties = new Properties()
@@ -19,7 +19,7 @@ buildscript {
 }
 
 plugins {
-    id 'com.android.application' version '7.3.0' apply false
-    id 'com.android.library' version '7.3.0' apply false
+    id 'com.android.application' version '7.4.2' apply false
+    id 'com.android.library' version '7.4.2' apply false
     id 'org.jetbrains.kotlin.android' version '1.7.10' apply false
 }
