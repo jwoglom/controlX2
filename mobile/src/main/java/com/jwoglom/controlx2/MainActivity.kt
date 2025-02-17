@@ -82,11 +82,14 @@ import com.jwoglom.controlx2.shared.util.shortTime
 import com.jwoglom.controlx2.shared.util.shortTimeAgo
 import com.jwoglom.controlx2.shared.util.twoDecimalPlaces1000Unit
 import com.jwoglom.controlx2.util.extractPumpSid
+import com.jwoglom.pumpx2.pump.messages.models.NotificationBundle
+import com.jwoglom.pumpx2.pump.messages.response.control.ChangeCartridgeResponse
 import com.jwoglom.pumpx2.pump.messages.response.control.SetG6TransmitterIdResponse
 import com.jwoglom.pumpx2.pump.messages.response.control.SetModesResponse
 import com.jwoglom.pumpx2.pump.messages.response.control.SetTempRateResponse
 import com.jwoglom.pumpx2.pump.messages.response.control.StartG6SensorSessionResponse
 import com.jwoglom.pumpx2.pump.messages.response.control.StopG6SensorSessionResponse
+import com.jwoglom.pumpx2.pump.messages.response.currentStatus.AlertStatusResponse
 import com.jwoglom.pumpx2.pump.messages.response.currentStatus.TempRateResponse
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.SupervisorJob
@@ -598,6 +601,10 @@ class MainActivity : ComponentActivity(), GoogleApiClient.ConnectionCallbacks, G
                 .setPositiveButton("OK") { dialog, which -> dialog.cancel() }
                 .show()
         }
+        if (NotificationBundle.isNotificationResponse(message)) {
+            // returns an instance of itself: ensures that watchers get the updated values
+            dataStore.notificationBundle.value = dataStore.notificationBundle.value?.add(message);
+        }
         when (message) {
             is CurrentBatteryAbstractResponse -> {
                 dataStore.batteryPercent.value = message.batteryPercent
@@ -750,6 +757,9 @@ class MainActivity : ComponentActivity(), GoogleApiClient.ConnectionCallbacks, G
             }
             is StopG6SensorSessionResponse -> {
                 if (message.status != 0) unsuccessfulAlert("StopG6SensorSession")
+            }
+            is ChangeCartridgeResponse -> {
+                if (message.status != 0) unsuccessfulAlert("ChangeCartridgeResponse")
             }
         }
     }

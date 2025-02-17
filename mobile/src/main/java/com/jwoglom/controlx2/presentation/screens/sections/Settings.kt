@@ -56,6 +56,7 @@ fun Settings(
     navController: NavHostController? = null,
     sendMessage: (String, ByteArray) -> Unit,
     sendPumpCommands: (SendType, List<Message>) -> Unit,
+    navigateToDebugOptions: () -> Unit = {}
 ) {
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
@@ -238,6 +239,23 @@ fun Settings(
                     modifier = Modifier.clickable {
                         Prefs(context).setAppSetupComplete(false)
                         navController?.navigate(Screen.AppSetup.route)
+                    }
+                )
+                Divider()
+            }
+            
+            item {
+                ListItem(
+                    headlineText = { Text("Debug options") },
+                    supportingText = { Text("Perform debug options.") },
+                    leadingContent = {
+                        Icon(
+                            Icons.Filled.Settings,
+                            contentDescription = "Settings icon",
+                        )
+                    },
+                    modifier = Modifier.clickable {
+                        navigateToDebugOptions()
                     }
                 )
                 Divider()

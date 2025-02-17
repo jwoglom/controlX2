@@ -22,6 +22,8 @@ import com.jwoglom.controlx2.presentation.screens.PumpSetupStage
 import com.jwoglom.controlx2.shared.enums.BasalStatus
 import com.jwoglom.controlx2.shared.enums.CGMSessionState
 import com.jwoglom.controlx2.shared.enums.UserMode
+import com.jwoglom.pumpx2.pump.messages.models.NotificationBundle
+import com.jwoglom.pumpx2.pump.messages.response.currentStatus.AlertStatusResponse
 import com.jwoglom.pumpx2.pump.messages.response.currentStatus.TempRateResponse
 import timber.log.Timber
 import java.time.Instant
@@ -40,6 +42,7 @@ class DataStore {
     val setupDeviceModel = MutableLiveData<String>()
     val pumpCriticalError = MutableLiveData<Pair<String, Instant>>()
 
+    val notificationBundle = MutableLiveData<NotificationBundle>(NotificationBundle())
     val batteryPercent = MutableLiveData<Int>()
     val iobUnits = MutableLiveData<Double>()
     val cartridgeRemainingUnits = MutableLiveData<Int>()
@@ -115,6 +118,7 @@ class DataStore {
         setupDeviceModel.observeForever { t -> Timber.i("DataStore.setupDeviceModel=$t") }
         pumpCriticalError.observeForever { t -> Timber.i("DataStore.pumpCriticalError=$t") }
 
+        notificationBundle.observeForever { t -> Timber.i("DataStore.notificationBundle=$t") }
         batteryPercent.observeForever { t -> Timber.i("DataStore.batteryPercent=$t") }
         iobUnits.observeForever { t -> Timber.i("DataStore.iobUnits=$t") }
         cartridgeRemainingUnits.observeForever { t -> Timber.i("DataStore.cartridgeRemainingUnits=$t") }

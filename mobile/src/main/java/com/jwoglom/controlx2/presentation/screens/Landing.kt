@@ -26,6 +26,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Build
 import androidx.compose.material.icons.filled.Create
 import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Warning
@@ -70,8 +71,11 @@ import com.jwoglom.controlx2.db.historylog.HistoryLogViewModel
 import com.jwoglom.controlx2.presentation.DataStore
 import com.jwoglom.controlx2.presentation.screens.sections.Actions
 import com.jwoglom.controlx2.presentation.screens.sections.BolusWindow
+import com.jwoglom.controlx2.presentation.screens.sections.CGMActions
+import com.jwoglom.controlx2.presentation.screens.sections.CartridgeActions
 import com.jwoglom.controlx2.presentation.screens.sections.Dashboard
 import com.jwoglom.controlx2.presentation.screens.sections.Debug
+import com.jwoglom.controlx2.presentation.screens.sections.Notifications
 import com.jwoglom.controlx2.presentation.screens.sections.Settings
 import com.jwoglom.controlx2.presentation.screens.sections.TempRateWindow
 import com.jwoglom.controlx2.presentation.screens.sections.dashboardCommands
@@ -243,6 +247,17 @@ fun Landing(
                                 historyLogViewModel = historyLogViewModel,
                             )
                         }
+
+                        LandingSection.NOTIFICATIONS -> {
+                            Notifications(
+                                innerPadding = innerPadding,
+                                navController = navController,
+                                sendMessage = sendMessage,
+                                sendPumpCommands = sendPumpCommands,
+                                historyLogViewModel = historyLogViewModel,
+                            )
+                        }
+
                         LandingSection.ACTIONS -> {
                             Actions(
                                 innerPadding = innerPadding,
@@ -255,7 +270,39 @@ fun Landing(
                                         bottomScaffoldState = BottomScaffoldState.TEMP_RATE_WINDOW
                                         displayBottomScaffold.bottomSheetState.expand()
                                     }
+                                },
+                                navigateToCgmActions = {
+                                    selectedItem = LandingSection.CGM_ACTIONS
+                                },
+                                navigateToCartridgeActions = {
+                                    selectedItem = LandingSection.CARTRIDGE_ACTIONS
                                 }
+                            )
+                        }
+
+                        LandingSection.CGM_ACTIONS -> {
+                            CGMActions(
+                                innerPadding = innerPadding,
+                                navController = navController,
+                                sendMessage = sendMessage,
+                                sendPumpCommands = sendPumpCommands,
+                                historyLogViewModel = historyLogViewModel,
+                                navigateBack = {
+                                    selectedItem = LandingSection.ACTIONS
+                                },
+                            )
+                        }
+
+                        LandingSection.CARTRIDGE_ACTIONS -> {
+                            CartridgeActions(
+                                innerPadding = innerPadding,
+                                navController = navController,
+                                sendMessage = sendMessage,
+                                sendPumpCommands = sendPumpCommands,
+                                historyLogViewModel = historyLogViewModel,
+                                navigateBack = {
+                                    selectedItem = LandingSection.ACTIONS
+                                },
                             )
                         }
                         LandingSection.DEBUG -> {
@@ -272,6 +319,9 @@ fun Landing(
                                 navController = navController,
                                 sendMessage = sendMessage,
                                 sendPumpCommands = sendPumpCommands,
+                                navigateToDebugOptions = {
+                                    selectedItem = LandingSection.DEBUG
+                                }
                             )
                         }
                     }
@@ -324,11 +374,13 @@ fun Landing(
         },
         bottomBar = {
             NavigationBar {
-                LandingSection.values().forEach { item ->
+                LandingSection.values()
+                    .filter { item -> item.showInNav }
+                    .forEach { item ->
                     NavigationBarItem(
                         icon = { Icon(item.icon, contentDescription = item.label) },
                         label = { Text(item.label) },
-                        selected = selectedItem == item,
+                        selected = selectedItem.label == item.label,
                         onClick = { selectedItem = item }
                     )
                 }
@@ -337,11 +389,19 @@ fun Landing(
     )
 }
 
-enum class LandingSection(val label: String, val icon: ImageVector) {
-    DASHBOARD("Dashboard", Icons.Filled.Info),
-    ACTIONS("Actions", Icons.Filled.Create),
-    DEBUG("Debug", Icons.Filled.Build),
-    SETTINGS("Settings", Icons.Filled.Settings),
+// HACK: subpages should have the same label as an item appearing in the nav
+// so that item appears as selected when it is navigated to within the app
+enum class LandingSection(val label: String, val icon: ImageVector, val showInNav: Boolean) {
+    DASHBOARD("Dashboard", Icons.Filled.Info, true),
+
+    NOTIFICATIONS("Notifications", Icons.Filled.Notifications, true),
+
+    ACTIONS("Actions", Icons.Filled.Create, true),
+    CGM_ACTIONS("Actions", Icons.Filled.Create, false),
+    CARTRIDGE_ACTIONS("Actions", Icons.Filled.Create, false),
+
+    SETTINGS("Settings", Icons.Filled.Settings, true),
+    DEBUG("Settings", Icons.Filled.Settings, false),
     ;
 }
 

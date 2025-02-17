@@ -58,13 +58,10 @@ import com.jwoglom.controlx2.db.historylog.HistoryLogViewModel
 import com.jwoglom.controlx2.presentation.components.HeaderLine
 import com.jwoglom.controlx2.presentation.components.Line
 import com.jwoglom.controlx2.presentation.screens.TempRatePreview
-import com.jwoglom.controlx2.presentation.screens.sections.components.DexcomG6SensorCode
-import com.jwoglom.controlx2.presentation.screens.sections.components.DexcomG6TransmitterCode
 import com.jwoglom.controlx2.presentation.screens.setUpPreviewState
 import com.jwoglom.controlx2.presentation.theme.ControlX2Theme
 import com.jwoglom.controlx2.presentation.util.LifecycleStateObserver
 import com.jwoglom.controlx2.shared.enums.BasalStatus
-import com.jwoglom.controlx2.shared.enums.CGMSessionState
 import com.jwoglom.controlx2.shared.enums.UserMode
 import com.jwoglom.controlx2.shared.presentation.intervalOf
 import com.jwoglom.controlx2.shared.util.SendType
@@ -73,13 +70,9 @@ import com.jwoglom.pumpx2.pump.messages.Message
 import com.jwoglom.pumpx2.pump.messages.builders.ControlIQInfoRequestBuilder
 import com.jwoglom.pumpx2.pump.messages.models.KnownDeviceModel
 import com.jwoglom.pumpx2.pump.messages.request.control.ResumePumpingRequest
-import com.jwoglom.pumpx2.pump.messages.request.control.SetG6TransmitterIdRequest
 import com.jwoglom.pumpx2.pump.messages.request.control.SetModesRequest
-import com.jwoglom.pumpx2.pump.messages.request.control.StartG6SensorSessionRequest
-import com.jwoglom.pumpx2.pump.messages.request.control.StopG6SensorSessionRequest
 import com.jwoglom.pumpx2.pump.messages.request.control.StopTempRateRequest
 import com.jwoglom.pumpx2.pump.messages.request.control.SuspendPumpingRequest
-import com.jwoglom.pumpx2.pump.messages.request.currentStatus.CGMStatusRequest
 import com.jwoglom.pumpx2.pump.messages.request.currentStatus.HomeScreenMirrorRequest
 import com.jwoglom.pumpx2.pump.messages.request.currentStatus.TempRateRequest
 import kotlinx.coroutines.Dispatchers
@@ -98,18 +91,15 @@ fun Actions(
     _resumeInsulinMenuState: Boolean = false,
     _suspendInsulinMenuState: Boolean = false,
     _stopTempRateMenuState: Boolean = false,
-    _startCgmSessionMenuState: Boolean = false,
-    _stopCgmSessionMenuState: Boolean = false,
-    openTempRateWindow: () -> Unit
+    openTempRateWindow: () -> Unit,
+    navigateToCgmActions: () -> Unit,
+    navigateToCartridgeActions: () -> Unit,
 ) {
     val coroutineScope = rememberCoroutineScope()
 
     var showResumeInsulinMenu by remember { mutableStateOf(_resumeInsulinMenuState) }
     var showSuspendInsulinMenu by remember { mutableStateOf(_suspendInsulinMenuState) }
     var showStopTempRateMenu by remember { mutableStateOf(_stopTempRateMenuState) }
-    var showStartCgmSessionMenu by remember { mutableStateOf(_startCgmSessionMenuState) }
-    var startCgmSessionInProgressTxId by remember { mutableStateOf<String?>(null) }
-    var showStopCgmSessionMenu by remember { mutableStateOf(_stopCgmSessionMenuState) }
 
     val context = LocalContext.current
     val ds = LocalDataStore.current
@@ -610,7 +600,6 @@ fun Actions(
                 }
 
                 item {
-                    val cgmSessionState = ds.cgmSessionState.observeAsState()
                     Box(
                         modifier = Modifier
                             .fillMaxSize()
@@ -618,197 +607,39 @@ fun Actions(
                     ) {
                         ListItem(
                             headlineText = { Text(
-                                when (cgmSessionState.value) {
-                                    CGMSessionState.ACTIVE -> "Dexcom G6: Stop CGM Sensor"
-                                    CGMSessionState.STOPPED -> "Dexcom G6: Start CGM Sensor"
-                                    else -> "Dexcom G6 CGM Sensor State: ${cgmSessionState.value?.str}"
-                                }
+                                "Cartridge Settings"
                             )},
                             supportingText = {
                             },
                             leadingContent = {
-                                when (cgmSessionState.value) {
-                                    CGMSessionState.ACTIVE -> Icon(Icons.Filled.Close, contentDescription = null)
-                                    CGMSessionState.STOPPED -> Icon(Icons.Filled.Settings, contentDescription = null)
-                                    else -> Icon(Icons.Filled.Settings, contentDescription = null)
-                                }
+                                Icon(Icons.Filled.Settings, contentDescription = null)
                             },
                             modifier = Modifier.clickable {
-                                when (cgmSessionState.value) {
-                                    CGMSessionState.ACTIVE -> { showStopCgmSessionMenu = true }
-                                    CGMSessionState.STOPPED -> { showStartCgmSessionMenu = true }
-                                    else -> {}
-                                }
+                                navigateToCartridgeActions()
                             }
                         )
+                    }
+                }
 
-                        DropdownMenu(
-                            expanded = showStartCgmSessionMenu,
-                            onDismissRequest = { showStartCgmSessionMenu = false },
-                            modifier = Modifier.fillMaxWidth(),
-                        ) {
-                            val cgmSetupG6TxId = ds.cgmSetupG6TxId.observeAsState()
-                            val cgmSetupG6SensorCode = ds.cgmSetupG6SensorCode.observeAsState()
-
-                            AlertDialog(
-                                onDismissRequest = {showStartCgmSessionMenu = false},
-                                title = {
-                                    Text("Start G6 CGM Session")
-                                },
-                                text = {
-                                    LazyColumn(
-                                        contentPadding = innerPadding,
-                                        verticalArrangement = Arrangement.spacedBy(0.dp),
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .padding(horizontal = 0.dp),
-                                        content = {
-                                            if (startCgmSessionInProgressTxId == null) {
-                                                item {
-                                                    Text("To start the CGM session, confirm the transmitter ID and sensor code:")
-                                                    Text("\n")
-                                                }
-
-                                                item {
-                                                    DexcomG6TransmitterCode(
-                                                        title = "Transmitter ID",
-                                                        value = cgmSetupG6TxId.value,
-                                                        onValueChange = { it ->
-                                                            ds.cgmSetupG6TxId.value = it
-                                                        }
-                                                    )
-                                                }
-
-                                                item {
-                                                    Text("\n")
-                                                    Text("To connect to an existing G6 CGM session or if no code is available, use '0000'")
-                                                    Text("\n")
-                                                }
-
-                                                item {
-                                                    DexcomG6SensorCode(
-                                                        title = "Sensor Code",
-                                                        value = cgmSetupG6SensorCode.value,
-                                                        onValueChange = { it ->
-                                                            ds.cgmSetupG6SensorCode.value = it
-                                                        }
-                                                    )
-                                                }
-                                            } else {
-                                                item {
-                                                    Text("Setting Transmitter ID to ${startCgmSessionInProgressTxId}...")
-                                                }
-                                            }
-                                        }
-                                    )
-                                },
-                                dismissButton = {
-                                    TextButton(
-                                        onClick = {
-                                            showStartCgmSessionMenu = false
-                                        },
-                                        modifier = Modifier.padding(top = 16.dp)
-                                    ) {
-                                        Text("Cancel")
-                                    }
-                                },
-                                confirmButton = {
-                                    TextButton(
-                                        onClick = {
-                                            refreshScope.launch {
-                                                startCgmSessionInProgressTxId = cgmSetupG6TxId.value
-                                                ds.cgmSetupG6SensorCode.value = null
-                                                sendPumpCommands(SendType.BUST_CACHE, listOf(
-                                                    SetG6TransmitterIdRequest(startCgmSessionInProgressTxId)
-                                                ))
-
-                                                run repeatBlock@{
-                                                    repeat(3) {
-                                                        withContext(Dispatchers.IO) {
-                                                            Thread.sleep(250)
-                                                        }
-                                                        if (cgmSetupG6SensorCode.value == startCgmSessionInProgressTxId) {
-                                                            return@repeatBlock
-                                                        }
-                                                    }
-                                                }
-
-                                                val sensorCode = cgmSetupG6SensorCode.value?.toIntOrNull() ?: 0
-
-                                                sendPumpCommands(SendType.BUST_CACHE, listOf(
-                                                    StartG6SensorSessionRequest(sensorCode)
-                                                ))
-
-                                                showStartCgmSessionMenu = false
-                                                withContext(Dispatchers.IO) {
-                                                    Thread.sleep(250)
-                                                }
-                                                sendPumpCommands(
-                                                    SendType.BUST_CACHE,
-                                                    listOf(CGMStatusRequest())
-                                                )
-                                            }
-                                        },
-                                        enabled = startCgmSessionInProgressTxId == null,
-                                        modifier = Modifier.padding(top = 16.dp)
-                                    ) {
-                                        Text("Start Sensor")
-                                    }
-                                }
-                            )
-
-                        }
-
-                        DropdownMenu(
-                            expanded = showStopCgmSessionMenu,
-                            onDismissRequest = { showStopCgmSessionMenu = false },
-                            modifier = Modifier.fillMaxWidth(),
-                        ) {
-
-                            AlertDialog(
-                                onDismissRequest = {showStopCgmSessionMenu = false},
-                                title = {
-                                    Text("Stop G6 CGM Session")
-                                },
-                                text = {
-                                    Text("The Dexcom G6 sensor will be stopped.")
-                                },
-                                dismissButton = {
-                                    TextButton(
-                                        onClick = {
-                                            showStopCgmSessionMenu = false
-                                        },
-                                        modifier = Modifier.padding(top = 16.dp)
-                                    ) {
-                                        Text("Cancel")
-                                    }
-                                },
-                                confirmButton = {
-                                    TextButton(
-                                        onClick = {
-                                            refreshScope.launch {
-                                                sendPumpCommands(SendType.BUST_CACHE, listOf(
-                                                    StopG6SensorSessionRequest()
-                                                ))
-
-                                                showStopCgmSessionMenu = false
-                                                repeat(3) {
-                                                    Thread.sleep(250)
-                                                    sendPumpCommands(
-                                                        SendType.BUST_CACHE,
-                                                        listOf(CGMStatusRequest())
-                                                    )
-                                                }
-                                            }
-                                        },
-                                        modifier = Modifier.padding(top = 16.dp)
-                                    ) {
-                                        Text("Stop Sensor")
-                                    }
-                                }
-                            )
-
-                        }
+                item {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .wrapContentSize(Alignment.TopStart)
+                    ) {
+                        ListItem(
+                            headlineText = { Text(
+                                "CGM Settings"
+                            )},
+                            supportingText = {
+                            },
+                            leadingContent = {
+                                Icon(Icons.Filled.Settings, contentDescription = null)
+                            },
+                            modifier = Modifier.clickable {
+                                navigateToCgmActions()
+                            }
+                        )
                     }
                 }
             }
@@ -818,8 +649,7 @@ fun Actions(
 val actionsCommands = listOf(
     HomeScreenMirrorRequest(),
     ControlIQInfoRequestBuilder.create(apiVersion()),
-    TempRateRequest(),
-    CGMStatusRequest()
+    TempRateRequest()
 )
 
 val actionsFields = listOf(
@@ -827,7 +657,6 @@ val actionsFields = listOf(
     dataStore.controlIQMode,
     dataStore.tempRateActive,
     dataStore.tempRateDetails,
-    dataStore.cgmSessionState
 )
 
 @Preview(showBackground = true)
@@ -842,7 +671,9 @@ private fun DefaultPreviewInsulinActive() {
             Actions(
                 sendMessage = { _, _ -> },
                 sendPumpCommands = { _, _ -> },
-                openTempRateWindow = {}
+                openTempRateWindow = {},
+                navigateToCgmActions = {},
+                navigateToCartridgeActions = {}
             )
         }
     }
@@ -861,7 +692,9 @@ private fun DefaultPreviewInsulinActive_StopMenuOpen() {
                 sendMessage = { _, _ -> },
                 sendPumpCommands = { _, _ -> },
                 _suspendInsulinMenuState = true,
-                openTempRateWindow = {}
+                openTempRateWindow = {},
+                navigateToCgmActions = {},
+                navigateToCartridgeActions = {}
             )
         }
     }
@@ -880,7 +713,9 @@ private fun DefaultPreviewInsulinSuspended() {
             Actions(
                 sendMessage = { _, _ -> },
                 sendPumpCommands = { _, _ -> },
-                openTempRateWindow = {}
+                openTempRateWindow = {},
+                navigateToCgmActions = {},
+                navigateToCartridgeActions = {}
             )
         }
     }
@@ -900,7 +735,9 @@ private fun DefaultPreviewInsulinSuspended_ResumeMenuOpen() {
                 sendMessage = { _, _ -> },
                 sendPumpCommands = { _, _ -> },
                 _resumeInsulinMenuState = true,
-                openTempRateWindow = {}
+                openTempRateWindow = {},
+                navigateToCgmActions = {},
+                navigateToCartridgeActions = {}
             )
         }
     }
@@ -910,25 +747,4 @@ private fun DefaultPreviewInsulinSuspended_ResumeMenuOpen() {
 @Composable
 private fun DefaultPreview_StartTempRate() {
     TempRatePreview()
-}
-
-@Preview(showBackground = true)
-@Composable
-private fun DefaultPreviewCgmStart() {
-    ControlX2Theme() {
-        Surface(
-            modifier = Modifier.fillMaxSize(),
-            color = Color.White,
-        ) {
-            setUpPreviewState(LocalDataStore.current)
-            LocalDataStore.current.cgmSetupG6TxId.value = "ABC123"
-            LocalDataStore.current.cgmSetupG6SensorCode.value = "1234"
-            Actions(
-                sendMessage = { _, _ -> },
-                sendPumpCommands = { _, _ -> },
-                _startCgmSessionMenuState = true,
-                openTempRateWindow = {}
-            )
-        }
-    }
 }
