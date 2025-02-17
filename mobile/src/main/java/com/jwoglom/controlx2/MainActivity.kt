@@ -765,11 +765,11 @@ class MainActivity : ComponentActivity(), GoogleApiClient.ConnectionCallbacks, G
     }
 
     private fun unsuccessfulAlert(req: String) {
-        AlertDialog.Builder(this)
+        AlertDialog.Builder(this@MainActivity)
             .setTitle("Failed Pump Request")
             .setMessage("$req was not successful. The pump returned an error fulfilling the request.")
             .setPositiveButton("OK", null)
-            .create()
+            .show()
     }
 
     /**
