@@ -172,7 +172,7 @@ fun Notifications(
                 .zIndex(10f)
         )
 
-        var notifications = mutableStateListOf<Any>()
+        val notifications = remember { mutableStateListOf<Any>()}
         ds.notificationBundle.observe(LocalLifecycleOwner.current, Observer {
             ds.notificationBundle.value?.let {
                 notifications.clear()

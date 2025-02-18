@@ -118,27 +118,42 @@ class MainActivity : ComponentActivity(), GoogleApiClient.ConnectionCallbacks, G
     override fun onCreate(savedInstanceState: Bundle?) {
         Timber.d("mobile UIActivity onCreate $savedInstanceState")
         super.onCreate(savedInstanceState)
-        setupTimber("MUA",
+        setupTimber(
+            "MUA",
             context = this,
             logToFile = true,
             shouldLog = ShouldLogToFile(this),
-            writeCharacteristicFailedCallback = writeCharacteristicFailedCallback)
+            writeCharacteristicFailedCallback = writeCharacteristicFailedCallback
+        )
         val startDestination = determineStartDestination()
         Timber.d("startDestination=%s", startDestination)
 
         setContent {
             MobileApp(
                 startDestination = startDestination,
-                sendMessage = {path, message -> sendMessage(path, message) },
-                sendPumpCommands = {type, messages -> sendPumpCommands(type, messages) },
-                sendServiceBolusRequest = {bolusId, bolusParameters, unitBreakdown, dataSnapshot, timeSinceReset ->
-                    sendServiceBolusRequest(bolusId, bolusParameters, unitBreakdown, dataSnapshot, timeSinceReset) },
-                sendServiceBolusCancel = { sendMessage("/to-phone/bolus-cancel", "".toByteArray()) },
+                sendMessage = { path, message -> sendMessage(path, message) },
+                sendPumpCommands = { type, messages -> sendPumpCommands(type, messages) },
+                sendServiceBolusRequest = { bolusId, bolusParameters, unitBreakdown, dataSnapshot, timeSinceReset ->
+                    sendServiceBolusRequest(
+                        bolusId,
+                        bolusParameters,
+                        unitBreakdown,
+                        dataSnapshot,
+                        timeSinceReset
+                    )
+                },
+                sendServiceBolusCancel = {
+                    sendMessage(
+                        "/to-phone/bolus-cancel",
+                        "".toByteArray()
+                    )
+                },
                 historyLogViewModel = historyLogViewModel
             )
         }
 
         reinitializeGoogleApiClient()
+        checkNotificationPermissions()
 
 
         startCommServiceWithPreconditions()
@@ -152,6 +167,25 @@ class MainActivity : ComponentActivity(), GoogleApiClient.ConnectionCallbacks, G
             .build()
 
         mApiClient.connect()
+    }
+
+    private fun checkNotificationPermissions() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            if (checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED &&
+                ActivityCompat.shouldShowRequestPermissionRationale(
+                    this,
+                    Manifest.permission.POST_NOTIFICATIONS
+                )
+            ) {
+
+                val REQUEST_POST_NOTIFICATIONS = 10023;
+                ActivityCompat.requestPermissions(
+                    this,
+                    arrayOf(Manifest.permission.POST_NOTIFICATIONS),
+                    REQUEST_POST_NOTIFICATIONS
+                )
+            }
+        }
     }
 
     private val writeCharacteristicFailedCallback: (String) -> Unit = { uuid ->

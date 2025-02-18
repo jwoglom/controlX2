@@ -1,5 +1,6 @@
 package com.jwoglom.controlx2
 
+import android.Manifest
 import android.app.ActivityManager
 import android.app.ActivityManager.RunningAppProcessInfo.IMPORTANCE_FOREGROUND
 import android.app.ActivityManager.RunningAppProcessInfo.IMPORTANCE_VISIBLE
@@ -9,8 +10,10 @@ import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.graphics.drawable.Icon
 import android.os.Bundle
+import androidx.core.app.ActivityCompat
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.graphics.drawable.IconCompat
@@ -213,7 +216,13 @@ class PhoneCommService : WearableListenerService(), GoogleApiClient.ConnectionCa
                 .setChannelId("disconnectedChannel")
                 .build()
 
-            notificationManagerCompat.notify(notificationId, notif)
+            if (ActivityCompat.checkSelfPermission(
+                    this,
+                    Manifest.permission.POST_NOTIFICATIONS
+                ) == PackageManager.PERMISSION_GRANTED
+            ) {
+                notificationManagerCompat.notify(notificationId, notif)
+            }
         }.start()
     }
 
