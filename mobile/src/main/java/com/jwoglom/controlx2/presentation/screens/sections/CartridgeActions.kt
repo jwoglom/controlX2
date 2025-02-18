@@ -72,6 +72,7 @@ import com.jwoglom.pumpx2.pump.messages.request.control.StartG6SensorSessionRequ
 import com.jwoglom.pumpx2.pump.messages.request.control.StopG6SensorSessionRequest
 import com.jwoglom.pumpx2.pump.messages.request.currentStatus.CGMStatusRequest
 import com.jwoglom.pumpx2.pump.messages.request.currentStatus.HomeScreenMirrorRequest
+import com.jwoglom.pumpx2.pump.messages.request.currentStatus.TimeSinceResetRequest
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
@@ -209,7 +210,7 @@ fun CartridgeActions(
                                 refreshScope.launch {
                                     sendPumpCommands(
                                         SendType.BUST_CACHE, listOf(
-
+                                            TimeSinceResetRequest()
                                         )
                                     )
                                     showChangeCartridgeMenu = true

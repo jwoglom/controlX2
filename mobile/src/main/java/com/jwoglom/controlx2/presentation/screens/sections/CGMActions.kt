@@ -65,10 +65,13 @@ import com.jwoglom.controlx2.util.determinePumpModel
 import com.jwoglom.pumpx2.pump.messages.Message
 import com.jwoglom.pumpx2.pump.messages.models.KnownDeviceModel
 import com.jwoglom.pumpx2.pump.messages.request.control.SetG6TransmitterIdRequest
+import com.jwoglom.pumpx2.pump.messages.request.control.SetG7PairingCodeRequest
 import com.jwoglom.pumpx2.pump.messages.request.control.StartG6SensorSessionRequest
 import com.jwoglom.pumpx2.pump.messages.request.control.StopG6SensorSessionRequest
 import com.jwoglom.pumpx2.pump.messages.request.currentStatus.CGMStatusRequest
+import com.jwoglom.pumpx2.pump.messages.request.currentStatus.GetSavedG7PairingCodeRequest
 import com.jwoglom.pumpx2.pump.messages.request.currentStatus.HomeScreenMirrorRequest
+import com.jwoglom.pumpx2.pump.messages.response.currentStatus.GetSavedG7PairingCodeResponse
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
@@ -82,15 +85,20 @@ fun CGMActions(
     sendMessage: (String, ByteArray) -> Unit,
     sendPumpCommands: (SendType, List<Message>) -> Unit,
     historyLogViewModel: HistoryLogViewModel? = null,
-    _startCgmSessionMenuState: Boolean = false,
-    _stopCgmSessionMenuState: Boolean = false,
+    _startG6CgmSessionMenuState: Boolean = false,
+    _stopG6CgmSessionMenuState: Boolean = false,
+    _startG7CgmSessionMenuState: Boolean = false,
+    _stopG7CgmSessionMenuState: Boolean = false,
     navigateBack: () -> Unit
 ) {
     val coroutineScope = rememberCoroutineScope()
 
-    var showStartCgmSessionMenu by remember { mutableStateOf(_startCgmSessionMenuState) }
-    var startCgmSessionInProgressTxId by remember { mutableStateOf<String?>(null) }
-    var showStopCgmSessionMenu by remember { mutableStateOf(_stopCgmSessionMenuState) }
+    var showStartG6CgmSessionMenu by remember { mutableStateOf(_startG6CgmSessionMenuState) }
+    var startG6CgmSessionInProgressTxId by remember { mutableStateOf<String?>(null) }
+    var showStopG6CgmSessionMenu by remember { mutableStateOf(_stopG6CgmSessionMenuState) }
+
+    var showStartG7CgmSessionMenu by remember { mutableStateOf(_startG7CgmSessionMenuState) }
+    var showStopG7CgmSessionMenu by remember { mutableStateOf(_stopG7CgmSessionMenuState) }
 
     val context = LocalContext.current
     val ds = LocalDataStore.current
@@ -184,7 +192,6 @@ fun CGMActions(
                     }
                 }
 
-                // TODO G7
                 item {
                     val cgmSessionState = ds.cgmSessionState.observeAsState()
                     Box(
@@ -211,23 +218,23 @@ fun CGMActions(
                             },
                             modifier = Modifier.clickable {
                                 when (cgmSessionState.value) {
-                                    CGMSessionState.ACTIVE -> { showStopCgmSessionMenu = true }
-                                    CGMSessionState.STOPPED -> { showStartCgmSessionMenu = true }
+                                    CGMSessionState.ACTIVE -> { showStopG6CgmSessionMenu = true }
+                                    CGMSessionState.STOPPED -> { showStartG6CgmSessionMenu = true }
                                     else -> {}
                                 }
                             }
                         )
 
                         DropdownMenu(
-                            expanded = showStartCgmSessionMenu,
-                            onDismissRequest = { showStartCgmSessionMenu = false },
+                            expanded = showStartG6CgmSessionMenu,
+                            onDismissRequest = { showStartG6CgmSessionMenu = false },
                             modifier = Modifier.fillMaxWidth(),
                         ) {
                             val cgmSetupG6TxId = ds.cgmSetupG6TxId.observeAsState()
                             val cgmSetupG6SensorCode = ds.cgmSetupG6SensorCode.observeAsState()
 
                             AlertDialog(
-                                onDismissRequest = {showStartCgmSessionMenu = false},
+                                onDismissRequest = {showStartG6CgmSessionMenu = false},
                                 title = {
                                     Text("Start G6 CGM Session")
                                 },
@@ -239,7 +246,7 @@ fun CGMActions(
                                             .fillMaxWidth()
                                             .padding(horizontal = 0.dp),
                                         content = {
-                                            if (startCgmSessionInProgressTxId == null) {
+                                            if (startG6CgmSessionInProgressTxId == null) {
                                                 item {
                                                     Text("To start the CGM session, confirm the transmitter ID and sensor code:")
                                                     Text("\n")
@@ -272,7 +279,7 @@ fun CGMActions(
                                                 }
                                             } else {
                                                 item {
-                                                    Text("Setting Transmitter ID to ${startCgmSessionInProgressTxId}...")
+                                                    Text("Setting Transmitter ID to ${startG6CgmSessionInProgressTxId}...")
                                                 }
                                             }
                                         }
@@ -281,7 +288,7 @@ fun CGMActions(
                                 dismissButton = {
                                     TextButton(
                                         onClick = {
-                                            showStartCgmSessionMenu = false
+                                            showStartG6CgmSessionMenu = false
                                         },
                                         modifier = Modifier.padding(top = 16.dp)
                                     ) {
@@ -292,10 +299,10 @@ fun CGMActions(
                                     TextButton(
                                         onClick = {
                                             refreshScope.launch {
-                                                startCgmSessionInProgressTxId = cgmSetupG6TxId.value
+                                                startG6CgmSessionInProgressTxId = cgmSetupG6TxId.value
                                                 ds.cgmSetupG6SensorCode.value = null
                                                 sendPumpCommands(SendType.BUST_CACHE, listOf(
-                                                    SetG6TransmitterIdRequest(startCgmSessionInProgressTxId)
+                                                    SetG6TransmitterIdRequest(startG6CgmSessionInProgressTxId)
                                                 ))
 
                                                 run repeatBlock@{
@@ -303,7 +310,7 @@ fun CGMActions(
                                                         withContext(Dispatchers.IO) {
                                                             Thread.sleep(250)
                                                         }
-                                                        if (cgmSetupG6SensorCode.value == startCgmSessionInProgressTxId) {
+                                                        if (cgmSetupG6SensorCode.value == startG6CgmSessionInProgressTxId) {
                                                             return@repeatBlock
                                                         }
                                                     }
@@ -315,7 +322,7 @@ fun CGMActions(
                                                     StartG6SensorSessionRequest(sensorCode)
                                                 ))
 
-                                                showStartCgmSessionMenu = false
+                                                showStartG6CgmSessionMenu = false
                                                 withContext(Dispatchers.IO) {
                                                     Thread.sleep(250)
                                                 }
@@ -325,7 +332,7 @@ fun CGMActions(
                                                 )
                                             }
                                         },
-                                        enabled = startCgmSessionInProgressTxId == null,
+                                        enabled = startG6CgmSessionInProgressTxId == null,
                                         modifier = Modifier.padding(top = 16.dp)
                                     ) {
                                         Text("Start Sensor")
@@ -336,13 +343,13 @@ fun CGMActions(
                         }
 
                         DropdownMenu(
-                            expanded = showStopCgmSessionMenu,
-                            onDismissRequest = { showStopCgmSessionMenu = false },
+                            expanded = showStopG6CgmSessionMenu,
+                            onDismissRequest = { showStopG6CgmSessionMenu = false },
                             modifier = Modifier.fillMaxWidth(),
                         ) {
 
                             AlertDialog(
-                                onDismissRequest = {showStopCgmSessionMenu = false},
+                                onDismissRequest = {showStopG6CgmSessionMenu = false},
                                 title = {
                                     Text("Stop G6 CGM Session")
                                 },
@@ -352,7 +359,7 @@ fun CGMActions(
                                 dismissButton = {
                                     TextButton(
                                         onClick = {
-                                            showStopCgmSessionMenu = false
+                                            showStopG6CgmSessionMenu = false
                                         },
                                         modifier = Modifier.padding(top = 16.dp)
                                     ) {
@@ -367,7 +374,7 @@ fun CGMActions(
                                                     StopG6SensorSessionRequest()
                                                 ))
 
-                                                showStopCgmSessionMenu = false
+                                                showStopG6CgmSessionMenu = false
                                                 repeat(3) {
                                                     Thread.sleep(250)
                                                     sendPumpCommands(
@@ -391,6 +398,130 @@ fun CGMActions(
                 item {
                     Line("\n")
                 }
+
+
+                item {
+                    val cgmSessionState = ds.cgmSessionState.observeAsState()
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .wrapContentSize(Alignment.TopStart)
+                    ) {
+                        ListItem(
+                            headlineText = { Text(
+                                when (cgmSessionState.value) {
+                                    CGMSessionState.ACTIVE -> "Dexcom G7: Stop CGM Sensor"
+                                    CGMSessionState.STOPPED -> "Dexcom G7: Start CGM Sensor"
+                                    else -> "Dexcom G7 CGM Sensor State: ${cgmSessionState.value?.str}"
+                                }
+                            )},
+                            supportingText = {
+                            },
+                            leadingContent = {
+                                when (cgmSessionState.value) {
+                                    CGMSessionState.ACTIVE -> Icon(Icons.Filled.Close, contentDescription = null)
+                                    CGMSessionState.STOPPED -> Icon(Icons.Filled.Settings, contentDescription = null)
+                                    else -> Icon(Icons.Filled.Settings, contentDescription = null)
+                                }
+                            },
+                            modifier = Modifier.clickable {
+                                when (cgmSessionState.value) {
+                                    CGMSessionState.ACTIVE -> { showStopG7CgmSessionMenu = true }
+                                    CGMSessionState.STOPPED -> { showStartG7CgmSessionMenu = true }
+                                    else -> {}
+                                }
+                            }
+                        )
+
+                        DropdownMenu(
+                            expanded = showStartG7CgmSessionMenu,
+                            onDismissRequest = { showStartG7CgmSessionMenu = false },
+                            modifier = Modifier.fillMaxWidth(),
+                        ) {
+                            val cgmSetupG7SensorCode = ds.cgmSetupG7SensorCode.observeAsState()
+
+                            AlertDialog(
+                                onDismissRequest = {showStartG7CgmSessionMenu = false},
+                                title = {
+                                    Text("Start G7 CGM Session")
+                                },
+                                text = {
+                                    LazyColumn(
+                                        contentPadding = innerPadding,
+                                        verticalArrangement = Arrangement.spacedBy(0.dp),
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(horizontal = 0.dp),
+                                        content = {
+                                            item {
+                                                Text("To start the CGM session, enter the sensor code:")
+                                                Text("\n")
+                                            }
+
+                                            item {
+                                                DexcomG6SensorCode(
+                                                    title = "Sensor Code",
+                                                    value = cgmSetupG7SensorCode.value,
+                                                    onValueChange = { it ->
+                                                        ds.cgmSetupG7SensorCode.value = it
+                                                    }
+                                                )
+                                            }
+                                        }
+                                    )
+                                },
+                                dismissButton = {
+                                    TextButton(
+                                        onClick = {
+                                            showStartG7CgmSessionMenu = false
+                                        },
+                                        modifier = Modifier.padding(top = 16.dp)
+                                    ) {
+                                        Text("Cancel")
+                                    }
+                                },
+                                confirmButton = {
+                                    TextButton(
+                                        onClick = {
+                                            refreshScope.launch {
+                                                cgmSetupG7SensorCode.value?.let {
+                                                    sendPumpCommands(
+                                                        SendType.BUST_CACHE, listOf(
+                                                            SetG7PairingCodeRequest(it.toInt())
+                                                        )
+                                                    )
+                                                }
+
+                                                run repeatBlock@{
+                                                    repeat(3) {
+                                                        withContext(Dispatchers.IO) {
+                                                            Thread.sleep(250)
+                                                        }
+                                                        sendPumpCommands(
+                                                            SendType.BUST_CACHE, listOf(
+                                                                GetSavedG7PairingCodeRequest()
+                                                            )
+                                                        )
+                                                        if (ds.savedG7PairingCode.value.toString() == startG6CgmSessionInProgressTxId) {
+                                                            return@repeatBlock
+                                                        }
+                                                    }
+                                                }
+
+                                                showStartG6CgmSessionMenu = false
+                                            }
+                                        },
+                                        enabled = cgmSetupG7SensorCode.value != null,
+                                        modifier = Modifier.padding(top = 16.dp)
+                                    ) {
+                                        Text("Start Sensor")
+                                    }
+                                }
+                            )
+                        }
+                    }
+                }
+
 
                 item {
                     Box(
@@ -460,7 +591,7 @@ private fun DefaultPreviewCgmStart() {
             CGMActions(
                 sendMessage = { _, _ -> },
                 sendPumpCommands = { _, _ -> },
-                _startCgmSessionMenuState = true,
+                _startG6CgmSessionMenuState = true,
                 navigateBack = {},
             )
         }

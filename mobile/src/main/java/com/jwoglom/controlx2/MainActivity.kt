@@ -90,6 +90,7 @@ import com.jwoglom.pumpx2.pump.messages.response.control.SetTempRateResponse
 import com.jwoglom.pumpx2.pump.messages.response.control.StartG6SensorSessionResponse
 import com.jwoglom.pumpx2.pump.messages.response.control.StopG6SensorSessionResponse
 import com.jwoglom.pumpx2.pump.messages.response.currentStatus.AlertStatusResponse
+import com.jwoglom.pumpx2.pump.messages.response.currentStatus.GetSavedG7PairingCodeResponse
 import com.jwoglom.pumpx2.pump.messages.response.currentStatus.TempRateResponse
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.SupervisorJob
@@ -704,6 +705,9 @@ class MainActivity : ComponentActivity(), GoogleApiClient.ConnectionCallbacks, G
             is CurrentEGVGuiDataResponse -> {
                 dataStore.cgmReading.value = message.cgmReading
                 dataStore.cgmDelta.value = message.trendRate
+            }
+            is GetSavedG7PairingCodeResponse -> {
+                dataStore.savedG7PairingCode.value = message.pairingCode
             }
             is BolusCalcDataSnapshotResponse -> {
                 if (!cached) {
