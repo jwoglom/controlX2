@@ -648,6 +648,9 @@ class MainActivity : ComponentActivity(), GoogleApiClient.ConnectionCallbacks, G
         }
         if (NotificationBundle.isNotificationResponse(message)) {
             // returns an instance of itself: ensures that watchers get the updated values
+            if (dataStore.notificationBundle.value == null) {
+                dataStore.notificationBundle.value = NotificationBundle()
+            }
             dataStore.notificationBundle.value = dataStore.notificationBundle.value?.add(message);
         }
         when (message) {

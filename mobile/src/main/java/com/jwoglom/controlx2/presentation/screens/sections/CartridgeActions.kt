@@ -47,12 +47,14 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
 import androidx.navigation.NavHostController
+import com.google.common.base.Strings
 import com.jwoglom.controlx2.LocalDataStore
 import com.jwoglom.controlx2.Prefs
 import com.jwoglom.controlx2.dataStore
 import com.jwoglom.controlx2.db.historylog.HistoryLogViewModel
 import com.jwoglom.controlx2.presentation.components.HeaderLine
 import com.jwoglom.controlx2.presentation.components.Line
+import com.jwoglom.controlx2.presentation.screens.sections.components.DecimalOutlinedText
 import com.jwoglom.controlx2.presentation.screens.setUpPreviewState
 import com.jwoglom.controlx2.presentation.theme.ControlX2Theme
 import com.jwoglom.controlx2.presentation.util.LifecycleStateObserver
@@ -61,17 +63,20 @@ import com.jwoglom.controlx2.shared.presentation.intervalOf
 import com.jwoglom.controlx2.shared.util.SendType
 import com.jwoglom.controlx2.util.determinePumpModel
 import com.jwoglom.pumpx2.pump.messages.Message
+import com.jwoglom.pumpx2.pump.messages.models.InsulinUnit
 import com.jwoglom.pumpx2.pump.messages.models.KnownDeviceModel
 import com.jwoglom.pumpx2.pump.messages.request.control.EnterChangeCartridgeModeRequest
 import com.jwoglom.pumpx2.pump.messages.request.control.EnterFillTubingModeRequest
 import com.jwoglom.pumpx2.pump.messages.request.control.ExitChangeCartridgeModeRequest
 import com.jwoglom.pumpx2.pump.messages.request.control.ExitFillTubingModeRequest
+import com.jwoglom.pumpx2.pump.messages.request.control.FillCannulaRequest
 import com.jwoglom.pumpx2.pump.messages.request.currentStatus.CGMStatusRequest
 import com.jwoglom.pumpx2.pump.messages.request.currentStatus.HomeScreenMirrorRequest
 import com.jwoglom.pumpx2.pump.messages.request.currentStatus.TimeSinceResetRequest
 import com.jwoglom.pumpx2.pump.messages.request.currentStatus.UnknownMobiOpcode20Request
 import com.jwoglom.pumpx2.pump.messages.response.controlStream.EnterChangeCartridgeModeStateStreamResponse
 import com.jwoglom.pumpx2.pump.messages.response.controlStream.ExitFillTubingModeStateStreamResponse
+import com.jwoglom.pumpx2.pump.messages.response.controlStream.FillCannulaStateStreamResponse
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
@@ -244,6 +249,7 @@ fun CartridgeActions(
                                         verticalArrangement = Arrangement.spacedBy(0.dp),
                                         modifier = Modifier
                                             .fillMaxWidth()
+                                            .fillMaxHeight()
                                             .padding(horizontal = 0.dp),
                                         content = {
                                             if (detectingCartridgeState.value != null) {
@@ -389,7 +395,7 @@ fun CartridgeActions(
 
                         DropdownMenu(
                             expanded = showFillTubingMenu,
-                            onDismissRequest = { showFillTubingMenu = false },
+                            onDismissRequest = {  },
                             modifier = Modifier.fillMaxWidth().fillMaxHeight(),
                         ) {
                             val basalStatus = ds.basalStatus.observeAsState()
@@ -412,6 +418,7 @@ fun CartridgeActions(
                                         verticalArrangement = Arrangement.spacedBy(0.dp),
                                         modifier = Modifier
                                             .fillMaxWidth()
+                                            .fillMaxHeight()
                                             .padding(horizontal = 0.dp),
                                         content = {
                                             if (exitFillTubingState.value != null) {
@@ -425,11 +432,9 @@ fun CartridgeActions(
                                                     }
                                                 }
                                             } else if (inFillTubingMode.value == true) {
-                                                item {
-                                                    Text("Hold down the pump button to fill insulin through the tubing.\n\n")
-                                                }
                                                 if (fillTubingState.value == null) {
                                                     item {
+                                                        Text("Hold down the pump button to fill insulin through the tubing.\n\n")
                                                         Text("You haven't filled any insulin through the tubing yet.")
                                                     }
                                                 } else if (fillTubingState.value?.buttonDown == true) {
@@ -528,6 +533,173 @@ fun CartridgeActions(
                 }
 
                 item {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .wrapContentSize(Alignment.TopStart)
+                    ) {
+                        ListItem(
+                            headlineText = {
+                                Text(
+                                    "Fill Cannula"
+                                )
+                            },
+                            supportingText = {
+                            },
+                            leadingContent = {
+                                Icon(Icons.Filled.Settings, contentDescription = null)
+                            },
+                            modifier = Modifier.clickable {
+                                refreshScope.launch {
+                                    ds.fillCannulaState.value = null
+                                    sendPumpCommands(
+                                        SendType.BUST_CACHE, listOf(
+                                            TimeSinceResetRequest()
+                                        )
+                                    )
+                                    showFillCannulaMenu = true
+                                }
+                            }
+                        )
+
+                        DropdownMenu(
+                            expanded = showFillCannulaMenu,
+                            onDismissRequest = {  },
+                            modifier = Modifier.fillMaxWidth().fillMaxHeight(),
+                        ) {
+                            val basalStatus = ds.basalStatus.observeAsState()
+                            val fillCannulaState = ds.fillCannulaState.observeAsState()
+                            var cannulaFillAmountStr by remember { mutableStateOf<String?>(null) }
+                            var cannulaFillAmount by remember { mutableStateOf<Double?>(null) }
+
+                            fun allowedCannulaFillAmount(units: Double?): Boolean {
+                                return units != null && units > 0 && units <= 3.0
+                            }
+
+                            AlertDialog(
+                                onDismissRequest = {
+                                },
+                                title = {
+                                    Text("Fill Cannula")
+                                },
+                                text = {
+                                    LazyColumn(
+                                        contentPadding = innerPadding,
+                                        verticalArrangement = Arrangement.spacedBy(0.dp),
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .fillMaxHeight()
+                                            .padding(horizontal = 0.dp),
+                                        content = {
+                                            if (fillCannulaState.value != null) {
+                                                if (fillCannulaState.value?.state == FillCannulaStateStreamResponse.FillCannulaState.CANNULA_FILLED) {
+                                                    item {
+                                                        Text("Cannula filled.")
+                                                    }
+                                                } else {
+                                                    item {
+                                                        Text("Filling cannula with ${cannulaFillAmount} units...\n\n")
+                                                        Text("State: ${fillCannulaState.value?.stateId}")
+                                                    }
+                                                }
+
+                                            } else if (basalStatus.value == BasalStatus.PUMP_SUSPENDED) {
+                                                item {
+                                                    Text("Enter the cannula fill size:")
+                                                    Text("\n\n")
+                                                    DecimalOutlinedText(
+                                                        title = "Fill size",
+                                                        value = cannulaFillAmountStr,
+                                                        onValueChange = {
+                                                            cannulaFillAmountStr = it
+                                                            cannulaFillAmount = when {
+                                                                it == "" -> null
+                                                                else -> {
+                                                                    val d = it.toDoubleOrNull()
+                                                                    if (!allowedCannulaFillAmount(d)) {
+                                                                        null
+                                                                    } else {
+                                                                        d
+                                                                    }
+                                                                }
+                                                            }
+                                                        }
+                                                    )
+                                                    Text("\n")
+
+                                                }
+                                            } else {
+                                                item {
+                                                    Text("Before filling your cannula, stop delivery of insulin.")
+                                                    Text("\n")
+                                                }
+                                            }
+                                        }
+                                    )
+                                },
+                                dismissButton = {
+                                    if (fillCannulaState.value != null) {
+                                        /* */
+                                    } else {
+                                        TextButton(
+                                            onClick = {
+                                                showFillCannulaMenu = false
+                                            },
+                                            modifier = Modifier.padding(top = 16.dp)
+                                        ) {
+                                            Text("Cancel")
+                                        }
+                                    }
+                                },
+                                confirmButton = {
+                                    if (fillCannulaState.value != null) {
+                                        if (fillCannulaState.value?.state == FillCannulaStateStreamResponse.FillCannulaState.CANNULA_FILLED) {
+                                            TextButton(
+                                                onClick = {
+                                                    showFillCannulaMenu = false
+                                                },
+                                                modifier = Modifier.padding(top = 16.dp)
+                                            ) {
+                                                Text("Done")
+                                            }
+                                        }
+                                    } else if (basalStatus.value == BasalStatus.PUMP_SUSPENDED) {
+                                        TextButton(
+                                            onClick = {
+                                                refreshScope.launch {
+                                                    cannulaFillAmount.let {
+                                                        if (allowedCannulaFillAmount(it)) {
+                                                            sendPumpCommands(
+                                                                SendType.BUST_CACHE, listOf(
+                                                                    FillCannulaRequest(
+                                                                        InsulinUnit.from1To1000(it).toInt()
+                                                                    )
+                                                                )
+                                                            )
+                                                        }
+                                                    }
+                                                }
+                                            },
+                                            enabled = basalStatus.value == BasalStatus.PUMP_SUSPENDED && cannulaFillAmount != null && allowedCannulaFillAmount(cannulaFillAmount),
+                                            modifier = Modifier.padding(top = 16.dp)
+                                        ) {
+                                            if (allowedCannulaFillAmount(cannulaFillAmount)) {
+                                                Text("Fill ${cannulaFillAmount}u Cannula")
+                                            } else {
+                                                Text("Fill Cannula")
+                                            }
+                                        }
+                                    }
+                                }
+                            )
+
+                        }
+
+                    }
+                }
+
+
+                item {
                     Line("\n")
                 }
 
@@ -561,7 +733,8 @@ fun CartridgeActions(
 val cartridgeActionsCommands = listOf(
     HomeScreenMirrorRequest(),
     CGMStatusRequest(),
-    TimeSinceResetRequest()
+    TimeSinceResetRequest(),
+    UnknownMobiOpcode20Request()
 )
 
 val cartridgeActionsFields = listOf(
