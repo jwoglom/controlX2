@@ -23,6 +23,12 @@ import com.jwoglom.controlx2.shared.enums.BasalStatus
 import com.jwoglom.controlx2.shared.enums.CGMSessionState
 import com.jwoglom.controlx2.shared.enums.UserMode
 import com.jwoglom.pumpx2.pump.messages.models.NotificationBundle
+import com.jwoglom.pumpx2.pump.messages.response.controlStream.DetectingCartridgeStateStreamResponse
+import com.jwoglom.pumpx2.pump.messages.response.controlStream.EnterChangeCartridgeModeStateStreamResponse
+import com.jwoglom.pumpx2.pump.messages.response.controlStream.ExitFillTubingModeStateStreamResponse
+import com.jwoglom.pumpx2.pump.messages.response.controlStream.FillCannulaStateStreamResponse
+import com.jwoglom.pumpx2.pump.messages.response.controlStream.FillTubingStateStreamResponse
+import com.jwoglom.pumpx2.pump.messages.response.controlStream.PumpingStateStreamResponse
 import com.jwoglom.pumpx2.pump.messages.response.currentStatus.AlertStatusResponse
 import com.jwoglom.pumpx2.pump.messages.response.currentStatus.TempRateResponse
 import timber.log.Timber
@@ -100,6 +106,15 @@ class DataStore {
     val lastBolusStatusResponse = MutableLiveData<LastBolusStatusAbstractResponse>()
     val bolusCurrentResponse = MutableLiveData<CurrentBolusStatusResponse>()
 
+    val inChangeCartridgeMode = MutableLiveData<Boolean>()
+    val inFillTubingMode = MutableLiveData<Boolean>()
+    val enterChangeCartridgeState = MutableLiveData<EnterChangeCartridgeModeStateStreamResponse>()
+    val detectingCartridgeState = MutableLiveData<DetectingCartridgeStateStreamResponse>()
+    val fillTubingState = MutableLiveData<FillTubingStateStreamResponse>()
+    val exitFillTubingState = MutableLiveData<ExitFillTubingModeStateStreamResponse>()
+    val fillCannulaState = MutableLiveData<FillCannulaStateStreamResponse>()
+    val pumpingState = MutableLiveData<PumpingStateStreamResponse>()
+
     val historyLogStatus = MutableLiveData<HistoryLogStatusResponse>()
 
     val historyLogCache = MutableLiveData<MutableMap<Long, HistoryLog>>(mutableMapOf())
@@ -176,6 +191,15 @@ class DataStore {
         bolusInitiateResponse.observeForever { t -> Timber.i("DataStore.bolusInitiateResponse=$t") }
         bolusCancelResponse.observeForever { t -> Timber.i("DataStore.bolusCancelResponse=$t") }
         bolusCurrentResponse.observeForever { t -> Timber.i("DataStore.bolusCurrentResponse=$t") }
+
+        inChangeCartridgeMode.observeForever { t -> Timber.i("DataStore.inChangeCartridgeMode=$t") }
+        inFillTubingMode.observeForever { t -> Timber.i("DataStore.inFillTubingMode=$t") }
+        enterChangeCartridgeState.observeForever { t -> Timber.i("DataStore.enterChangeCartridgeState=$t") }
+        detectingCartridgeState.observeForever { t -> Timber.i("DataStore.detectingCartridgeState=$t") }
+        fillTubingState.observeForever { t -> Timber.i("DataStore.fillTubingState=$t") }
+        exitFillTubingState.observeForever { t -> Timber.i("DataStore.exitFillTubingState=$t") }
+        fillCannulaState.observeForever { t -> Timber.i("DataStore.fillCannulaState=$t") }
+        pumpingState.observeForever { t -> Timber.i("DataStore.pumpingState=$t") }
 
         historyLogStatus.observeForever { t -> Timber.i("DataStore.historyLogStatus=$t") }
 

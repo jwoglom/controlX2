@@ -83,12 +83,22 @@ import com.jwoglom.controlx2.shared.util.shortTimeAgo
 import com.jwoglom.controlx2.shared.util.twoDecimalPlaces1000Unit
 import com.jwoglom.controlx2.util.extractPumpSid
 import com.jwoglom.pumpx2.pump.messages.models.NotificationBundle
-import com.jwoglom.pumpx2.pump.messages.response.control.ChangeCartridgeResponse
+import com.jwoglom.pumpx2.pump.messages.models.StatusMessage
+import com.jwoglom.pumpx2.pump.messages.response.control.EnterChangeCartridgeModeResponse
+import com.jwoglom.pumpx2.pump.messages.response.control.EnterFillTubingModeResponse
+import com.jwoglom.pumpx2.pump.messages.response.control.ExitChangeCartridgeModeResponse
+import com.jwoglom.pumpx2.pump.messages.response.control.ExitFillTubingModeResponse
 import com.jwoglom.pumpx2.pump.messages.response.control.SetG6TransmitterIdResponse
 import com.jwoglom.pumpx2.pump.messages.response.control.SetModesResponse
 import com.jwoglom.pumpx2.pump.messages.response.control.SetTempRateResponse
 import com.jwoglom.pumpx2.pump.messages.response.control.StartG6SensorSessionResponse
 import com.jwoglom.pumpx2.pump.messages.response.control.StopG6SensorSessionResponse
+import com.jwoglom.pumpx2.pump.messages.response.controlStream.DetectingCartridgeStateStreamResponse
+import com.jwoglom.pumpx2.pump.messages.response.controlStream.EnterChangeCartridgeModeStateStreamResponse
+import com.jwoglom.pumpx2.pump.messages.response.controlStream.ExitFillTubingModeStateStreamResponse
+import com.jwoglom.pumpx2.pump.messages.response.controlStream.FillCannulaStateStreamResponse
+import com.jwoglom.pumpx2.pump.messages.response.controlStream.FillTubingStateStreamResponse
+import com.jwoglom.pumpx2.pump.messages.response.controlStream.PumpingStateStreamResponse
 import com.jwoglom.pumpx2.pump.messages.response.currentStatus.AlertStatusResponse
 import com.jwoglom.pumpx2.pump.messages.response.currentStatus.GetSavedG7PairingCodeResponse
 import com.jwoglom.pumpx2.pump.messages.response.currentStatus.TempRateResponse
@@ -780,24 +790,55 @@ class MainActivity : ComponentActivity(), GoogleApiClient.ConnectionCallbacks, G
                 dataStore.timeSinceResetResponse.value = message
             }
 
+            is EnterChangeCartridgeModeStateStreamResponse -> {
+                dataStore.enterChangeCartridgeState.value = message
+            }
+            is DetectingCartridgeStateStreamResponse -> {
+                dataStore.detectingCartridgeState.value = message
+            }
+            is FillTubingStateStreamResponse -> {
+                dataStore.fillTubingState.value = message
+            }
+            is ExitFillTubingModeStateStreamResponse -> {
+                dataStore.exitFillTubingState.value = message
+            }
+            is FillCannulaStateStreamResponse -> {
+                dataStore.fillCannulaState.value = message
+            }
+            is PumpingStateStreamResponse -> {
+                dataStore.pumpingState.value = message
+            }
+            is EnterChangeCartridgeModeResponse -> {
+                if (!message.isStatusOK) {
+                    unsuccessfulAlert(message.messageName())
+                } else {
+                    dataStore.inChangeCartridgeMode.value = true
+                }
+            }
+            is ExitChangeCartridgeModeResponse -> {
+                if (message.status != 0) {
+                    unsuccessfulAlert(message.messageName())
+                } else {
+                    dataStore.inChangeCartridgeMode.value = false
+                }
+            }
+            is EnterFillTubingModeResponse -> {
+                if (!message.isStatusOK) {
+                    unsuccessfulAlert(message.messageName())
+                } else {
+                    dataStore.inFillTubingMode.value = true
+                }
+            }
+            is ExitFillTubingModeResponse -> {
+                if (!message.isStatusOK) {
+                    unsuccessfulAlert(message.messageName())
+                } else {
+                    dataStore.inFillTubingMode.value = false
+                }
+            }
             // error handlers
-            is SetModesResponse -> {
-                if (message.status != 0) unsuccessfulAlert("SetModes")
-            }
-            is SetTempRateResponse -> {
-                if (message.status != 0) unsuccessfulAlert("SetTempRate")
-            }
-            is SetG6TransmitterIdResponse -> {
-                if (message.status != 0) unsuccessfulAlert("SetG6TransmitterId")
-            }
-            is StartG6SensorSessionResponse -> {
-                if (message.status != 0) unsuccessfulAlert("StartG6SensorSession")
-            }
-            is StopG6SensorSessionResponse -> {
-                if (message.status != 0) unsuccessfulAlert("StopG6SensorSession")
-            }
-            is ChangeCartridgeResponse -> {
-                if (message.status != 0) unsuccessfulAlert("ChangeCartridgeResponse")
+            is StatusMessage -> {
+                if (!message.isStatusOK) unsuccessfulAlert(message.messageName())
             }
         }
     }

@@ -285,15 +285,31 @@ fun Notifications(
                                             }
 
                                             is AlarmStatusResponse.AlarmResponseType -> {
-                                                // TODO
-                                                // sendPumpCommands(SendType.BUST_CACHE, listOf(
-                                                //     DismissNotificationRequest(DismissNotificationRequest.NotificationType.ALARM, it.bitmask())
-                                                // ))
+                                                sendPumpCommands(
+                                                    SendType.BUST_CACHE, listOf(
+                                                        DismissNotificationRequest(
+                                                            DismissNotificationRequest.NotificationType.ALARM,
+                                                            it.bitmask().toLong()
+                                                        )
+                                                    )
+                                                )
                                             }
 
                                             is CGMAlertStatusResponse.CGMAlert -> {
-                                                // TODO
+                                                sendPumpCommands(
+                                                    SendType.BUST_CACHE, listOf(
+                                                        DismissNotificationRequest(
+                                                            DismissNotificationRequest.NotificationType.CGM_ALERT,
+                                                            it.id().toLong()
+                                                        )
+                                                    )
+                                                )
                                             }
+                                        }
+
+                                        withContext(Dispatchers.IO) {
+                                            Thread.sleep(500)
+                                            refresh()
                                         }
                                     }
                                 }
