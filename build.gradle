@@ -2,7 +2,7 @@
 buildscript {
     ext {
         controlx2_version = "1.0.0-20250217"
-        pumpx2_version = "1.5.5"
+        pumpx2_version = "1.5.7"
         use_local_pumpx2 = System.properties.getOrDefault('use_local_pumpx2', 'false') == 'true'
         if (!use_local_pumpx2) {
             Properties properties = new Properties()
