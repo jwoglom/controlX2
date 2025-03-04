@@ -3,6 +3,7 @@
 package com.jwoglom.controlx2.presentation.screens.sections
 
 import android.app.AlertDialog
+import android.content.ClipData
 import android.content.Context
 import android.content.DialogInterface
 import android.content.Intent
@@ -26,6 +27,8 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.wrapContentSize
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.text.BasicText
+import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Build
 import androidx.compose.material.icons.filled.Check
@@ -60,8 +63,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.platform.ClipboardManager
+import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
@@ -122,6 +128,8 @@ fun Debug(
     sendPumpCommands: (SendType, List<Message>) -> Unit,
 ) {
     val coroutineScope = rememberCoroutineScope()
+    val clipboardManager: ClipboardManager = LocalClipboardManager.current
+
 
     var showSendPumpMessageMenu by remember { mutableStateOf(false) }
     var showMessageCache by remember { mutableStateOf(false) }
@@ -131,12 +139,10 @@ fun Debug(
     val context = LocalContext.current
     val ds = LocalDataStore.current
 
-//    fun setClipboard(str: String) {
-//        val clipboard: ClipboardManager =
-//            context.getSystemService(ComponentActivity.CLIPBOARD_SERVICE) as ClipboardManager
-//        val clip = ClipData.newPlainText(str, str)
-//        clipboard.setPrimaryClip(clip)
-//    }
+    fun setClipboard(str: String) {
+        clipboardManager.setText(AnnotatedString(str))
+        Toast.makeText(context, "Saved to clipboard", Toast.LENGTH_SHORT).show()
+    }
 
     fun shareTextContents(str: String, label: String, mimeType: String) {
         ShareCompat.IntentBuilder(context)
@@ -725,24 +731,40 @@ fun Debug(
                             modifier = Modifier
                                 .fillMaxSize()
                                 .wrapContentSize(Alignment.TopStart)
-                                .background(Color.DarkGray.copy(alpha = 0.3f))
+                                .background(Color.DarkGray.copy(alpha = 0.7f))
                         ) {
-                            LazyColumn {
+                            LazyColumn(modifier = Modifier.fillMaxSize().padding(16.dp)) {
                                 item {
                                     Spacer(Modifier.height(64.dp))
                                 }
-
                                 item {
                                     TextField(
                                         value = exportedPumpState,
+                                        label = { Text("PumpState") },
                                         onValueChange = {v -> },
-                                        modifier = Modifier.fillMaxWidth().height(300.dp).padding(10.dp)
+                                        modifier = Modifier.fillMaxWidth().height(200.dp).padding(10.dp).background(Color.White)
                                     )
                                 }
 
                                 item {
-                                    Button(onClick = {showPumpState = false}) {
-                                        Text("Close")
+                                    LazyRow {
+                                        item {
+                                            Button(onClick = {
+                                                setClipboard(exportedPumpState)
+                                            }) {
+                                                Text("Save to clipboard")
+                                            }
+                                        }
+                                        item {
+                                            Spacer(Modifier.width(16.dp))
+                                        }
+                                        item {
+                                            Button(onClick = {
+                                                showPumpState = false
+                                            }) {
+                                                Text("Close")
+                                            }
+                                        }
                                     }
                                 }
                             }

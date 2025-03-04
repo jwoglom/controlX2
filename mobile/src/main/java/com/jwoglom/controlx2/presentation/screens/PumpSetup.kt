@@ -1,8 +1,15 @@
+@file:OptIn(ExperimentalMaterial3Api::class)
+
 package com.jwoglom.controlx2.presentation.screens
 
+import android.content.Context
+import android.content.Intent
 import android.widget.Toast
+import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -10,24 +17,39 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.wrapContentSize
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Button
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextField
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.livedata.observeAsState
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.ClipboardManager
+import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.SpanStyle
@@ -40,12 +62,14 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.Popup
 import androidx.navigation.NavHostController
 import com.jwoglom.pumpx2.pump.PumpState
 import com.jwoglom.pumpx2.pump.messages.builders.PumpChallengeRequestBuilder
 import com.jwoglom.controlx2.LocalDataStore
 import com.jwoglom.controlx2.Prefs
 import com.jwoglom.controlx2.presentation.components.DialogScreen
+import com.jwoglom.controlx2.presentation.components.HeaderLine
 import com.jwoglom.controlx2.presentation.components.Line
 import com.jwoglom.controlx2.presentation.components.PumpSetupStageDescription
 import com.jwoglom.controlx2.presentation.components.PumpSetupStageProgress
@@ -56,6 +80,9 @@ import com.jwoglom.controlx2.util.determinePumpModel
 import com.jwoglom.pumpx2.pump.messages.models.KnownDeviceModel
 import com.jwoglom.pumpx2.pump.messages.models.PairingCodeType
 import com.jwoglom.pumpx2.pump.messages.response.authentication.CentralChallengeResponse
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import timber.log.Timber
 
 @Composable
@@ -65,6 +92,8 @@ fun PumpSetup(
 ) {
     val context = LocalContext.current
     val ds = LocalDataStore.current
+    val coroutineScope = rememberCoroutineScope()
+    val clipboardManager: ClipboardManager = LocalClipboardManager.current
 
     val setupStage = ds.pumpSetupStage.observeAsState()
 
@@ -72,8 +101,22 @@ fun PumpSetup(
         null -> ""
         else -> PumpState.getPairingCode(context)
     }) }
+
+    var showAdvancedPairingSettings by remember { mutableStateOf(false) }
+    var pumpStateStatus by remember { mutableStateOf<String?>(null) }
+    var pumpStateJson by remember { mutableStateOf(PumpState.exportState(context)) }
     DialogScreen(
         "Pump Setup",
+        actionContent = {
+            IconButton(onClick = {
+                showAdvancedPairingSettings = true
+            }) {
+                Icon(
+                    Icons.Filled.Settings,
+                    contentDescription = null,
+                )
+            }
+        },
         buttonContent = {
             when (setupStage.value) {
                 PumpSetupStage.PERMISSIONS_NOT_GRANTED -> {
@@ -168,6 +211,103 @@ fun PumpSetup(
     ) {
         item {
             ServiceDisabledMessage(sendMessage = sendMessage)
+        }
+        item {
+
+            if (showAdvancedPairingSettings) {
+                Popup(
+                    onDismissRequest = { showAdvancedPairingSettings = false }
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .wrapContentSize(Alignment.TopStart)
+                            .background(Color.DarkGray.copy(alpha = 0.7f))
+                    ) {
+                        LazyColumn(modifier = Modifier.fillMaxSize().padding(16.dp)) {
+                            item {
+                                Spacer(Modifier.height(64.dp))
+                            }
+
+                            item {
+                                HeaderLine("Advanced Pairing")
+                            }
+
+                            if (pumpStateStatus != null) {
+                                item {
+                                    Line("${pumpStateStatus}")
+                                }
+                            }
+
+                            item {
+                                TextField(
+                                    value = pumpStateJson,
+                                    label = { Text("PumpState") },
+                                    onValueChange = {v -> pumpStateJson = v},
+                                    modifier = Modifier.fillMaxWidth().height(200.dp).background(Color.White)
+                                )
+                            }
+
+                            fun triggerAppReload(context: Context) {
+                                val packageManager = context.packageManager
+                                val intent = packageManager.getLaunchIntentForPackage(context.packageName)
+                                val componentName = intent!!.component
+                                val mainIntent = Intent.makeRestartActivityTask(componentName)
+                                context.startActivity(mainIntent)
+                                Runtime.getRuntime().exit(0)
+                            }
+
+                            item {
+                                LazyRow {
+                                    item {
+                                        Button(onClick = {
+                                            clipboardManager.getText()?.text?.let {
+                                                pumpStateJson = it
+                                            }
+                                        }) {
+                                            Text("Read from clipboard")
+                                        }
+                                    }
+                                    item {
+                                        Spacer(Modifier.width(16.dp))
+                                    }
+                                    item {
+                                        Button(onClick = {
+                                            try {
+                                                PumpState.importState(context, pumpStateJson)
+                                                pumpStateStatus =
+                                                    "Success, application will reload with new state momentarily..."
+                                                coroutineScope.launch {
+                                                    withContext(Dispatchers.IO) {
+                                                        Thread.sleep(1000)
+                                                    }
+                                                    triggerAppReload(context)
+                                                }
+
+                                            } catch (e: Exception) {
+                                                pumpStateStatus = "Error importing state: ${e}"
+                                            }
+                                        }) {
+                                            Text("Apply")
+                                        }
+                                    }
+                                    item {
+                                        Spacer(Modifier.width(16.dp))
+                                    }
+                                    item {
+                                        Button(onClick = {
+                                            showAdvancedPairingSettings = false
+                                        }) {
+                                            Text("Cancel")
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
         }
         item {
             PumpSetupStageProgress(initialSetup = true)
