@@ -30,9 +30,11 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Build
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.Send
+import androidx.compose.material3.Button
 import androidx.compose.material3.Divider
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -44,6 +46,7 @@ import androidx.compose.material3.ListItem
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextField
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -95,6 +98,7 @@ import com.jwoglom.controlx2.presentation.components.HeaderLine
 import com.jwoglom.controlx2.presentation.theme.ControlX2Theme
 import com.jwoglom.controlx2.shared.util.SendType
 import com.jwoglom.controlx2.shared.util.shortTimeAgo
+import com.jwoglom.pumpx2.pump.PumpState
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
@@ -122,6 +126,7 @@ fun Debug(
     var showSendPumpMessageMenu by remember { mutableStateOf(false) }
     var showMessageCache by remember { mutableStateOf(false) }
     var showHistoryLogs by remember { mutableStateOf(false) }
+    var showPumpState by remember { mutableStateOf(false) }
 
     val context = LocalContext.current
     val ds = LocalDataStore.current
@@ -688,6 +693,62 @@ fun Debug(
                         shareDebugLog(context)
                     }
                 )
+            }
+
+
+            item {
+                Divider()
+            }
+
+            item {
+                ListItem(
+                    headlineText = { Text("View PumpState") },
+                    supportingText = { Text("Displays the pump MAC, pairing key, and authentication secrets.") },
+                    leadingContent = {
+                        Icon(
+                            Icons.Filled.Info,
+                            contentDescription = null,
+                        )
+                    },
+                    modifier = Modifier.clickable {
+                        showPumpState = true
+                    }
+                )
+
+                if (showPumpState) {
+                    val exportedPumpState = PumpState.exportState(context)
+                    Popup(
+                        onDismissRequest = { showPumpState = false }
+                    ) {
+
+                        Box(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .wrapContentSize(Alignment.TopStart)
+                                .background(Color.DarkGray.copy(alpha = 0.3f))
+                        ) {
+                            LazyColumn {
+                                item {
+                                    Spacer(Modifier.height(64.dp))
+                                }
+
+                                item {
+                                    TextField(
+                                        value = exportedPumpState,
+                                        onValueChange = {v -> },
+                                        modifier = Modifier.fillMaxWidth().height(300.dp).padding(10.dp)
+                                    )
+                                }
+
+                                item {
+                                    Button(onClick = {showPumpState = false}) {
+                                        Text("Close")
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
             }
 
             item {
