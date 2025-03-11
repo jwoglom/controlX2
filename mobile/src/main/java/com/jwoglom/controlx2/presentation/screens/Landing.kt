@@ -76,6 +76,7 @@ import com.jwoglom.controlx2.presentation.screens.sections.CartridgeActions
 import com.jwoglom.controlx2.presentation.screens.sections.Dashboard
 import com.jwoglom.controlx2.presentation.screens.sections.Debug
 import com.jwoglom.controlx2.presentation.screens.sections.Notifications
+import com.jwoglom.controlx2.presentation.screens.sections.ProfileActions
 import com.jwoglom.controlx2.presentation.screens.sections.Settings
 import com.jwoglom.controlx2.presentation.screens.sections.TempRateWindow
 import com.jwoglom.controlx2.presentation.screens.sections.dashboardCommands
@@ -271,12 +272,7 @@ fun Landing(
                                         displayBottomScaffold.bottomSheetState.expand()
                                     }
                                 },
-                                navigateToCgmActions = {
-                                    selectedItem = LandingSection.CGM_ACTIONS
-                                },
-                                navigateToCartridgeActions = {
-                                    selectedItem = LandingSection.CARTRIDGE_ACTIONS
-                                }
+                                navigateToSection = { section -> selectedItem = section }
                             )
                         }
 
@@ -295,6 +291,19 @@ fun Landing(
 
                         LandingSection.CARTRIDGE_ACTIONS -> {
                             CartridgeActions(
+                                innerPadding = innerPadding,
+                                navController = navController,
+                                sendMessage = sendMessage,
+                                sendPumpCommands = sendPumpCommands,
+                                historyLogViewModel = historyLogViewModel,
+                                navigateBack = {
+                                    selectedItem = LandingSection.ACTIONS
+                                },
+                            )
+                        }
+
+                        LandingSection.PROFILE_ACTIONS -> {
+                            ProfileActions(
                                 innerPadding = innerPadding,
                                 navController = navController,
                                 sendMessage = sendMessage,
@@ -399,6 +408,7 @@ enum class LandingSection(val label: String, val icon: ImageVector, val showInNa
     ACTIONS("Actions", Icons.Filled.Create, true),
     CGM_ACTIONS("Actions", Icons.Filled.Create, false),
     CARTRIDGE_ACTIONS("Actions", Icons.Filled.Create, false),
+    PROFILE_ACTIONS("Profiles", Icons.Filled.Create, false),
 
     SETTINGS("Settings", Icons.Filled.Settings, true),
     DEBUG("Settings", Icons.Filled.Settings, false),

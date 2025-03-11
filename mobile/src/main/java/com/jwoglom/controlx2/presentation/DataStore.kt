@@ -22,6 +22,7 @@ import com.jwoglom.controlx2.presentation.screens.PumpSetupStage
 import com.jwoglom.controlx2.shared.enums.BasalStatus
 import com.jwoglom.controlx2.shared.enums.CGMSessionState
 import com.jwoglom.controlx2.shared.enums.UserMode
+import com.jwoglom.pumpx2.pump.messages.builders.IDPManager
 import com.jwoglom.pumpx2.pump.messages.models.NotificationBundle
 import com.jwoglom.pumpx2.pump.messages.response.controlStream.DetectingCartridgeStateStreamResponse
 import com.jwoglom.pumpx2.pump.messages.response.controlStream.EnterChangeCartridgeModeStateStreamResponse
@@ -73,6 +74,8 @@ class DataStore {
     val cgmSetupG6SensorCode = MutableLiveData<String>()
     val cgmSetupG7SensorCode = MutableLiveData<String>()
     val savedG7PairingCode = MutableLiveData<Int>()
+    val idpManager = MutableLiveData<IDPManager>(IDPManager())
+
     val bolusCalcDataSnapshot = MutableLiveData<BolusCalcDataSnapshotResponse>()
     val bolusCalcLastBG = MutableLiveData<LastBGResponse>()
     val maxBolusAmount = MutableLiveData<Int>()
@@ -160,6 +163,9 @@ class DataStore {
         cgmSetupG6SensorCode.observeForever { t -> Timber.i("DataStore.cgmSetupG6SensorId=$t") }
         cgmSetupG7SensorCode.observeForever { t -> Timber.i("DataStore.cgmSetupG7SensorId=$t") }
         savedG7PairingCode.observeForever { t -> Timber.i("DataStore.savedG7PairingCode=$t") }
+        idpManager.observeForever { t -> Timber.i("DataStore.idpManager=$t") }
+
+
         bolusCalcDataSnapshot.observeForever { t -> Timber.i("DataStore.bolusCalcDataSnapshot=$t") }
         bolusCalcLastBG.observeForever { t -> Timber.i("DataStore.bolusCalcLastBG=$t") }
         maxBolusAmount.observeForever { t -> Timber.i("DataStore.maxBolusAmount=$t") }

@@ -54,6 +54,7 @@ import com.jwoglom.controlx2.dataStore
 import com.jwoglom.controlx2.db.historylog.HistoryLogViewModel
 import com.jwoglom.controlx2.presentation.components.HeaderLine
 import com.jwoglom.controlx2.presentation.components.Line
+import com.jwoglom.controlx2.presentation.components.LoadSpinner
 import com.jwoglom.controlx2.presentation.screens.sections.components.DecimalOutlinedText
 import com.jwoglom.controlx2.presentation.screens.setUpPreviewState
 import com.jwoglom.controlx2.presentation.theme.ControlX2Theme
@@ -227,7 +228,7 @@ fun CartridgeActions(
                         DropdownMenu(
                             expanded = showChangeCartridgeMenu,
                             onDismissRequest = {  },
-                            modifier = Modifier.fillMaxWidth().fillMaxHeight(),
+                            modifier = Modifier.fillMaxWidth().fillMaxHeight(0.7f),
                         ) {
                             val basalStatus = ds.basalStatus.observeAsState()
                             val inChangeCartridgeMode = ds.inChangeCartridgeMode.observeAsState()
@@ -249,7 +250,7 @@ fun CartridgeActions(
                                         verticalArrangement = Arrangement.spacedBy(0.dp),
                                         modifier = Modifier
                                             .fillMaxWidth()
-                                            .fillMaxHeight()
+                                            .fillMaxHeight(0.7f)
                                             .padding(horizontal = 0.dp),
                                         content = {
                                             if (detectingCartridgeState.value != null) {
@@ -261,9 +262,7 @@ fun CartridgeActions(
                                                     }
                                                 } else {
                                                     item {
-                                                        Text("Detecting insulin in the cartridge...")
-                                                        Text("\n")
-                                                        Text("${detectingCartridgeState.value?.percentComplete}% complete")
+                                                        LoadSpinner("Detecting insulin in the cartridge...\n${detectingCartridgeState.value?.percentComplete}% complete")
                                                     }
                                                 }
                                             } else if (enterChangeCartridgeState.value?.state == EnterChangeCartridgeModeStateStreamResponse.ChangeCartridgeState.READY_TO_CHANGE) {
@@ -274,8 +273,7 @@ fun CartridgeActions(
                                                 }
                                             } else if (inChangeCartridgeMode.value == true) {
                                                 item {
-                                                    Text("Preparing to change cartridge...")
-                                                    Text("\n")
+                                                    LoadSpinner("Preparing to change cartridge...\n")
                                                 }
                                             } else if (basalStatus.value == BasalStatus.PUMP_SUSPENDED) {
                                                 item {
@@ -396,7 +394,7 @@ fun CartridgeActions(
                         DropdownMenu(
                             expanded = showFillTubingMenu,
                             onDismissRequest = {  },
-                            modifier = Modifier.fillMaxWidth().fillMaxHeight(),
+                            modifier = Modifier.fillMaxWidth().fillMaxHeight(0.7f),
                         ) {
                             val basalStatus = ds.basalStatus.observeAsState()
                             val inFillTubingMode = ds.inFillTubingMode.observeAsState()
@@ -418,7 +416,7 @@ fun CartridgeActions(
                                         verticalArrangement = Arrangement.spacedBy(0.dp),
                                         modifier = Modifier
                                             .fillMaxWidth()
-                                            .fillMaxHeight()
+                                            .fillMaxHeight(0.7f)
                                             .padding(horizontal = 0.dp),
                                         content = {
                                             if (exitFillTubingState.value != null) {
@@ -428,7 +426,7 @@ fun CartridgeActions(
                                                     }
                                                 } else {
                                                     item {
-                                                        Text("Please wait, finalizing tubing fill...\n\n${exitFillTubingState.value?.state} (${exitFillTubingState.value?.stateId})")
+                                                        LoadSpinner("Please wait, finalizing tubing fill...\n\n${exitFillTubingState.value?.state} (${exitFillTubingState.value?.stateId})")
                                                     }
                                                 }
                                             } else if (inFillTubingMode.value == true) {
@@ -565,7 +563,7 @@ fun CartridgeActions(
                         DropdownMenu(
                             expanded = showFillCannulaMenu,
                             onDismissRequest = {  },
-                            modifier = Modifier.fillMaxWidth().fillMaxHeight(),
+                            modifier = Modifier.fillMaxWidth().fillMaxHeight(0.7f),
                         ) {
                             val basalStatus = ds.basalStatus.observeAsState()
                             val fillCannulaState = ds.fillCannulaState.observeAsState()
@@ -588,7 +586,7 @@ fun CartridgeActions(
                                         verticalArrangement = Arrangement.spacedBy(0.dp),
                                         modifier = Modifier
                                             .fillMaxWidth()
-                                            .fillMaxHeight()
+                                            .fillMaxHeight(0.7f)
                                             .padding(horizontal = 0.dp),
                                         content = {
                                             if (fillCannulaState.value != null) {
@@ -598,8 +596,7 @@ fun CartridgeActions(
                                                     }
                                                 } else {
                                                     item {
-                                                        Text("Filling cannula with ${cannulaFillAmount} units...\n\n")
-                                                        Text("State: ${fillCannulaState.value?.stateId}")
+                                                        LoadSpinner("Filling cannula with ${cannulaFillAmount} units...\n\nState: ${fillCannulaState.value?.stateId}")
                                                     }
                                                 }
 

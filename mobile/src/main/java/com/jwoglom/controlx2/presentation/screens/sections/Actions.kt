@@ -17,6 +17,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.ExperimentalMaterialApi
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Create
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Settings
@@ -57,6 +58,7 @@ import com.jwoglom.controlx2.dataStore
 import com.jwoglom.controlx2.db.historylog.HistoryLogViewModel
 import com.jwoglom.controlx2.presentation.components.HeaderLine
 import com.jwoglom.controlx2.presentation.components.Line
+import com.jwoglom.controlx2.presentation.screens.LandingSection
 import com.jwoglom.controlx2.presentation.screens.TempRatePreview
 import com.jwoglom.controlx2.presentation.screens.setUpPreviewState
 import com.jwoglom.controlx2.presentation.theme.ControlX2Theme
@@ -92,8 +94,7 @@ fun Actions(
     _suspendInsulinMenuState: Boolean = false,
     _stopTempRateMenuState: Boolean = false,
     openTempRateWindow: () -> Unit,
-    navigateToCgmActions: () -> Unit,
-    navigateToCartridgeActions: () -> Unit,
+    navigateToSection: (section: LandingSection) -> Unit,
 ) {
     val coroutineScope = rememberCoroutineScope()
 
@@ -615,7 +616,7 @@ fun Actions(
                                 Icon(Icons.Filled.Settings, contentDescription = null)
                             },
                             modifier = Modifier.clickable {
-                                navigateToCartridgeActions()
+                                navigateToSection(LandingSection.CARTRIDGE_ACTIONS)
                             }
                         )
                     }
@@ -637,7 +638,30 @@ fun Actions(
                                 Icon(Icons.Filled.Settings, contentDescription = null)
                             },
                             modifier = Modifier.clickable {
-                                navigateToCgmActions()
+                                navigateToSection(LandingSection.CGM_ACTIONS)
+                            }
+                        )
+                    }
+                }
+
+
+                item {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .wrapContentSize(Alignment.TopStart)
+                    ) {
+                        ListItem(
+                            headlineText = { Text(
+                                "Profile Settings"
+                            )},
+                            supportingText = {
+                            },
+                            leadingContent = {
+                                Icon(Icons.Filled.Create, contentDescription = null)
+                            },
+                            modifier = Modifier.clickable {
+                                navigateToSection(LandingSection.PROFILE_ACTIONS)
                             }
                         )
                     }
@@ -672,8 +696,7 @@ private fun DefaultPreviewInsulinActive() {
                 sendMessage = { _, _ -> },
                 sendPumpCommands = { _, _ -> },
                 openTempRateWindow = {},
-                navigateToCgmActions = {},
-                navigateToCartridgeActions = {}
+                navigateToSection = {},
             )
         }
     }
@@ -693,8 +716,7 @@ private fun DefaultPreviewInsulinActive_StopMenuOpen() {
                 sendPumpCommands = { _, _ -> },
                 _suspendInsulinMenuState = true,
                 openTempRateWindow = {},
-                navigateToCgmActions = {},
-                navigateToCartridgeActions = {}
+                navigateToSection = {},
             )
         }
     }
@@ -714,8 +736,7 @@ private fun DefaultPreviewInsulinSuspended() {
                 sendMessage = { _, _ -> },
                 sendPumpCommands = { _, _ -> },
                 openTempRateWindow = {},
-                navigateToCgmActions = {},
-                navigateToCartridgeActions = {}
+                navigateToSection = {},
             )
         }
     }
@@ -736,8 +757,7 @@ private fun DefaultPreviewInsulinSuspended_ResumeMenuOpen() {
                 sendPumpCommands = { _, _ -> },
                 _resumeInsulinMenuState = true,
                 openTempRateWindow = {},
-                navigateToCgmActions = {},
-                navigateToCartridgeActions = {}
+                navigateToSection = {},
             )
         }
     }

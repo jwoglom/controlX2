@@ -82,6 +82,7 @@ import com.jwoglom.controlx2.shared.util.shortTime
 import com.jwoglom.controlx2.shared.util.shortTimeAgo
 import com.jwoglom.controlx2.shared.util.twoDecimalPlaces1000Unit
 import com.jwoglom.controlx2.util.extractPumpSid
+import com.jwoglom.pumpx2.pump.messages.builders.IDPManager
 import com.jwoglom.pumpx2.pump.messages.models.NotificationBundle
 import com.jwoglom.pumpx2.pump.messages.models.StatusMessage
 import com.jwoglom.pumpx2.pump.messages.response.control.EnterChangeCartridgeModeResponse
@@ -101,6 +102,9 @@ import com.jwoglom.pumpx2.pump.messages.response.controlStream.FillTubingStateSt
 import com.jwoglom.pumpx2.pump.messages.response.controlStream.PumpingStateStreamResponse
 import com.jwoglom.pumpx2.pump.messages.response.currentStatus.AlertStatusResponse
 import com.jwoglom.pumpx2.pump.messages.response.currentStatus.GetSavedG7PairingCodeResponse
+import com.jwoglom.pumpx2.pump.messages.response.currentStatus.IDPSegmentResponse
+import com.jwoglom.pumpx2.pump.messages.response.currentStatus.IDPSettingsResponse
+import com.jwoglom.pumpx2.pump.messages.response.currentStatus.ProfileStatusResponse
 import com.jwoglom.pumpx2.pump.messages.response.currentStatus.TempRateResponse
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.SupervisorJob
@@ -347,6 +351,7 @@ class MainActivity : ComponentActivity(), GoogleApiClient.ConnectionCallbacks, G
     }
 
     private fun sendPumpCommands(type: SendType, msgs: List<Message>) {
+        if (msgs.isEmpty()) return
         if (type == SendType.DEBUG_PROMPT) {
             synchronized (dataStore.debugPromptAwaitingResponses) {
                 val awaiting = dataStore.debugPromptAwaitingResponses.value ?: mutableSetOf()
@@ -646,12 +651,31 @@ class MainActivity : ComponentActivity(), GoogleApiClient.ConnectionCallbacks, G
                 .setPositiveButton("OK") { dialog, which -> dialog.cancel() }
                 .show()
         }
+
+        // Always process error handlers first
+        when (message) {
+            is StatusMessage -> {
+                if (!message.isStatusOK) {
+                    unsuccessfulAlert(message.messageName())
+                    return
+                }
+            }
+        }
+
         if (NotificationBundle.isNotificationResponse(message)) {
             // returns an instance of itself: ensures that watchers get the updated values
             if (dataStore.notificationBundle.value == null) {
                 dataStore.notificationBundle.value = NotificationBundle()
             }
             dataStore.notificationBundle.value = dataStore.notificationBundle.value?.add(message);
+        }
+
+        if (IDPManager.isIDPManagerResponse(message)) {
+            // returns an instance of itself: ensures that watchers get the updated values
+            if (dataStore.idpManager.value == null) {
+                dataStore.idpManager.value = IDPManager()
+            }
+            dataStore.idpManager.value = dataStore.idpManager.value?.processMessage(message)
         }
         when (message) {
             is CurrentBatteryAbstractResponse -> {
@@ -839,10 +863,7 @@ class MainActivity : ComponentActivity(), GoogleApiClient.ConnectionCallbacks, G
                     dataStore.inFillTubingMode.value = false
                 }
             }
-            // error handlers
-            is StatusMessage -> {
-                if (!message.isStatusOK) unsuccessfulAlert(message.messageName())
-            }
+
         }
     }
 
