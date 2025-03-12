@@ -62,6 +62,7 @@ import com.jwoglom.controlx2.shared.enums.BasalStatus
 import com.jwoglom.controlx2.shared.enums.UserMode
 import com.jwoglom.controlx2.shared.presentation.intervalOf
 import com.jwoglom.controlx2.shared.util.SendType
+import com.jwoglom.pumpx2.pump.messages.models.NotificationBundle
 import com.jwoglom.pumpx2.pump.messages.request.currentStatus.HistoryLogStatusRequest
 import com.jwoglom.pumpx2.pump.messages.response.historyLog.CGMHistoryLog
 import com.jwoglom.pumpx2.pump.messages.response.historyLog.HistoryLogParser.LOG_MESSAGE_IDS
@@ -343,7 +344,9 @@ val dashboardCommands = listOf(
     CurrentEGVGuiDataRequest(),
     GlobalMaxBolusSettingsRequest(),
     // trigger HistoryLogFetcher
-    HistoryLogStatusRequest()
+    HistoryLogStatusRequest(),
+    // update notification badge
+    *NotificationBundle.allRequests().toTypedArray()
 )
 
 val dashboardFields = listOf(
@@ -358,6 +361,7 @@ val dashboardFields = listOf(
     dataStore.cgmTransmitterStatus,
     dataStore.cgmReading,
     dataStore.cgmDeltaArrow,
+    dataStore.notificationBundle
 )
 
 @Preview(showBackground = true)

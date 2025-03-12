@@ -119,29 +119,37 @@ fun ProfileActions(
         if (!Prefs(context).serviceEnabled()) return@launch
         var sinceLastFetchTime = 0
         var attempts = 0
+        var round = 0
+        val messagesSent = mutableSetOf<Message>()
         while (true) {
             if (ds.idpManager.value?.isComplete == true) {
                 break
             }
 
             val nextMessages = ds.idpManager.value?.nextMessages() ?: IDPManager().nextMessages()
-            Timber.i("profileActions loading: remaining ${nextMessages?.size}: ${nextMessages}")
-            if (sinceLastFetchTime >= 2500) {
-                if (attempts >= 3) {
-                    Timber.i("profileActions loading re-fetching with bust_cache")
+            if (messagesSent.containsAll(nextMessages)) {
+                Timber.i("profileActions round${round} loading: remaining ${nextMessages?.size} sent ${messagesSent.size}")
+                if (sinceLastFetchTime >= 2500) {
+                    Timber.i("profileActions round${round} loading re-fetching with bust_cache")
                     sendPumpCommands(SendType.BUST_CACHE, nextMessages)
-                } else {
-                    Timber.i("profileActions loading re-fetching with cache")
-                    sendPumpCommands(SendType.CACHED, nextMessages)
+                    sinceLastFetchTime = 0
+                    attempts++
                 }
+            } else {
+                // there are new messages to send
+                round++
                 sinceLastFetchTime = 0
-                attempts++
+                attempts = 0
+                Timber.i("profileActions round${round} sent: remaining ${nextMessages?.size} sent ${messagesSent.size}")
+                sendPumpCommands(SendType.BUST_CACHE, nextMessages)
+                messagesSent.addAll(nextMessages)
             }
 
+
             withContext(Dispatchers.IO) {
-                Thread.sleep(250)
+                Thread.sleep(100)
             }
-            sinceLastFetchTime += 250
+            sinceLastFetchTime += 100
         }
         Timber.i("profileActions loading done: ${ds.idpManager}")
         refreshing = false

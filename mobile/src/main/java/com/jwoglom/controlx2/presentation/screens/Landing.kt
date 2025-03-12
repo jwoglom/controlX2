@@ -31,6 +31,8 @@ import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material.rememberBottomSheetScaffoldState
+import androidx.compose.material3.Badge
+import androidx.compose.material3.BadgedBox
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.Icon
@@ -44,6 +46,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.livedata.observeAsState
 import androidx.compose.runtime.mutableStateOf
@@ -112,6 +115,8 @@ fun Landing(
     val pumpLastConnectionTimestamp = ds.pumpLastConnectionTimestamp.observeAsState()
     val pumpLastMessageTimestamp = ds.pumpLastMessageTimestamp.observeAsState()
     val deviceName = ds.setupDeviceName.observeAsState()
+    val notificationBundle = ds.notificationBundle.observeAsState()
+
 
     var selectedItem by remember { mutableStateOf(sectionState) }
     val displayBottomScaffold = rememberBottomSheetScaffoldState(
@@ -180,10 +185,11 @@ fun Landing(
                         modifier = Modifier
                             .padding(horizontal = 16.dp)
                             .fillMaxWidth()
-                            .fillMaxHeight(0.7F).let {
-                                 if (isSystemInDarkTheme()) {
-                                     it.background(MaterialTheme.colorScheme.onBackground)
-                                 }
+                            .fillMaxHeight(0.7F)
+                            .let {
+                                if (isSystemInDarkTheme()) {
+                                    it.background(MaterialTheme.colorScheme.onBackground)
+                                }
                                 it
                             },
                         content = {
@@ -386,13 +392,31 @@ fun Landing(
                 LandingSection.values()
                     .filter { item -> item.showInNav }
                     .forEach { item ->
-                    NavigationBarItem(
-                        icon = { Icon(item.icon, contentDescription = item.label) },
-                        label = { Text(item.label) },
-                        selected = selectedItem.label == item.label,
-                        onClick = { selectedItem = item }
-                    )
-                }
+                        NavigationBarItem(
+                            icon = {
+                                BadgedBox(
+                                    badge = {
+                                        notificationBundle.value?.get()?.count()?.let { count ->
+                                            if (item.label == LandingSection.NOTIFICATIONS.label && count > 0) {
+                                                Badge(
+                                                    containerColor = Color.Red,
+                                                    contentColor = Color.White
+                                                ) {
+                                                    Text("$count")
+                                                }
+                                            }
+                                        }
+                                    },
+                                    content = {
+                                        Icon(item.icon, contentDescription = item.label)
+                                    }
+                                )
+                           },
+                            label = { Text(item.label) },
+                            selected = selectedItem.label == item.label,
+                            onClick = { selectedItem = item }
+                        )
+                    }
             }
         }
     )
