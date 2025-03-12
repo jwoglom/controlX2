@@ -43,6 +43,8 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
+val requiredProgress = 0.5f
+
 @Composable
 fun NotificationItem(
     notification: Any,
@@ -51,6 +53,11 @@ fun NotificationItem(
 ) {
     val refreshScope = rememberCoroutineScope()
     val context = LocalContext.current
+
+    val canDismiss = notification is AlertStatusResponse.AlertResponseType ||
+            notification is ReminderStatusResponse.ReminderType ||
+            notification is AlarmStatusResponse.AlarmResponseType ||
+            notification is CGMAlertStatusResponse.CGMAlert
 
     fun dismissNotification() {
         refreshScope.launch {
@@ -118,8 +125,7 @@ fun NotificationItem(
             }
             return@rememberSwipeToDismissBoxState true
         },
-        // positional threshold of 25%
-        positionalThreshold = { it * .25f }
+        positionalThreshold = { it * requiredProgress }
     )
 
     SwipeToDismissBox(
@@ -186,10 +192,17 @@ fun NotificationItem(
     )
 }
 
+val darkRedColor = Color(0xFFFF1744)
 @Composable
 fun DismissBackground(dismissState: SwipeToDismissBoxState) {
     val color = when (dismissState.dismissDirection) {
-        SwipeToDismissBoxValue.StartToEnd, SwipeToDismissBoxValue.EndToStart -> Color(0xFFFF1744)
+        SwipeToDismissBoxValue.StartToEnd, SwipeToDismissBoxValue.EndToStart -> {
+            if (dismissState.progress >= requiredProgress) {
+                darkRedColor
+            } else {
+                darkRedColor.copy(alpha = (dismissState.progress / (1.5 * requiredProgress)).toFloat())
+            }
+        }
         SwipeToDismissBoxValue.Settled -> Color.Transparent
     }
 
