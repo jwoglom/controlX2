@@ -201,12 +201,12 @@ fun CartridgeActions(
                             .wrapContentSize(Alignment.TopStart)
                     ) {
                         ListItem(
-                            headlineText = {
+                            headlineContent = {
                                 Text(
                                     "Change Cartridge"
                                 )
                             },
-                            supportingText = {
+                            supportingContent = {
                             },
                             leadingContent = {
                                 Icon(Icons.Filled.Settings, contentDescription = null)
@@ -366,12 +366,12 @@ fun CartridgeActions(
                             .wrapContentSize(Alignment.TopStart)
                     ) {
                         ListItem(
-                            headlineText = {
+                            headlineContent = {
                                 Text(
                                     "Fill Tubing"
                                 )
                             },
-                            supportingText = {
+                            supportingContent = {
                             },
                             leadingContent = {
                                 Icon(Icons.Filled.Settings, contentDescription = null)
@@ -537,12 +537,12 @@ fun CartridgeActions(
                             .wrapContentSize(Alignment.TopStart)
                     ) {
                         ListItem(
-                            headlineText = {
+                            headlineContent = {
                                 Text(
                                     "Fill Cannula"
                                 )
                             },
-                            supportingText = {
+                            supportingContent = {
                             },
                             leadingContent = {
                                 Icon(Icons.Filled.Settings, contentDescription = null)
@@ -707,12 +707,12 @@ fun CartridgeActions(
                             .wrapContentSize(Alignment.BottomStart)
                     ) {
                         ListItem(
-                            headlineText = {
+                            headlineContent = {
                                 Text(
                                     "Back"
                                 )
                             },
-                            supportingText = {
+                            supportingContent = {
                             },
                             leadingContent = {
                                 Icon(Icons.Filled.ArrowBack, contentDescription = null)

@@ -222,12 +222,12 @@ fun ProfileActions(
                                     .wrapContentSize(Alignment.TopStart)
                             ) {
                                 ListItem(
-                                    headlineText = {
+                                    headlineContent = {
                                         Text(
                                             profile.idpSettingsResponse.name
                                         )
                                     },
-                                    supportingText = {
+                                    supportingContent = {
                                         Text(
                                             buildAnnotatedString {
                                                 append("IDP ID ${profile.idpSettingsResponse.idpId} in slot ${profileIndex}")
@@ -290,7 +290,7 @@ fun ProfileActions(
                                                     profile.segments?.forEachIndexed { segmentIndex, segment ->
                                                         item {
                                                             ListItem(
-                                                                headlineText = {
+                                                                headlineContent = {
                                                                     Text(
                                                                         buildAnnotatedString {
                                                                             append("${segmentIndex}. ")
@@ -306,7 +306,7 @@ fun ProfileActions(
                                                                         }
                                                                     )
                                                                 },
-                                                                supportingText = {
+                                                                supportingContent = {
                                                                     Text(buildAnnotatedString {
                                                                         append("Carb ratio: ${segment.profileCarbRatio}")
                                                                         append("\n")
@@ -327,7 +327,7 @@ fun ProfileActions(
 
                                                     item {
                                                         ListItem(
-                                                            headlineText = {
+                                                            headlineContent = {
                                                                 Text("Delete Profile")
                                                             },
                                                             leadingContent = {
@@ -352,10 +352,10 @@ fun ProfileActions(
 
                                                     item {
                                                         ListItem(
-                                                            headlineText = {
+                                                            headlineContent = {
                                                                 Text("Set Active Profile")
                                                             },
-                                                            supportingText = {
+                                                            supportingContent = {
                                                                 if (idpManager.value?.activeProfile?.idpId == profile.idpId) {
                                                                     Text("This profile is already active")
                                                                 }
@@ -409,12 +409,12 @@ fun ProfileActions(
                             .wrapContentSize(Alignment.BottomStart)
                     ) {
                         ListItem(
-                            headlineText = {
+                            headlineContent = {
                                 Text(
                                     "Back"
                                 )
                             },
-                            supportingText = {
+                            supportingContent = {
                             },
                             leadingContent = {
                                 Icon(Icons.Filled.ArrowBack, contentDescription = null)

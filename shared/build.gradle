@@ -13,7 +13,7 @@ android {
         }
     }
     namespace 'com.jwoglom.controlx2.shared'
-    compileSdk 33
+    compileSdk 34
 
     defaultConfig {
         minSdk 26

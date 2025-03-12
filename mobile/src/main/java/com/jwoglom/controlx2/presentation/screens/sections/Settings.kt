@@ -81,8 +81,8 @@ fun Settings(
             item {
                 if (Prefs(context).serviceEnabled()) {
                     ListItem(
-                        headlineText = { Text("Disable ControlX2 service") },
-                        supportingText = { Text("Stops the background service and disables it from starting automatically when the app is opened.") },
+                        headlineContent = { Text("Disable ControlX2 service") },
+                        supportingContent = { Text("Stops the background service and disables it from starting automatically when the app is opened.") },
                         leadingContent = {
                             Icon(
                                 Icons.Filled.Close,
@@ -101,8 +101,8 @@ fun Settings(
                     )
                 } else {
                     ListItem(
-                        headlineText = { Text("Enable ControlX2 service") },
-                        supportingText = { Text("Starts the background service and enables it to start automatically when the app is opened.") },
+                        headlineContent = { Text("Enable ControlX2 service") },
+                        supportingContent = { Text("Starts the background service and enables it to start automatically when the app is opened.") },
                         leadingContent = {
                             Icon(
                                 Icons.Filled.Check,
@@ -131,8 +131,8 @@ fun Settings(
             item {
                 if (Prefs(context).connectionSharingEnabled()) {
                     ListItem(
-                        headlineText = { Text("Disable connection sharing") },
-                        supportingText = { Text("Removes workarounds to run WearX2 and the t:connect app at the same time.") },
+                        headlineContent = { Text("Disable connection sharing") },
+                        supportingContent = { Text("Removes workarounds to run WearX2 and the t:connect app at the same time.") },
                         leadingContent = {
                             Icon(
                                 Icons.Filled.Close,
@@ -151,8 +151,8 @@ fun Settings(
                     )
                 } else {
                     ListItem(
-                        headlineText = { Text("Enable connection sharing") },
-                        supportingText = { Text("Enables workarounds to run WearX2 and the t:connect app at the same time.") },
+                        headlineContent = { Text("Enable connection sharing") },
+                        supportingContent = { Text("Enables workarounds to run WearX2 and the t:connect app at the same time.") },
                         leadingContent = {
                             Icon(
                                 Icons.Filled.Check,
@@ -175,8 +175,8 @@ fun Settings(
 
             item {
                 ListItem(
-                    headlineText = { Text("Force service reload") },
-                    supportingText = { Text("Restarts the background service.") },
+                    headlineContent = { Text("Force service reload") },
+                    supportingContent = { Text("Restarts the background service.") },
                     leadingContent = {
                         Icon(
                             Icons.Filled.Refresh,
@@ -192,8 +192,8 @@ fun Settings(
 
             item {
                 ListItem(
-                    headlineText = { Text("Reconfigure pump") },
-                    supportingText = { Text("Change or re-pair with the connected pump.") },
+                    headlineContent = { Text("Reconfigure pump") },
+                    supportingContent = { Text("Change or re-pair with the connected pump.") },
                     leadingContent = {
                         Icon(
                             painterResource(R.drawable.pump),
@@ -228,8 +228,8 @@ fun Settings(
 
             item {
                 ListItem(
-                    headlineText = { Text("Reconfigure app") },
-                    supportingText = { Text("Enable or disable insulin delivery actions (for remote bolus).") },
+                    headlineContent = { Text("Reconfigure app") },
+                    supportingContent = { Text("Enable or disable insulin delivery actions (for remote bolus).") },
                     leadingContent = {
                         Icon(
                             Icons.Filled.Settings,
@@ -246,8 +246,8 @@ fun Settings(
             
             item {
                 ListItem(
-                    headlineText = { Text("Debug options") },
-                    supportingText = { Text("Perform debug options.") },
+                    headlineContent = { Text("Debug options") },
+                    supportingContent = { Text("Perform debug options.") },
                     leadingContent = {
                         Icon(
                             Icons.Filled.Settings,

@@ -207,7 +207,7 @@ fun Notifications(
                                 .fillMaxSize()
                                 .wrapContentSize(Alignment.TopStart)
                         ) {
-                            NotificationItem(it, sendPumpCommands=sendPumpCommands, refresh=refresh)
+                            NotificationItem(it, sendPumpCommands=sendPumpCommands, ::refresh)
                         }
                     }
                 }

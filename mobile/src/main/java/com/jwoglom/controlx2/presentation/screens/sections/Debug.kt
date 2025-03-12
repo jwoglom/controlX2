@@ -210,8 +210,8 @@ fun Debug(
                         .wrapContentSize(Alignment.TopStart)
                 ) {
                     ListItem(
-                        headlineText = { Text("Send Pump Message") },
-                        supportingText = { Text("Displays the response message for the given request.") },
+                        headlineContent = { Text("Send Pump Message") },
+                        supportingContent = { Text("Displays the response message for the given request.") },
                         leadingContent = {
                             Icon(
                                 Icons.Filled.Build,
@@ -317,8 +317,8 @@ fun Debug(
 
             item {
                 ListItem(
-                    headlineText = { Text("View Received Message Cache") },
-                    supportingText = { Text("Displays recently received pump messages.") },
+                    headlineContent = { Text("View Received Message Cache") },
+                    supportingContent = { Text("Displays recently received pump messages.") },
                     leadingContent = {
                         Icon(
                             Icons.Filled.Build,
@@ -386,15 +386,15 @@ fun Debug(
                                 }?.forEach { message ->
                                     item {
                                         ListItem(
-                                            headlineText = {
+                                            headlineContent = {
                                                 // message name
                                                 Text(shortPumpMessageTitle(message.first))
                                             },
-                                            supportingText = {
+                                            supportingContent = {
                                                 // message detail
                                                 Text(shortPumpMessageDetail(message.first))
                                             },
-                                            overlineText = {
+                                            overlineContent = {
                                                 // time
                                                 Text("${message.second} (${shortTimeAgo(message.second, nowThresholdSeconds = 1)})")
                                             },
@@ -416,8 +416,8 @@ fun Debug(
 
             item {
                 ListItem(
-                    headlineText = { Text("Get History Logs") },
-                    supportingText = { Text("Fetches history logs within the given range.") },
+                    headlineContent = { Text("Get History Logs") },
+                    supportingContent = { Text("Fetches history logs within the given range.") },
                     leadingContent = {
                         Icon(
                             Icons.Filled.Build,
@@ -456,8 +456,8 @@ fun Debug(
 
             item {
                 ListItem(
-                    headlineText = { Text("View History Log Messages") },
-                    supportingText = { Text("Displays pump history log messages") },
+                    headlineContent = { Text("View History Log Messages") },
+                    supportingContent = { Text("Displays pump history log messages") },
                     leadingContent = {
                         Icon(
                             Icons.Filled.Build,
@@ -607,15 +607,15 @@ fun Debug(
                                 }?.forEach { log ->
                                     item {
                                         ListItem(
-                                            headlineText = {
+                                            headlineContent = {
 //                                                // message name
                                                 Text(shortHistoryLogPumpMessageTitle(log.value))
                                             },
-                                            supportingText = {
+                                            supportingContent = {
                                                 // message detail
                                                 Text("${log.value}")
                                             },
-                                            overlineText = {
+                                            overlineContent = {
                                                 // time
                                                 Text("#${log.key} ${log.value.pumpTimeSecInstant}")
                                             },
@@ -639,8 +639,8 @@ fun Debug(
                 item {
                     if (Prefs(context).onlySnoopBluetoothEnabled()) {
                         ListItem(
-                            headlineText = { Text("Disable Only Snoop Bluetooth") },
-                            supportingText = { Text("Re-enables app functionality.") },
+                            headlineContent = { Text("Disable Only Snoop Bluetooth") },
+                            supportingContent = { Text("Re-enables app functionality.") },
                             leadingContent = {
                                 Icon(
                                     Icons.Filled.Close,
@@ -659,8 +659,8 @@ fun Debug(
                         )
                     } else {
                         ListItem(
-                            headlineText = { Text("Enable Only Snoop Bluetooth") },
-                            supportingText = { Text("All app functionality will be disabled, for debugging purposes only.") },
+                            headlineContent = { Text("Enable Only Snoop Bluetooth") },
+                            supportingContent = { Text("All app functionality will be disabled, for debugging purposes only.") },
                             leadingContent = {
                                 Icon(
                                     Icons.Filled.Check,
@@ -687,8 +687,8 @@ fun Debug(
 
             item {
                 ListItem(
-                    headlineText = { Text("Download ControlX2 Debug Logs") },
-                    supportingText = { Text("Exports a text file with filtered logcat output.") },
+                    headlineContent = { Text("Download ControlX2 Debug Logs") },
+                    supportingContent = { Text("Exports a text file with filtered logcat output.") },
                     leadingContent = {
                         Icon(
                             Icons.Filled.Send,
@@ -708,8 +708,8 @@ fun Debug(
 
             item {
                 ListItem(
-                    headlineText = { Text("View PumpState") },
-                    supportingText = { Text("Displays the pump MAC, pairing key, and authentication secrets.") },
+                    headlineContent = { Text("View PumpState") },
+                    supportingContent = { Text("Displays the pump MAC, pairing key, and authentication secrets.") },
                     leadingContent = {
                         Icon(
                             Icons.Filled.Info,
@@ -779,8 +779,8 @@ fun Debug(
 
             item {
                 ListItem(
-                    headlineText = { Text("Clear Debug Logs") },
-                    supportingText = { Text("Clears the saved debug logs.") },
+                    headlineContent = { Text("Clear Debug Logs") },
+                    supportingContent = { Text("Clears the saved debug logs.") },
                     leadingContent = {
                         Icon(
                             Icons.Filled.Close,
@@ -795,8 +795,8 @@ fun Debug(
 
             item {
                 ListItem(
-                    headlineText = { Text("Empty database") },
-                    supportingText = { Text("Removes all saved history logs in sqlite.") },
+                    headlineContent = { Text("Empty database") },
+                    supportingContent = { Text("Removes all saved history logs in sqlite.") },
                     leadingContent = {
                         Icon(
                             Icons.Filled.Close,

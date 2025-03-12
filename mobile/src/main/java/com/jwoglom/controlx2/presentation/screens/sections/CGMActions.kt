@@ -200,14 +200,14 @@ fun CGMActions(
                             .wrapContentSize(Alignment.TopStart)
                     ) {
                         ListItem(
-                            headlineText = { Text(
+                            headlineContent = { Text(
                                 when (cgmSessionState.value) {
                                     CGMSessionState.ACTIVE -> "Dexcom G6: Stop CGM Sensor"
                                     CGMSessionState.STOPPED -> "Dexcom G6: Start CGM Sensor"
                                     else -> "Dexcom G6 CGM Sensor State: ${cgmSessionState.value?.str}"
                                 }
                             )},
-                            supportingText = {
+                            supportingContent = {
                             },
                             leadingContent = {
                                 when (cgmSessionState.value) {
@@ -408,14 +408,14 @@ fun CGMActions(
                             .wrapContentSize(Alignment.TopStart)
                     ) {
                         ListItem(
-                            headlineText = { Text(
+                            headlineContent = { Text(
                                 when (cgmSessionState.value) {
                                     CGMSessionState.ACTIVE -> "Dexcom G7: Stop CGM Sensor"
                                     CGMSessionState.STOPPED -> "Dexcom G7: Start CGM Sensor"
                                     else -> "Dexcom G7 CGM Sensor State: ${cgmSessionState.value?.str}"
                                 }
                             )},
-                            supportingText = {
+                            supportingContent = {
                             },
                             leadingContent = {
                                 when (cgmSessionState.value) {
@@ -530,12 +530,12 @@ fun CGMActions(
                             .wrapContentSize(Alignment.TopStart)
                     ) {
                         ListItem(
-                            headlineText = {
+                            headlineContent = {
                                 Text(
                                     "Back"
                                 )
                             },
-                            supportingText = {
+                            supportingContent = {
                             },
                             leadingContent = {
                                 Icon(Icons.Filled.ArrowBack, contentDescription = null)

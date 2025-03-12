@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.runtime.Composable
@@ -42,9 +43,16 @@ fun DexcomG6TransmitterCode(
             Text(title)
         },
         isError = error,
-        colors = if (isSystemInDarkTheme())
-            TextFieldDefaults.outlinedTextFieldColors(textColor = Color.DarkGray, placeholderColor = Color.DarkGray)
-        else TextFieldDefaults.outlinedTextFieldColors(),
+        colors = if (isSystemInDarkTheme()) {
+            OutlinedTextFieldDefaults.colors(
+                focusedTextColor = Color.DarkGray,
+                unfocusedTextColor = Color.DarkGray,
+                focusedPlaceholderColor = Color.DarkGray,
+                unfocusedPlaceholderColor = Color.DarkGray
+            )
+        } else {
+            OutlinedTextFieldDefaults.colors()
+        },
         modifier = modifier.fillMaxWidth()
     )
 }

@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextFieldColors
 import androidx.compose.material3.TextFieldDefaults
@@ -14,6 +15,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.TextFieldValue
@@ -41,7 +43,7 @@ fun DecimalOutlinedText(
 
     OutlinedTextField(
         value = textFieldValue.value,
-        onValueChange = {
+        onValueChange = { it: TextFieldValue ->
             textFieldValue.value = it
             val text = it.text
             var filtered = text.filter { (it in '0'..'9') || it == '.' }
@@ -61,9 +63,16 @@ fun DecimalOutlinedText(
             Text(title)
         },
         isError = error,
-        colors = if (isSystemInDarkTheme())
-            TextFieldDefaults.outlinedTextFieldColors(textColor = Color.DarkGray, placeholderColor = Color.DarkGray)
-        else TextFieldDefaults.outlinedTextFieldColors(),
+        colors = if (isSystemInDarkTheme()) {
+            OutlinedTextFieldDefaults.colors(
+                focusedTextColor = Color.DarkGray,
+                unfocusedTextColor = Color.DarkGray,
+                focusedPlaceholderColor = Color.DarkGray,
+                unfocusedPlaceholderColor = Color.DarkGray
+            )
+        } else {
+            OutlinedTextFieldDefaults.colors()
+        },
         modifier = modifier.fillMaxWidth().onFocusSelectAll(textFieldValue)
     )
 }

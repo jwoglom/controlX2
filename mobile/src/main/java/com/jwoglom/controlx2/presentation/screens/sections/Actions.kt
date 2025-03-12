@@ -201,14 +201,14 @@ fun Actions(
                             .wrapContentSize(Alignment.TopStart)
                     ) {
                         ListItem(
-                            headlineText = { Text(
+                            headlineContent = { Text(
                                 when (basalStatus.value) {
                                     BasalStatus.UNKNOWN, null -> "Stop / Start Insulin"
                                     BasalStatus.PUMP_SUSPENDED -> "Start Insulin"
                                     else -> "Stop Insulin"
                                 }
                             )},
-                            supportingText = { Text(
+                            supportingContent = { Text(
                                 when (basalStatus.value) {
                                     BasalStatus.UNKNOWN, null -> "Stop or resume insulin deliveries"
                                     BasalStatus.PUMP_SUSPENDED -> "Resume insulin deliveries"
@@ -352,7 +352,7 @@ fun Actions(
                             .wrapContentSize(Alignment.TopStart)
                     ) {
                         ListItem(
-                            headlineText = { Text(
+                            headlineContent = { Text(
                                 when (controlIQMode.value) {
                                     UserMode.EXERCISE -> "Disable Exercise Mode"
                                     else -> "Enable Exercise Mode"
@@ -432,7 +432,7 @@ fun Actions(
                             .wrapContentSize(Alignment.TopStart)
                     ) {
                         ListItem(
-                            headlineText = { Text(
+                            headlineContent = { Text(
                                 when (controlIQMode.value) {
                                     UserMode.SLEEP -> "Disable Sleep Mode"
                                     else -> "Enable Sleep Mode"
@@ -517,13 +517,13 @@ fun Actions(
                         }
 
                         ListItem(
-                            headlineText = { Text(
+                            headlineContent = { Text(
                                 when (tempRateActive.value) {
                                     true -> "Stop Temp Rate"
                                     else -> "Start Temp Rate"
                                 }
                             )},
-                            supportingText = { 
+                            supportingContent = { 
                                 when (tempRateActive.value) {
                                     true -> Text("Active: ${tempRateDetails.value?.percentage}% for ${prettyDuration(tempRateDetails.value?.duration?.div(60))} at ${tempRateDetails.value?.startTimeInstant}")
                                     else -> null
@@ -607,10 +607,10 @@ fun Actions(
                             .wrapContentSize(Alignment.TopStart)
                     ) {
                         ListItem(
-                            headlineText = { Text(
+                            headlineContent = { Text(
                                 "Cartridge Settings"
                             )},
-                            supportingText = {
+                            supportingContent = {
                             },
                             leadingContent = {
                                 Icon(Icons.Filled.Settings, contentDescription = null)
@@ -629,10 +629,10 @@ fun Actions(
                             .wrapContentSize(Alignment.TopStart)
                     ) {
                         ListItem(
-                            headlineText = { Text(
+                            headlineContent = { Text(
                                 "CGM Settings"
                             )},
-                            supportingText = {
+                            supportingContent = {
                             },
                             leadingContent = {
                                 Icon(Icons.Filled.Settings, contentDescription = null)
@@ -652,10 +652,10 @@ fun Actions(
                             .wrapContentSize(Alignment.TopStart)
                     ) {
                         ListItem(
-                            headlineText = { Text(
+                            headlineContent = { Text(
                                 "Profile Settings"
                             )},
-                            supportingText = {
+                            supportingContent = {
                             },
                             leadingContent = {
                                 Icon(Icons.Filled.Create, contentDescription = null)

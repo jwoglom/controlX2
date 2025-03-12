@@ -126,7 +126,6 @@ fun Landing(
 
     fun showBottomScaffold(): Boolean {
         return displayBottomScaffold.bottomSheetState.isExpanded ||
-            displayBottomScaffold.bottomSheetState.isAnimationRunning ||
             _bottomScaffoldState != BottomScaffoldState.NONE
     }
 

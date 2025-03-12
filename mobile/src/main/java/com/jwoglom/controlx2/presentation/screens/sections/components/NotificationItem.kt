@@ -127,7 +127,7 @@ fun NotificationItem(
         backgroundContent = { DismissBackground(dismissState)},
         content = {
             ListItem(
-                headlineText = {
+                headlineContent = {
                     Text(
                         when (notification) {
                             is AlertStatusResponse.AlertResponseType -> "Alert: ${notification.name}"
@@ -139,7 +139,7 @@ fun NotificationItem(
                         }
                     )
                 },
-                supportingText = {
+                supportingContent = {
                     when (notification) {
                         is AlertStatusResponse.AlertResponseType -> Text(
                             notification.description ?: ""
