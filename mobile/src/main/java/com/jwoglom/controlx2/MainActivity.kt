@@ -663,7 +663,12 @@ class MainActivity : ComponentActivity(), GoogleApiClient.ConnectionCallbacks, G
         if (IDPManager.isIDPManagerResponse(message)) {
             synchronized(dataStore.idpManager) {
                 // processMessage returns an instance of itself: ensures that watchers get the updated values
+                val isComplete = dataStore.idpManager.value?.isComplete == true
                 dataStore.idpManager.value = (dataStore.idpManager.value ?: IDPManager()).processMessage(message)
+                // re-create self when complete to trigger state update via object change
+                if (isComplete != dataStore.idpManager.value?.isComplete) {
+                    dataStore.idpManager.value = IDPManager(dataStore.idpManager.value)
+                }
             }
         }
         when (message) {
