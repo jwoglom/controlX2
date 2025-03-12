@@ -59,6 +59,7 @@ import com.jwoglom.controlx2.presentation.components.HeaderLine
 import com.jwoglom.controlx2.presentation.components.Line
 import com.jwoglom.controlx2.presentation.screens.sections.components.DexcomG6SensorCode
 import com.jwoglom.controlx2.presentation.screens.sections.components.DexcomG6TransmitterCode
+import com.jwoglom.controlx2.presentation.screens.sections.components.NotificationItem
 import com.jwoglom.controlx2.presentation.screens.setUpPreviewState
 import com.jwoglom.controlx2.presentation.theme.ControlX2Theme
 import com.jwoglom.controlx2.presentation.util.LifecycleStateObserver
@@ -206,114 +207,7 @@ fun Notifications(
                                 .fillMaxSize()
                                 .wrapContentSize(Alignment.TopStart)
                         ) {
-                            ListItem(
-                                headlineText = {
-                                    Text(
-                                        when (it) {
-                                            is AlertStatusResponse.AlertResponseType -> "Alert: ${it.name}"
-                                            is ReminderStatusResponse.ReminderType -> "Reminder: ${it.name}"
-                                            is AlarmStatusResponse.AlarmResponseType -> "Alarm: ${it.name}"
-                                            is CGMAlertStatusResponse.CGMAlert -> "CGM Alert: ${it.name}"
-                                            is MalfunctionStatusResponse -> "MALFUNCTION: ${it.errorString}"
-                                            else -> "$it"
-                                        }
-                                    )
-                                },
-                                supportingText = {
-                                    when (it) {
-                                        is AlertStatusResponse.AlertResponseType -> Text(
-                                            it.description ?: ""
-                                        )
-                                        is AlarmStatusResponse.AlarmResponseType -> Text(
-                                            it.description ?: ""
-                                        )
-                                        is MalfunctionStatusResponse -> Text("This alert cannot be cleared and DIY app developers cannot assist you with this problem.\nFor further instructions please contact Tandem technical support and reference the above code.")
-                                        else -> {}
-                                    }
-                                },
-                                leadingContent = {
-                                    when (it) {
-                                        is AlertStatusResponse.AlertResponseType -> Icon(
-                                            Icons.Filled.Info,
-                                            contentDescription = "Alert"
-                                        )
-
-                                        is ReminderStatusResponse.ReminderType -> Icon(
-                                            Icons.Filled.Info,
-                                            contentDescription = "Reminder"
-                                        )
-
-                                        is AlarmStatusResponse.AlarmResponseType -> Icon(
-                                            Icons.Filled.Warning,
-                                            contentDescription = "Alarm"
-                                        )
-
-                                        is CGMAlertStatusResponse.CGMAlert -> Icon(
-                                            Icons.Filled.Info,
-                                            contentDescription = "CGM Alert"
-                                        )
-
-                                        is MalfunctionStatusResponse -> Icon(
-                                            Icons.Filled.Warning,
-                                            contentDescription = "Malfunction"
-                                        )
-                                    }
-                                },
-                                modifier = Modifier.clickable {
-                                    refreshScope.launch {
-                                        when (it) {
-                                            is AlertStatusResponse.AlertResponseType -> {
-                                                sendPumpCommands(
-                                                    SendType.BUST_CACHE, listOf(
-                                                        DismissNotificationRequest(
-                                                            DismissNotificationRequest.NotificationType.ALERT,
-                                                            it.bitmask().toLong()
-                                                        )
-                                                    )
-                                                )
-                                            }
-
-                                            is ReminderStatusResponse.ReminderType -> {
-                                                sendPumpCommands(
-                                                    SendType.BUST_CACHE, listOf(
-                                                        DismissNotificationRequest(
-                                                            DismissNotificationRequest.NotificationType.REMINDER,
-                                                            it.id().toLong()
-                                                        )
-                                                    )
-                                                )
-                                            }
-
-                                            is AlarmStatusResponse.AlarmResponseType -> {
-                                                sendPumpCommands(
-                                                    SendType.BUST_CACHE, listOf(
-                                                        DismissNotificationRequest(
-                                                            DismissNotificationRequest.NotificationType.ALARM,
-                                                            it.bitmask().toLong()
-                                                        )
-                                                    )
-                                                )
-                                            }
-
-                                            is CGMAlertStatusResponse.CGMAlert -> {
-                                                sendPumpCommands(
-                                                    SendType.BUST_CACHE, listOf(
-                                                        DismissNotificationRequest(
-                                                            DismissNotificationRequest.NotificationType.CGM_ALERT,
-                                                            it.id().toLong()
-                                                        )
-                                                    )
-                                                )
-                                            }
-                                        }
-
-                                        withContext(Dispatchers.IO) {
-                                            Thread.sleep(500)
-                                            refresh()
-                                        }
-                                    }
-                                }
-                            )
+                            NotificationItem(it, sendPumpCommands=sendPumpCommands, refresh=refresh)
                         }
                     }
                 }
@@ -321,6 +215,7 @@ fun Notifications(
         )
     }
 }
+
 val notificationsCommands = listOf(
     HomeScreenMirrorRequest(),
     *NotificationBundle.allRequests().toTypedArray()

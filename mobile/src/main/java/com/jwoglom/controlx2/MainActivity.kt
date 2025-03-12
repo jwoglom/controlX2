@@ -36,34 +36,6 @@ import com.jwoglom.controlx2.db.historylog.HistoryLogDatabase
 import com.jwoglom.controlx2.db.historylog.HistoryLogRepo
 import com.jwoglom.controlx2.db.historylog.HistoryLogViewModel
 import com.jwoglom.controlx2.db.historylog.HistoryLogViewModelFactory
-import com.jwoglom.pumpx2.pump.PumpState
-import com.jwoglom.pumpx2.pump.messages.Message
-import com.jwoglom.pumpx2.pump.messages.calculator.BolusCalcUnits
-import com.jwoglom.pumpx2.pump.messages.calculator.BolusParameters
-import com.jwoglom.pumpx2.pump.messages.models.InsulinUnit
-import com.jwoglom.pumpx2.pump.messages.request.control.InitiateBolusRequest
-import com.jwoglom.pumpx2.pump.messages.request.control.RemoteBgEntryRequest
-import com.jwoglom.pumpx2.pump.messages.request.control.RemoteCarbEntryRequest
-import com.jwoglom.pumpx2.pump.messages.response.control.BolusPermissionResponse
-import com.jwoglom.pumpx2.pump.messages.response.control.CancelBolusResponse
-import com.jwoglom.pumpx2.pump.messages.response.control.InitiateBolusResponse
-import com.jwoglom.pumpx2.pump.messages.response.control.RemoteCarbEntryResponse
-import com.jwoglom.pumpx2.pump.messages.response.currentStatus.BolusCalcDataSnapshotResponse
-import com.jwoglom.pumpx2.pump.messages.response.currentStatus.CGMStatusResponse
-import com.jwoglom.pumpx2.pump.messages.response.currentStatus.ControlIQIOBResponse
-import com.jwoglom.pumpx2.pump.messages.response.currentStatus.ControlIQInfoAbstractResponse
-import com.jwoglom.pumpx2.pump.messages.response.currentStatus.CurrentBasalStatusResponse
-import com.jwoglom.pumpx2.pump.messages.response.currentStatus.CurrentBatteryAbstractResponse
-import com.jwoglom.pumpx2.pump.messages.response.currentStatus.CurrentBolusStatusResponse
-import com.jwoglom.pumpx2.pump.messages.response.currentStatus.CurrentEGVGuiDataResponse
-import com.jwoglom.pumpx2.pump.messages.response.currentStatus.GlobalMaxBolusSettingsResponse
-import com.jwoglom.pumpx2.pump.messages.response.currentStatus.HistoryLogStatusResponse
-import com.jwoglom.pumpx2.pump.messages.response.currentStatus.HomeScreenMirrorResponse
-import com.jwoglom.pumpx2.pump.messages.response.currentStatus.InsulinStatusResponse
-import com.jwoglom.pumpx2.pump.messages.response.currentStatus.LastBGResponse
-import com.jwoglom.pumpx2.pump.messages.response.currentStatus.LastBolusStatusAbstractResponse
-import com.jwoglom.pumpx2.pump.messages.response.currentStatus.TimeSinceResetResponse
-import com.jwoglom.pumpx2.pump.messages.response.historyLog.BolusDeliveryHistoryLog
 import com.jwoglom.controlx2.presentation.DataStore
 import com.jwoglom.controlx2.presentation.MobileApp
 import com.jwoglom.controlx2.presentation.navigation.Screen
@@ -82,36 +54,55 @@ import com.jwoglom.controlx2.shared.util.shortTime
 import com.jwoglom.controlx2.shared.util.shortTimeAgo
 import com.jwoglom.controlx2.shared.util.twoDecimalPlaces1000Unit
 import com.jwoglom.controlx2.util.extractPumpSid
+import com.jwoglom.pumpx2.pump.PumpState
+import com.jwoglom.pumpx2.pump.messages.Message
 import com.jwoglom.pumpx2.pump.messages.builders.IDPManager
+import com.jwoglom.pumpx2.pump.messages.calculator.BolusCalcUnits
+import com.jwoglom.pumpx2.pump.messages.calculator.BolusParameters
+import com.jwoglom.pumpx2.pump.messages.models.InsulinUnit
 import com.jwoglom.pumpx2.pump.messages.models.NotificationBundle
 import com.jwoglom.pumpx2.pump.messages.models.StatusMessage
+import com.jwoglom.pumpx2.pump.messages.request.control.InitiateBolusRequest
+import com.jwoglom.pumpx2.pump.messages.request.control.RemoteBgEntryRequest
+import com.jwoglom.pumpx2.pump.messages.request.control.RemoteCarbEntryRequest
+import com.jwoglom.pumpx2.pump.messages.response.control.BolusPermissionResponse
+import com.jwoglom.pumpx2.pump.messages.response.control.CancelBolusResponse
 import com.jwoglom.pumpx2.pump.messages.response.control.EnterChangeCartridgeModeResponse
 import com.jwoglom.pumpx2.pump.messages.response.control.EnterFillTubingModeResponse
 import com.jwoglom.pumpx2.pump.messages.response.control.ExitChangeCartridgeModeResponse
 import com.jwoglom.pumpx2.pump.messages.response.control.ExitFillTubingModeResponse
-import com.jwoglom.pumpx2.pump.messages.response.control.SetG6TransmitterIdResponse
-import com.jwoglom.pumpx2.pump.messages.response.control.SetModesResponse
-import com.jwoglom.pumpx2.pump.messages.response.control.SetTempRateResponse
-import com.jwoglom.pumpx2.pump.messages.response.control.StartG6SensorSessionResponse
-import com.jwoglom.pumpx2.pump.messages.response.control.StopG6SensorSessionResponse
+import com.jwoglom.pumpx2.pump.messages.response.control.InitiateBolusResponse
+import com.jwoglom.pumpx2.pump.messages.response.control.RemoteCarbEntryResponse
 import com.jwoglom.pumpx2.pump.messages.response.controlStream.DetectingCartridgeStateStreamResponse
 import com.jwoglom.pumpx2.pump.messages.response.controlStream.EnterChangeCartridgeModeStateStreamResponse
 import com.jwoglom.pumpx2.pump.messages.response.controlStream.ExitFillTubingModeStateStreamResponse
 import com.jwoglom.pumpx2.pump.messages.response.controlStream.FillCannulaStateStreamResponse
 import com.jwoglom.pumpx2.pump.messages.response.controlStream.FillTubingStateStreamResponse
 import com.jwoglom.pumpx2.pump.messages.response.controlStream.PumpingStateStreamResponse
-import com.jwoglom.pumpx2.pump.messages.response.currentStatus.AlertStatusResponse
+import com.jwoglom.pumpx2.pump.messages.response.currentStatus.BolusCalcDataSnapshotResponse
+import com.jwoglom.pumpx2.pump.messages.response.currentStatus.CGMStatusResponse
+import com.jwoglom.pumpx2.pump.messages.response.currentStatus.ControlIQIOBResponse
+import com.jwoglom.pumpx2.pump.messages.response.currentStatus.ControlIQInfoAbstractResponse
+import com.jwoglom.pumpx2.pump.messages.response.currentStatus.CurrentBasalStatusResponse
+import com.jwoglom.pumpx2.pump.messages.response.currentStatus.CurrentBatteryAbstractResponse
+import com.jwoglom.pumpx2.pump.messages.response.currentStatus.CurrentBolusStatusResponse
+import com.jwoglom.pumpx2.pump.messages.response.currentStatus.CurrentEGVGuiDataResponse
 import com.jwoglom.pumpx2.pump.messages.response.currentStatus.GetSavedG7PairingCodeResponse
-import com.jwoglom.pumpx2.pump.messages.response.currentStatus.IDPSegmentResponse
-import com.jwoglom.pumpx2.pump.messages.response.currentStatus.IDPSettingsResponse
-import com.jwoglom.pumpx2.pump.messages.response.currentStatus.ProfileStatusResponse
+import com.jwoglom.pumpx2.pump.messages.response.currentStatus.GlobalMaxBolusSettingsResponse
+import com.jwoglom.pumpx2.pump.messages.response.currentStatus.HistoryLogStatusResponse
+import com.jwoglom.pumpx2.pump.messages.response.currentStatus.HomeScreenMirrorResponse
+import com.jwoglom.pumpx2.pump.messages.response.currentStatus.InsulinStatusResponse
+import com.jwoglom.pumpx2.pump.messages.response.currentStatus.LastBGResponse
+import com.jwoglom.pumpx2.pump.messages.response.currentStatus.LastBolusStatusAbstractResponse
 import com.jwoglom.pumpx2.pump.messages.response.currentStatus.TempRateResponse
+import com.jwoglom.pumpx2.pump.messages.response.currentStatus.TimeSinceResetResponse
+import com.jwoglom.pumpx2.pump.messages.response.historyLog.BolusDeliveryHistoryLog
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.SupervisorJob
 import timber.log.Timber
 import java.time.Instant
 import java.time.temporal.ChronoUnit
-import java.util.*
+import java.util.Objects
 import kotlin.system.exitProcess
 
 
@@ -663,19 +654,17 @@ class MainActivity : ComponentActivity(), GoogleApiClient.ConnectionCallbacks, G
         }
 
         if (NotificationBundle.isNotificationResponse(message)) {
-            // returns an instance of itself: ensures that watchers get the updated values
-            if (dataStore.notificationBundle.value == null) {
-                dataStore.notificationBundle.value = NotificationBundle()
+            synchronized(dataStore.notificationBundle) {
+                // returns an instance of itself: ensures that watchers get the updated values
+                dataStore.notificationBundle.value = (dataStore.notificationBundle.value ?: NotificationBundle()).add(message);
             }
-            dataStore.notificationBundle.value = dataStore.notificationBundle.value?.add(message);
         }
 
         if (IDPManager.isIDPManagerResponse(message)) {
-            // returns an instance of itself: ensures that watchers get the updated values
-            if (dataStore.idpManager.value == null) {
-                dataStore.idpManager.value = IDPManager()
+            synchronized(dataStore.idpManager) {
+                // processMessage returns an instance of itself: ensures that watchers get the updated values
+                dataStore.idpManager.value = (dataStore.idpManager.value ?: IDPManager()).processMessage(message)
             }
-            dataStore.idpManager.value = dataStore.idpManager.value?.processMessage(message)
         }
         when (message) {
             is CurrentBatteryAbstractResponse -> {
