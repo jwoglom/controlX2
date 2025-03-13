@@ -1,9 +1,10 @@
 plugins {
     id 'com.android.application'
     id 'org.jetbrains.kotlin.android'
+    id 'org.jetbrains.kotlin.plugin.compose'
     id 'hu.supercluster.paperwork'
     id 'kotlin-android'
-    id 'com.google.devtools.ksp' version '1.7.10-1.0.6'
+    id 'com.google.devtools.ksp' version '2.1.10-1.0.31'
 }
 
 android {
@@ -16,12 +17,12 @@ android {
         }
     }
     namespace 'com.jwoglom.controlx2'
-    compileSdk 34
+    compileSdk 35
 
     defaultConfig {
         applicationId "com.jwoglom.controlx2"
         minSdk 30
-        targetSdk 33
+        targetSdk 35
         versionCode 1
         versionName "${project.controlx2_version}"
 
@@ -47,9 +48,6 @@ android {
     }
     buildFeatures {
         compose true
-    }
-    composeOptions {
-        kotlinCompilerExtensionVersion "${compose_version}"
     }
     packagingOptions {
         resources {
