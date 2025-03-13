@@ -11,7 +11,8 @@ import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
-import android.graphics.drawable.Icon
+import android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_CONNECTED_DEVICE
+import android.os.Build
 import android.os.Bundle
 import androidx.core.app.ActivityCompat
 import androidx.core.app.NotificationCompat
@@ -23,12 +24,6 @@ import com.google.android.gms.wearable.MessageEvent
 import com.google.android.gms.wearable.Node
 import com.google.android.gms.wearable.Wearable
 import com.google.android.gms.wearable.WearableListenerService
-import com.jwoglom.pumpx2.pump.messages.Message
-import com.jwoglom.pumpx2.pump.messages.helpers.Dates
-import com.jwoglom.pumpx2.pump.messages.models.InsulinUnit
-import com.jwoglom.pumpx2.pump.messages.response.currentStatus.ControlIQIOBResponse
-import com.jwoglom.pumpx2.pump.messages.response.currentStatus.CurrentBatteryAbstractResponse
-import com.jwoglom.pumpx2.pump.messages.response.currentStatus.CurrentEGVGuiDataResponse
 import com.jwoglom.controlx2.presentation.navigation.Screen
 import com.jwoglom.controlx2.shared.PumpMessageSerializer
 import com.jwoglom.controlx2.shared.util.setupTimber
@@ -36,6 +31,12 @@ import com.jwoglom.controlx2.util.ConnectedState
 import com.jwoglom.controlx2.util.StatePrefs
 import com.jwoglom.controlx2.util.UpdateComplication
 import com.jwoglom.controlx2.util.WearX2Complication
+import com.jwoglom.pumpx2.pump.messages.Message
+import com.jwoglom.pumpx2.pump.messages.helpers.Dates
+import com.jwoglom.pumpx2.pump.messages.models.InsulinUnit
+import com.jwoglom.pumpx2.pump.messages.response.currentStatus.ControlIQIOBResponse
+import com.jwoglom.pumpx2.pump.messages.response.currentStatus.CurrentBatteryAbstractResponse
+import com.jwoglom.pumpx2.pump.messages.response.currentStatus.CurrentEGVGuiDataResponse
 import timber.log.Timber
 import java.time.Instant
 
@@ -64,9 +65,13 @@ class PhoneCommService : WearableListenerService(), GoogleApiClient.ConnectionCa
         updateNotification()
     }
 
+    private fun startForegroundWrapped(id: Int, notification: Notification) {
+        startForeground(id, notification, FOREGROUND_SERVICE_TYPE_CONNECTED_DEVICE)
+    }
+
     private fun updateNotification() {
         var notification = createNotification()
-        startForeground(1, notification)
+        startForegroundWrapped(1, notification)
     }
 
     private fun createNotification(): Notification {

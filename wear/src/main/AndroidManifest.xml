@@ -5,6 +5,7 @@
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.WAKE_LOCK" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_CONNECTED_DEVICE" android:minSdkVersion="34" />
     <uses-permission android:name="com.google.android.c2dm.permission.RECEIVE" />
 
     <uses-feature android:name="android.hardware.type.watch" />
@@ -16,6 +17,7 @@
         android:supportsRtl="true"
         android:theme="@style/SplashTheme"
         android:debuggable="true"
+        android:foregroundServiceType="connectedDevice"
         tools:ignore="HardcodedDebugMode">
         <uses-library
             android:name="com.google.android.wearable"

@@ -12,7 +12,9 @@ import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
 import android.content.SharedPreferences
+import android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_CONNECTED_DEVICE
 import android.media.RingtoneManager
+import android.os.Build
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
@@ -837,7 +839,7 @@ class CommService : WearableListenerService(), GoogleApiClient.ConnectionCallbac
             Thread {
                 while (!mApiClient.isConnected) {
                     Timber.d("waiting for mApiClient in CommService")
-                    Thread.sleep(100)
+                    Thread.sleep(250)
                 }
                 Timber.d("mApiClient established")
 
@@ -985,12 +987,17 @@ class CommService : WearableListenerService(), GoogleApiClient.ConnectionCallbac
         return START_STICKY
     }
 
+    private fun startForegroundWrapped(id: Int, notification: Notification) {
+        startForeground(id, notification, FOREGROUND_SERVICE_TYPE_CONNECTED_DEVICE)
+    }
+
+
     fun updateNotification(statusText: String? = null) {
         if (statusText != null) {
             currentPumpData.statusText = statusText
         }
         var notification = createNotification()
-        startForeground(1, notification)
+        startForegroundWrapped(1, notification)
     }
 
     override fun onTaskRemoved(rootIntent: Intent?) {
