@@ -59,6 +59,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavHostController
 import com.jwoglom.pumpx2.pump.messages.Message
@@ -120,7 +121,7 @@ fun Landing(
 
     var selectedItem by remember { mutableStateOf(sectionState) }
     val displayBottomScaffold = rememberBottomSheetScaffoldState(
-        bottomSheetState = BottomSheetState(bottomScaffoldDisplayState)
+        bottomSheetState = BottomSheetState(bottomScaffoldDisplayState, density=Density(context))
     )
     var bottomScaffoldState by remember { mutableStateOf(_bottomScaffoldState) }
 
