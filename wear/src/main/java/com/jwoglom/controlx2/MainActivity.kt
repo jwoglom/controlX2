@@ -16,12 +16,27 @@ import androidx.navigation.NavController
 import androidx.navigation.NavHostController
 import androidx.wear.compose.navigation.rememberSwipeDismissableNavController
 import androidx.wear.remote.interactions.RemoteActivityHelper
-import com.google.android.gms.common.ConnectionResult
-import com.google.android.gms.common.api.GoogleApiClient
-import com.google.android.gms.wearable.MessageApi
+import com.google.android.gms.wearable.MessageClient
 import com.google.android.gms.wearable.MessageEvent
 import com.google.android.gms.wearable.Node
 import com.google.android.gms.wearable.Wearable
+import com.jwoglom.controlx2.presentation.DataStore
+import com.jwoglom.controlx2.presentation.WearApp
+import com.jwoglom.controlx2.presentation.navigation.Screen
+import com.jwoglom.controlx2.presentation.ui.resetBolusDataStoreState
+import com.jwoglom.controlx2.shared.InitiateConfirmedBolusSerializer
+import com.jwoglom.controlx2.shared.PumpMessageSerializer
+import com.jwoglom.controlx2.shared.PumpQualifyingEventsSerializer
+import com.jwoglom.controlx2.shared.enums.BasalStatus
+import com.jwoglom.controlx2.shared.enums.UserMode
+import com.jwoglom.controlx2.shared.util.SendType
+import com.jwoglom.controlx2.shared.util.pumpTimeToLocalTz
+import com.jwoglom.controlx2.shared.util.setupTimber
+import com.jwoglom.controlx2.shared.util.shortTime
+import com.jwoglom.controlx2.shared.util.shortTimeAgo
+import com.jwoglom.controlx2.shared.util.twoDecimalPlaces1000Unit
+import com.jwoglom.controlx2.util.UpdateComplication
+import com.jwoglom.controlx2.util.WearX2Complication
 import com.jwoglom.pumpx2.pump.messages.Message
 import com.jwoglom.pumpx2.pump.messages.calculator.BolusCalcUnits
 import com.jwoglom.pumpx2.pump.messages.calculator.BolusParameters
@@ -46,30 +61,15 @@ import com.jwoglom.pumpx2.pump.messages.response.currentStatus.CurrentBolusStatu
 import com.jwoglom.pumpx2.pump.messages.response.currentStatus.CurrentEGVGuiDataResponse
 import com.jwoglom.pumpx2.pump.messages.response.currentStatus.GlobalMaxBolusSettingsResponse
 import com.jwoglom.pumpx2.pump.messages.response.currentStatus.HomeScreenMirrorResponse
-import com.jwoglom.pumpx2.pump.messages.response.currentStatus.HomeScreenMirrorResponse.*
+import com.jwoglom.pumpx2.pump.messages.response.currentStatus.HomeScreenMirrorResponse.ApControlStateIcon
+import com.jwoglom.pumpx2.pump.messages.response.currentStatus.HomeScreenMirrorResponse.BasalStatusIcon
+import com.jwoglom.pumpx2.pump.messages.response.currentStatus.HomeScreenMirrorResponse.CGMAlertIcon
 import com.jwoglom.pumpx2.pump.messages.response.currentStatus.InsulinStatusResponse
 import com.jwoglom.pumpx2.pump.messages.response.currentStatus.LastBGResponse
 import com.jwoglom.pumpx2.pump.messages.response.currentStatus.LastBolusStatusAbstractResponse
 import com.jwoglom.pumpx2.pump.messages.response.currentStatus.TimeSinceResetResponse
 import com.jwoglom.pumpx2.pump.messages.response.historyLog.BolusDeliveryHistoryLog
 import com.jwoglom.pumpx2.pump.messages.response.qualifyingEvent.QualifyingEvent
-import com.jwoglom.controlx2.presentation.DataStore
-import com.jwoglom.controlx2.presentation.WearApp
-import com.jwoglom.controlx2.presentation.navigation.Screen
-import com.jwoglom.controlx2.presentation.ui.resetBolusDataStoreState
-import com.jwoglom.controlx2.shared.InitiateConfirmedBolusSerializer
-import com.jwoglom.controlx2.shared.PumpMessageSerializer
-import com.jwoglom.controlx2.shared.PumpQualifyingEventsSerializer
-import com.jwoglom.controlx2.shared.enums.BasalStatus
-import com.jwoglom.controlx2.shared.enums.UserMode
-import com.jwoglom.controlx2.shared.util.SendType
-import com.jwoglom.controlx2.shared.util.pumpTimeToLocalTz
-import com.jwoglom.controlx2.shared.util.setupTimber
-import com.jwoglom.controlx2.shared.util.shortTime
-import com.jwoglom.controlx2.shared.util.shortTimeAgo
-import com.jwoglom.controlx2.shared.util.twoDecimalPlaces1000Unit
-import com.jwoglom.controlx2.util.UpdateComplication
-import com.jwoglom.controlx2.util.WearX2Complication
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.asExecutor
 import timber.log.Timber
@@ -79,10 +79,10 @@ import kotlin.math.roundToInt
 var dataStore = DataStore()
 val LocalDataStore = compositionLocalOf { dataStore }
 
-class MainActivity : ComponentActivity(), MessageApi.MessageListener, GoogleApiClient.ConnectionCallbacks, GoogleApiClient.OnConnectionFailedListener {
+class MainActivity : ComponentActivity(), MessageClient.OnMessageReceivedListener {
 
     internal lateinit var navController: NavHostController
-    private lateinit var mApiClient: GoogleApiClient
+    private lateinit var messageClient: MessageClient
 
     private lateinit var initialRoute: String
 
@@ -138,6 +138,7 @@ class MainActivity : ComponentActivity(), MessageApi.MessageListener, GoogleApiC
                     }
                     val remoteBgRequest = RemoteBgEntryRequest(
                         bgValue,
+                        false, // useForCgmCalibration
                         autopopBg,
                         timeSinceReset.pumpTimeSecondsSinceReset,
                         bolusId
@@ -181,19 +182,21 @@ class MainActivity : ComponentActivity(), MessageApi.MessageListener, GoogleApiC
             }
 
             val sendPhoneOpenActivity: () -> Unit = {
+                val nodeClient = Wearable.getNodeClient(this)
                 val phoneIntent = Intent(Intent.ACTION_VIEW)
                     .addCategory(Intent.CATEGORY_BROWSABLE)
                     .setData(Uri.parse("com_jwoglom_controlx2://controlx2/"))
-                Wearable.NodeApi.getConnectedNodes(mApiClient).setResultCallback { nodes ->
-                    Timber.d("wear openActivity nodes: ${nodes.nodes}")
-                    nodes.nodes.forEach { node ->
-                        RemoteActivityHelper(this)
-                            .startRemoteActivity(
-                                targetIntent = phoneIntent,
-                                targetNodeId = node.id
-                            )
+                nodeClient.connectedNodes
+                    .addOnSuccessListener { nodes ->
+                        Timber.d("wear openActivity nodes: ${nodes}")
+                        nodes.forEach { node ->
+                            RemoteActivityHelper(this)
+                                .startRemoteActivity(
+                                    targetIntent = phoneIntent,
+                                    targetNodeId = node.id
+                                )
+                        }
                     }
-                }
             }
 
             val sendPhoneOpenTconnect: () -> Unit = {
@@ -216,16 +219,11 @@ class MainActivity : ComponentActivity(), MessageApi.MessageListener, GoogleApiC
             )
         }
 
-        mApiClient = GoogleApiClient.Builder(this)
-            .addApi(Wearable.API)
-            .addConnectionCallbacks(this)
-            .addOnConnectionFailedListener(this)
-            .build()
-
-        Timber.d("create: mApiClient: $mApiClient")
-        mApiClient.connect()
+        messageClient = Wearable.getMessageClient(this)
+        messageClient.addListener(this)
 
         startPhoneCommService()
+        onConnected(savedInstanceState)
     }
 
     private fun startPhoneCommService() {
@@ -255,15 +253,12 @@ class MainActivity : ComponentActivity(), MessageApi.MessageListener, GoogleApiC
 
     override fun onResume() {
         super.onResume()
-        Timber.d("activity onResume: mApiClient: $mApiClient")
-        if (!mApiClient.isConnected && !mApiClient.isConnecting) {
-            mApiClient.connect()
-        }
+        messageClient.addListener(this)
 
         sendMessage("/to-phone/is-pump-connected", "onResume".toByteArray())
     }
 
-    override fun onNewIntent(intent: Intent?) {
+    override fun onNewIntent(intent: Intent) {
         var newRoute = initialRoute
         if (intent != null) {
             newRoute = intent.getStringExtra("route") ?: Screen.Landing.route
@@ -281,33 +276,20 @@ class MainActivity : ComponentActivity(), MessageApi.MessageListener, GoogleApiC
         super.onNewIntent(intent)
     }
 
-    override fun onConnected(bundle: Bundle?) {
+    fun onConnected(bundle: Bundle?) {
         Timber.i("wear onConnected: $bundle")
         sendMessage("/to-phone/connected", "wear_launched".toByteArray())
         sendMessage("/to-phone/is-pump-connected", "onConnected".toByteArray())
-        Wearable.MessageApi.addListener(mApiClient, this)
-    }
-
-    override fun onConnectionSuspended(id: Int) {
-        Timber.w("wear connectionSuspended: $id")
-        mApiClient.reconnect()
-    }
-
-    override fun onConnectionFailed(result: ConnectionResult) {
-        Timber.w("wear connectionFailed $result")
-        mApiClient.reconnect()
+        messageClient.addListener(this)
     }
 
     override fun onStop() {
         super.onStop()
-        Wearable.MessageApi.removeListener(mApiClient, this)
-        if (mApiClient.isConnected) {
-            mApiClient.disconnect()
-        }
+        messageClient.removeListener(this)
     }
 
     override fun onDestroy() {
-        mApiClient.unregisterConnectionCallbacks(this)
+        messageClient.removeListener(this)
         super.onDestroy()
     }
 
@@ -321,29 +303,32 @@ class MainActivity : ComponentActivity(), MessageApi.MessageListener, GoogleApiC
 
     private fun sendMessage(path: String, message: ByteArray) {
         Timber.i("wear sendMessage: $path ${String(message)}")
+        val nodeClient = Wearable.getNodeClient(this)
+
 
         fun inner(node: Node) {
-            Wearable.MessageApi.sendMessage(mApiClient, node.id, path, message)
-                .setResultCallback { result ->
-                    if (result.status.isSuccess) {
-                        Timber.i("Wear message sent: ${path} ${String(message)} to ${node.displayName}")
-                    } else {
-                        Timber.w("wear sendMessage callback: ${result.status}")
-                    }
+            messageClient.sendMessage(node.id, path, message)
+                .addOnSuccessListener {
+                    Timber.i("Wear message sent: ${path} ${String(message)} to ${node.displayName}")
+                }
+                .addOnFailureListener {
+                    Timber.w("wear sendMessage callback: ${it}")
                 }
         }
         if (path.startsWith("/to-wear")) {
-            Wearable.NodeApi.getLocalNode(mApiClient).setResultCallback { nodes ->
-                Timber.d("wear sendMessage local: ${nodes.node}")
-                inner(nodes.node)
-            }
+            nodeClient.localNode
+                .addOnSuccessListener { localNode ->
+                    Timber.d("wear sendMessage local: ${localNode}")
+                    inner(localNode)
+                }
         }
-        Wearable.NodeApi.getConnectedNodes(mApiClient).setResultCallback { nodes ->
-            Timber.d("wear sendMessage nodes: ${nodes.nodes}")
-            nodes.nodes.forEach { node ->
-                inner(node)
+        nodeClient.connectedNodes
+            .addOnSuccessListener { nodes ->
+                Timber.d("wear sendMessage nodes: ${nodes}")
+                nodes.forEach { node ->
+                    inner(node)
+                }
             }
-        }
     }
 
     private fun inWaitingState(): Boolean {

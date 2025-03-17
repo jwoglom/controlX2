@@ -14,16 +14,13 @@ import android.content.IntentFilter
 import android.content.SharedPreferences
 import android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_CONNECTED_DEVICE
 import android.media.RingtoneManager
-import android.os.Build
-import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
 import android.os.Message
 import android.widget.Toast
 import androidx.core.app.NotificationCompat
 import androidx.core.graphics.drawable.IconCompat
-import com.google.android.gms.common.ConnectionResult
-import com.google.android.gms.common.api.GoogleApiClient
+import com.google.android.gms.wearable.MessageClient
 import com.google.android.gms.wearable.MessageEvent
 import com.google.android.gms.wearable.Node
 import com.google.android.gms.wearable.Wearable
@@ -90,13 +87,12 @@ import timber.log.Timber
 import java.security.Security
 import java.time.Duration
 import java.time.Instant
-import java.time.temporal.ChronoUnit
-import java.util.*
+import java.util.Collections
 
 
 const val CacheSeconds = 30
 
-class CommService : WearableListenerService(), GoogleApiClient.ConnectionCallbacks, GoogleApiClient.OnConnectionFailedListener {
+class CommService : WearableListenerService(), MessageClient.OnMessageReceivedListener {
     private val supervisorJob = SupervisorJob()
     private val scope = CoroutineScope(supervisorJob + Dispatchers.Main.immediate)
 
@@ -104,7 +100,7 @@ class CommService : WearableListenerService(), GoogleApiClient.ConnectionCallbac
     private var pumpCommHandler: PumpCommHandler? = null
     private var pumpFinderCommHandler: PumpFinderCommHandler? = null
 
-    private lateinit var mApiClient: GoogleApiClient
+    private lateinit var messageClient: MessageClient
 
     private var lastResponseMessage: MutableMap<Pair<Characteristic, Byte>, Pair<com.jwoglom.pumpx2.pump.messages.Message, Instant>> = Collections.synchronizedMap(mutableMapOf())
     private var historyLogCache: MutableMap<Long, HistoryLog> = Collections.synchronizedMap(mutableMapOf())
@@ -689,24 +685,22 @@ class CommService : WearableListenerService(), GoogleApiClient.ConnectionCallbac
     fun sendWearCommMessage(path: String, message: ByteArray) {
         Timber.i("service sendMessage: $path ${String(message)}")
         fun inner(node: Node) {
-            Wearable.MessageApi.sendMessage(mApiClient, node.id, path, message)
-                .setResultCallback { result ->
-                    if (result.status.isSuccess) {
-                        Timber.d("service message sent: $path ${String(message)} to: $node")
-                    } else {
-                        Timber.w("service sendMessage callback: ${result.status} for: $path ${String(message)}")
-                    }
+            messageClient.sendMessage(node.id, path, message)
+                .addOnSuccessListener {
+                    Timber.d("service message sent: $path ${String(message)} to: $node")
+                }
+                .addOnFailureListener {
+                    Timber.w("service sendMessage callback: ${it} for: $path ${String(message)}")
                 }
         }
         if (!path.startsWith("/to-wear")) {
-            Wearable.NodeApi.getLocalNode(mApiClient).setResultCallback { nodes ->
-                Timber.d("service sendMessage to local node: ${nodes.node}")
-                inner(nodes.node)
+            Wearable.getNodeClient(this).localNode.addOnSuccessListener { localNode ->
+                // If needed, send to the local node
+                inner(localNode)
             }
         }
-        Wearable.NodeApi.getConnectedNodes(mApiClient).setResultCallback { nodes ->
-            Timber.d("service sendMessage nodes: ${nodes.nodes}")
-            nodes.nodes.forEach { node ->
+        Wearable.getNodeClient(this).connectedNodes.addOnSuccessListener { nodes ->
+            nodes.forEach { node ->
                 inner(node)
             }
         }
@@ -792,64 +786,52 @@ class CommService : WearableListenerService(), GoogleApiClient.ConnectionCallbac
 //            start()
 //            Timber.d("service thread start")
 
-            // Timber already set in up MUA, but for good measure:
-            setupTimber("MWC",
-                context = this,
-                logToFile = true,
-                shouldLog = ShouldLogToFile(this),
-                writeCharacteristicFailedCallback = handleWriteCharacteristicFailedCallback)
-            Timber.i("service onCreate")
+        // Timber already set in up MUA, but for good measure:
+        setupTimber("MWC",
+            context = this,
+            logToFile = true,
+            shouldLog = ShouldLogToFile(this),
+            writeCharacteristicFailedCallback = handleWriteCharacteristicFailedCallback)
+        Timber.i("service onCreate")
 
-            // Listen to BLE state changes
-            val intentFilter = IntentFilter()
-            intentFilter.addAction("android.bluetooth.adapter.action.STATE_CHANGED")
-            intentFilter.addAction("android.bluetooth.device.action.BOND_STATE_CHANGED")
-            registerReceiver(bleChangeReceiver, intentFilter)
-
-
-            if (!Prefs(applicationContext).tosAccepted()) {
-                Timber.w("commService is short-circuiting because first TOS not accepted")
-                return
-            } else if (!Prefs(applicationContext).serviceEnabled()) {
-                Timber.w("commService is short-circuiting because service not enabled")
-                return
-            }
+        // Listen to BLE state changes
+        val intentFilter = IntentFilter()
+        intentFilter.addAction("android.bluetooth.adapter.action.STATE_CHANGED")
+        intentFilter.addAction("android.bluetooth.device.action.BOND_STATE_CHANGED")
+        registerReceiver(bleChangeReceiver, intentFilter)
 
 
-            mApiClient = GoogleApiClient.Builder(applicationContext)
-                .addApi(Wearable.API)
-                .addConnectionCallbacks(this@CommService)
-                .addOnConnectionFailedListener(this@CommService)
-                .build()
+        if (!Prefs(applicationContext).tosAccepted()) {
+            Timber.w("commService is short-circuiting because first TOS not accepted")
+            return
+        } else if (!Prefs(applicationContext).serviceEnabled()) {
+            Timber.w("commService is short-circuiting because service not enabled")
+            return
+        }
 
-            mApiClient.connect()
-            // Get the HandlerThread's Looper and use it for our Handler
-            serviceLooper = looper
+        messageClient = Wearable.getMessageClient(this)
+        messageClient.addListener(this)
 
+        // Get the HandlerThread's Looper and use it for our Handler
+        serviceLooper = looper
+
+        if (Prefs(applicationContext).pumpFinderServiceEnabled()) {
+            pumpFinderCommHandler = PumpFinderCommHandler(looper)
+        } else {
+            pumpCommHandler = PumpCommHandler(looper)
+
+            pumpCommHandler?.postDelayed(periodicUpdateTask, periodicUpdateIntervalMs)
+            pumpCommHandler?.postDelayed(checkForUpdatesTask, checkForUpdatesDelayMs)
+        }
+
+
+        Thread {
             if (Prefs(applicationContext).pumpFinderServiceEnabled()) {
-                pumpFinderCommHandler = PumpFinderCommHandler(looper)
+                sendWearCommMessage("/to-phone/pump-finder-started", "".toByteArray())
             } else {
-                pumpCommHandler = PumpCommHandler(looper)
-
-                pumpCommHandler?.postDelayed(periodicUpdateTask, periodicUpdateIntervalMs)
-                pumpCommHandler?.postDelayed(checkForUpdatesTask, checkForUpdatesDelayMs)
+                sendWearCommMessage("/to-phone/comm-started", "".toByteArray())
             }
-
-
-            Thread {
-                while (!mApiClient.isConnected) {
-                    Timber.d("waiting for mApiClient in CommService")
-                    Thread.sleep(250)
-                }
-                Timber.d("mApiClient established")
-
-                if (Prefs(applicationContext).pumpFinderServiceEnabled()) {
-                    sendWearCommMessage("/to-phone/pump-finder-started", "".toByteArray())
-                } else {
-                    sendWearCommMessage("/to-phone/comm-started", "".toByteArray())
-                }
-            }.start()
-//        }
+        }.start()
     }
 
     override fun onMessageReceived(messageEvent: MessageEvent) {
@@ -1257,24 +1239,9 @@ class CommService : WearableListenerService(), GoogleApiClient.ConnectionCallbac
     override fun onDestroy() {
         super.onDestroy()
         scope.cancel()
+        messageClient.removeListener(this)
         Toast.makeText(this, "ControlX2 service destroyed", Toast.LENGTH_SHORT).show()
     }
-
-    override fun onConnected(bundle: Bundle?) {
-        Timber.i("service onConnected $bundle")
-        Wearable.MessageApi.addListener(mApiClient, this)
-    }
-
-    override fun onConnectionSuspended(id: Int) {
-        Timber.i("service onConnectionSuspended: $id")
-        mApiClient.reconnect()
-    }
-
-    override fun onConnectionFailed(result: ConnectionResult) {
-        Timber.i("service onConnectionFailed: $result")
-        mApiClient.reconnect()
-    }
-
 
     private fun createNotification(): Notification {
         val notificationChannelId = "ControlX2 Background Notification"

@@ -27,8 +27,7 @@ import androidx.compose.runtime.compositionLocalOf
 import androidx.core.app.ActivityCompat
 import com.google.android.gms.common.ConnectionResult
 import com.google.android.gms.common.GoogleApiAvailability
-import com.google.android.gms.common.api.GoogleApiClient
-import com.google.android.gms.wearable.MessageApi
+import com.google.android.gms.wearable.MessageClient
 import com.google.android.gms.wearable.MessageEvent
 import com.google.android.gms.wearable.Node
 import com.google.android.gms.wearable.Wearable
@@ -109,8 +108,8 @@ import kotlin.system.exitProcess
 var dataStore = DataStore()
 val LocalDataStore = compositionLocalOf { dataStore }
 
-class MainActivity : ComponentActivity(), GoogleApiClient.ConnectionCallbacks, GoogleApiClient.OnConnectionFailedListener, MessageApi.MessageListener {
-    private lateinit var mApiClient: GoogleApiClient
+class MainActivity : ComponentActivity(), MessageClient.OnMessageReceivedListener {
+    private lateinit var messageClient: MessageClient
 
     private val applicationScope = CoroutineScope(SupervisorJob())
     private val historyLogDb by lazy { HistoryLogDatabase.getDatabase(this) }
@@ -157,7 +156,9 @@ class MainActivity : ComponentActivity(), GoogleApiClient.ConnectionCallbacks, G
             )
         }
 
-        reinitializeGoogleApiClient()
+        if (checkPlayServicesAndInitialize()) {
+            reinitializeGoogleApiClient()
+        }
         checkNotificationPermissions()
 
 
@@ -165,13 +166,8 @@ class MainActivity : ComponentActivity(), GoogleApiClient.ConnectionCallbacks, G
     }
 
     private fun reinitializeGoogleApiClient() {
-        mApiClient = GoogleApiClient.Builder(this)
-            .addApi(Wearable.API)
-            .addConnectionCallbacks(this)
-            .addOnConnectionFailedListener(this)
-            .build()
-
-        mApiClient.connect()
+        messageClient = Wearable.getMessageClient(this)
+        messageClient.addListener(this)
     }
 
     private fun checkNotificationPermissions() {
@@ -199,9 +195,9 @@ class MainActivity : ComponentActivity(), GoogleApiClient.ConnectionCallbacks, G
 
     override fun onResume() {
         Timber.i("activity onResume")
-        if (!mApiClient.isConnected && !mApiClient.isConnecting) {
-            mApiClient.connect()
-        }
+//        if (!mApiClient.isConnected && !mApiClient.isConnecting) {
+//            mApiClient.connect()
+//        }
 
         if (!Prefs(applicationContext).tosAccepted()) {
             Timber.i("BTPermissionsCheck not started because TOS not accepted")
@@ -215,14 +211,11 @@ class MainActivity : ComponentActivity(), GoogleApiClient.ConnectionCallbacks, G
 
     override fun onStop() {
         super.onStop()
-        Wearable.MessageApi.removeListener(mApiClient, this)
-        if (mApiClient.isConnected) {
-            mApiClient.disconnect()
-        }
+        messageClient.removeListener(this)
     }
 
     override fun onDestroy() {
-        mApiClient.unregisterConnectionCallbacks(this)
+        messageClient.removeListener(this)
         super.onDestroy()
     }
 
@@ -260,85 +253,71 @@ class MainActivity : ComponentActivity(), GoogleApiClient.ConnectionCallbacks, G
         }
     }
 
-    override fun onConnected(bundle: Bundle?) {
-        connectionFailureCount = 0
-        Timber.i("mobile onConnected $bundle")
-        sendMessage("/to-wear/connected", "phone_launched".toByteArray())
-        Wearable.MessageApi.addListener(mApiClient, this)
-    }
 
-    override fun onConnectionSuspended(id: Int) {
-        Timber.i("mobile onConnectionSuspended: $id")
-        mApiClient.reconnect()
-    }
-
-    private var connectionFailureCount = 0
-    override fun onConnectionFailed(result: ConnectionResult) {
-        Timber.i("mobile onConnectionFailed: $result connectionFailureCount=$connectionFailureCount")
-        if (!result.isSuccess) {
-            val apiAvail = GoogleApiAvailability.getInstance()
-            connectionFailureCount++
-            when (result.errorCode) {
+    private fun checkPlayServicesAndInitialize(): Boolean {
+        val availability = GoogleApiAvailability.getInstance()
+        val resultCode = availability.isGooglePlayServicesAvailable(this)
+        if (resultCode == ConnectionResult.SUCCESS) {
+            return true
+        } else {
+            when (resultCode) {
                 ConnectionResult.API_UNAVAILABLE -> {
                     AlertDialog.Builder(this)
                         .setMessage(
-                            """The 'Wear OS' application is not installed on this device.\n
-                            This is required, even if not using a wearable, due to the current implementation of the app which uses these libraries.
-                            To resolve this issue, install the 'Wear OS' app from Google Play. This dependency will be removed in a later version.""".trimIndent()
+                            """
+                        The 'Wear OS' application is not installed on this device.
+                        This is required due to the current implementation.
+                        To resolve, install the 'Wear OS' app from Google Play.
+                        """.trimIndent()
                         )
-                        .setPositiveButton("Install") { dialog, which ->
+                        .setPositiveButton("Install") { _, _ ->
                             openPlayStore("com.google.android.wearable.app")
                         }
                         .show()
-                    return
                 }
                 else -> {
-                    if (connectionFailureCount > 3) {
-                        if (apiAvail.isUserResolvableError(result.errorCode)) {
-                            apiAvail.getErrorDialog(this, result.errorCode, 1000) {
-                                exitProcess(0)
-                            }?.show();
-                        } else {
-                            AlertDialog.Builder(this)
-                                .setTitle("Error connecting to Google Play Services")
-                                .setMessage("$result")
-                                .setPositiveButton("OK") { dialog, which -> dialog.cancel() }
-                                .show()
-                        }
+                    if (availability.isUserResolvableError(resultCode)) {
+                        availability.getErrorDialog(this, resultCode, 1000) {
+                            exitProcess(0)
+                        }?.show()
                     } else {
-                        reinitializeGoogleApiClient()
-                        return
+                        AlertDialog.Builder(this)
+                            .setTitle("Error connecting to Google Play Services")
+                            .setMessage("Error code: $resultCode")
+                            .setPositiveButton("OK") { d, _ -> d.cancel() }
+                            .show()
                     }
                 }
             }
+            return false
         }
-        mApiClient.reconnect()
     }
 
     private fun sendMessage(path: String, message: ByteArray) {
+        val messageClient = Wearable.getMessageClient(this)
+        val nodeClient = Wearable.getNodeClient(this)
         Timber.i("mobile sendMessage: $path ${String(message)}")
+
         fun inner(node: Node) {
-            Wearable.MessageApi.sendMessage(mApiClient, node.id, path, message)
-                .setResultCallback { result ->
-                    if (result.status.isSuccess) {
-                        Timber.i("Message sent: ${path} ${String(message)}")
-                    } else {
-                        Timber.e("mobile sendMessage callback: ${result}")
-                    }
+            messageClient.sendMessage(node.id, path, message)
+                .addOnSuccessListener {
+                    Timber.d("Message sent: ${path} ${String(message)}")
+                }
+                .addOnFailureListener {
+                    Timber.e("mobile sendMessage callback: $it")
                 }
         }
         if (!path.startsWith("/to-wear")) {
-            Wearable.NodeApi.getLocalNode(mApiClient).setResultCallback { nodes ->
-                Timber.i("mobile sendMessage local: ${nodes.node}")
-                inner(nodes.node)
-            }
+            Timber.d("mobile sendMessage local: ${nodeClient.localNode.result}")
+            inner(nodeClient.localNode.result)
         }
-        Wearable.NodeApi.getConnectedNodes(mApiClient).setResultCallback { nodes ->
-            Timber.i("mobile sendMessage nodes: $nodes")
-            nodes.nodes.forEach { node ->
-                inner(node)
+        nodeClient.connectedNodes
+            .addOnSuccessListener { nodes ->
+                Timber.d("mobile sendMessage nodes: $nodes")
+                nodes.forEach { node ->
+                    inner(node)
+                }
             }
-        }
     }
 
     private fun sendPumpCommands(type: SendType, msgs: List<Message>) {
@@ -383,6 +362,7 @@ class MainActivity : ComponentActivity(), GoogleApiClient.ConnectionCallbacks, G
             }
             val remoteBgRequest = RemoteBgEntryRequest(
                 bgValue,
+                false, // useForCgmCalibration
                 autopopBg,
                 timeSinceReset.pumpTimeSecondsSinceReset,
                 bolusId

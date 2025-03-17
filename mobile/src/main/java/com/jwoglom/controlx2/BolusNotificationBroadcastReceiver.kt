@@ -7,39 +7,35 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.SharedPreferences
-import android.os.Bundle
 import androidx.core.app.NotificationCompat
-import com.google.android.gms.common.ConnectionResult
-import com.google.android.gms.common.api.GoogleApiClient
+import com.google.android.gms.wearable.MessageClient
+import com.google.android.gms.wearable.MessageEvent
 import com.google.android.gms.wearable.Node
 import com.google.android.gms.wearable.Wearable
 import com.google.android.gms.wearable.WearableListenerService
+import com.jwoglom.controlx2.shared.InitiateConfirmedBolusSerializer
+import com.jwoglom.controlx2.shared.PumpMessageSerializer
+import com.jwoglom.controlx2.shared.util.shortTimeAgo
+import com.jwoglom.controlx2.shared.util.twoDecimalPlaces
 import com.jwoglom.pumpx2.pump.PumpState
 import com.jwoglom.pumpx2.pump.messages.models.InsulinUnit
 import com.jwoglom.pumpx2.pump.messages.request.control.CancelBolusRequest
 import com.jwoglom.pumpx2.pump.messages.request.control.InitiateBolusRequest
 import com.jwoglom.pumpx2.pump.messages.response.control.InitiateBolusResponse
 import com.jwoglom.pumpx2.shared.Hex
-import com.jwoglom.controlx2.shared.InitiateConfirmedBolusSerializer
-import com.jwoglom.controlx2.shared.PumpMessageSerializer
-import com.jwoglom.controlx2.shared.util.shortTimeAgo
-import com.jwoglom.controlx2.shared.util.twoDecimalPlaces
 import timber.log.Timber
 import java.time.Instant
 
 
-public class BolusNotificationBroadcastReceiver : BroadcastReceiver(),
-    GoogleApiClient.ConnectionCallbacks, GoogleApiClient.OnConnectionFailedListener {
-    private lateinit var mApiClient: GoogleApiClient
+class BolusNotificationBroadcastReceiver : BroadcastReceiver(), MessageClient.OnMessageReceivedListener {
+    private lateinit var messageClient: MessageClient
+
 
     override fun onReceive(context: Context?, intent: Intent?) {
         Timber.i("BolusNotificationBroadcastReceiver $context $intent")
 
-        mApiClient = GoogleApiClient.Builder(context!!)
-            .addApi(Wearable.API)
-            .addConnectionCallbacks(this@BolusNotificationBroadcastReceiver)
-            .addOnConnectionFailedListener(this@BolusNotificationBroadcastReceiver)
-            .build()
+        messageClient = Wearable.getMessageClient(this)
+        messageClient.addListener(this)
 
         val action = intent?.getStringExtra("action")
         val notifId = getCurrentNotificationId(context)
@@ -62,7 +58,7 @@ public class BolusNotificationBroadcastReceiver : BroadcastReceiver(),
                         }"
                     )
 
-                    waitForApiClient()
+                    // waitForApiClient()
                     val bolusSource = prefs(context)?.getString("initiateBolusSource", "") ?: ""
                     if (bolusSource == "wear") {
                         sendMessage("/to-wear/initiate-confirmed-bolus", rawBytes)
@@ -167,7 +163,7 @@ public class BolusNotificationBroadcastReceiver : BroadcastReceiver(),
                     )
                 )
                 resetBolusPrefs(context)
-                waitForApiClient()
+                // waitForApiClient()
                 sendMessage("/to-wear/bolus-rejected", "from_phone".toByteArray())
             }
             "CANCEL" -> {
@@ -180,7 +176,7 @@ public class BolusNotificationBroadcastReceiver : BroadcastReceiver(),
                         PumpMessageSerializer.toBytes(CancelBolusRequest(bolusId))
                     )
                     Thread.sleep(500)
-                    waitForApiClient()
+                    // waitForApiClient()
                 }
             }
             else -> {
@@ -343,58 +339,34 @@ public class BolusNotificationBroadcastReceiver : BroadcastReceiver(),
         return context?.getSharedPreferences("WearX2", WearableListenerService.MODE_PRIVATE)
     }
 
-    override fun onConnected(bundle: Bundle?) {
-        Timber.i("broadcastReceiver onConnected $bundle")
-    }
-
-    override fun onConnectionSuspended(id: Int) {
-        Timber.i("broadcastReceiver onConnectionSuspended: $id")
-        mApiClient.reconnect()
-    }
-
-    override fun onConnectionFailed(result: ConnectionResult) {
-        Timber.i("broadcastReceiver onConnectionFailed: $result")
-        mApiClient.connect()
-    }
-
-    private fun waitForApiClient() {
-        mApiClient.connect()
-        while (!mApiClient.isConnected && mApiClient.hasConnectedApi(Wearable.API)) {
-            Timber.d("BolusNotificationBroadcastReceiver is waiting on mApiClient connection")
-            Thread.sleep(100)
-        }
-    }
-
     fun sendMessage(path: String, message: ByteArray) {
-        Timber.i("service sendMessage: $path ${String(message)}")
+        Timber.i("bolusNotificationBroadcastReceiver sendMessage: $path ${String(message)}")
+        val messageClient = Wearable.getMessageClient(this)
+        val nodeClient = Wearable.getNodeClient(this)
+
         fun inner(node: Node) {
-            Wearable.MessageApi.sendMessage(mApiClient, node.id, path, message)
-                .setResultCallback { result ->
-                    if (result.status.isSuccess) {
-                        Timber.i("service message sent: $path ${String(message)} to: $node")
-                    } else {
-                        Timber.w(
-                            "service sendMessage callback: ${result.status} for: $path ${
-                                String(
-                                    message
-                                )
-                            }"
-                        )
-                    }
+            messageClient.sendMessage(node.id, path, message)
+                .addOnSuccessListener {
+                    Timber.d("bolusNotificationBroadcastReceiver message sent: $path ${String(message)} to: $node")
+                }
+                .addOnFailureListener {
+                    Timber.w("bolusNotificationBroadcastReceiver sendMessage callback: ${it} for: $path ${String(message)}")
                 }
         }
         if (!path.startsWith("/to-wear")) {
-            Wearable.NodeApi.getLocalNode(mApiClient).setResultCallback { nodes ->
-                Timber.i("service sendMessage local: ${nodes.node}")
-                inner(nodes.node)
-            }
+            inner(nodeClient.localNode.result)
         }
-        Wearable.NodeApi.getConnectedNodes(mApiClient).setResultCallback { nodes ->
-            Timber.i("service sendMessage nodes: ${nodes.nodes}")
-            nodes.nodes.forEach { node ->
-                inner(node)
+        nodeClient.connectedNodes
+            .addOnSuccessListener { nodes ->
+                Timber.d("bolusNotificationBroadcastReceiver sendMessage nodes: ${nodes}")
+                nodes.forEach { node ->
+                    inner(node)
+                }
             }
-        }
+    }
+
+    override fun onMessageReceived(messageEvent: MessageEvent) {
+        // does not currently listen for anything
     }
 
 }
