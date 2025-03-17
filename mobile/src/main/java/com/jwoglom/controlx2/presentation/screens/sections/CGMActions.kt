@@ -64,10 +64,10 @@ import com.jwoglom.controlx2.shared.util.SendType
 import com.jwoglom.controlx2.util.determinePumpModel
 import com.jwoglom.pumpx2.pump.messages.Message
 import com.jwoglom.pumpx2.pump.messages.models.KnownDeviceModel
+import com.jwoglom.pumpx2.pump.messages.request.control.SetDexcomG7PairingCodeRequest
 import com.jwoglom.pumpx2.pump.messages.request.control.SetG6TransmitterIdRequest
-import com.jwoglom.pumpx2.pump.messages.request.control.SetG7PairingCodeRequest
-import com.jwoglom.pumpx2.pump.messages.request.control.StartG6SensorSessionRequest
-import com.jwoglom.pumpx2.pump.messages.request.control.StopG6SensorSessionRequest
+import com.jwoglom.pumpx2.pump.messages.request.control.StartDexcomG6SensorSessionRequest
+import com.jwoglom.pumpx2.pump.messages.request.control.StopDexcomCGMSensorSessionRequest
 import com.jwoglom.pumpx2.pump.messages.request.currentStatus.CGMStatusRequest
 import com.jwoglom.pumpx2.pump.messages.request.currentStatus.GetSavedG7PairingCodeRequest
 import com.jwoglom.pumpx2.pump.messages.request.currentStatus.HomeScreenMirrorRequest
@@ -319,7 +319,7 @@ fun CGMActions(
                                                 val sensorCode = cgmSetupG6SensorCode.value?.toIntOrNull() ?: 0
 
                                                 sendPumpCommands(SendType.BUST_CACHE, listOf(
-                                                    StartG6SensorSessionRequest(sensorCode)
+                                                    StartDexcomG6SensorSessionRequest(sensorCode)
                                                 ))
 
                                                 showStartG6CgmSessionMenu = false
@@ -371,7 +371,7 @@ fun CGMActions(
                                         onClick = {
                                             refreshScope.launch {
                                                 sendPumpCommands(SendType.BUST_CACHE, listOf(
-                                                    StopG6SensorSessionRequest()
+                                                    StopDexcomCGMSensorSessionRequest()
                                                 ))
 
                                                 showStopG6CgmSessionMenu = false
@@ -487,7 +487,7 @@ fun CGMActions(
                                                 cgmSetupG7SensorCode.value?.let {
                                                     sendPumpCommands(
                                                         SendType.BUST_CACHE, listOf(
-                                                            SetG7PairingCodeRequest(it.toInt())
+                                                            SetDexcomG7PairingCodeRequest(it.toInt())
                                                         )
                                                     )
                                                 }
