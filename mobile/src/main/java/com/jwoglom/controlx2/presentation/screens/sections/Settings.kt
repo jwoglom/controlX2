@@ -128,50 +128,50 @@ fun Settings(
                 }
                 Divider()
             }
-            item {
-                if (Prefs(context).connectionSharingEnabled()) {
-                    ListItem(
-                        headlineContent = { Text("Disable connection sharing") },
-                        supportingContent = { Text("Removes workarounds to run WearX2 and the t:connect app at the same time.") },
-                        leadingContent = {
-                            Icon(
-                                Icons.Filled.Close,
-                                contentDescription = "Stop icon",
-                            )
-                        },
-                        modifier = Modifier.clickable {
-                            Prefs(context).setConnectionSharingEnabled(false)
-                            coroutineScope.launch {
-                                withContext(Dispatchers.IO) {
-                                    Thread.sleep(250)
-                                }
-                                sendMessage("/to-phone/force-reload", "".toByteArray())
-                            }
-                        }
-                    )
-                } else {
-                    ListItem(
-                        headlineContent = { Text("Enable connection sharing") },
-                        supportingContent = { Text("Enables workarounds to run WearX2 and the t:connect app at the same time.") },
-                        leadingContent = {
-                            Icon(
-                                Icons.Filled.Check,
-                                contentDescription = "Start icon",
-                            )
-                        },
-                        modifier = Modifier.clickable {
-                            Prefs(context).setConnectionSharingEnabled(true)
-                            coroutineScope.launch {
-                                withContext(Dispatchers.IO) {
-                                    Thread.sleep(250)
-                                }
-                                sendMessage("/to-phone/force-reload", "".toByteArray())
-                            }
-                        }
-                    )
-                }
-                Divider()
-            }
+//            item {
+//                if (Prefs(context).connectionSharingEnabled()) {
+//                    ListItem(
+//                        headlineContent = { Text("Disable connection sharing") },
+//                        supportingContent = { Text("Removes workarounds to run WearX2 and the t:connect app at the same time.") },
+//                        leadingContent = {
+//                            Icon(
+//                                Icons.Filled.Close,
+//                                contentDescription = "Stop icon",
+//                            )
+//                        },
+//                        modifier = Modifier.clickable {
+//                            Prefs(context).setConnectionSharingEnabled(false)
+//                            coroutineScope.launch {
+//                                withContext(Dispatchers.IO) {
+//                                    Thread.sleep(250)
+//                                }
+//                                sendMessage("/to-phone/force-reload", "".toByteArray())
+//                            }
+//                        }
+//                    )
+//                } else {
+//                    ListItem(
+//                        headlineContent = { Text("Enable connection sharing") },
+//                        supportingContent = { Text("Enables workarounds to run WearX2 and the t:connect app at the same time.") },
+//                        leadingContent = {
+//                            Icon(
+//                                Icons.Filled.Check,
+//                                contentDescription = "Start icon",
+//                            )
+//                        },
+//                        modifier = Modifier.clickable {
+//                            Prefs(context).setConnectionSharingEnabled(true)
+//                            coroutineScope.launch {
+//                                withContext(Dispatchers.IO) {
+//                                    Thread.sleep(250)
+//                                }
+//                                sendMessage("/to-phone/force-reload", "".toByteArray())
+//                            }
+//                        }
+//                    )
+//                }
+//                Divider()
+//            }
 
             item {
                 ListItem(
