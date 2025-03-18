@@ -1,5 +1,6 @@
 package com.jwoglom.controlx2.presentation.ui
 
+import android.content.res.Configuration
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -32,6 +33,8 @@ import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.withStyle
+import androidx.compose.ui.tooling.preview.Devices
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.zIndex
@@ -43,6 +46,7 @@ import androidx.wear.compose.material.Icon
 import androidx.wear.compose.material.ScalingLazyColumn
 import androidx.wear.compose.material.ScalingLazyListState
 import androidx.wear.compose.material.Text
+import androidx.wear.compose.navigation.rememberSwipeDismissableNavController
 import com.google.accompanist.flowlayout.FlowRow
 import com.google.android.horologist.compose.navscaffold.scrollableColumn
 import com.jwoglom.controlx2.BuildConfig
@@ -73,6 +77,7 @@ import com.jwoglom.controlx2.presentation.redTheme
 import com.jwoglom.controlx2.shared.enums.BasalStatus
 import com.jwoglom.controlx2.shared.enums.UserMode
 import com.jwoglom.controlx2.shared.util.SendType
+import com.jwoglom.pumpx2.pump.messages.calculator.BolusCalcCondition
 import hu.supercluster.paperwork.Paperwork
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.cancel
@@ -450,4 +455,46 @@ fun LandingScreen(
 //            }
         }
     }
+}
+
+
+@Preview(
+    apiLevel = 28,
+    uiMode = Configuration.UI_MODE_TYPE_WATCH,
+    device = Devices.WEAR_OS_LARGE_ROUND,
+    heightDp = 500,
+    showSystemUi = true,
+    showBackground = true
+)
+@Composable
+fun DefaultLandingScreenPreviewFull() {
+    LandingScreen(
+        scalingLazyListState = ScalingLazyListState(1, 0),
+        focusRequester = FocusRequester(),
+        sendPumpCommands = { _, _ -> },
+        sendPhoneOpenActivity = {},
+        sendPhoneCommand = {},
+        resetSavedBolusEnteredState = {},
+        swipeDismissableNavController = rememberSwipeDismissableNavController()
+    )
+}
+
+
+@Preview(
+    apiLevel = 28,
+    uiMode = Configuration.UI_MODE_TYPE_WATCH,
+    device = Devices.WEAR_OS_LARGE_ROUND,
+    showBackground = true
+)
+@Composable
+fun DefaultLandingScreenPreviewCropped() {
+    LandingScreen(
+        scalingLazyListState = ScalingLazyListState(1, 0),
+        focusRequester = FocusRequester(),
+        sendPumpCommands = { _, _ -> },
+        sendPhoneOpenActivity = {},
+        sendPhoneCommand = {},
+        resetSavedBolusEnteredState = {},
+        swipeDismissableNavController = rememberSwipeDismissableNavController()
+    )
 }
