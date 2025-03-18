@@ -295,9 +295,11 @@ fun LandingScreen(
                             null -> null
                             else -> "${basalRate.value}"
                         }
+                        BasalStatus.PUMP_SUSPENDED, BasalStatus.BASALIQ_SUSPENDED ->
+                            "${basalStatus.value?.str}"
                         else -> when (basalRate.value) {
-                            null -> "${basalStatus.value}"
-                            else -> "${basalStatus.value} (${basalRate.value})"
+                            null -> "${basalStatus.value?.str}"
+                            else -> "${basalStatus.value?.str} (${basalRate.value})"
                         }
                     }
                 }
