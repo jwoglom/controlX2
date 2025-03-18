@@ -62,7 +62,7 @@ class BolusNotificationBroadcastReceiver : BroadcastReceiver(), MessageClient.On
                         }"
                     )
 
-                    // waitForApiClient()
+                    waitForApiClient()
                     val bolusSource = prefs(context)?.getString("initiateBolusSource", "") ?: ""
                     if (bolusSource == "wear") {
                         sendMessage("/to-wear/initiate-confirmed-bolus", rawBytes)
@@ -167,7 +167,7 @@ class BolusNotificationBroadcastReceiver : BroadcastReceiver(), MessageClient.On
                     )
                 )
                 resetBolusPrefs(context)
-                // waitForApiClient()
+                waitForApiClient()
                 sendMessage("/to-wear/bolus-rejected", "from_phone".toByteArray())
             }
             "CANCEL" -> {
@@ -180,7 +180,7 @@ class BolusNotificationBroadcastReceiver : BroadcastReceiver(), MessageClient.On
                         PumpMessageSerializer.toBytes(CancelBolusRequest(bolusId))
                     )
                     Thread.sleep(500)
-                    // waitForApiClient()
+                    waitForApiClient()
                 }
             }
             else -> {
@@ -356,7 +356,9 @@ class BolusNotificationBroadcastReceiver : BroadcastReceiver(), MessageClient.On
                 }
         }
         if (!path.startsWith("/to-wear")) {
-            inner(nodeClient.localNode.result)
+            nodeClient.localNode.addOnSuccessListener { localNode ->
+                inner(localNode)
+            }
         }
         nodeClient.connectedNodes
             .addOnSuccessListener { nodes ->
@@ -365,6 +367,17 @@ class BolusNotificationBroadcastReceiver : BroadcastReceiver(), MessageClient.On
                     inner(node)
                 }
             }
+    }
+
+    private fun waitForApiClient() {
+        var connected = false
+        while (!connected) {
+            Timber.d("BolusNotificationBroadcastReceiver is waiting on mApiClient connection")
+            nodeClient.localNode.addOnSuccessListener {
+                connected = true
+            }
+            Thread.sleep(100)
+        }
     }
 
     override fun onMessageReceived(messageEvent: MessageEvent) {

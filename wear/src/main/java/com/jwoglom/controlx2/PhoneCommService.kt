@@ -217,6 +217,15 @@ class PhoneCommService : WearableListenerService(), MessageClient.OnMessageRecei
         val messageClient = Wearable.getMessageClient(this)
         val nodeClient = Wearable.getNodeClient(this)
 
+        var connected = false
+        while (!connected) {
+            Timber.d("wear service sendMessage waiting for connect $path ${String(message)}")
+            nodeClient.localNode.addOnSuccessListener {
+                connected = true
+            }
+            Thread.sleep(100)
+        }
+
         Timber.i("wear sendMessage: $path ${String(message)}")
         fun inner(node: Node) {
             messageClient.sendMessage(node.id, path, message)

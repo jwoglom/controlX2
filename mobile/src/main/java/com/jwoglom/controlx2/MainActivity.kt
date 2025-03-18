@@ -308,8 +308,10 @@ class MainActivity : ComponentActivity(), MessageClient.OnMessageReceivedListene
                 }
         }
         if (!path.startsWith("/to-wear")) {
-            Timber.d("mobile sendMessage local: ${nodeClient.localNode.result}")
-            inner(nodeClient.localNode.result)
+            nodeClient.localNode.addOnSuccessListener { localNode ->
+                Timber.d("mobile sendMessage local: ${localNode}")
+                inner(localNode)
+            }
         }
         nodeClient.connectedNodes
             .addOnSuccessListener { nodes ->
