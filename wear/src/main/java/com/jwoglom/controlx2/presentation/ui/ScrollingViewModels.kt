@@ -24,11 +24,10 @@ import com.jwoglom.controlx2.util.saveable
 
 const val SCROLL_STATE_KEY = "scrollState"
 
-// Saves scroll state through process death; inspired by https://issuetracker.google.com/195689777
 class ScalingLazyListStateViewModel(savedStateHandle: SavedStateHandle) : ViewModel() {
     val scrollState = savedStateHandle.saveable(
         key = SCROLL_STATE_KEY,
-        saver = ScalingLazyListState.Saver
+        saver = ScalingLazyListState.Saver // now from material package
     ) {
         ScalingLazyListState()
     }

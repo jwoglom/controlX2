@@ -1,7 +1,6 @@
 package com.jwoglom.controlx2.presentation.ui
 
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -9,7 +8,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.material.ExperimentalMaterialApi
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.OpenInFull
 import androidx.compose.material.icons.filled.OpenInNew
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.pullrefresh.PullRefreshIndicator
@@ -67,7 +65,6 @@ import com.jwoglom.controlx2.dataStore
 import com.jwoglom.controlx2.presentation.components.FirstRowChip
 import com.jwoglom.controlx2.shared.presentation.LifecycleStateObserver
 import com.jwoglom.controlx2.presentation.components.LineInfoChip
-import com.jwoglom.controlx2.presentation.components.MiniChip
 import com.jwoglom.controlx2.shared.presentation.intervalOf
 import com.jwoglom.controlx2.presentation.defaultTheme
 import com.jwoglom.controlx2.presentation.greenTheme

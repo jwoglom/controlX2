@@ -2,18 +2,15 @@ package com.jwoglom.controlx2.presentation.ui
 
 import android.content.res.Configuration
 import androidx.compose.foundation.Image
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.absolutePadding
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.wrapContentSize
@@ -45,7 +42,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.zIndex
-import androidx.lifecycle.MutableLiveData
+import androidx.wear.compose.foundation.lazy.rememberScalingLazyListState
 import androidx.wear.compose.material.AutoCenteringParams
 import androidx.wear.compose.material.Button
 import androidx.wear.compose.material.ButtonDefaults
@@ -57,7 +54,6 @@ import androidx.wear.compose.material.ScalingLazyListState
 import androidx.wear.compose.material.Text
 import androidx.wear.compose.material.dialog.Alert
 import androidx.wear.compose.material.dialog.Dialog
-import androidx.wear.compose.material.rememberScalingLazyListState
 import com.google.android.horologist.compose.navscaffold.scrollableColumn
 import com.jwoglom.pumpx2.pump.messages.Message
 import com.jwoglom.pumpx2.pump.messages.calculator.BolusCalcCondition
@@ -87,7 +83,6 @@ import com.jwoglom.controlx2.presentation.defaultTheme
 import com.jwoglom.controlx2.shared.presentation.LifecycleStateObserver
 import com.jwoglom.controlx2.shared.util.SendType
 import com.jwoglom.controlx2.shared.util.firstLetterCapitalized
-import com.jwoglom.controlx2.shared.util.oneDecimalPlace
 import com.jwoglom.controlx2.shared.util.snakeCaseToSpace
 import com.jwoglom.controlx2.shared.util.twoDecimalPlaces
 import com.jwoglom.controlx2.shared.util.twoDecimalPlaces1000Unit
@@ -1194,7 +1189,7 @@ fun resetBolusDataStoreState(dataStore: DataStore) {
 
 
 @Preview(
-    apiLevel = 26,
+    apiLevel = 28,
     uiMode = Configuration.UI_MODE_TYPE_WATCH,
     device = Devices.WEAR_OS_LARGE_ROUND,
 )
@@ -1212,15 +1207,15 @@ fun EmptyPreview() {
         onClickCarbs = { },
         onClickBG = { },
         onClickLanding = { },
-        sendPumpCommands = {_, _ -> },
-        sendPhoneBolusRequest = {_, _, _, _, _ -> },
+        sendPumpCommands = { _, _ -> },
+        sendPhoneBolusRequest = { _, _, _, _, _ -> },
         resetSavedBolusEnteredState = {},
         sendPhoneBolusCancel = {}
     )
 }
 
 @Preview(
-    apiLevel = 26,
+    apiLevel = 28,
     uiMode = Configuration.UI_MODE_TYPE_WATCH,
     device = Devices.WEAR_OS_LARGE_ROUND,
 )
@@ -1237,8 +1232,8 @@ fun ConditionAcknowledgedPreview() {
         onClickCarbs = { },
         onClickBG = { },
         onClickLanding = { },
-        sendPumpCommands = {_, _ -> },
-        sendPhoneBolusRequest = {_, _, _, _, _ -> },
+        sendPumpCommands = { _, _ -> },
+        sendPhoneBolusRequest = { _, _, _, _, _ -> },
         resetSavedBolusEnteredState = {},
         sendPhoneBolusCancel = {}
     )

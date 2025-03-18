@@ -83,7 +83,6 @@ import com.jwoglom.controlx2.presentation.ui.ScrollStateViewModel
 import com.jwoglom.controlx2.shared.util.SendType
 import kotlin.math.abs
 import kotlin.math.pow
-import kotlin.math.roundToInt
 
 @Composable
 fun WearApp(
