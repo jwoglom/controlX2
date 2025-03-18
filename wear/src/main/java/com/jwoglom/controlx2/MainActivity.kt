@@ -38,6 +38,7 @@ import com.jwoglom.controlx2.shared.util.twoDecimalPlaces1000Unit
 import com.jwoglom.controlx2.util.UpdateComplication
 import com.jwoglom.controlx2.util.WearX2Complication
 import com.jwoglom.pumpx2.pump.messages.Message
+import com.jwoglom.pumpx2.pump.messages.builders.IDPManager
 import com.jwoglom.pumpx2.pump.messages.calculator.BolusCalcUnits
 import com.jwoglom.pumpx2.pump.messages.calculator.BolusParameters
 import com.jwoglom.pumpx2.pump.messages.models.InsulinUnit
@@ -344,6 +345,17 @@ class MainActivity : ComponentActivity(), MessageClient.OnMessageReceivedListene
     }
 
     private fun onPumpMessageReceived(message: Message, cached: Boolean) {
+        if (IDPManager.isIDPManagerResponse(message)) {
+            synchronized(dataStore.idpManager) {
+                // processMessage returns an instance of itself: ensures that watchers get the updated values
+                val isComplete = dataStore.idpManager.value?.isComplete == true
+                dataStore.idpManager.value = (dataStore.idpManager.value ?: IDPManager()).processMessage(message)
+                // re-create self when complete to trigger state update via object change
+                if (isComplete != dataStore.idpManager.value?.isComplete) {
+                    dataStore.idpManager.value = IDPManager(dataStore.idpManager.value)
+                }
+            }
+        }
         when (message) {
             is CurrentBatteryAbstractResponse -> {
                 dataStore.batteryPercent.value = message.batteryPercent

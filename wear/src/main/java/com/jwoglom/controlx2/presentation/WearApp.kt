@@ -21,6 +21,9 @@ import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.size
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.DirectionsRun
+import androidx.compose.material.icons.filled.KingBed
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -67,6 +70,7 @@ import com.jwoglom.pumpx2.pump.messages.response.currentStatus.BolusCalcDataSnap
 import com.jwoglom.pumpx2.pump.messages.response.currentStatus.TimeSinceResetResponse
 import com.jwoglom.controlx2.LocalDataStore
 import com.jwoglom.controlx2.R
+import com.jwoglom.controlx2.dataStore
 import com.jwoglom.controlx2.presentation.components.BottomText
 import com.jwoglom.controlx2.presentation.components.DecimalNumberPicker
 import com.jwoglom.controlx2.presentation.components.SingleNumberPicker
@@ -80,7 +84,9 @@ import com.jwoglom.controlx2.presentation.ui.IndeterminateProgressIndicator
 import com.jwoglom.controlx2.presentation.ui.LandingScreen
 import com.jwoglom.controlx2.presentation.ui.ScalingLazyListStateViewModel
 import com.jwoglom.controlx2.presentation.ui.ScrollStateViewModel
+import com.jwoglom.controlx2.shared.enums.UserMode
 import com.jwoglom.controlx2.shared.util.SendType
+import com.jwoglom.pumpx2.pump.messages.request.control.SetModesRequest
 import kotlin.math.abs
 import kotlin.math.pow
 
@@ -269,7 +275,7 @@ fun WearApp(
                     LandingScreen(
                         scalingLazyListState = scalingLazyListState,
                         focusRequester = focusRequester,
-                        swipeDismissableNavController = navController,
+                        navController = navController,
                         sendPumpCommands = sendPumpCommands,
                         sendPhoneCommand = sendPhoneCommand,
                         sendPhoneOpenActivity = sendPhoneOpenActivity,
@@ -277,6 +283,146 @@ fun WearApp(
                     )
 
                     RequestFocusOnResume(focusRequester)
+                    BottomText()
+                }
+
+                composable(Screen.SleepModeSet.route) {
+                    val controlIQMode = dataStore.controlIQMode.observeAsState()
+                    Alert(
+                        title = {
+                            Text(
+                                text = when (controlIQMode.value) {
+                                    UserMode.SLEEP -> "Disable Sleep mode?"
+                                    UserMode.NONE -> "Enable Sleep mode?"
+                                    else -> "Already in ${controlIQMode.value?.str} mode, that must be disabled first."
+                                },
+                                textAlign = TextAlign.Center,
+                                color = MaterialTheme.colors.onBackground
+                            )
+                        },
+                        negativeButton = {
+                            Button(
+                                onClick = {
+                                    navController.navigate(Screen.Landing.route)
+                                },
+                                colors = ButtonDefaults.secondaryButtonColors(),
+                                modifier = Modifier.fillMaxWidth()
+
+                            ) {
+                                Text("Cancel")
+                            }
+                        },
+                        positiveButton = {
+                            when (controlIQMode.value) {
+                                UserMode.SLEEP ->
+                                    Button(
+                                        onClick = {
+                                            sendPumpCommands(SendType.BUST_CACHE, listOf(
+                                                SetModesRequest(SetModesRequest.ModeCommand.SLEEP_MODE_OFF)
+                                            ))
+                                        },
+                                        colors = ButtonDefaults.secondaryButtonColors(),
+                                        modifier = Modifier.fillMaxWidth()
+
+                                    ) {
+                                        Text("Disable")
+                                    }
+
+                                UserMode.NONE ->
+                                    Button(
+                                        onClick = {
+                                            sendPumpCommands(SendType.BUST_CACHE, listOf(
+                                                SetModesRequest(SetModesRequest.ModeCommand.SLEEP_MODE_ON)
+                                            ))
+                                        },
+                                        colors = ButtonDefaults.secondaryButtonColors(),
+                                        modifier = Modifier.fillMaxWidth()
+
+                                    ) {
+                                        Text("Enable")
+                                    }
+                                else -> {}
+                            }
+
+                        },
+                        icon = {
+                            Image(
+                                Icons.Filled.KingBed,
+                                "Sleep mode",
+                                Modifier.size(24.dp)
+                            )
+                        },
+                    ) {}
+                    BottomText()
+                }
+
+                composable(Screen.ExerciseModeSet.route) {
+                    val controlIQMode = dataStore.controlIQMode.observeAsState()
+                    Alert(
+                        title = {
+                            Text(
+                                text = when (controlIQMode.value) {
+                                    UserMode.EXERCISE -> "Disable Exercise mode?"
+                                    UserMode.NONE -> "Enable Exercise mode?"
+                                    else -> "Already in ${controlIQMode.value?.str} mode, that must be disabled first."
+                                },
+                                textAlign = TextAlign.Center,
+                                color = MaterialTheme.colors.onBackground
+                            )
+                        },
+                        negativeButton = {
+                            Button(
+                                onClick = {
+                                    navController.navigate(Screen.Landing.route)
+                                },
+                                colors = ButtonDefaults.secondaryButtonColors(),
+                                modifier = Modifier.fillMaxWidth()
+
+                            ) {
+                                Text("Cancel")
+                            }
+                        },
+                        positiveButton = {
+                            when (controlIQMode.value) {
+                                UserMode.EXERCISE ->
+                                    Button(
+                                        onClick = {
+                                            sendPumpCommands(SendType.BUST_CACHE, listOf(
+                                                SetModesRequest(SetModesRequest.ModeCommand.EXERCISE_MODE_OFF)
+                                            ))
+                                        },
+                                        colors = ButtonDefaults.secondaryButtonColors(),
+                                        modifier = Modifier.fillMaxWidth()
+
+                                    ) {
+                                        Text("Disable")
+                                    }
+
+                                UserMode.NONE ->
+                                    Button(
+                                        onClick = {
+                                            sendPumpCommands(SendType.BUST_CACHE, listOf(
+                                                SetModesRequest(SetModesRequest.ModeCommand.EXERCISE_MODE_ON)
+                                            ))
+                                        },
+                                        colors = ButtonDefaults.secondaryButtonColors(),
+                                        modifier = Modifier.fillMaxWidth()
+
+                                    ) {
+                                        Text("Enable")
+                                    }
+                                else -> {}
+                            }
+
+                        },
+                        icon = {
+                            Image(
+                                Icons.AutoMirrored.Filled.DirectionsRun,
+                                "Exercise mode",
+                                Modifier.size(24.dp)
+                            )
+                        },
+                    ) {}
                     BottomText()
                 }
 

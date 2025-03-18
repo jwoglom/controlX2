@@ -3,6 +3,7 @@ package com.jwoglom.controlx2.presentation
 import androidx.lifecycle.MutableLiveData
 import com.jwoglom.controlx2.shared.enums.BasalStatus
 import com.jwoglom.controlx2.shared.enums.UserMode
+import com.jwoglom.pumpx2.pump.messages.builders.IDPManager
 import com.jwoglom.pumpx2.pump.messages.calculator.BolusCalcCondition
 import com.jwoglom.pumpx2.pump.messages.calculator.BolusCalcUnits
 import com.jwoglom.pumpx2.pump.messages.calculator.BolusCalculatorBuilder
@@ -43,6 +44,7 @@ class DataStore {
     val bolusCalcLastBG = MutableLiveData<LastBGResponse>()
     val maxBolusAmount = MutableLiveData<Double>()
     val maxCarbAmount = MutableLiveData<Int>()
+    val idpManager = MutableLiveData<IDPManager>(IDPManager())
 
     val landingBasalDisplayedText = MutableLiveData<String>()
     val landingControlIQDisplayedText = MutableLiveData<String>()
@@ -95,6 +97,8 @@ class DataStore {
         bolusCalcDataSnapshot.observeForever { t -> Timber.i("DataStore.bolusCalcDataSnapshot=$t") }
         bolusCalcLastBG.observeForever { t -> Timber.i("DataStore.bolusCalcLastBG=$t") }
         maxBolusAmount.observeForever { t -> Timber.i("DataStore.maxBolusAmount=$t") }
+        maxCarbAmount.observeForever { t -> Timber.i("DataStore.maxCarbAmount=$t") }
+        idpManager.observeForever { t -> Timber.i("DataStore.idpManager=$t") }
 
         landingBasalDisplayedText.observeForever { t -> Timber.i("DataStore.landingBasalDisplayedText=$t") }
         landingControlIQDisplayedText.observeForever { t -> Timber.i("DataStore.landingControlIQDisplayedText=$t") }

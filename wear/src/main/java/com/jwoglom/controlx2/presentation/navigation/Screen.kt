@@ -36,6 +36,8 @@ sealed class Screen(
     object MissingPairingCode : Screen("MissingPairingCode")
     object PumpDisconnectedReconnecting : Screen("PumpDisconnectedReconnecting")
     object Landing : Screen("Landing")
+    object SleepModeSet : Screen("SleepModeSet")
+    object ExerciseModeSet : Screen("ExerciseModeSet")
     object Bolus : Screen("Bolus")
     object BolusSelectUnitsScreen : Screen("BolusSelectUnits")
     object BolusSelectCarbsScreen : Screen("BolusSelectCarbs")

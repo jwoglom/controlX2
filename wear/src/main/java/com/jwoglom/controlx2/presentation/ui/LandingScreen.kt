@@ -6,9 +6,13 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.material.ExperimentalMaterialApi
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.DirectionsRun
+import androidx.compose.material.icons.filled.KingBed
 import androidx.compose.material.icons.filled.OpenInNew
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.pullrefresh.PullRefreshIndicator
@@ -28,6 +32,7 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
@@ -65,6 +70,7 @@ import com.jwoglom.pumpx2.pump.messages.request.currentStatus.GlobalMaxBolusSett
 import com.jwoglom.pumpx2.pump.messages.request.currentStatus.HomeScreenMirrorRequest
 import com.jwoglom.pumpx2.pump.messages.request.currentStatus.InsulinStatusRequest
 import com.jwoglom.controlx2.LocalDataStore
+import com.jwoglom.controlx2.R
 import com.jwoglom.controlx2.dataStore
 import com.jwoglom.controlx2.presentation.components.FirstRowChip
 import com.jwoglom.controlx2.shared.presentation.LifecycleStateObserver
@@ -77,7 +83,6 @@ import com.jwoglom.controlx2.presentation.redTheme
 import com.jwoglom.controlx2.shared.enums.BasalStatus
 import com.jwoglom.controlx2.shared.enums.UserMode
 import com.jwoglom.controlx2.shared.util.SendType
-import com.jwoglom.pumpx2.pump.messages.calculator.BolusCalcCondition
 import hu.supercluster.paperwork.Paperwork
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.cancel
@@ -94,7 +99,7 @@ fun LandingScreen(
     sendPhoneCommand: (String) -> Unit,
     sendPhoneOpenActivity: () -> Unit,
     resetSavedBolusEnteredState: () -> Unit,
-    swipeDismissableNavController: NavHostController,
+    navController: NavHostController,
     modifier: Modifier = Modifier,
 ) {
     val refreshScope = rememberCoroutineScope()
@@ -266,7 +271,7 @@ fun LandingScreen(
                     onClick = {
                         resetSavedBolusEnteredState()
                         resetBolusDataStoreState(dataStore)
-                        swipeDismissableNavController.navigate(Screen.Bolus.route)
+                        navController.navigate(Screen.Bolus.route)
                     },
                     label = {
                         Text(
@@ -316,6 +321,85 @@ fun LandingScreen(
                         else -> "${landingBasalDisplayedText.value}"
                     },
                 )
+            }
+
+
+            item {
+                val controlIQMode = dataStore.controlIQMode.observeAsState()
+
+                LazyRow {
+                    item {
+                        Chip(
+                            onClick = {
+                                navController.navigate(Screen.ExerciseModeSet.route)
+                            },
+                            label = {
+                                Icon(Icons.AutoMirrored.Filled.DirectionsRun, contentDescription = "Exercise")
+                            },
+                            secondaryLabel = {
+                                Text(
+                                    when (controlIQMode.value) {
+                                        UserMode.EXERCISE -> "ON"
+                                        else -> "OFF"
+                                    },
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                            },
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                    }
+                    item {
+                        Spacer(Modifier.width(12.dp))
+                    }
+                    item {
+                        Chip(
+                            onClick = {
+                                navController.navigate(Screen.SleepModeSet.route)
+                            },
+                            label = {
+                                Icon(Icons.Filled.KingBed, contentDescription = "Sleep")
+                            },
+                            secondaryLabel = {
+                                Text(
+                                    when (controlIQMode.value) {
+                                        UserMode.SLEEP -> "ON"
+                                        else -> "OFF"
+                                    },
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                            },
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                    }
+                    item {
+                        Spacer(Modifier.width(12.dp))
+                    }
+                    item {
+                        Chip(
+                            onClick = {
+                                // swipeDismissableNavController.navigate(Screen.Bolus.route)
+                            },
+                            label = {
+                                Icon(
+                                    painterResource(R.drawable.pump),
+                                    tint = Color.Unspecified,
+                                    contentDescription = "Pump icon",
+                                    modifier = Modifier.size(24.dp),
+                                )
+                            },
+                            secondaryLabel = {
+                                Text(
+                                    " ",
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                            },
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                    }
+                }
             }
 
             item {
@@ -461,9 +545,8 @@ fun LandingScreen(
 @Preview(
     apiLevel = 28,
     uiMode = Configuration.UI_MODE_TYPE_WATCH,
-    device = Devices.WEAR_OS_LARGE_ROUND,
+    device = Devices.WEAR_OS_RECT,
     heightDp = 500,
-    showSystemUi = true,
     showBackground = true
 )
 @Composable
@@ -475,7 +558,7 @@ fun DefaultLandingScreenPreviewFull() {
         sendPhoneOpenActivity = {},
         sendPhoneCommand = {},
         resetSavedBolusEnteredState = {},
-        swipeDismissableNavController = rememberSwipeDismissableNavController()
+        navController = rememberSwipeDismissableNavController()
     )
 }
 
@@ -495,6 +578,6 @@ fun DefaultLandingScreenPreviewCropped() {
         sendPhoneOpenActivity = {},
         sendPhoneCommand = {},
         resetSavedBolusEnteredState = {},
-        swipeDismissableNavController = rememberSwipeDismissableNavController()
+        navController = rememberSwipeDismissableNavController()
     )
 }
