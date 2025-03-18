@@ -57,6 +57,7 @@
         <service
             android:name=".PhoneCommService"
             android:exported="false"
+            android:foregroundServiceType="connectedDevice"
             android:icon="@drawable/pump">
             <intent-filter>
                 <!--action
