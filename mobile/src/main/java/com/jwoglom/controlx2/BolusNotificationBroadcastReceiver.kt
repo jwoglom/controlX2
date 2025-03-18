@@ -11,6 +11,7 @@ import androidx.core.app.NotificationCompat
 import com.google.android.gms.wearable.MessageClient
 import com.google.android.gms.wearable.MessageEvent
 import com.google.android.gms.wearable.Node
+import com.google.android.gms.wearable.NodeClient
 import com.google.android.gms.wearable.Wearable
 import com.google.android.gms.wearable.WearableListenerService
 import com.jwoglom.controlx2.shared.InitiateConfirmedBolusSerializer
@@ -29,13 +30,16 @@ import java.time.Instant
 
 class BolusNotificationBroadcastReceiver : BroadcastReceiver(), MessageClient.OnMessageReceivedListener {
     private lateinit var messageClient: MessageClient
+    private lateinit var nodeClient: NodeClient
 
 
     override fun onReceive(context: Context?, intent: Intent?) {
         Timber.i("BolusNotificationBroadcastReceiver $context $intent")
 
-        messageClient = Wearable.getMessageClient(this)
+        messageClient = Wearable.getMessageClient(context!!)
         messageClient.addListener(this)
+
+        nodeClient = Wearable.getNodeClient(context)
 
         val action = intent?.getStringExtra("action")
         val notifId = getCurrentNotificationId(context)
@@ -341,8 +345,6 @@ class BolusNotificationBroadcastReceiver : BroadcastReceiver(), MessageClient.On
 
     fun sendMessage(path: String, message: ByteArray) {
         Timber.i("bolusNotificationBroadcastReceiver sendMessage: $path ${String(message)}")
-        val messageClient = Wearable.getMessageClient(this)
-        val nodeClient = Wearable.getNodeClient(this)
 
         fun inner(node: Node) {
             messageClient.sendMessage(node.id, path, message)

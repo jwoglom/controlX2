@@ -240,7 +240,6 @@ class PhoneCommService : WearableListenerService(), MessageClient.OnMessageRecei
                     inner(node)
                 }
             }
-        }
     }
 
     private fun isForegrounded(): Boolean {
