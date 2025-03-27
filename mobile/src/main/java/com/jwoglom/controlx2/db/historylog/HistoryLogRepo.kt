@@ -3,7 +3,6 @@ package com.jwoglom.controlx2.db.historylog
 import androidx.annotation.WorkerThread
 import com.jwoglom.pumpx2.pump.messages.response.historyLog.HistoryLog
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.flatMapLatest
 import timber.log.Timber
 import java.time.LocalDateTime
 import java.time.ZoneId
@@ -24,6 +23,10 @@ class HistoryLogRepo(private val historyLogDao: HistoryLogDao) {
 
     fun getLatestForType(pumpSid: Int, typeId: Int): Flow<HistoryLogItem?> {
         return historyLogDao.getLatestForType(pumpSid, typeId)
+    }
+
+    fun getLatestItemsForType(pumpSid: Int, typeId: Int, maxItems: Int): Flow<List<HistoryLogItem>> {
+        return historyLogDao.getLatestItemsForType(pumpSid, typeId, maxItems)
     }
 
     fun allForType(pumpSid: Int, typeId: Int): Flow<List<HistoryLogItem>> {

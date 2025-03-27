@@ -5,6 +5,8 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.asLiveData
 import androidx.lifecycle.viewModelScope
+import com.jwoglom.pumpx2.pump.messages.response.historyLog.HistoryLog
+import com.jwoglom.pumpx2.pump.messages.response.historyLog.HistoryLogParser.LOG_MESSAGE_CLASS_TO_ID
 import kotlinx.coroutines.launch
 import timber.log.Timber
 
@@ -18,9 +20,18 @@ class HistoryLogViewModel(private val repo: HistoryLogRepo, private val pumpSid:
         return repo.getLatestForType(pumpSid, typeId).asLiveData()
     }
 
+    fun latestItemsForType(typeId: Int, maxItems: Int): LiveData<List<HistoryLogItem>> {
+        return repo.getLatestItemsForType(pumpSid, typeId, maxItems).asLiveData()
+    }
+
+    fun latestItemsForType(typeClass: Class<out HistoryLog>, maxItems: Int): LiveData<List<HistoryLogItem>> {
+        return latestItemsForType(LOG_MESSAGE_CLASS_TO_ID[typeClass]!!, maxItems)
+    }
+
     fun insert(historyLogItem: HistoryLogItem) = viewModelScope.launch {
         repo.insert(historyLogItem)
     }
+
 }
 
 class HistoryLogViewModelFactory(private val repo: HistoryLogRepo, private val pumpSid: Int) : ViewModelProvider.Factory {

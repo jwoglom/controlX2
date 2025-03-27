@@ -47,6 +47,16 @@ interface HistoryLogDao {
     """)
     fun getAllForType(pumpSid: Int, typeId: Int): Flow<List<HistoryLogItem>>
 
+
+    @Query("""
+        SELECT * FROM $HistoryLogTable
+        WHERE pumpSid = :pumpSid
+        AND typeId = :typeId
+        ORDER BY seqId DESC
+        LIMIT :maxItems
+    """)
+    fun getLatestItemsForType(pumpSid: Int, typeId: Int, maxItems: Int): Flow<List<HistoryLogItem>>
+
     @Query("""
         SELECT * FROM $HistoryLogTable
         WHERE pumpSid = :pumpSid

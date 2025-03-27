@@ -6,6 +6,7 @@ import androidx.room.Ignore
 import com.jwoglom.pumpx2.pump.messages.response.historyLog.HistoryLog
 import com.jwoglom.pumpx2.pump.messages.response.historyLog.HistoryLogParser
 import java.time.LocalDateTime
+import java.time.ZoneId
 
 val itemLruCache = LruCache<Pair<Long, Int>, HistoryLog>(500)
 
@@ -22,8 +23,17 @@ class HistoryLogItem(
     val typeId: Int,
     val cargo: ByteArray,
     val pumpTime: LocalDateTime,
-    val addedTime: LocalDateTime
+    val addedTime: LocalDateTime = LocalDateTime.now()
 ) {
+
+    constructor(message: HistoryLog, addedTime: LocalDateTime = LocalDateTime.now()) : this(
+        seqId=message.sequenceNum,
+        pumpSid=0,
+        typeId=message.typeId(),
+        cargo=message.cargo,
+        pumpTime=LocalDateTime.ofInstant(message.pumpTimeSecInstant, ZoneId.systemDefault()),
+        addedTime=addedTime
+    )
 
     @Ignore
     fun parse(): HistoryLog {

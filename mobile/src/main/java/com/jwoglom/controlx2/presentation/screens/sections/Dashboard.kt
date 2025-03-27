@@ -54,6 +54,7 @@ import com.jwoglom.controlx2.presentation.components.Line
 import com.jwoglom.controlx2.presentation.components.PumpSetupStageDescription
 import com.jwoglom.controlx2.presentation.components.PumpSetupStageProgress
 import com.jwoglom.controlx2.presentation.components.ServiceDisabledMessage
+import com.jwoglom.controlx2.presentation.screens.sections.components.DashboardCgmChart
 import com.jwoglom.controlx2.presentation.screens.sections.components.PumpStatusBar
 import com.jwoglom.controlx2.presentation.screens.setUpPreviewState
 import com.jwoglom.controlx2.presentation.theme.ControlX2Theme
@@ -195,6 +196,10 @@ fun Dashboard(
                         } ${cgmDeltaArrow.value ?: ""}",
                         style = MaterialTheme.typography.displayMedium,
                     )
+                }
+                
+                item {
+                    DashboardCgmChart(historyLogViewModel)
                 }
 
                 item {

@@ -112,6 +112,10 @@ dependencies {
     implementation 'androidx.compose.runtime:runtime-livedata:1.7.8'
 
 
+    // charts
+    implementation("io.github.dautovicharis:charts:2.0.0")
+
+
     // https://issuetracker.google.com/issues/227767363
     debugImplementation "androidx.customview:customview:1.2.0-alpha02"
     debugImplementation "androidx.customview:customview-poolingcontainer:1.0.0"
