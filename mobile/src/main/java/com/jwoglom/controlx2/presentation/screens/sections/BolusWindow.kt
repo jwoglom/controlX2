@@ -86,10 +86,12 @@ import com.jwoglom.controlx2.shared.util.SendType
 import com.jwoglom.controlx2.shared.util.snakeCaseToSpace
 import com.jwoglom.controlx2.shared.util.twoDecimalPlaces
 import com.jwoglom.controlx2.shared.util.twoDecimalPlaces1000Unit
+import com.jwoglom.pumpx2.pump.messages.bluetooth.PumpStateSupplier
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import timber.log.Timber
+import java.util.function.Supplier
 
 @Composable
 fun BolusWindow(
@@ -975,6 +977,7 @@ fun rawToInt(s: String?): Int? {
 
 fun resetBolusDataStoreState(dataStore: DataStore) {
     Timber.d("bolusCalc resetBolusDataStoreState")
+    PumpStateSupplier.inProgressBolusId = Supplier { null }
     dataStore.bolusPermissionResponse.value = null
     dataStore.bolusCancelResponse.value = null
     dataStore.bolusInitiateResponse.value = null

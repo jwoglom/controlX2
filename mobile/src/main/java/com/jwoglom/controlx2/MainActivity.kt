@@ -55,6 +55,7 @@ import com.jwoglom.controlx2.shared.util.twoDecimalPlaces1000Unit
 import com.jwoglom.controlx2.util.extractPumpSid
 import com.jwoglom.pumpx2.pump.PumpState
 import com.jwoglom.pumpx2.pump.messages.Message
+import com.jwoglom.pumpx2.pump.messages.bluetooth.PumpStateSupplier
 import com.jwoglom.pumpx2.pump.messages.builders.IDPManager
 import com.jwoglom.pumpx2.pump.messages.calculator.BolusCalcUnits
 import com.jwoglom.pumpx2.pump.messages.calculator.BolusParameters
@@ -102,6 +103,7 @@ import timber.log.Timber
 import java.time.Instant
 import java.time.temporal.ChronoUnit
 import java.util.Objects
+import java.util.function.Supplier
 import kotlin.system.exitProcess
 
 
@@ -772,6 +774,7 @@ class MainActivity : ComponentActivity(), MessageClient.OnMessageReceivedListene
             }
             is BolusPermissionResponse -> {
                 dataStore.bolusPermissionResponse.value = message
+                PumpStateSupplier.inProgressBolusId = Supplier { message.bolusId }
             }
             is RemoteCarbEntryResponse -> {
                 dataStore.bolusCarbEntryResponse.value = message
@@ -782,6 +785,7 @@ class MainActivity : ComponentActivity(), MessageClient.OnMessageReceivedListene
             is CancelBolusResponse -> {
                 if (dataStore.bolusCancelResponse.value == null || message.wasCancelled()) {
                     dataStore.bolusCancelResponse.value = message
+                    PumpStateSupplier.inProgressBolusId = Supplier { null }
                 } else {
                     Timber.w("skipping population of bolusCancelResponse: $message because a successful cancellation already existed in the state: ${dataStore.bolusCancelResponse.value}");
                 }

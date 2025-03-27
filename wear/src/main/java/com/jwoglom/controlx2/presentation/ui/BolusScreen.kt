@@ -86,6 +86,7 @@ import com.jwoglom.controlx2.shared.util.firstLetterCapitalized
 import com.jwoglom.controlx2.shared.util.snakeCaseToSpace
 import com.jwoglom.controlx2.shared.util.twoDecimalPlaces
 import com.jwoglom.controlx2.shared.util.twoDecimalPlaces1000Unit
+import com.jwoglom.pumpx2.pump.messages.bluetooth.PumpStateSupplier
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext

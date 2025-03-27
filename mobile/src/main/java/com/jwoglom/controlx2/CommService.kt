@@ -48,6 +48,7 @@ import com.jwoglom.pumpx2.pump.bluetooth.TandemPumpFinder
 import com.jwoglom.pumpx2.pump.messages.Packetize
 import com.jwoglom.pumpx2.pump.messages.bluetooth.Characteristic
 import com.jwoglom.pumpx2.pump.messages.bluetooth.CharacteristicUUID
+import com.jwoglom.pumpx2.pump.messages.bluetooth.PumpStateSupplier
 import com.jwoglom.pumpx2.pump.messages.builders.CurrentBatteryRequestBuilder
 import com.jwoglom.pumpx2.pump.messages.helpers.Bytes
 import com.jwoglom.pumpx2.pump.messages.models.ApiVersion
@@ -63,7 +64,10 @@ import com.jwoglom.pumpx2.pump.messages.request.currentStatus.InsulinStatusReque
 import com.jwoglom.pumpx2.pump.messages.request.currentStatus.TimeSinceResetRequest
 import com.jwoglom.pumpx2.pump.messages.response.authentication.AbstractCentralChallengeResponse
 import com.jwoglom.pumpx2.pump.messages.response.authentication.AbstractPumpChallengeResponse
+import com.jwoglom.pumpx2.pump.messages.response.control.BolusPermissionReleaseResponse
+import com.jwoglom.pumpx2.pump.messages.response.control.BolusPermissionResponse
 import com.jwoglom.pumpx2.pump.messages.response.control.InitiateBolusResponse
+import com.jwoglom.pumpx2.pump.messages.response.currentStatus.BolusCalcDataSnapshotResponse
 import com.jwoglom.pumpx2.pump.messages.response.currentStatus.ControlIQIOBResponse
 import com.jwoglom.pumpx2.pump.messages.response.currentStatus.CurrentBasalStatusResponse
 import com.jwoglom.pumpx2.pump.messages.response.currentStatus.CurrentBatteryAbstractResponse
@@ -88,6 +92,7 @@ import java.security.Security
 import java.time.Duration
 import java.time.Instant
 import java.util.Collections
+import java.util.function.Supplier
 
 
 const val CacheSeconds = 30
@@ -161,6 +166,9 @@ class CommService : WearableListenerService(), MessageClient.OnMessageReceivedLi
                 when (message) {
                     is TimeSinceResetResponse -> onReceiveTimeSinceResetResponse(message)
                     is InitiateBolusResponse -> onReceiveInitiateBolusResponse(message)
+                    is BolusPermissionResponse -> {
+                        PumpStateSupplier.inProgressBolusId = Supplier { message.bolusId }
+                    }
                     is CurrentBatteryAbstractResponse -> DataClientState(context).pumpBattery = Pair("${message.batteryPercent}", Instant.now())
                     is ControlIQIOBResponse -> DataClientState(context).pumpIOB = Pair("${InsulinUnit.from1000To1(message.pumpDisplayedIOB)}", Instant.now())
                     is InsulinStatusResponse -> DataClientState(context).pumpCartridgeUnits = Pair("${message.currentInsulinAmount}", Instant.now())
@@ -193,9 +201,9 @@ class CommService : WearableListenerService(), MessageClient.OnMessageReceivedLi
                 Timber.i("onReceiveQualifyingEvent: $events")
                 Toast.makeText(this@CommService, "Events: $events", Toast.LENGTH_SHORT).show()
                 events?.forEach { event ->
-                    event.suggestedHandlers.forEach {
-                        Timber.i("onReceiveQualifyingEvent: running handler for $event message: ${it.get()}")
-                        command(it.get())
+                    event.suggestedHandlers.forEach { handler ->
+                        Timber.i("onReceiveQualifyingEvent: running handler for $event message: ${handler.get()}")
+                        handler.get()?.let { command(it) }
                     }
                 }
                 sendWearCommMessage("/from-pump/receive-qualifying-event", PumpQualifyingEventsSerializer.toBytes(events))
