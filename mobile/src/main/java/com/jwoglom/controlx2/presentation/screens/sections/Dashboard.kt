@@ -65,7 +65,8 @@ import com.jwoglom.controlx2.shared.presentation.intervalOf
 import com.jwoglom.controlx2.shared.util.SendType
 import com.jwoglom.pumpx2.pump.messages.models.NotificationBundle
 import com.jwoglom.pumpx2.pump.messages.request.currentStatus.HistoryLogStatusRequest
-import com.jwoglom.pumpx2.pump.messages.response.historyLog.CGMHistoryLog
+import com.jwoglom.pumpx2.pump.messages.response.historyLog.DexcomG6CGMHistoryLog
+import com.jwoglom.pumpx2.pump.messages.response.historyLog.DexcomG7CGMHistoryLog
 import com.jwoglom.pumpx2.pump.messages.response.historyLog.HistoryLogParser.LOG_MESSAGE_IDS
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.cancel
@@ -319,9 +320,14 @@ fun Dashboard(
                 }
 
                 item {
-                    val latestHistoryLog = historyLogViewModel?.latestForType(CGMHistoryLog().typeId())?.observeAsState()
-                    Line(latestHistoryLog?.value?.let {
-                        "Latest CGM history log reading: ${it.seqId}: ${LOG_MESSAGE_IDS[it.typeId]?.let { m -> shortPumpMessageTitle(m)}} (${it.typeId}) at ${it.addedTime}: ${(it.parse() as CGMHistoryLog).currentGlucoseDisplayValue}mgdl"
+                    val latestG6Reading = historyLogViewModel?.latestForType(DexcomG6CGMHistoryLog().typeId())?.observeAsState()
+                    Line(latestG6Reading?.value?.let {
+                        "Latest G6 history log reading: ${it.seqId}: ${LOG_MESSAGE_IDS[it.typeId]?.let { m -> shortPumpMessageTitle(m)}} (${it.typeId}) at ${it.addedTime}: ${(it.parse() as DexcomG6CGMHistoryLog).currentGlucoseDisplayValue}mgdl"
+                    } ?: "")
+
+                    val latestG7Reading = historyLogViewModel?.latestForType(DexcomG7CGMHistoryLog().typeId())?.observeAsState()
+                    Line(latestG7Reading?.value?.let {
+                        "Latest G7 history log reading: ${it.seqId}: ${LOG_MESSAGE_IDS[it.typeId]?.let { m -> shortPumpMessageTitle(m)}} (${it.typeId}) at ${it.addedTime}: ${(it.parse() as DexcomG7CGMHistoryLog).currentGlucoseDisplayValue}mgdl"
                     } ?: "")
                 }
             }

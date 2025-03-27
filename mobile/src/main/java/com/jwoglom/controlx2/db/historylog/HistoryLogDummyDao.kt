@@ -33,6 +33,12 @@ class HistoryLogDummyDao(val data: MutableList<HistoryLogItem>) : HistoryLogDao 
             .take(maxItems)
     )
 
+    override fun getLatestItemsForTypes(pumpSid: Int, typeIds: List<Int>, maxItems: Int): Flow<List<HistoryLogItem>> = flowOf(
+        data.filter { it.pumpSid == pumpSid && it.typeId in typeIds }
+            .sortedByDescending { it.seqId }
+            .take(maxItems)
+    )
+
     override fun getRange(pumpSid: Int, seqIdMin: Long, seqIdMax: Long): Flow<List<HistoryLogItem>> = flowOf(
         data.filter { it.pumpSid == pumpSid && it.seqId in seqIdMin..seqIdMax }
             .sortedBy { it.seqId }

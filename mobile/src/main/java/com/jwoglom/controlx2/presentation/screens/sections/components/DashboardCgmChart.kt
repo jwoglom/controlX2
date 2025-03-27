@@ -1,7 +1,6 @@
 package com.jwoglom.controlx2.presentation.screens.sections.components
 
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.material3.Surface
@@ -21,13 +20,19 @@ import com.jwoglom.controlx2.presentation.components.Line
 import com.jwoglom.controlx2.presentation.screens.setUpPreviewState
 import com.jwoglom.controlx2.presentation.theme.ControlX2Theme
 import com.jwoglom.controlx2.presentation.util.FixedHeightContainer
-import com.jwoglom.pumpx2.pump.messages.response.historyLog.CGMHistoryLog
+import com.jwoglom.pumpx2.pump.messages.response.historyLog.DexcomG6CGMHistoryLog
+import com.jwoglom.pumpx2.pump.messages.response.historyLog.DexcomG7CGMHistoryLog
 import com.jwoglom.pumpx2.pump.messages.response.historyLog.HistoryLog
-import com.jwoglom.pumpx2.pump.messages.response.historyLog.HistoryLogParser.LOG_MESSAGE_CLASS_TO_ID
 import io.github.dautovicharis.charts.LineChart
 import io.github.dautovicharis.charts.model.toMultiChartDataSet
 import io.github.dautovicharis.charts.style.ChartViewDefaults
 import io.github.dautovicharis.charts.style.LineChartDefaults
+
+val CgmReadingHistoryLogs = listOf(
+    DexcomG6CGMHistoryLog::class.java,
+    DexcomG7CGMHistoryLog::class.java
+
+)
 
 @Composable
 fun DashboardCgmChart(
@@ -35,12 +40,18 @@ fun DashboardCgmChart(
     width: Dp = 400.dp,
     height: Dp = 300.dp
 ) {
-    val cgmData = historyLogViewModel?.latestItemsForType(
-        CGMHistoryLog::class.java,
+    val cgmData = historyLogViewModel?.latestItemsForTypes(
+        CgmReadingHistoryLogs,
         100
     )?.observeAsState()
 
-    val cgmValues = (cgmData?.value?.map { (it.parse() as CGMHistoryLog).currentGlucoseDisplayValue.toFloat() } ?: listOf()).asReversed()
+    val cgmValues = (cgmData?.value?.map { dao ->
+        when (val it = dao.parse()) {
+            is DexcomG6CGMHistoryLog -> it.currentGlucoseDisplayValue.toFloat()
+            is DexcomG7CGMHistoryLog -> it.currentGlucoseDisplayValue.toFloat()
+            else -> 0f
+        }
+    } ?: listOf()).asReversed()
     val dataSet = listOf(
         "CGM" to cgmValues,
         "High target" to (1..cgmValues.size).map { 200f },
@@ -76,7 +87,7 @@ fun DashboardCgmChart(
 }
 
 private fun cgmEntry(index: Int, mgdl: Int): HistoryLog {
-    return CGMHistoryLog(
+    return DexcomG6CGMHistoryLog(
             446191545L + index, index.toLong(),
             0, 1, -2, 6, -89,
             mgdl,

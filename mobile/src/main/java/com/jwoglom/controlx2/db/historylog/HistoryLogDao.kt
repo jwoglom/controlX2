@@ -60,6 +60,15 @@ interface HistoryLogDao {
     @Query("""
         SELECT * FROM $HistoryLogTable
         WHERE pumpSid = :pumpSid
+        AND typeId IN(:typeIds)
+        ORDER BY seqId DESC
+        LIMIT :maxItems
+    """)
+    fun getLatestItemsForTypes(pumpSid: Int, typeIds: List<Int>, maxItems: Int): Flow<List<HistoryLogItem>>
+
+    @Query("""
+        SELECT * FROM $HistoryLogTable
+        WHERE pumpSid = :pumpSid
         AND seqId BETWEEN :seqIdMin AND :seqIdMax
         ORDER BY seqId ASC
     """)
