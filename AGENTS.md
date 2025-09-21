@@ -21,6 +21,33 @@ This document summarizes the structure, design, and common workflows inside the 
   - `./gradlew :shared:lintDebug` runs lint on the shared code; `:mobile:lintDebug` and `:wear:lintDebug` catch Compose/manifest issues for each app.
   - `./gradlew testDebugUnitTest` executes JVM unit tests across modules (there are few today, but the task guards against regressions when new ones are added).
   - `./gradlew :mobile:connectedDebugAndroidTest` (or `:wear:connectedDebugAndroidTest`) runs instrumentation tests; requires an attached device/emulator with the service enabled.
+- Command-line prerequisites when running inside the Codex container:
+  1. Install the Android command-line tools into `/opt/android-sdk`:
+     ```bash
+     cd /opt
+     mkdir -p android-sdk
+     cd android-sdk
+     wget https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip
+     unzip commandlinetools-linux-11076708_latest.zip
+     mv cmdline-tools cmdline-tools_tmp
+     mkdir -p cmdline-tools/latest
+     mv cmdline-tools_tmp/* cmdline-tools/latest/
+     rm -rf cmdline-tools_tmp commandlinetools-linux-11076708_latest.zip
+     ```
+  2. Install the required SDK packages and accept licenses:
+     ```bash
+     export ANDROID_SDK_ROOT=/opt/android-sdk
+     export ANDROID_HOME=/opt/android-sdk
+     yes | /opt/android-sdk/cmdline-tools/latest/bin/sdkmanager --install \
+       "platform-tools" "platforms;android-35" "build-tools;35.0.0"
+     yes | /opt/android-sdk/cmdline-tools/latest/bin/sdkmanager --licenses
+     ```
+  3. Ensure a `local.properties` file exists in the repo root (it is git-ignored) pointing at the SDK and keeping remote PumpX2 artifacts enabled:
+     ```properties
+     sdk.dir=/opt/android-sdk
+     use_local_pumpx2=false
+     ```
+  4. Run tests from the repo root with `./gradlew testDebugUnitTest --console=plain`. The `--console=plain` flag avoids spinner output that can overflow the execution log.
 - Compose previews are heavily relied upon for iteration. Use `setUpPreviewState` (mobile) or the preview helpers inside wear UI files to seed fake data—this prevents Compose previews from crashing when new observable fields are introduced.
 - When PumpX2 artifacts change, clear Gradle caches with `./gradlew --stop && ./gradlew clean` or `./gradlew build --refresh-dependencies` before rebuilding so the new protocol definitions flow through to both apps.
 
