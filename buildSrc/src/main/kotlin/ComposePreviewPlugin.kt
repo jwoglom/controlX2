@@ -2,12 +2,12 @@ package com.jwoglom.controlx2.build.compose
 
 import com.android.build.api.variant.AndroidComponentsExtension
 import java.util.Locale
+import java.util.concurrent.atomic.AtomicBoolean
 import org.gradle.api.Plugin
 import org.gradle.api.Project
 import org.gradle.api.Task
 import org.gradle.api.tasks.TaskProvider
 import org.gradle.kotlin.dsl.register
-import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 
 class ComposePreviewPlugin : Plugin<Project> {
     override fun apply(project: Project) {
@@ -28,11 +28,33 @@ class ComposePreviewPlugin : Plugin<Project> {
         aggregateRender.configure { dependsOn(aggregateMetadata) }
 
         project.pluginManager.withPlugin("com.android.application") {
-            configureAndroidVariants(project, aggregateMetadata, aggregateRender)
+            configureWhenKotlinReady(project, aggregateMetadata, aggregateRender)
         }
         project.pluginManager.withPlugin("com.android.library") {
-            configureAndroidVariants(project, aggregateMetadata, aggregateRender)
+            configureWhenKotlinReady(project, aggregateMetadata, aggregateRender)
         }
+    }
+
+    private fun configureWhenKotlinReady(
+        project: Project,
+        aggregateMetadata: TaskProvider<Task>,
+        aggregateRender: TaskProvider<Task>
+    ) {
+        val configured = AtomicBoolean(false)
+        val configureIfNeeded = {
+            if (configured.compareAndSet(false, true)) {
+                configureAndroidVariants(project, aggregateMetadata, aggregateRender)
+            }
+        }
+
+        val pluginManager = project.pluginManager
+        if (pluginManager.hasPlugin("org.jetbrains.kotlin.android") || pluginManager.hasPlugin("kotlin-android")) {
+            configureIfNeeded()
+            return
+        }
+
+        pluginManager.withPlugin("org.jetbrains.kotlin.android") { configureIfNeeded() }
+        pluginManager.withPlugin("kotlin-android") { configureIfNeeded() }
     }
 
     private fun configureAndroidVariants(
@@ -68,14 +90,17 @@ class ComposePreviewPlugin : Plugin<Project> {
         }
 
         val kotlinCompileTaskName = "compile${taskSuffix}Kotlin"
-        val kotlinCompileTask = project.tasks.named(kotlinCompileTaskName, KotlinCompile::class.java)
+        val javaCompileTaskName = "compile${taskSuffix}JavaWithJavac"
+        val kotlinClassesDir = project.layout.buildDirectory.dir("tmp/kotlin-classes/$variantName")
+        val javaClassesDir = project.layout.buildDirectory.dir("intermediates/javac/$variantName/classes")
 
         collectTask.configure {
-            classDirectories.from(kotlinCompileTask.flatMap { it.destinationDirectory })
-            classDirectories.from(
-                project.layout.buildDirectory.dir("intermediates/javac/$variantName/classes")
-            )
-            dependsOn(kotlinCompileTask)
+            classDirectories.from(kotlinClassesDir.map { it.asFile })
+            classDirectories.from(javaClassesDir.map { it.asFile })
+            dependsOn(kotlinCompileTaskName)
+            if (project.tasks.names.contains(javaCompileTaskName)) {
+                dependsOn(javaCompileTaskName)
+            }
         }
 
         val renderTask = project.tasks.register<RenderComposePreviewsTask>(
