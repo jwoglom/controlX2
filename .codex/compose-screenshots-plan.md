@@ -8,7 +8,8 @@
 
 ## Current Status
 - ✅ Bootstrapped a `buildSrc` Gradle convention plugin that registers placeholder metadata and rendering tasks, plus aggregate entry points (`collectAllComposePreviewMetadata`, `renderAllComposePreviews`). The plugin is applied to the `mobile` module so contributors can begin invoking the scaffolding; tasks currently emit placeholder JSON/marker files instead of real preview assets.
-- ⬜ Replace the placeholder task implementations with actual Compose preview discovery and rendering.
+- 🟡 Replace the placeholder task implementations with actual Compose preview discovery and rendering. (Discovery task now scans
+  compiled classes to enumerate `@Preview`-annotated composables; rendering still pending.)
 - ⬜ Author local helper scripts and CI automation (artifact upload + PR comment).
 
 ## Recommended Technical Approach

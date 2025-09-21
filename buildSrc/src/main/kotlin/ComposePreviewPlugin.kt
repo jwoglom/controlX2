@@ -7,6 +7,7 @@ import org.gradle.api.Project
 import org.gradle.api.Task
 import org.gradle.api.tasks.TaskProvider
 import org.gradle.kotlin.dsl.register
+import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 
 class ComposePreviewPlugin : Plugin<Project> {
     override fun apply(project: Project) {
@@ -64,6 +65,17 @@ class ComposePreviewPlugin : Plugin<Project> {
             outputFile.set(
                 project.layout.buildDirectory.file("composePreviews/$variantName/metadata.json")
             )
+        }
+
+        val kotlinCompileTaskName = "compile${taskSuffix}Kotlin"
+        val kotlinCompileTask = project.tasks.named(kotlinCompileTaskName, KotlinCompile::class.java)
+
+        collectTask.configure {
+            classDirectories.from(kotlinCompileTask.flatMap { it.destinationDirectory })
+            classDirectories.from(
+                project.layout.buildDirectory.dir("intermediates/javac/$variantName/classes")
+            )
+            dependsOn(kotlinCompileTask)
         }
 
         val renderTask = project.tasks.register<RenderComposePreviewsTask>(
