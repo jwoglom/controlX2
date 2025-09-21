@@ -6,6 +6,11 @@
 - Automatically post a PR comment summarizing previews with collapsible sections, one per composable/component, each containing its associated images.
 - Ensure the workflow is reproducible locally so contributors can validate previews prior to pushing changes.
 
+## Current Status
+- ✅ Bootstrapped a `buildSrc` Gradle convention plugin that registers placeholder metadata and rendering tasks, plus aggregate entry points (`collectAllComposePreviewMetadata`, `renderAllComposePreviews`). The plugin is applied to the `mobile` module so contributors can begin invoking the scaffolding; tasks currently emit placeholder JSON/marker files instead of real preview assets.
+- ⬜ Replace the placeholder task implementations with actual Compose preview discovery and rendering.
+- ⬜ Author local helper scripts and CI automation (artifact upload + PR comment).
+
 ## Recommended Technical Approach
 
 ### 1. Render previews off-device using Compose tooling
@@ -89,7 +94,7 @@ If direct usage of `PreviewRenderer` proves brittle, Square's [Paparazzi](https:
 - **Security**: PR comment posting requires `GITHUB_TOKEN` with `pull-requests: write` scope. Ensure the workflow uses the default token and handles forks by running the commenting step only on trusted contexts (e.g., via `if: github.event.pull_request.head.repo.fork == false`).
 
 ## Next Steps
-1. Prototype the Gradle preview renderer locally, starting with the `mobile` module to validate metadata discovery and PNG output.
+1. ✅ Prototype the Gradle preview tooling scaffolding by introducing a `buildSrc` convention plugin for the `mobile` module (placeholder metadata/render tasks + aggregate entry points). Next iteration: replace the placeholders with real metadata discovery and rendering that produces preview assets.
 2. Extend the plugin to handle the `wear` module and generate a consolidated manifest for PR consumption.
 3. Author scripts for Markdown generation and integrate with GitHub Actions as outlined.
 4. Run the preview rendering command locally as proof-of-concept, then open the implementation PR with CI validation.
