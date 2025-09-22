@@ -7,7 +7,7 @@
 - Ensure the workflow is reproducible locally so contributors can validate previews prior to pushing changes.
 
 ## Current Status
-- ✅ Bootstrapped a `buildSrc` Gradle convention plugin that registers metadata collection and rendering tasks, plus aggregate entry points (`collectAllComposePreviewMetadata`, `renderAllComposePreviews`). The plugin is applied to the `mobile` module so contributors can begin invoking the scaffolding; metadata collection emits structured JSON describing each preview while the render task now produces deterministic filenames, placeholder PNG assets, and a manifest for downstream automation.
+- ✅ Bootstrapped a `buildSrc` Gradle convention plugin that registers metadata collection and rendering tasks, plus aggregate entry points (`collectAllComposePreviewMetadata`, `renderAllComposePreviews`). The plugin is applied to the `mobile` module so contributors can begin invoking the scaffolding; metadata collection emits structured JSON describing each preview while the render task now produces deterministic filenames, placeholder PNG assets, and a manifest for downstream automation. The placeholder renderer now compiles cleanly after swapping metadata parsing to `Json.decodeFromString` and hoisting JSON summary helpers out of nested data classes.
 - 🟡 Replace the placeholder task implementations with actual Compose preview discovery and rendering. Discovery already scans compiled classes to enumerate `@Preview`-annotated composables and the renderer consumes that metadata to emit placeholder outputs; wiring in the real Compose renderer (or Paparazzi) to capture true UI imagery remains outstanding.
 - ⬜ Author local helper scripts and CI automation (artifact upload + PR comment).
 

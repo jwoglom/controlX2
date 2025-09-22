@@ -15,12 +15,12 @@ import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
-import kotlinx.serialization.json.parseToJsonElement
 import kotlinx.serialization.json.put
 import org.gradle.api.DefaultTask
 import org.gradle.api.file.DirectoryProperty
@@ -123,7 +123,7 @@ abstract class RenderComposePreviewsTask : DefaultTask() {
         val jsonText = file.readText()
         val json = Json { ignoreUnknownKeys = true }
         val root = try {
-            json.parseToJsonElement(jsonText).jsonObject
+            json.decodeFromString<JsonObject>(jsonText)
         } catch (exception: Exception) {
             throw IllegalStateException(
                 "Unable to parse Compose preview metadata at ${file.absolutePath}",
@@ -514,15 +514,6 @@ abstract class RenderComposePreviewsTask : DefaultTask() {
         val bodyLines: List<String>
     )
 
-    private fun JsonElement.toSummaryString(): String = when (this) {
-        is JsonPrimitive -> if (isString) content else content
-        is JsonObject -> entries
-            .sortedBy { it.key }
-            .joinToString(prefix = "{", postfix = "}") { (key, value) -> "$key=${value.toSummaryString()}" }
-        is JsonArray -> joinToString(prefix = "[", postfix = "]") { it.toSummaryString() }
-        else -> toString()
-    }
-
     private companion object {
         private const val HEADLESS_PROPERTY = "java.awt.headless"
         private const val PLACEHOLDER_WIDTH = 1200
@@ -540,4 +531,13 @@ abstract class RenderComposePreviewsTask : DefaultTask() {
         private val UNDERSCORE_RUN_REGEX = "_+".toRegex()
         private val WHITESPACE_REGEX = "\\s+".toRegex()
     }
+}
+
+private fun JsonElement.toSummaryString(): String = when (this) {
+    is JsonPrimitive -> if (isString) "\"$content\"" else content
+    is JsonObject -> entries
+        .sortedBy { it.key }
+        .joinToString(prefix = "{", postfix = "}") { (key, value) -> "$key=${value.toSummaryString()}" }
+    is JsonArray -> joinToString(prefix = "[", postfix = "]") { it.toSummaryString() }
+    else -> toString()
 }
