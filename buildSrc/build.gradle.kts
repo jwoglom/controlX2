@@ -16,4 +16,5 @@ dependencies {
     compileOnly("com.android.tools.build:gradle:8.8.2")
     implementation("org.ow2.asm:asm:9.7")
     compileOnly("org.jetbrains.kotlin:kotlin-gradle-plugin:2.1.10")
+    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3")
 }

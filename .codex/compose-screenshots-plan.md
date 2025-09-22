@@ -7,9 +7,8 @@
 - Ensure the workflow is reproducible locally so contributors can validate previews prior to pushing changes.
 
 ## Current Status
-- ✅ Bootstrapped a `buildSrc` Gradle convention plugin that registers placeholder metadata and rendering tasks, plus aggregate entry points (`collectAllComposePreviewMetadata`, `renderAllComposePreviews`). The plugin is applied to the `mobile` module so contributors can begin invoking the scaffolding; tasks currently emit placeholder JSON/marker files instead of real preview assets.
-- 🟡 Replace the placeholder task implementations with actual Compose preview discovery and rendering. (Discovery task now scans
-  compiled classes to enumerate `@Preview`-annotated composables; rendering still pending.)
+- ✅ Bootstrapped a `buildSrc` Gradle convention plugin that registers metadata collection and rendering tasks, plus aggregate entry points (`collectAllComposePreviewMetadata`, `renderAllComposePreviews`). The plugin is applied to the `mobile` module so contributors can begin invoking the scaffolding; metadata collection emits structured JSON describing each preview while the render task now produces deterministic filenames, placeholder PNG assets, and a manifest for downstream automation.
+- 🟡 Replace the placeholder task implementations with actual Compose preview discovery and rendering. Discovery already scans compiled classes to enumerate `@Preview`-annotated composables and the renderer consumes that metadata to emit placeholder outputs; wiring in the real Compose renderer (or Paparazzi) to capture true UI imagery remains outstanding.
 - ⬜ Author local helper scripts and CI automation (artifact upload + PR comment).
 
 ## Recommended Technical Approach
@@ -95,7 +94,8 @@ If direct usage of `PreviewRenderer` proves brittle, Square's [Paparazzi](https:
 - **Security**: PR comment posting requires `GITHUB_TOKEN` with `pull-requests: write` scope. Ensure the workflow uses the default token and handles forks by running the commenting step only on trusted contexts (e.g., via `if: github.event.pull_request.head.repo.fork == false`).
 
 ## Next Steps
-1. ✅ Prototype the Gradle preview tooling scaffolding by introducing a `buildSrc` convention plugin for the `mobile` module (placeholder metadata/render tasks + aggregate entry points). Next iteration: replace the placeholders with real metadata discovery and rendering that produces preview assets.
-2. Extend the plugin to handle the `wear` module and generate a consolidated manifest for PR consumption.
-3. Author scripts for Markdown generation and integrate with GitHub Actions as outlined.
-4. Run the preview rendering command locally as proof-of-concept, then open the implementation PR with CI validation.
+1. ✅ Prototype the Gradle preview tooling scaffolding by introducing a `buildSrc` convention plugin for the `mobile` module (placeholder metadata/render tasks + aggregate entry points). Metadata collection now emits structured JSON and the render task provides deterministic placeholder PNGs plus a manifest for downstream tooling.
+2. 🔄 Replace the placeholder renderer with real Compose rendering (via `PreviewRenderer` or Paparazzi), wiring in module resources and runtime classpaths so previews produce actual UI imagery.
+3. Extend the plugin to handle the `wear` module and generate a consolidated manifest for PR consumption.
+4. Author scripts for Markdown generation and integrate with GitHub Actions as outlined.
+5. Run the preview rendering command locally as proof-of-concept, then open the implementation PR with CI validation.
