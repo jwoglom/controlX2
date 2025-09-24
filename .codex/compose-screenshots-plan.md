@@ -8,7 +8,7 @@
 
 ## Current Status
 - ✅ Bootstrapped a `buildSrc` Gradle convention plugin that registers metadata collection and rendering tasks, plus aggregate entry points (`collectAllComposePreviewMetadata`, `renderAllComposePreviews`). The plugin is applied to the `mobile` module so contributors can begin invoking the scaffolding; metadata collection emits structured JSON describing each preview while the render task now produces deterministic filenames, placeholder PNG assets, and a manifest for downstream automation. The placeholder renderer now compiles cleanly after swapping metadata parsing to `Json.decodeFromString` and hoisting JSON summary helpers out of nested data classes.
-- 🟡 Replace the placeholder task implementations with actual Compose preview discovery and rendering. Discovery already scans compiled classes to enumerate `@Preview`-annotated composables and the renderer consumes that metadata to emit placeholder outputs; wiring in the real Compose renderer (or Paparazzi) to capture true UI imagery remains outstanding.
+- 🟡 Replace the placeholder task implementations with actual Compose preview discovery and rendering. Discovery already scans compiled classes to enumerate `@Preview`-annotated composables and the renderer now uses Paparazzi to invoke Compose functions and write PNGs for both the mobile and wear modules. Parameterized previews are now expanded by instantiating their providers, and each invocation records manifest metadata (environment details, parameter descriptors, success/error state). Provider reflection now tolerates iterators, primitive arrays, and Java streams, and Paparazzi invocation reports clearer diagnostics when Compose runtime pieces are missing. Follow-up work focuses on verifying dependency resource harvesting, broadening device/theme coverage, and exercising end-to-end CI runs so the Paparazzi integration is production ready.
 - ⬜ Author local helper scripts and CI automation (artifact upload + PR comment).
 
 ## Recommended Technical Approach
@@ -95,7 +95,7 @@ If direct usage of `PreviewRenderer` proves brittle, Square's [Paparazzi](https:
 
 ## Next Steps
 1. ✅ Prototype the Gradle preview tooling scaffolding by introducing a `buildSrc` convention plugin for the `mobile` module (placeholder metadata/render tasks + aggregate entry points). Metadata collection now emits structured JSON and the render task provides deterministic placeholder PNGs plus a manifest for downstream tooling.
-2. 🔄 Replace the placeholder renderer with real Compose rendering (via `PreviewRenderer` or Paparazzi), wiring in module resources and runtime classpaths so previews produce actual UI imagery.
-3. Extend the plugin to handle the `wear` module and generate a consolidated manifest for PR consumption.
+2. ✅ Replace the placeholder renderer with real Compose rendering (via Paparazzi) so previews produce actual UI imagery. The renderer now instantiates composables via Compose reflection, drives Paparazzi with module resources/runtime classpaths, expands `@PreviewParameter` providers, and emits PNGs plus manifest metadata for each invocation.
+3. 🔄 Extend the plugin to handle the `wear` module and generate a consolidated manifest for PR consumption. The plugin now wires preview collection/rendering tasks for the wear app, but manifest consumers still need to reconcile multi-module outputs and validate resource/asset coverage across dependencies.
 4. Author scripts for Markdown generation and integrate with GitHub Actions as outlined.
 5. Run the preview rendering command locally as proof-of-concept, then open the implementation PR with CI validation.
