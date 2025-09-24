@@ -1389,11 +1389,6 @@ abstract class RenderComposePreviewsTask : DefaultTask() {
         return sanitized.ifBlank { "preview" }
     }
 
-    private fun Throwable.renderSummary(): String {
-        val messagePart = message?.takeIf { it.isNotBlank() }?.let { ": $it" } ?: ""
-        return "${this::class.java.simpleName}$messagePart"
-    }
-
     private class SingleImageSnapshotHandler(private val outputFile: File) : SnapshotHandler {
         override fun newFrameHandler(snapshot: Snapshot, frameCount: Int, fps: Int): SnapshotHandler.FrameHandler {
             return object : SnapshotHandler.FrameHandler {
@@ -1567,6 +1562,11 @@ private fun File.toPrettyPath(root: File): String = try {
 
 private fun Iterable<File>.toJsonArray(root: File): JsonArray =
     JsonArray(map { JsonPrimitive(it.toPrettyPath(root)) })
+
+private fun Throwable.renderSummary(): String {
+    val messagePart = message?.takeIf { it.isNotBlank() }?.let { ": $it" } ?: ""
+    return "${this::class.java.simpleName}$messagePart"
+}
 
 private fun Throwable.asRenderFailureMessage(): String {
     val target = (this as? InvocationTargetException)?.targetException ?: this
