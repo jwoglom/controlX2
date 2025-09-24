@@ -1,0 +1,66 @@
+name: Compose Preview Screenshots
+
+on:
+  pull_request:
+    branches: ["main", "dev"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  render:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: gradle
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+        with:
+          packages: |
+            platform-tools
+            build-tools;35.0.0
+            platforms;android-35
+
+      - name: Generate local.properties
+        run: |
+          cat <<'PROPS' > local.properties
+          sdk.dir=$ANDROID_SDK_ROOT
+          use_local_pumpx2=false
+          PROPS
+
+      - name: Render Compose previews
+        run: ./gradlew --stacktrace renderAllComposePreviews
+
+      - name: Generate Compose preview comment
+        run: |
+          python3 scripts/generate-compose-preview-comment.py \
+            --manifest build/composePreviews/aggregate/manifest.json \
+            --image-root $GITHUB_WORKSPACE \
+            --output build/composePreviews/aggregate/comment.md
+
+      - name: Upload Compose preview artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: compose-previews
+          path: build/composePreviews
+          if-no-files-found: error
+
+      - name: Post Compose preview comment
+        if: ${{ github.event_name == 'pull_request' }}
+        uses: peter-evans/create-or-update-comment@v3
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          issue-number: ${{ github.event.pull_request.number }}
+          body-path: build/composePreviews/aggregate/comment.md
+          comment-identifier: controlx2-compose-previews
