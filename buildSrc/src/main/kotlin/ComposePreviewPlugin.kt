@@ -30,25 +30,30 @@ class ComposePreviewPlugin : Plugin<Project> {
             description = "Renders Compose previews across all modules."
         )
 
+        val aggregateManifest = ensureAggregateManifestTask(rootProject)
+
         aggregateRender.configure { dependsOn(aggregateMetadata) }
+        aggregateManifest.configure { dependsOn(aggregateRender) }
+        aggregateRender.configure { finalizedBy(aggregateManifest) }
 
         project.pluginManager.withPlugin("com.android.application") {
-            configureWhenKotlinReady(project, aggregateMetadata, aggregateRender)
+            configureWhenKotlinReady(project, aggregateMetadata, aggregateRender, aggregateManifest)
         }
         project.pluginManager.withPlugin("com.android.library") {
-            configureWhenKotlinReady(project, aggregateMetadata, aggregateRender)
+            configureWhenKotlinReady(project, aggregateMetadata, aggregateRender, aggregateManifest)
         }
     }
 
     private fun configureWhenKotlinReady(
         project: Project,
         aggregateMetadata: TaskProvider<Task>,
-        aggregateRender: TaskProvider<Task>
+        aggregateRender: TaskProvider<Task>,
+        aggregateManifest: TaskProvider<AggregateComposePreviewManifestsTask>
     ) {
         val configured = AtomicBoolean(false)
         val configureIfNeeded = {
             if (configured.compareAndSet(false, true)) {
-                configureAndroidVariants(project, aggregateMetadata, aggregateRender)
+                configureAndroidVariants(project, aggregateMetadata, aggregateRender, aggregateManifest)
             }
         }
 
@@ -65,12 +70,13 @@ class ComposePreviewPlugin : Plugin<Project> {
     private fun configureAndroidVariants(
         project: Project,
         aggregateMetadata: TaskProvider<Task>,
-        aggregateRender: TaskProvider<Task>
+        aggregateRender: TaskProvider<Task>,
+        aggregateManifest: TaskProvider<AggregateComposePreviewManifestsTask>
     ) {
         val androidComponents = project.extensions.findByType(AndroidComponentsExtension::class.java) ?: return
 
         androidComponents.onVariants(androidComponents.selector().withBuildType("debug")) { variant ->
-            registerVariantTasks(project, variant, aggregateMetadata, aggregateRender)
+            registerVariantTasks(project, variant, aggregateMetadata, aggregateRender, aggregateManifest)
         }
     }
 
@@ -78,7 +84,8 @@ class ComposePreviewPlugin : Plugin<Project> {
         project: Project,
         variant: Variant,
         aggregateMetadata: TaskProvider<Task>,
-        aggregateRender: TaskProvider<Task>
+        aggregateRender: TaskProvider<Task>,
+        aggregateManifest: TaskProvider<AggregateComposePreviewManifestsTask>
     ) {
         val variantName = variant.name
         val taskSuffix = variantName.toTaskSuffix()
@@ -120,6 +127,7 @@ class ComposePreviewPlugin : Plugin<Project> {
             outputDirectory.set(
                 project.layout.buildDirectory.dir("composePreviews/$variantName/images")
             )
+            manifestFile.set(outputDirectory.map { it.file("manifest.json") })
         }
 
         val runtimeConfigurationName = "${variantName}RuntimeClasspath"
@@ -205,6 +213,16 @@ class ComposePreviewPlugin : Plugin<Project> {
         aggregateMetadata.configure { dependsOn(collectTask) }
         aggregateRender.configure { dependsOn(renderTask) }
         renderTask.configure { dependsOn(collectTask) }
+        aggregateManifest.configure {
+            manifestFiles.from(renderTask.flatMap { it.manifestFile })
+            expectedManifestPaths.addAll(
+                renderTask.flatMap { task ->
+                    task.manifestFile.map { file ->
+                        listOf(file.asFile.absoluteFile.normalize().path.replace(File.separatorChar, '/'))
+                    }
+                }
+            )
+        }
     }
 
     private fun ensureAggregateTask(
@@ -236,6 +254,33 @@ class ComposePreviewPlugin : Plugin<Project> {
     private companion object {
         const val TASK_GROUP = "compose previews"
         const val DEFAULT_COMPILE_SDK = 33
+    }
+
+    private fun ensureAggregateManifestTask(
+        rootProject: Project
+    ): TaskProvider<AggregateComposePreviewManifestsTask> {
+        val key = "controlx2.compose.aggregate.manifest"
+        val extra = rootProject.extensions.extraProperties
+        if (extra.has(key)) {
+            val existing = extra.get(key)
+            if (existing is TaskProvider<*>) {
+                @Suppress("UNCHECKED_CAST")
+                return existing as TaskProvider<AggregateComposePreviewManifestsTask>
+            }
+        }
+
+        val provider = rootProject.tasks.register<AggregateComposePreviewManifestsTask>(
+            "aggregateComposePreviewManifests"
+        ) {
+            group = TASK_GROUP
+            description = "Aggregates Compose preview manifests across all modules."
+            expectedManifestPaths.convention(emptyList())
+            outputFile.set(
+                rootProject.layout.buildDirectory.file("composePreviews/aggregate/manifest.json")
+            )
+        }
+        extra.set(key, provider)
+        return provider
     }
 
     private fun determineCompileSdk(project: Project): Int? {

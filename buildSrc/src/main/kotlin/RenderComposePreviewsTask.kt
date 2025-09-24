@@ -54,6 +54,7 @@ import org.gradle.api.tasks.InputFile
 import org.gradle.api.tasks.InputFiles
 import org.gradle.api.tasks.Optional
 import org.gradle.api.tasks.OutputDirectory
+import org.gradle.api.tasks.OutputFile
 import org.gradle.api.tasks.PathSensitive
 import org.gradle.api.tasks.PathSensitivity
 import org.gradle.api.tasks.TaskAction
@@ -69,6 +70,9 @@ abstract class RenderComposePreviewsTask : DefaultTask() {
 
     @get:OutputDirectory
     abstract val outputDirectory: DirectoryProperty
+
+    @get:OutputFile
+    abstract val manifestFile: RegularFileProperty
 
     @get:Input
     abstract val variantName: Property<String>
@@ -132,13 +136,23 @@ abstract class RenderComposePreviewsTask : DefaultTask() {
         }
         outputDir.mkdirs()
 
+        val manifestOutput = manifestFile.orNull?.asFile
+            ?: File(outputDir, "manifest.json").also { candidate ->
+                manifestFile.set(project.objects.fileProperty().fileValue(candidate))
+            }
+
         val metadataDocument = parseMetadata(metadataSource)
         val environment = buildRenderingEnvironment()
         reportEnvironment(metadataDocument, environment)
         val previews = metadataDocument.previews
 
         if (previews.isEmpty()) {
-            val manifest = writeManifest(outputDir, metadataDocument, environment, emptyList())
+            val manifest = writeManifest(
+                manifestOutput,
+                metadataDocument,
+                environment,
+                emptyList()
+            )
             logger.lifecycle(
                 "No Compose previews discovered for ${metadataDocument.modulePath}#${metadataDocument.variant}. " +
                     "Wrote empty manifest to ${manifest.toPrettyPath(project.rootDir)}."
@@ -254,7 +268,12 @@ abstract class RenderComposePreviewsTask : DefaultTask() {
             runCatching { classLoader.close() }
         }
 
-        val manifest = writeManifest(outputDir, metadataDocument, environment, renderedPreviews)
+        val manifest = writeManifest(
+            manifestOutput,
+            metadataDocument,
+            environment,
+            renderedPreviews
+        )
 
         val placeholderCount = renderedPreviews.count { it.placeholder }
         val placeholderSuffix = if (placeholderCount > 0) " (placeholders: $placeholderCount)" else ""
@@ -962,12 +981,11 @@ abstract class RenderComposePreviewsTask : DefaultTask() {
     }
 
     private fun writeManifest(
-        outputDir: File,
+        manifestFile: File,
         metadata: MetadataDocument,
         environment: RenderingEnvironment,
         previews: List<RenderedPreview>
     ): File {
-        val manifestFile = File(outputDir, "manifest.json")
         val renderTimestamp = Instant.now().toString()
         val previewElements = JsonArray(previews.map { it.toJsonElement() })
         val json = Json { prettyPrint = true }
@@ -987,6 +1005,7 @@ abstract class RenderComposePreviewsTask : DefaultTask() {
             put("previews", previewElements)
         }
 
+        manifestFile.parentFile?.mkdirs()
         manifestFile.writeText(json.encodeToString(manifest))
         return manifestFile
     }
