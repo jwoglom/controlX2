@@ -1,7 +1,12 @@
 package com.jwoglom.controlx2.build.compose
 
+import com.android.build.api.dsl.ApplicationExtension
+import com.android.build.api.dsl.LibraryExtension
 import com.android.build.api.variant.AndroidComponentsExtension
+import com.android.build.api.variant.Variant
+import java.io.File
 import java.util.Locale
+import java.util.Properties
 import java.util.concurrent.atomic.AtomicBoolean
 import org.gradle.api.Plugin
 import org.gradle.api.Project
@@ -65,16 +70,17 @@ class ComposePreviewPlugin : Plugin<Project> {
         val androidComponents = project.extensions.findByType(AndroidComponentsExtension::class.java) ?: return
 
         androidComponents.onVariants(androidComponents.selector().withBuildType("debug")) { variant ->
-            registerVariantTasks(project, variant.name, aggregateMetadata, aggregateRender)
+            registerVariantTasks(project, variant, aggregateMetadata, aggregateRender)
         }
     }
 
     private fun registerVariantTasks(
         project: Project,
-        variantName: String,
+        variant: Variant,
         aggregateMetadata: TaskProvider<Task>,
         aggregateRender: TaskProvider<Task>
     ) {
+        val variantName = variant.name
         val taskSuffix = variantName.toTaskSuffix()
 
         val collectTask = project.tasks.register<CollectComposePreviewsTask>(
@@ -116,6 +122,86 @@ class ComposePreviewPlugin : Plugin<Project> {
             )
         }
 
+        val runtimeConfigurationName = "${variantName}RuntimeClasspath"
+        val runtimeConfiguration = project.configurations.findByName(runtimeConfigurationName)
+        val layoutlibCandidate = locateLayoutlibJar(project)
+        val namespace: String = runCatching { variant.namespace.get() }.getOrElse { throwable ->
+            val fallback = project.name
+            val reason = throwable.message?.takeIf { it.isNotBlank() }
+                ?: throwable::class.java.simpleName
+            project.logger.warn(
+                "Unable to determine namespace for ${project.path}#$variantName from Android Gradle APIs; " +
+                    "defaulting to '$fallback'. Reason: $reason"
+            )
+            fallback
+        }
+        val compileSdk = determineCompileSdk(project) ?: DEFAULT_COMPILE_SDK
+        val resourcePackages: List<String> = listOf(namespace)
+
+        renderTask.configure {
+            runtimeClasspath.from(kotlinClassesDir.map { it.asFile })
+            runtimeClasspath.from(javaClassesDir.map { it.asFile })
+            runtimeConfiguration?.let { runtimeClasspath.from(it) }
+
+            packageName.set(namespace)
+            resourcePackageNames.set(resourcePackages.toMutableList())
+            compileSdkVersion.set(compileSdk)
+
+            mergedResources.from(
+                project.layout.buildDirectory.dir(
+                    "intermediates/merged_res/$variantName/merge${taskSuffix}Resources/out"
+                ).map { it.asFile }
+            )
+            mergedResources.from(
+                project.layout.buildDirectory.dir("intermediates/merged_res/$variantName/out")
+                    .map { it.asFile }
+            )
+            mergedResources.from(
+                project.layout.buildDirectory.dir("intermediates/packaged_res/$variantName")
+                    .map { it.asFile }
+            )
+
+            compiledRClassJar.from(
+                project.layout.buildDirectory.file(
+                    "intermediates/compile_and_runtime_not_namespaced_r_class_jar/$variantName/R.jar"
+                ).map { it.asFile }
+            )
+
+            moduleAssets.from(
+                project.layout.buildDirectory.dir(
+                    "intermediates/merged_assets/$variantName/merge${taskSuffix}Assets/out"
+                ).map { it.asFile }
+            )
+            moduleAssets.from(
+                project.layout.buildDirectory.dir("intermediates/merged_assets/$variantName/out")
+                    .map { it.asFile }
+            )
+
+            libraryResources.from(
+                project.layout.buildDirectory.dir(
+                    "intermediates/merged_res/$variantName/merge${taskSuffix}Resources/out/lib"
+                ).map { it.asFile }
+            )
+            libraryResources.from(
+                project.layout.buildDirectory.dir("intermediates/packaged_res/$variantName/lib")
+                    .map { it.asFile }
+            )
+
+            libraryAssets.from(
+                project.layout.buildDirectory.dir(
+                    "intermediates/merged_assets/$variantName/merge${taskSuffix}Assets/out/lib"
+                ).map { it.asFile }
+            )
+            libraryAssets.from(
+                project.layout.buildDirectory.dir("intermediates/merged_assets/$variantName/out/lib")
+                    .map { it.asFile }
+            )
+
+            layoutlibCandidate?.let { candidate ->
+                layoutlibJar.set(project.objects.fileProperty().fileValue(candidate))
+            }
+        }
+
         aggregateMetadata.configure { dependsOn(collectTask) }
         aggregateRender.configure { dependsOn(renderTask) }
         renderTask.configure { dependsOn(collectTask) }
@@ -149,5 +235,79 @@ class ComposePreviewPlugin : Plugin<Project> {
 
     private companion object {
         const val TASK_GROUP = "compose previews"
+        const val DEFAULT_COMPILE_SDK = 33
+    }
+
+    private fun determineCompileSdk(project: Project): Int? {
+        val applicationExtension = project.extensions.findByType(ApplicationExtension::class.java)
+        if (applicationExtension?.compileSdk != null) {
+            return applicationExtension.compileSdk
+        }
+        val libraryExtension = project.extensions.findByType(LibraryExtension::class.java)
+        if (libraryExtension?.compileSdk != null) {
+            return libraryExtension.compileSdk
+        }
+        return null
+    }
+
+    private fun locateLayoutlibJar(project: Project): File? {
+        val sdkDir = findAndroidSdkDirectory(project) ?: return null
+        val platformsDir = File(sdkDir, "platforms")
+        if (!platformsDir.exists()) {
+            return File(platformsDir, "android-35/data/layoutlib.jar")
+        }
+
+        val preferredApis = listOf("android-35", "android-34", "android-33")
+        val preferredExisting = preferredApis
+            .map { File(platformsDir, "$it/data/layoutlib.jar") }
+            .firstOrNull(File::exists)
+        if (preferredExisting != null) {
+            return preferredExisting
+        }
+
+        val otherExisting = platformsDir.listFiles()
+            ?.sortedByDescending { it.name }
+            ?.map { File(it, "data/layoutlib.jar") }
+            ?.firstOrNull(File::exists)
+        if (otherExisting != null) {
+            return otherExisting
+        }
+
+        return preferredApis
+            .map { File(platformsDir, "$it/data/layoutlib.jar") }
+            .firstOrNull()
+            ?: platformsDir.listFiles()
+                ?.sortedByDescending { it.name }
+                ?.map { File(it, "data/layoutlib.jar") }
+                ?.firstOrNull()
+    }
+
+    private fun findAndroidSdkDirectory(project: Project): File? {
+        val localProperties = project.rootProject.file("local.properties")
+        if (localProperties.exists()) {
+            runCatching {
+                Properties().apply {
+                    localProperties.inputStream().use { load(it) }
+                }
+            }.getOrNull()?.getProperty("sdk.dir")
+                ?.takeIf { it.isNotBlank() }
+                ?.let { File(it) }
+                ?.takeIf { it.exists() }
+                ?.let { return it }
+        }
+
+        val envCandidates = sequenceOf(
+            System.getenv("ANDROID_SDK_ROOT"),
+            System.getenv("ANDROID_HOME")
+        ).filterNotNull().map(String::trim).filter { it.isNotEmpty() }
+
+        for (candidate in envCandidates) {
+            val dir = File(candidate)
+            if (dir.exists()) {
+                return dir
+            }
+        }
+
+        return null
     }
 }
