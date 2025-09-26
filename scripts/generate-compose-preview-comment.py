@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import argparse
 import base64
+import html
 import json
 import os
 from dataclasses import dataclass
@@ -32,6 +33,11 @@ IMAGE_MODE_INLINE = "inline"
 IMAGE_MODE_ATTACHMENT = "attachment"
 IMAGE_MODE_LINK = "link"
 IMAGE_MODE_CHOICES = [IMAGE_MODE_ATTACHMENT, IMAGE_MODE_INLINE, IMAGE_MODE_LINK]
+
+# GitHub issue comments are limited to 65,536 characters. Keep a safety
+# margin so the rendered Markdown (after attachment substitution) stays
+# comfortably below that ceiling.
+MAX_COMMENT_CHARS = 60_000
 
 
 @dataclass(frozen=True)
@@ -220,6 +226,45 @@ def encode_image(image_path: Path, max_inline_bytes: int) -> Optional[str]:
         return None
 
 
+def truncate_for_table(text: str, max_length: int = 200) -> str:
+    text = text.strip()
+    if len(text) <= max_length:
+        return text
+    return text[: max_length - 1].rstrip() + "\u2026"
+
+
+def format_image_cell(
+    *,
+    preview: PreviewEntry,
+    key: PreviewKey,
+    inline: Optional[str],
+    rel_path: Optional[str],
+    image_mode: str,
+) -> str:
+    alt_text = html.escape(preview.display_name or key.label or "Preview")
+    if inline:
+        return (
+            f'<img src="data:image/png;base64,{inline}" alt="{alt_text}" '
+            "style=\"max-width: 100%; height: auto;\" />"
+        )
+    if image_mode == IMAGE_MODE_ATTACHMENT and rel_path:
+        return f"![{alt_text}](attachment://{rel_path})"
+    if image_mode == IMAGE_MODE_LINK and rel_path:
+        return f"`{rel_path}`"
+    return "_Image unavailable_"
+
+
+def format_variation_cell(preview: PreviewEntry) -> str:
+    variation = truncate_for_table(preview.variation_summary(), max_length=240)
+    escaped = html.escape(variation).replace("\n", "<br>")
+    extras: List[str] = []
+    if preview.render_error:
+        extras.append(f"`{html.escape(preview.render_error)}`")
+    if extras:
+        escaped = f"{escaped}<br><br>{'<br>'.join(extras)}"
+    return escaped.replace("|", "\\|")
+
+
 def format_module_section(
     module: ModuleReport,
     manifest_root: Path,
@@ -252,15 +297,16 @@ def format_module_section(
         previews.sort(key=lambda entry: entry.display_name.lower())
         summary_label = previews[0].display_name or key.label
         details_title = f"`{summary_label}`" if summary_label else f"`{key.label}`"
+        variation_count = len(previews)
+        variation_label = "variation" if variation_count == 1 else "variations"
         lines.append("")
         lines.append("<details>")
-        lines.append(f"<summary>{details_title}</summary>")
+        lines.append(f"<summary>{details_title} — {variation_count} {variation_label}</summary>")
         lines.append("")
+        lines.append("| Variation | Preview |")
+        lines.append("| --- | --- |")
+
         for preview in previews:
-            variation = preview.variation_summary()
-            lines.append(f"- **{variation}**")
-            if preview.render_error:
-                lines.append(f"  - Render error: `{preview.render_error}`")
             image_path = resolve_image_path(preview, manifest_root, image_root)
             inline = None
             rel_path = None
@@ -268,18 +314,17 @@ def format_module_section(
                 rel_path = os.path.relpath(image_path, image_root)
             if image_mode == IMAGE_MODE_INLINE and not preview.image_missing and image_path is not None:
                 inline = encode_image(image_path, max_inline_bytes)
-            if inline:
-                alt_text = preview.display_name or key.label
-                lines.append(
-                    f"  <img src=\"data:image/png;base64,{inline}\" alt=\"{alt_text}\" style=\"max-width: 100%; height: auto;\"/>"
-                )
-            elif image_mode == IMAGE_MODE_ATTACHMENT and rel_path:
-                alt_text = preview.display_name or key.label
-                lines.append(f"  ![{alt_text}](attachment://{rel_path})")
-            elif image_mode == IMAGE_MODE_LINK and rel_path:
-                lines.append(f"  - Image: `{rel_path}`")
-            else:
-                lines.append("  - _Image unavailable_")
+
+            variation_cell = format_variation_cell(preview)
+            image_cell = format_image_cell(
+                preview=preview,
+                key=key,
+                inline=inline,
+                rel_path=rel_path,
+                image_mode=image_mode,
+            )
+            lines.append(f"| {variation_cell} | {image_cell} |")
+
         lines.append("")
         lines.append("</details>")
         lines.append("")
@@ -301,33 +346,71 @@ def generate_comment(
     total_modules = len(module_reports)
     total_previews = sum(len(entries) for module in module_reports for entries in module.previews.values())
 
-    lines: List[str] = []
+    header_lines: List[str] = []
     if identifier:
-        lines.append(f"<!-- {identifier} -->")
-    lines.append("## Compose Preview Results")
-    lines.append("")
+        header_lines.append(f"<!-- {identifier} -->")
+    header_lines.append("## Compose Preview Results")
+    header_lines.append("")
     summary = f"Rendered {total_previews} previews across {total_modules} module(s)."
-    lines.append(summary)
+    header_lines.append(summary)
     if global_issues:
-        lines.append("")
-        lines.append("**Global issues:**")
+        header_lines.append("")
+        header_lines.append("**Global issues:**")
         for issue in global_issues:
-            lines.append(f"- {issue}")
+            header_lines.append(f"- {issue}")
 
+    header_text = "\n".join(header_lines).rstrip() + "\n\n"
+
+    module_sections: List[Tuple[str, str]] = []
     for module in module_reports:
-        lines.append("")
-        lines.extend(
-            format_module_section(
-                module=module,
-                manifest_root=manifest_root,
-                image_root=image_root,
-                max_inline_bytes=max_inline_bytes,
-                image_mode=image_mode,
-            )
+        section_lines = format_module_section(
+            module=module,
+            manifest_root=manifest_root,
+            image_root=image_root,
+            max_inline_bytes=max_inline_bytes,
+            image_mode=image_mode,
         )
+        section_text = "\n".join(section_lines).rstrip()
+        if section_text:
+            section_text += "\n\n"
+        module_sections.append((module.title, section_text))
 
-    lines.append("")
-    return "\n".join(lines).strip() + "\n"
+    comment = header_text
+    omitted_modules: List[str] = []
+    for title, section in module_sections:
+        if not section:
+            continue
+        prospective = comment + section
+        if len(prospective) <= MAX_COMMENT_CHARS:
+            comment = prospective
+        else:
+            omitted_modules.append(title)
+
+    comment = comment.rstrip() + "\n"
+
+    if omitted_modules:
+        note_lines = [
+            "",
+            "⚠️ Some module previews were omitted because the comment approached GitHub's size limit.",
+            "The full gallery is available in the `compose-previews` workflow artifact.",
+            "",
+            "**Omitted modules:**",
+        ]
+        for title in omitted_modules:
+            note_lines.append(f"- {title}")
+        note_text = "\n".join(note_lines).rstrip() + "\n"
+        if len(comment) + len(note_text) > MAX_COMMENT_CHARS:
+            # If we still exceed the limit, keep trimming module names until the note fits.
+            while omitted_modules and len(comment) + len(note_text) > MAX_COMMENT_CHARS:
+                omitted_modules.pop()
+                note_lines = note_lines[:5] + [f"- {name}" for name in omitted_modules]
+                note_text = "\n".join(note_lines).rstrip() + "\n"
+            if not omitted_modules:
+                note_lines = note_lines[:4]
+                note_text = "\n".join(note_lines).rstrip() + "\n"
+        comment += note_text
+
+    return comment
 
 
 def main() -> None:

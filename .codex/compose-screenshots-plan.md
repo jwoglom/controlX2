@@ -15,6 +15,10 @@
   workflow that render previews on CI, upload the `build/composePreviews`
   artifacts, and post/update sticky PR comments with uploaded image
   attachments.
+- ✅ Tightened the generated Markdown so preview images are referenced via
+  GitHub-hosted URLs in compact tables, trimming module sections when the
+  report nears GitHub's comment length cap while pointing contributors to the
+  full artifact gallery.
 - ✅ Verified `./gradlew renderAllComposePreviews` succeeds locally after wiring the
   corrected resource directories, compiled classpaths, and layoutlib detection into
   the preview renderer.
