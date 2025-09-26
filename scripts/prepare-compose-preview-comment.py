@@ -15,6 +15,9 @@ from urllib import error, parse, request
 
 ATTACHMENT_PATTERN = re.compile(r"!\[(?P<alt>[^\]]*)\]\(attachment://(?P<path>[^)]+)\)")
 
+# GitHub comment attachments are limited to 10 MB per file.
+MAX_ATTACHMENT_BYTES = 10 * 1024 * 1024
+
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Upload comment attachments and rewrite Markdown")
@@ -42,12 +45,20 @@ def upload_attachment(*, token: str, owner: str, repo: str, issue_number: int, f
     boundary = f"----compose-preview-boundary-{uuid.uuid4().hex}"
     boundary_bytes = boundary.encode("utf-8")
     file_bytes = file_path.read_bytes()
+    file_size = len(file_bytes)
+    if file_size > MAX_ATTACHMENT_BYTES:
+        raise RuntimeError(
+            f"Attachment {file_path} exceeds GitHub's comment upload limit: "
+            f"{file_size} bytes > {MAX_ATTACHMENT_BYTES} bytes"
+        )
+
     body = (
         b"--" + boundary_bytes + b"\r\n"
         + (
             f'Content-Disposition: form-data; name="file"; filename="{file_path.name}"\r\n'
         ).encode("utf-8")
-        + (f"Content-Type: {content_type}\r\n\r\n").encode("utf-8")
+        + (f"Content-Type: {content_type}\r\n").encode("utf-8")
+        + (f"Content-Length: {file_size}\r\n\r\n").encode("utf-8")
         + file_bytes
         + b"\r\n--" + boundary_bytes + b"--\r\n"
     )
@@ -55,6 +66,8 @@ def upload_attachment(*, token: str, owner: str, repo: str, issue_number: int, f
         "Authorization": f"Bearer {token}",
         "Accept": "application/vnd.github+json",
         "Content-Type": f"multipart/form-data; boundary={boundary}",
+        "Content-Length": str(len(body)),
+        "X-GitHub-Api-Version": "2022-11-28",
         "User-Agent": "compose-preview-comment-uploader",
     }
     req = request.Request(url, data=body, method="POST", headers=headers)
@@ -68,8 +81,8 @@ def upload_attachment(*, token: str, owner: str, repo: str, issue_number: int, f
             size = file_path.stat().st_size
             hint = (
                 " Attachment upload was rejected because the file is too large. "
-                "Verify the Compose renderer downscaled outputs correctly and that the file is below GitHub's attachment limit. "
-                f"Current size: {size} bytes."
+                "Verify the Compose renderer downscaled outputs correctly and that the file is below GitHub's attachment limit "
+                f"({MAX_ATTACHMENT_BYTES} bytes). Current size: {size} bytes."
             )
         raise RuntimeError(
             f"Failed to upload {file_path}: {exc.status} {exc.reason}: {message}{hint}"
