@@ -60,6 +60,7 @@ import org.gradle.api.tasks.PathSensitive
 import org.gradle.api.tasks.PathSensitivity
 import org.gradle.api.tasks.TaskAction
 import org.junit.runner.Description
+import org.junit.runners.model.Statement
 import kotlin.math.min
 import kotlin.math.roundToInt
 import kotlin.reflect.KClass
@@ -1203,37 +1204,39 @@ abstract class RenderComposePreviewsTask : DefaultTask() {
             )
 
             val description = buildTestDescription(metadata, preview)
-            var prepared = false
-            val renderResult = try {
-                paparazzi.prepare(description)
-                prepared = true
-                val snapshotComposable: (Composer, Int) -> Unit = { composer, _ ->
-                    resolved.method.invoke(composer, resolved.receiver, *args)
-                }
-                snapshotMethod.invoke(paparazzi, preview.id, snapshotComposable)
-                RenderResult.success()
-            } catch (invokeError: InvocationTargetException) {
-                val cause = invokeError.targetException ?: invokeError
-                val summary = cause.asRenderFailureMessage()
-                logRenderFailure(metadata, preview, summary, cause)
-                RenderResult.failure(summary)
-            } catch (throwable: Throwable) {
-                val summary = throwable.asRenderFailureMessage()
-                logRenderFailure(metadata, preview, summary, throwable)
-                RenderResult.failure(summary)
-            } finally {
-                if (prepared) {
-                    runCatching { paparazzi.close() }.onFailure { closeError ->
-                        logger.warn(
-                            "Failed to close Paparazzi after rendering ${preview.id} for " +
-                                "${metadata.modulePath}#${metadata.variant}: ${closeError.renderSummary()}",
-                            closeError
-                        )
+            var invocationResult: RenderResult? = null
+
+            val baseStatement = object : Statement() {
+                override fun evaluate() {
+                    invocationResult = try {
+                        val snapshotComposable: (Composer, Int) -> Unit = { composer, _ ->
+                            resolved.method.invoke(composer, resolved.receiver, *args)
+                        }
+                        snapshotMethod.invoke(paparazzi, preview.id, snapshotComposable)
+                        RenderResult.success()
+                    } catch (invokeError: InvocationTargetException) {
+                        val cause = invokeError.targetException ?: invokeError
+                        val summary = cause.asRenderFailureMessage()
+                        logRenderFailure(metadata, preview, summary, cause)
+                        RenderResult.failure(summary)
+                    } catch (throwable: Throwable) {
+                        val summary = throwable.asRenderFailureMessage()
+                        logRenderFailure(metadata, preview, summary, throwable)
+                        RenderResult.failure(summary)
                     }
                 }
             }
 
-            renderResult
+            val statement = paparazzi.apply(baseStatement, description)
+
+            try {
+                statement.evaluate()
+                invocationResult ?: RenderResult.failure("Paparazzi did not report a rendering result")
+            } catch (throwable: Throwable) {
+                val summary = throwable.asRenderFailureMessage()
+                logRenderFailure(metadata, preview, summary, throwable)
+                RenderResult.failure(summary)
+            }
         } catch (throwable: Throwable) {
             val summary = throwable.asRenderFailureMessage()
             logRenderFailure(metadata, preview, summary, throwable)
