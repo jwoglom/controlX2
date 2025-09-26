@@ -53,10 +53,11 @@ def upload_attachment(*, token: str, owner: str, repo: str, issue_number: int, f
         )
 
     disposition = (
-        f'Content-Disposition: form-data; name="attachment"; filename="{file_path.name}"\r\n'
+        f'Content-Disposition: form-data; name="file"; filename="{file_path.name}"\r\n'
     ).encode("utf-8")
     part_headers = (
         f"Content-Type: {content_type}\r\n"
+        f"Content-Length: {file_size}\r\n"
         "Content-Transfer-Encoding: binary\r\n\r\n"
     ).encode("utf-8")
     body = (

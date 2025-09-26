@@ -29,6 +29,10 @@
   runtime and logging the chosen source. The Compose preview workflow now uploads
   rendered PNGs as GitHub comment attachments so pull request reports display the
   actual images inline with working download links.
+- ✅ Hardened the attachment upload helper so GitHub accepts the rendered PNGs by
+  switching to the documented `file` multipart field name and including
+  per-part `Content-Length` headers. This resolves the previous 422 "Bad Size"
+  failures and keeps inline preview images rendering in PR comments.
 
 ## Recommended Technical Approach
 
