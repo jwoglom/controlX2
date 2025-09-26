@@ -49,15 +49,26 @@ def upload_attachment(*, token: str, owner: str, repo: str, issue_number: int, f
             f"{file_size} bytes > {MAX_ATTACHMENT_BYTES} bytes"
         )
 
+    boundary = f"------------------------{os.urandom(16).hex()}"
+    disposition = (
+        f"Content-Disposition: form-data; name=\"file\"; filename=\"{file_path.name}\""
+    )
+    part_headers = [disposition, f"Content-Type: {content_type}"]
+    body = bytearray()
+    body.extend(f"--{boundary}\r\n".encode("utf-8"))
+    body.extend(("\r\n".join(part_headers) + "\r\n\r\n").encode("utf-8"))
+    body.extend(file_bytes)
+    body.extend(f"\r\n--{boundary}--\r\n".encode("utf-8"))
+
     headers = {
         "Authorization": f"Bearer {token}",
         "Accept": "application/vnd.github+json",
-        "Content-Type": content_type,
-        "Content-Length": str(file_size),
+        "Content-Type": f"multipart/form-data; boundary={boundary}",
+        "Content-Length": str(len(body)),
         "X-GitHub-Api-Version": "2022-11-28",
         "User-Agent": "compose-preview-comment-uploader",
     }
-    req = request.Request(url, data=file_bytes, method="POST", headers=headers)
+    req = request.Request(url, data=bytes(body), method="POST", headers=headers)
     try:
         with request.urlopen(req) as resp:
             payload = json.loads(resp.read().decode("utf-8"))
@@ -71,6 +82,11 @@ def upload_attachment(*, token: str, owner: str, repo: str, issue_number: int, f
                 "Verify the Compose renderer downscaled outputs correctly, confirm the attachment is under the "
                 f"{MAX_ATTACHMENT_BYTES} byte limit, and ensure the HTTP request streamed the expected number of bytes. "
                 f"Current file size: {size} bytes."
+            )
+        elif exc.status == 400 and "Multipart form data required" in message:
+            hint = (
+                " GitHub rejected the upload because the request was not encoded as multipart/form-data. "
+                "Double-check the request boundary and ensure the file bytes are wrapped in a `file` form field."
             )
         raise RuntimeError(
             f"Failed to upload {file_path}: {exc.status} {exc.reason}: {message}{hint}"

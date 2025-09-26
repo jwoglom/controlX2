@@ -30,9 +30,9 @@
   rendered PNGs as GitHub comment attachments so pull request reports display the
   actual images inline with working download links.
 - ✅ Hardened the attachment upload helper so GitHub accepts the rendered PNGs by
-  posting raw image bytes with explicit `Content-Type`/`Content-Length`
-  headers. This resolves the previous 422 "Bad Size" failures and keeps inline
-  preview images rendering in PR comments.
+  encoding uploads as multipart form data with explicit `Content-Type`/`Content-Length`
+  headers. This resolves the previous 422/400 failures and keeps inline preview
+  images rendering in PR comments.
 
 ## Recommended Technical Approach
 
