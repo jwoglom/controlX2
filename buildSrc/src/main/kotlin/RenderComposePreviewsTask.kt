@@ -14,6 +14,7 @@ import java.awt.Font
 import java.awt.Graphics2D
 import java.awt.RenderingHints
 import java.awt.image.BufferedImage
+import java.io.ByteArrayOutputStream
 import java.io.File
 import java.lang.reflect.InvocationTargetException
 import java.lang.reflect.Method
@@ -60,6 +61,7 @@ import org.gradle.api.tasks.PathSensitivity
 import org.gradle.api.tasks.TaskAction
 import org.junit.runner.Description
 import kotlin.math.min
+import kotlin.math.roundToInt
 import kotlin.reflect.KClass
 import kotlin.sequences.asSequence
 import kotlin.sequences.sequence
@@ -1408,7 +1410,7 @@ abstract class RenderComposePreviewsTask : DefaultTask() {
         return sanitized.ifBlank { "preview" }
     }
 
-    private class SingleImageSnapshotHandler(private val outputFile: File) : SnapshotHandler {
+    private inner class SingleImageSnapshotHandler(private val outputFile: File) : SnapshotHandler {
         override fun newFrameHandler(snapshot: Snapshot, frameCount: Int, fps: Int): SnapshotHandler.FrameHandler {
             return object : SnapshotHandler.FrameHandler {
                 private var written = false
@@ -1416,7 +1418,7 @@ abstract class RenderComposePreviewsTask : DefaultTask() {
                 override fun handle(image: BufferedImage) {
                     if (!written) {
                         outputFile.parentFile?.mkdirs()
-                        ImageIO.write(image, "PNG", outputFile)
+                        writeImageWithSizeLimit(image, outputFile)
                         written = true
                     }
                 }
@@ -1430,6 +1432,78 @@ abstract class RenderComposePreviewsTask : DefaultTask() {
         }
 
         override fun close() {}
+    }
+
+    private fun writeImageWithSizeLimit(image: BufferedImage, outputFile: File) {
+        var current = image
+        var attempt = 0
+
+        while (true) {
+            val encoded = encodePng(current)
+            val size = encoded.size
+
+            if (size <= MAX_ATTACHMENT_BYTES || current.width <= MIN_DOWNSCALE_DIMENSION || current.height <= MIN_DOWNSCALE_DIMENSION) {
+                outputFile.outputStream().use { stream ->
+                    stream.write(encoded)
+                }
+                if (attempt > 0) {
+                    logger.info(
+                        "Downscaled preview ${outputFile.name} to ${current.width}x${current.height} (${size} bytes) to satisfy comment attachment limits."
+                    )
+                }
+                if (size > MAX_ATTACHMENT_BYTES) {
+                    logger.warn(
+                        "Preview ${outputFile.name} still exceeds the attachment size limit after downscaling (" +
+                            "${size} bytes > $MAX_ATTACHMENT_BYTES bytes)."
+                    )
+                }
+                return
+            }
+
+            val nextWidth = (current.width * DOWNSCALE_FACTOR).roundToInt().coerceAtLeast(MIN_DOWNSCALE_DIMENSION)
+            val nextHeight = (current.height * DOWNSCALE_FACTOR).roundToInt().coerceAtLeast(MIN_DOWNSCALE_DIMENSION)
+            if (nextWidth >= current.width && nextHeight >= current.height) {
+                outputFile.outputStream().use { stream ->
+                    stream.write(encoded)
+                }
+                logger.warn(
+                    "Unable to downscale preview ${outputFile.name} below ${current.width}x${current.height}; writing ${size} bytes."
+                )
+                return
+            }
+
+            if (attempt == 0) {
+                logger.info(
+                    "Preview ${outputFile.name} produced ${image.width}x${image.height} image (${size} bytes); downscaling to reduce upload size."
+                )
+            }
+
+            current = resizeImage(current, nextWidth, nextHeight)
+            attempt += 1
+        }
+    }
+
+    private fun encodePng(image: BufferedImage): ByteArray {
+        val buffer = ByteArrayOutputStream()
+        buffer.use { stream ->
+            ImageIO.write(image, "PNG", stream)
+        }
+        return buffer.toByteArray()
+    }
+
+    private fun resizeImage(image: BufferedImage, width: Int, height: Int): BufferedImage {
+        if (image.width == width && image.height == height) {
+            return image
+        }
+        val resized = BufferedImage(width, height, BufferedImage.TYPE_INT_ARGB)
+        val graphics = resized.createGraphics()
+        graphics.use { g ->
+            g.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BICUBIC)
+            g.setRenderingHint(RenderingHints.KEY_RENDERING, RenderingHints.VALUE_RENDER_QUALITY)
+            g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON)
+            g.drawImage(image, 0, 0, width, height, null)
+        }
+        return resized
     }
 
     private companion object {
@@ -1452,6 +1526,9 @@ abstract class RenderComposePreviewsTask : DefaultTask() {
         private val NON_FILENAME_REGEX = "[^A-Za-z0-9._-]+".toRegex()
         private val UNDERSCORE_RUN_REGEX = "_+".toRegex()
         private val WHITESPACE_REGEX = "\\s+".toRegex()
+        private const val MAX_ATTACHMENT_BYTES = 2_000_000
+        private const val MIN_DOWNSCALE_DIMENSION = 320
+        private const val DOWNSCALE_FACTOR = 0.75
     }
 }
 
