@@ -14,6 +14,9 @@
   GitHub Actions workflow that render previews on CI, upload the
   `build/composePreviews` artifacts, and post/update sticky PR comments
   with inline data-URI screenshots.
+- ✅ Verified `./gradlew renderAllComposePreviews` succeeds locally after wiring the
+  corrected resource directories, compiled classpaths, and layoutlib detection into
+  the preview renderer.
 
 ## Recommended Technical Approach
 
@@ -102,4 +105,4 @@ If direct usage of `PreviewRenderer` proves brittle, Square's [Paparazzi](https:
 2. ✅ Replace the placeholder renderer with real Compose rendering (via Paparazzi) so previews produce actual UI imagery. The renderer now instantiates composables via Compose reflection, drives Paparazzi with module resources/runtime classpaths, expands `@PreviewParameter` providers, and emits PNGs plus manifest metadata for each invocation.
 3. ✅ Extend the plugin to handle the `wear` module and generate a consolidated manifest for PR consumption. The aggregate manifest task now runs after all module renders, merges manifests from both apps, resolves image paths relative to the repo root, and enforces that required resources and screenshots are present.
 4. ✅ Author scripts for Markdown generation and integrate with GitHub Actions as outlined. The new helper script produces sticky-comment Markdown with inline previews and the `compose-previews` workflow drives rendering, artifact uploads, and comment updates on pull requests.
-5. Run the preview rendering command locally as proof-of-concept, then open the implementation PR with CI validation.
+5. ✅ Run the preview rendering command locally as proof-of-concept, then open the implementation PR with CI validation.

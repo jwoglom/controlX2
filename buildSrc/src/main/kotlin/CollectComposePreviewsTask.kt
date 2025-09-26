@@ -221,7 +221,7 @@ abstract class CollectComposePreviewsTask : DefaultTask() {
             descriptor: String?,
             signature: String?,
             exceptions: Array<out String>?
-        ): MethodVisitor {
+        ): MethodVisitor? {
             val methodName = name ?: return super.visitMethod(access, name, descriptor, signature, exceptions)
             if ((access and Opcodes.ACC_SYNTHETIC) != 0) {
                 return super.visitMethod(access, name, descriptor, signature, exceptions)

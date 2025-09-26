@@ -13,6 +13,8 @@ import org.gradle.api.Project
 import org.gradle.api.Task
 import org.gradle.api.tasks.TaskProvider
 import org.gradle.kotlin.dsl.register
+import org.gradle.api.attributes.Attribute
+import org.gradle.api.artifacts.type.ArtifactTypeDefinition
 
 class ComposePreviewPlugin : Plugin<Project> {
     override fun apply(project: Project) {
@@ -105,7 +107,9 @@ class ComposePreviewPlugin : Plugin<Project> {
         val kotlinCompileTaskName = "compile${taskSuffix}Kotlin"
         val javaCompileTaskName = "compile${taskSuffix}JavaWithJavac"
         val kotlinClassesDir = project.layout.buildDirectory.dir("tmp/kotlin-classes/$variantName")
-        val javaClassesDir = project.layout.buildDirectory.dir("intermediates/javac/$variantName/classes")
+        val javaClassesDir = project.layout.buildDirectory.dir(
+            "intermediates/javac/$variantName/compile${taskSuffix}JavaWithJavac/classes"
+        )
 
         collectTask.configure {
             classDirectories.from(kotlinClassesDir.map { it.asFile })
@@ -127,7 +131,7 @@ class ComposePreviewPlugin : Plugin<Project> {
             outputDirectory.set(
                 project.layout.buildDirectory.dir("composePreviews/$variantName/images")
             )
-            manifestFile.set(outputDirectory.map { it.file("manifest.json") })
+            manifestFile.set(outputDirectory.file("manifest.json"))
         }
 
         val runtimeConfigurationName = "${variantName}RuntimeClasspath"
@@ -149,7 +153,27 @@ class ComposePreviewPlugin : Plugin<Project> {
         renderTask.configure {
             runtimeClasspath.from(kotlinClassesDir.map { it.asFile })
             runtimeClasspath.from(javaClassesDir.map { it.asFile })
-            runtimeConfiguration?.let { runtimeClasspath.from(it) }
+            runtimeConfiguration?.let { configuration ->
+                val artifactType = Attribute.of("artifactType", String::class.java)
+
+                val runtimeArtifacts = configuration.incoming.artifactView {
+                    attributes.attribute(artifactType, ArtifactTypeDefinition.JAR_TYPE)
+                    lenient(true)
+                }.files
+                runtimeClasspath.from(runtimeArtifacts)
+
+                val androidJarArtifacts = configuration.incoming.artifactView {
+                    attributes.attribute(artifactType, "android-classes-jar")
+                    lenient(true)
+                }.files
+                runtimeClasspath.from(androidJarArtifacts)
+
+                val androidDirectoryArtifacts = configuration.incoming.artifactView {
+                    attributes.attribute(artifactType, "android-classes-directory")
+                    lenient(true)
+                }.files
+                runtimeClasspath.from(androidDirectoryArtifacts)
+            }
 
             packageName.set(namespace)
             resourcePackageNames.set(resourcePackages.toMutableList())
@@ -157,12 +181,8 @@ class ComposePreviewPlugin : Plugin<Project> {
 
             mergedResources.from(
                 project.layout.buildDirectory.dir(
-                    "intermediates/merged_res/$variantName/merge${taskSuffix}Resources/out"
+                    "intermediates/merged_res/$variantName/merge${taskSuffix}Resources"
                 ).map { it.asFile }
-            )
-            mergedResources.from(
-                project.layout.buildDirectory.dir("intermediates/merged_res/$variantName/out")
-                    .map { it.asFile }
             )
             mergedResources.from(
                 project.layout.buildDirectory.dir("intermediates/packaged_res/$variantName")
@@ -171,38 +191,15 @@ class ComposePreviewPlugin : Plugin<Project> {
 
             compiledRClassJar.from(
                 project.layout.buildDirectory.file(
-                    "intermediates/compile_and_runtime_not_namespaced_r_class_jar/$variantName/R.jar"
+                    "intermediates/compile_and_runtime_not_namespaced_r_class_jar/$variantName/" +
+                        "process${taskSuffix}Resources/R.jar"
                 ).map { it.asFile }
-            )
-
-            moduleAssets.from(
-                project.layout.buildDirectory.dir(
-                    "intermediates/merged_assets/$variantName/merge${taskSuffix}Assets/out"
-                ).map { it.asFile }
-            )
-            moduleAssets.from(
-                project.layout.buildDirectory.dir("intermediates/merged_assets/$variantName/out")
-                    .map { it.asFile }
             )
 
             libraryResources.from(
                 project.layout.buildDirectory.dir(
-                    "intermediates/merged_res/$variantName/merge${taskSuffix}Resources/out/lib"
+                    "intermediates/packaged_res/$variantName/package${taskSuffix}Resources"
                 ).map { it.asFile }
-            )
-            libraryResources.from(
-                project.layout.buildDirectory.dir("intermediates/packaged_res/$variantName/lib")
-                    .map { it.asFile }
-            )
-
-            libraryAssets.from(
-                project.layout.buildDirectory.dir(
-                    "intermediates/merged_assets/$variantName/merge${taskSuffix}Assets/out/lib"
-                ).map { it.asFile }
-            )
-            libraryAssets.from(
-                project.layout.buildDirectory.dir("intermediates/merged_assets/$variantName/out/lib")
-                    .map { it.asFile }
             )
 
             layoutlibCandidate?.let { candidate ->
@@ -299,7 +296,7 @@ class ComposePreviewPlugin : Plugin<Project> {
         val sdkDir = findAndroidSdkDirectory(project) ?: return null
         val platformsDir = File(sdkDir, "platforms")
         if (!platformsDir.exists()) {
-            return File(platformsDir, "android-35/data/layoutlib.jar")
+            return null
         }
 
         val preferredApis = listOf("android-35", "android-34", "android-33")
@@ -318,13 +315,7 @@ class ComposePreviewPlugin : Plugin<Project> {
             return otherExisting
         }
 
-        return preferredApis
-            .map { File(platformsDir, "$it/data/layoutlib.jar") }
-            .firstOrNull()
-            ?: platformsDir.listFiles()
-                ?.sortedByDescending { it.name }
-                ?.map { File(it, "data/layoutlib.jar") }
-                ?.firstOrNull()
+        return null
     }
 
     private fun findAndroidSdkDirectory(project: Project): File? {
