@@ -5,8 +5,10 @@ from __future__ import annotations
 
 import argparse
 import json
+import mimetypes
 import os
 import re
+import uuid
 from pathlib import Path
 from typing import Dict
 from urllib import error, parse, request
@@ -36,14 +38,26 @@ def upload_attachment(*, token: str, owner: str, repo: str, issue_number: int, f
         f"https://uploads.github.com/repos/{owner}/{repo}/issues/{issue_number}/comments/"
         f"assets?name={parse.quote(file_path.name)}"
     )
+    content_type = mimetypes.guess_type(file_path.name)[0] or "application/octet-stream"
+    boundary = f"----compose-preview-boundary-{uuid.uuid4().hex}"
+    boundary_bytes = boundary.encode("utf-8")
+    file_bytes = file_path.read_bytes()
+    body = (
+        b"--" + boundary_bytes + b"\r\n"
+        + (
+            f'Content-Disposition: form-data; name="file"; filename="{file_path.name}"\r\n'
+        ).encode("utf-8")
+        + (f"Content-Type: {content_type}\r\n\r\n").encode("utf-8")
+        + file_bytes
+        + b"\r\n--" + boundary_bytes + b"--\r\n"
+    )
     headers = {
         "Authorization": f"Bearer {token}",
         "Accept": "application/vnd.github+json",
-        "Content-Type": "image/png",
+        "Content-Type": f"multipart/form-data; boundary={boundary}",
         "User-Agent": "compose-preview-comment-uploader",
     }
-    data = file_path.read_bytes()
-    req = request.Request(url, data=data, method="POST", headers=headers)
+    req = request.Request(url, data=body, method="POST", headers=headers)
     try:
         with request.urlopen(req) as resp:
             payload = json.loads(resp.read().decode("utf-8"))
