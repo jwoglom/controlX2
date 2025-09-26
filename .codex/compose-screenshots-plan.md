@@ -13,12 +13,12 @@
 - ✅ Authored Python helpers (`scripts/generate-compose-preview-comment.py`
   and `scripts/prepare-compose-preview-comment.py`) plus a GitHub Actions
   workflow that render previews on CI, upload the `build/composePreviews`
-  artifacts, and post/update sticky PR comments with uploaded image
-  attachments.
-- ✅ Tightened the generated Markdown so preview images are referenced via
-  GitHub-hosted URLs in compact tables, trimming module sections when the
-  report nears GitHub's comment length cap while pointing contributors to the
-  full artifact gallery.
+  artifacts, and post/update sticky PR comments linking back to the
+  uploaded artifact instead of relying on comment attachments.
+- ✅ Tightened the generated Markdown so preview images are referenced in
+  compact tables with direct links to the artifact contents, trimming
+  module sections when the report nears GitHub's comment length cap while
+  pointing contributors to the full artifact gallery.
 - ✅ Verified `./gradlew renderAllComposePreviews` succeeds locally after wiring the
   corrected resource directories, compiled classpaths, and layoutlib detection into
   the preview renderer.

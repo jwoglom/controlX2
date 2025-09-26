@@ -12,6 +12,7 @@ Usage:
     python generate-compose-preview-comment.py \
         --manifest build/composePreviews/aggregate/manifest.json \
         --image-root . \
+        --artifact-url <artifact-url> \
         --output build/composePreviews/aggregate/comment.md
 """
 
@@ -128,11 +129,20 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--image-mode",
         choices=IMAGE_MODE_CHOICES,
-        default=IMAGE_MODE_ATTACHMENT,
+        default=IMAGE_MODE_LINK,
         help=(
             "How preview images should appear in the Markdown output. 'attachment' "
             "emits attachment placeholders, 'inline' encodes data URIs, and 'link' "
             "records filesystem paths without embedding."
+        ),
+    )
+    parser.add_argument(
+        "--artifact-url",
+        default=None,
+        help=(
+            "Optional URL to the uploaded compose preview artifact. When provided "
+            "and --image-mode=link, the comment will include download links that "
+            "point reviewers at the artifact."
         ),
     )
     return parser.parse_args()
@@ -240,6 +250,7 @@ def format_image_cell(
     inline: Optional[str],
     rel_path: Optional[str],
     image_mode: str,
+    artifact_url: Optional[str],
 ) -> str:
     alt_text = html.escape(preview.display_name or key.label or "Preview")
     if inline:
@@ -250,6 +261,11 @@ def format_image_cell(
     if image_mode == IMAGE_MODE_ATTACHMENT and rel_path:
         return f"![{alt_text}](attachment://{rel_path})"
     if image_mode == IMAGE_MODE_LINK and rel_path:
+        if artifact_url:
+            escaped_url = html.escape(artifact_url, quote=True)
+            return (
+                f"[Download]({escaped_url})<br><code>{html.escape(rel_path)}</code>"
+            )
         return f"`{rel_path}`"
     return "_Image unavailable_"
 
@@ -271,6 +287,7 @@ def format_module_section(
     image_root: Path,
     max_inline_bytes: int,
     image_mode: str,
+    artifact_url: Optional[str],
 ) -> List[str]:
     lines: List[str] = []
     lines.append(f"### {module.title}")
@@ -322,6 +339,7 @@ def format_module_section(
                 inline=inline,
                 rel_path=rel_path,
                 image_mode=image_mode,
+                artifact_url=artifact_url,
             )
             lines.append(f"| {variation_cell} | {image_cell} |")
 
@@ -340,6 +358,7 @@ def generate_comment(
     image_root: Optional[Path],
     max_inline_bytes: int,
     image_mode: str,
+    artifact_url: Optional[str],
 ) -> str:
     image_root = image_root or manifest_path.parent
     manifest_root = manifest_path.parent
@@ -353,6 +372,11 @@ def generate_comment(
     header_lines.append("")
     summary = f"Rendered {total_previews} previews across {total_modules} module(s)."
     header_lines.append(summary)
+    if artifact_url and image_mode == IMAGE_MODE_LINK:
+        header_lines.append("")
+        header_lines.append(
+            f"📦 Preview images are available in the [compose-previews artifact]({artifact_url})."
+        )
     if global_issues:
         header_lines.append("")
         header_lines.append("**Global issues:**")
@@ -369,6 +393,7 @@ def generate_comment(
             image_root=image_root,
             max_inline_bytes=max_inline_bytes,
             image_mode=image_mode,
+            artifact_url=artifact_url,
         )
         section_text = "\n".join(section_lines).rstrip()
         if section_text:
@@ -428,6 +453,7 @@ def main() -> None:
         image_root=image_root,
         max_inline_bytes=args.max_inline_bytes,
         image_mode=args.image_mode,
+        artifact_url=args.artifact_url,
     )
 
     if args.output:
