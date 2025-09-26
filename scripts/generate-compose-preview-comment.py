@@ -4,8 +4,9 @@
 This script consumes the aggregate manifest produced by the
 ``aggregateComposePreviewManifests`` Gradle task and emits a Markdown
 report suitable for posting as a pull-request comment. The report groups
-previews by module and composable, inlines PNG images using data URIs
-(when they are reasonably small), and highlights any rendering issues.
+previews by module and composable, emits attachment placeholders (or
+optionally inlines PNG images using data URIs), and highlights any
+rendering issues.
 
 Usage:
     python generate-compose-preview-comment.py \
@@ -27,6 +28,10 @@ from typing import Dict, List, Optional, Sequence, Tuple
 
 DEFAULT_IDENTIFIER = "controlx2-compose-previews"
 DEFAULT_MAX_INLINE_BYTES = 700_000  # ~0.7 MB
+IMAGE_MODE_INLINE = "inline"
+IMAGE_MODE_ATTACHMENT = "attachment"
+IMAGE_MODE_LINK = "link"
+IMAGE_MODE_CHOICES = [IMAGE_MODE_ATTACHMENT, IMAGE_MODE_INLINE, IMAGE_MODE_LINK]
 
 
 @dataclass(frozen=True)
@@ -113,6 +118,16 @@ def parse_args() -> argparse.Namespace:
         type=int,
         default=DEFAULT_MAX_INLINE_BYTES,
         help="Maximum PNG file size (in bytes) to inline as a data URI",
+    )
+    parser.add_argument(
+        "--image-mode",
+        choices=IMAGE_MODE_CHOICES,
+        default=IMAGE_MODE_ATTACHMENT,
+        help=(
+            "How preview images should appear in the Markdown output. 'attachment' "
+            "emits attachment placeholders, 'inline' encodes data URIs, and 'link' "
+            "records filesystem paths without embedding."
+        ),
     )
     return parser.parse_args()
 
@@ -210,6 +225,7 @@ def format_module_section(
     manifest_root: Path,
     image_root: Path,
     max_inline_bytes: int,
+    image_mode: str,
 ) -> List[str]:
     lines: List[str] = []
     lines.append(f"### {module.title}")
@@ -247,22 +263,28 @@ def format_module_section(
                 lines.append(f"  - Render error: `{preview.render_error}`")
             image_path = resolve_image_path(preview, manifest_root, image_root)
             inline = None
-            if not preview.image_missing and image_path is not None:
+            rel_path = None
+            if image_path and image_path.exists():
+                rel_path = os.path.relpath(image_path, image_root)
+            if image_mode == IMAGE_MODE_INLINE and not preview.image_missing and image_path is not None:
                 inline = encode_image(image_path, max_inline_bytes)
             if inline:
                 alt_text = preview.display_name or key.label
                 lines.append(
-                    f"  <img src=\"data:image/png;base64,{inline}\" alt=\"{alt_text}\" style=\"max-width: 100%; height: auto;\" />"
+                    f"  <img src=\"data:image/png;base64,{inline}\" alt=\"{alt_text}\" style=\"max-width: 100%; height: auto;\"/>"
                 )
-            elif image_path and image_path.exists():
-                rel_path = os.path.relpath(image_path, image_root)
-                lines.append(f"  - Image: `{rel_path}` (too large to inline)")
+            elif image_mode == IMAGE_MODE_ATTACHMENT and rel_path:
+                alt_text = preview.display_name or key.label
+                lines.append(f"  ![{alt_text}](attachment://{rel_path})")
+            elif image_mode == IMAGE_MODE_LINK and rel_path:
+                lines.append(f"  - Image: `{rel_path}`")
             else:
                 lines.append("  - _Image unavailable_")
         lines.append("")
         lines.append("</details>")
         lines.append("")
     return lines
+
 
 
 def generate_comment(
@@ -272,6 +294,7 @@ def generate_comment(
     identifier: str,
     image_root: Optional[Path],
     max_inline_bytes: int,
+    image_mode: str,
 ) -> str:
     image_root = image_root or manifest_path.parent
     manifest_root = manifest_path.parent
@@ -299,6 +322,7 @@ def generate_comment(
                 manifest_root=manifest_root,
                 image_root=image_root,
                 max_inline_bytes=max_inline_bytes,
+                image_mode=image_mode,
             )
         )
 
@@ -320,6 +344,7 @@ def main() -> None:
         identifier=args.identifier,
         image_root=image_root,
         max_inline_bytes=args.max_inline_bytes,
+        image_mode=args.image_mode,
     )
 
     if args.output:

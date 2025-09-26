@@ -44,7 +44,19 @@ jobs:
           python3 scripts/generate-compose-preview-comment.py \
             --manifest build/composePreviews/aggregate/manifest.json \
             --image-root $GITHUB_WORKSPACE \
+            --image-mode attachment \
             --output build/composePreviews/aggregate/comment.md
+
+      - name: Resolve Compose preview attachments
+        if: ${{ github.event_name == 'pull_request' }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          python3 scripts/prepare-compose-preview-comment.py \
+            --comment build/composePreviews/aggregate/comment.md \
+            --image-root $GITHUB_WORKSPACE \
+            --repo "${{ github.repository }}" \
+            --issue-number "${{ github.event.pull_request.number }}"
 
       - name: Upload Compose preview artifacts
         uses: actions/upload-artifact@v4
