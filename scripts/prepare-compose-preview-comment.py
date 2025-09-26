@@ -52,13 +52,17 @@ def upload_attachment(*, token: str, owner: str, repo: str, issue_number: int, f
             f"{file_size} bytes > {MAX_ATTACHMENT_BYTES} bytes"
         )
 
+    disposition = (
+        f'Content-Disposition: form-data; name="attachment"; filename="{file_path.name}"\r\n'
+    ).encode("utf-8")
+    part_headers = (
+        f"Content-Type: {content_type}\r\n"
+        "Content-Transfer-Encoding: binary\r\n\r\n"
+    ).encode("utf-8")
     body = (
         b"--" + boundary_bytes + b"\r\n"
-        + (
-            f'Content-Disposition: form-data; name="file"; filename="{file_path.name}"\r\n'
-        ).encode("utf-8")
-        + (f"Content-Type: {content_type}\r\n").encode("utf-8")
-        + (f"Content-Length: {file_size}\r\n\r\n").encode("utf-8")
+        + disposition
+        + part_headers
         + file_bytes
         + b"\r\n--" + boundary_bytes + b"--\r\n"
     )
@@ -80,9 +84,10 @@ def upload_attachment(*, token: str, owner: str, repo: str, issue_number: int, f
         if exc.status == 422 and "Bad Size" in message:
             size = file_path.stat().st_size
             hint = (
-                " Attachment upload was rejected because the file is too large. "
-                "Verify the Compose renderer downscaled outputs correctly and that the file is below GitHub's attachment limit "
-                f"({MAX_ATTACHMENT_BYTES} bytes). Current size: {size} bytes."
+                " GitHub reported \"Bad Size\" for the uploaded payload. "
+                "Verify the Compose renderer downscaled outputs correctly, confirm the attachment is under the "
+                f"{MAX_ATTACHMENT_BYTES} byte limit, and ensure the multipart request body matches GitHub's expected format. "
+                f"Current file size: {size} bytes."
             )
         raise RuntimeError(
             f"Failed to upload {file_path}: {exc.status} {exc.reason}: {message}{hint}"
