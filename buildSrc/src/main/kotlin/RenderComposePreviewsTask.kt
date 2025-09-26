@@ -1203,8 +1203,10 @@ abstract class RenderComposePreviewsTask : DefaultTask() {
             )
 
             val description = buildTestDescription(metadata, preview)
+            var prepared = false
             val renderResult = try {
                 paparazzi.prepare(description)
+                prepared = true
                 val snapshotComposable: (Composer, Int) -> Unit = { composer, _ ->
                     resolved.method.invoke(composer, resolved.receiver, *args)
                 }
@@ -1220,7 +1222,15 @@ abstract class RenderComposePreviewsTask : DefaultTask() {
                 logRenderFailure(metadata, preview, summary, throwable)
                 RenderResult.failure(summary)
             } finally {
-                paparazzi.close()
+                if (prepared) {
+                    runCatching { paparazzi.close() }.onFailure { closeError ->
+                        logger.warn(
+                            "Failed to close Paparazzi after rendering ${preview.id} for " +
+                                "${metadata.modulePath}#${metadata.variant}: ${closeError.renderSummary()}",
+                            closeError
+                        )
+                    }
+                }
             }
 
             renderResult

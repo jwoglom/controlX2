@@ -27,6 +27,9 @@
 - ✅ Ensured Paparazzi can render previews on CI even when the Android SDK's
   layoutlib jar is unavailable by falling back to the Maven-distributed layoutlib
   runtime, logging which source is used, and warning when neither path exists.
+- ✅ Hardened the Paparazzi renderer cleanup so failed renders preserve their
+  original exception messages instead of masking them with `lateinit` cleanup
+  errors when Paparazzi fails before initialization completes.
 - ✅ Switched the Compose preview workflow to embed rendered PNGs directly in the
   PR comment via base64 data URIs (with inline download links), eliminating the
   need for comment attachment uploads while still pointing reviewers at the
