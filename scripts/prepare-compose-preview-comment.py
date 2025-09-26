@@ -63,7 +63,17 @@ def upload_attachment(*, token: str, owner: str, repo: str, issue_number: int, f
             payload = json.loads(resp.read().decode("utf-8"))
     except error.HTTPError as exc:
         message = exc.read().decode("utf-8", errors="ignore")
-        raise RuntimeError(f"Failed to upload {file_path}: {exc.status} {exc.reason}: {message}") from exc
+        hint = ""
+        if exc.status == 422 and "Bad Size" in message:
+            size = file_path.stat().st_size
+            hint = (
+                " Attachment upload was rejected because the file is too large. "
+                "Verify the Compose renderer downscaled outputs correctly and that the file is below GitHub's attachment limit. "
+                f"Current size: {size} bytes."
+            )
+        raise RuntimeError(
+            f"Failed to upload {file_path}: {exc.status} {exc.reason}: {message}{hint}"
+        ) from exc
 
     for key in ("download_url", "browser_download_url", "url"):
         candidate = payload.get(key)
