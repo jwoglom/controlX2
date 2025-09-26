@@ -138,6 +138,7 @@ class ComposePreviewPlugin : Plugin<Project> {
         val runtimeConfiguration = project.configurations.findByName(runtimeConfigurationName)
         val layoutlibCandidate = locateLayoutlibJar(project)
         val layoutlibFallback = layoutlibCandidate ?: layoutlibFallbackFromDependencies(project)
+        val resolvedLayoutlib = layoutlibFallback
         val namespace: String = runCatching { variant.namespace.get() }.getOrElse { throwable ->
             val fallback = project.name
             val reason = throwable.message?.takeIf { it.isNotBlank() }
@@ -203,14 +204,23 @@ class ComposePreviewPlugin : Plugin<Project> {
                 ).map { it.asFile }
             )
 
-            val usingFallback = layoutlibCandidate == null && layoutlibFallback != null
-            layoutlibFallback?.let { candidate ->
-                layoutlibJar.set(project.objects.fileProperty().fileValue(candidate))
-            }
-            if (usingFallback) {
+            if (resolvedLayoutlib != null) {
+                val fileProvider = project.providers.provider {
+                    project.objects.fileProperty().fileValue(resolvedLayoutlib).get()
+                }
+                layoutlibJar.set(fileProvider)
                 doFirst {
+                    val source = if (layoutlibCandidate != null) "Android SDK" else "Maven"
                     logger.lifecycle(
-                        "Compose preview task for ${project.path}#$variantName will use Maven-provided layoutlib runtime"
+                        "Compose preview task for ${project.path}#$variantName using $source layoutlib runtime at " +
+                            resolvedLayoutlib.absolutePath
+                    )
+                }
+            } else {
+                doFirst {
+                    logger.warn(
+                        "Compose preview task for ${project.path}#$variantName could not locate a layoutlib runtime. " +
+                            "Rendered previews will report the missing layoutlib."
                     )
                 }
             }

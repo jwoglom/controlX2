@@ -23,7 +23,18 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--comment", required=True, help="Path to the Markdown file to rewrite")
     parser.add_argument("--image-root", required=True, help="Root directory used for relative attachment paths")
     parser.add_argument("--repo", required=True, help="GitHub repository in the form owner/repo")
-    parser.add_argument("--issue-number", type=int, required=True, help="Pull request or issue number for the comment")
+    parser.add_argument(
+        "--issue-number",
+        type=int,
+        required=False,
+        help="Pull request or issue number for the comment (optional when --comment-id is provided)",
+    )
+    parser.add_argument(
+        "--comment-id",
+        type=int,
+        required=False,
+        help="Existing GitHub comment ID to associate attachments with",
+    )
     parser.add_argument(
         "--token",
         required=False,
@@ -33,12 +44,20 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
-def upload_attachment(*, token: str, owner: str, repo: str, issue_number: int, file_path: Path) -> str:
+def upload_attachment(
+    *,
+    token: str,
+    owner: str,
+    repo: str,
+    issue_number: int | None,
+    comment_id: int,
+    file_path: Path,
+) -> str:
     if not token:
         raise RuntimeError("A GitHub token is required to upload attachments")
     url = (
-        f"https://uploads.github.com/repos/{owner}/{repo}/issues/{issue_number}/comments/"
-        f"assets?name={parse.quote(file_path.name)}"
+        f"https://uploads.github.com/repos/{owner}/{repo}/issues/comments/{comment_id}/attachments"
+        f"?name={parse.quote(file_path.name)}"
     )
     content_type = mimetypes.guess_type(file_path.name)[0] or "application/octet-stream"
     file_bytes = file_path.read_bytes()
@@ -105,7 +124,8 @@ def rewrite_comment(
     image_root: Path,
     owner: str,
     repo: str,
-    issue_number: int,
+    issue_number: int | None,
+    comment_id: int,
     token: str,
 ) -> None:
     content = comment_path.read_text(encoding="utf-8")
@@ -123,6 +143,7 @@ def rewrite_comment(
                 owner=owner,
                 repo=repo,
                 issue_number=issue_number,
+                comment_id=comment_id,
                 file_path=candidate,
             )
         return f"![{alt}]({cache[candidate]})"
@@ -139,12 +160,15 @@ def main() -> None:
     image_root = Path(args.image_root).resolve()
     comment_path = Path(args.comment).resolve()
     token = args.token or ""
+    if args.comment_id is None:
+        raise SystemExit("--comment-id is required to upload attachments")
     rewrite_comment(
         comment_path=comment_path,
         image_root=image_root,
         owner=owner,
         repo=repo,
         issue_number=args.issue_number,
+        comment_id=args.comment_id,
         token=token,
     )
 

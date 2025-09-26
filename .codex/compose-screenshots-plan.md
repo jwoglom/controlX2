@@ -26,13 +26,11 @@
   the preview renderer.
 - ✅ Ensured Paparazzi can render previews on CI even when the Android SDK's
   layoutlib jar is unavailable by falling back to the Maven-distributed layoutlib
-  runtime and logging the chosen source. The Compose preview workflow now uploads
-  rendered PNGs as GitHub comment attachments so pull request reports display the
-  actual images inline with working download links.
-- ✅ Hardened the attachment upload helper so GitHub accepts the rendered PNGs by
-  encoding uploads as multipart form data with explicit `Content-Type`/`Content-Length`
-  headers. This resolves the previous 422/400 failures and keeps inline preview
-  images rendering in PR comments.
+  runtime, logging which source is used, and warning when neither path exists.
+- ✅ Switched the Compose preview workflow to embed rendered PNGs directly in the
+  PR comment via base64 data URIs (with inline download links), eliminating the
+  need for comment attachment uploads while still pointing reviewers at the
+  compose-previews artifact for the original files.
 
 ## Recommended Technical Approach
 
@@ -120,5 +118,5 @@ If direct usage of `PreviewRenderer` proves brittle, Square's [Paparazzi](https:
 1. ✅ Prototype the Gradle preview tooling scaffolding by introducing a `buildSrc` convention plugin for the `mobile` module (placeholder metadata/render tasks + aggregate entry points). Metadata collection now emits structured JSON and the render task provides deterministic placeholder PNGs plus a manifest for downstream tooling.
 2. ✅ Replace the placeholder renderer with real Compose rendering (via Paparazzi) so previews produce actual UI imagery. The renderer now instantiates composables via Compose reflection, drives Paparazzi with module resources/runtime classpaths, expands `@PreviewParameter` providers, and emits PNGs plus manifest metadata for each invocation.
 3. ✅ Extend the plugin to handle the `wear` module and generate a consolidated manifest for PR consumption. The aggregate manifest task now runs after all module renders, merges manifests from both apps, resolves image paths relative to the repo root, and enforces that required resources and screenshots are present.
-4. ✅ Author scripts for Markdown generation and integrate with GitHub Actions as outlined. The helpers now produce sticky-comment Markdown that uploads preview images as comment attachments, and the `compose-previews` workflow drives rendering, artifact uploads, and comment updates on pull requests.
+4. ✅ Author scripts for Markdown generation and integrate with GitHub Actions as outlined. The helpers now produce sticky-comment Markdown that embeds previews directly (with inline download links), and the `compose-previews` workflow drives rendering, artifact uploads, and comment updates on pull requests.
 5. ✅ Run the preview rendering command locally as proof-of-concept, then open the implementation PR with CI validation.
