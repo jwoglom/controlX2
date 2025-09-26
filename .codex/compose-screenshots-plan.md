@@ -24,6 +24,11 @@
 - ✅ Verified `./gradlew renderAllComposePreviews` succeeds locally after wiring the
   corrected resource directories, compiled classpaths, and layoutlib detection into
   the preview renderer.
+- ✅ Ensured Paparazzi can render previews on CI even when the Android SDK's
+  layoutlib jar is unavailable by falling back to the Maven-distributed layoutlib
+  runtime and logging the chosen source. The Compose preview workflow now uploads
+  rendered PNGs as GitHub comment attachments so pull request reports display the
+  actual images inline with working download links.
 
 ## Recommended Technical Approach
 

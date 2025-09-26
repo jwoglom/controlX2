@@ -11,10 +11,10 @@ import java.util.concurrent.atomic.AtomicBoolean
 import org.gradle.api.Plugin
 import org.gradle.api.Project
 import org.gradle.api.Task
-import org.gradle.api.tasks.TaskProvider
-import org.gradle.kotlin.dsl.register
 import org.gradle.api.attributes.Attribute
 import org.gradle.api.artifacts.type.ArtifactTypeDefinition
+import org.gradle.api.tasks.TaskProvider
+import org.gradle.kotlin.dsl.register
 
 class ComposePreviewPlugin : Plugin<Project> {
     override fun apply(project: Project) {
@@ -137,6 +137,7 @@ class ComposePreviewPlugin : Plugin<Project> {
         val runtimeConfigurationName = "${variantName}RuntimeClasspath"
         val runtimeConfiguration = project.configurations.findByName(runtimeConfigurationName)
         val layoutlibCandidate = locateLayoutlibJar(project)
+        val layoutlibFallback = layoutlibCandidate ?: layoutlibFallbackFromDependencies(project)
         val namespace: String = runCatching { variant.namespace.get() }.getOrElse { throwable ->
             val fallback = project.name
             val reason = throwable.message?.takeIf { it.isNotBlank() }
@@ -202,8 +203,16 @@ class ComposePreviewPlugin : Plugin<Project> {
                 ).map { it.asFile }
             )
 
-            layoutlibCandidate?.let { candidate ->
+            val usingFallback = layoutlibCandidate == null && layoutlibFallback != null
+            layoutlibFallback?.let { candidate ->
                 layoutlibJar.set(project.objects.fileProperty().fileValue(candidate))
+            }
+            if (usingFallback) {
+                doFirst {
+                    logger.lifecycle(
+                        "Compose preview task for ${project.path}#$variantName will use Maven-provided layoutlib runtime"
+                    )
+                }
             }
         }
 
@@ -316,6 +325,17 @@ class ComposePreviewPlugin : Plugin<Project> {
         }
 
         return null
+    }
+
+    private fun layoutlibFallbackFromDependencies(project: Project): File? {
+        val dependencyNotation = "com.android.tools.layoutlib:layoutlib:14.0.11"
+        val dependency = project.dependencies.create(dependencyNotation)
+        val configuration = project.configurations.detachedConfiguration(dependency).apply {
+            isCanBeConsumed = false
+            isVisible = false
+        }
+
+        return runCatching { configuration.singleFile }.getOrNull()
     }
 
     private fun findAndroidSdkDirectory(project: Project): File? {
