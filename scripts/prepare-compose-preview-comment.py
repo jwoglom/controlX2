@@ -8,7 +8,6 @@ import json
 import mimetypes
 import os
 import re
-import uuid
 from pathlib import Path
 from typing import Dict
 from urllib import error, parse, request
@@ -42,8 +41,6 @@ def upload_attachment(*, token: str, owner: str, repo: str, issue_number: int, f
         f"assets?name={parse.quote(file_path.name)}"
     )
     content_type = mimetypes.guess_type(file_path.name)[0] or "application/octet-stream"
-    boundary = f"----compose-preview-boundary-{uuid.uuid4().hex}"
-    boundary_bytes = boundary.encode("utf-8")
     file_bytes = file_path.read_bytes()
     file_size = len(file_bytes)
     if file_size > MAX_ATTACHMENT_BYTES:
@@ -52,30 +49,15 @@ def upload_attachment(*, token: str, owner: str, repo: str, issue_number: int, f
             f"{file_size} bytes > {MAX_ATTACHMENT_BYTES} bytes"
         )
 
-    disposition = (
-        f'Content-Disposition: form-data; name="file"; filename="{file_path.name}"\r\n'
-    ).encode("utf-8")
-    part_headers = (
-        f"Content-Type: {content_type}\r\n"
-        f"Content-Length: {file_size}\r\n"
-        "Content-Transfer-Encoding: binary\r\n\r\n"
-    ).encode("utf-8")
-    body = (
-        b"--" + boundary_bytes + b"\r\n"
-        + disposition
-        + part_headers
-        + file_bytes
-        + b"\r\n--" + boundary_bytes + b"--\r\n"
-    )
     headers = {
         "Authorization": f"Bearer {token}",
         "Accept": "application/vnd.github+json",
-        "Content-Type": f"multipart/form-data; boundary={boundary}",
-        "Content-Length": str(len(body)),
+        "Content-Type": content_type,
+        "Content-Length": str(file_size),
         "X-GitHub-Api-Version": "2022-11-28",
         "User-Agent": "compose-preview-comment-uploader",
     }
-    req = request.Request(url, data=body, method="POST", headers=headers)
+    req = request.Request(url, data=file_bytes, method="POST", headers=headers)
     try:
         with request.urlopen(req) as resp:
             payload = json.loads(resp.read().decode("utf-8"))
@@ -87,7 +69,7 @@ def upload_attachment(*, token: str, owner: str, repo: str, issue_number: int, f
             hint = (
                 " GitHub reported \"Bad Size\" for the uploaded payload. "
                 "Verify the Compose renderer downscaled outputs correctly, confirm the attachment is under the "
-                f"{MAX_ATTACHMENT_BYTES} byte limit, and ensure the multipart request body matches GitHub's expected format. "
+                f"{MAX_ATTACHMENT_BYTES} byte limit, and ensure the HTTP request streamed the expected number of bytes. "
                 f"Current file size: {size} bytes."
             )
         raise RuntimeError(
