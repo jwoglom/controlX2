@@ -31,8 +31,8 @@ jobs:
 
       - name: Generate local.properties
         run: |
-          cat <<'PROPS' > local.properties
-          sdk.dir=$ANDROID_SDK_ROOT
+          cat <<PROPS > local.properties
+          sdk.dir=${ANDROID_SDK_ROOT}
           use_local_pumpx2=false
           PROPS
 
@@ -44,7 +44,10 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: compose-previews
-          path: build/composePreviews
+          path: |
+            build/composePreviews
+            mobile/build/composePreviews
+            wear/build/composePreviews
           if-no-files-found: error
 
       - name: Generate Compose preview comment

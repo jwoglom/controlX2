@@ -23,6 +23,7 @@ import base64
 import html
 import json
 import os
+from urllib.parse import quote
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Dict, List, Optional, Sequence, Tuple
@@ -261,12 +262,16 @@ def format_image_cell(
     if image_mode == IMAGE_MODE_ATTACHMENT and rel_path:
         return f"![{alt_text}](attachment://{rel_path})"
     if image_mode == IMAGE_MODE_LINK and rel_path:
+        normalized = rel_path.replace(os.sep, "/")
         if artifact_url:
-            escaped_url = html.escape(artifact_url, quote=True)
+            encoded_path = quote(normalized)
+            base_url = artifact_url.rstrip("/")
+            download_url = f"{base_url}?path={encoded_path}" if encoded_path else base_url
+            escaped_url = html.escape(download_url, quote=True)
             return (
-                f"[Download]({escaped_url})<br><code>{html.escape(rel_path)}</code>"
+                f"[Download]({escaped_url})<br><code>{html.escape(normalized)}</code>"
             )
-        return f"`{rel_path}`"
+        return f"`{normalized}`"
     return "_Image unavailable_"
 
 

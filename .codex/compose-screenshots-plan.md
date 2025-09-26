@@ -16,9 +16,11 @@
   artifacts, and post/update sticky PR comments linking back to the
   uploaded artifact instead of relying on comment attachments.
 - ✅ Tightened the generated Markdown so preview images are referenced in
-  compact tables with direct links to the artifact contents, trimming
-  module sections when the report nears GitHub's comment length cap while
-  pointing contributors to the full artifact gallery.
+  compact tables with direct links into the uploaded artifact contents,
+  trimming module sections when the report nears GitHub's comment length
+  cap while pointing contributors to the full artifact gallery. The CI
+  workflow now bundles each module's preview output alongside the
+  aggregate manifest so every linked screenshot is downloadable.
 - ✅ Verified `./gradlew renderAllComposePreviews` succeeds locally after wiring the
   corrected resource directories, compiled classpaths, and layoutlib detection into
   the preview renderer.
