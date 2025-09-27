@@ -39,8 +39,9 @@
   need for comment attachment uploads while still pointing reviewers at the
   compose-previews artifact for the original files.
 - ✅ Hooked the render task into resource packaging so the generated R class jar
-  is available on the preview classpath, resolving the "Missing Compose runtime
-  dependency" failures for both mobile and wear modules.
+  is produced before rendering kicks off, and added the packaged jar to the
+  preview runtime classpath so Paparazzi can load each module's `R` classes
+  without triggering "Missing Compose runtime dependency" errors.
 
 ## Recommended Technical Approach
 

@@ -159,6 +159,7 @@ class ComposePreviewPlugin : Plugin<Project> {
         renderTask.configure {
             runtimeClasspath.from(kotlinClassesDir.map { it.asFile })
             runtimeClasspath.from(javaClassesDir.map { it.asFile })
+            runtimeClasspath.from(compiledRClassJar)
             runtimeConfiguration?.let { configuration ->
                 val artifactType = Attribute.of("artifactType", String::class.java)
 
