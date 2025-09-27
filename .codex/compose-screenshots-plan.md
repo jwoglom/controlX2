@@ -38,6 +38,9 @@
   PR comment via base64 data URIs (with inline download links), eliminating the
   need for comment attachment uploads while still pointing reviewers at the
   compose-previews artifact for the original files.
+- ✅ Hooked the render task into resource packaging so the generated R class jar
+  is available on the preview classpath, resolving the "Missing Compose runtime
+  dependency" failures for both mobile and wear modules.
 
 ## Recommended Technical Approach
 

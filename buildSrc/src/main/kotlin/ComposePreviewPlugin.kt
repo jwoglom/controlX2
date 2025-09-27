@@ -152,6 +152,10 @@ class ComposePreviewPlugin : Plugin<Project> {
         val compileSdk = determineCompileSdk(project) ?: DEFAULT_COMPILE_SDK
         val resourcePackages: List<String> = listOf(namespace)
 
+        val processResourcesTaskName = "process${taskSuffix}Resources"
+        val mergeResourcesTaskName = "merge${taskSuffix}Resources"
+        val mergeAssetsTaskName = "merge${taskSuffix}Assets"
+
         renderTask.configure {
             runtimeClasspath.from(kotlinClassesDir.map { it.asFile })
             runtimeClasspath.from(javaClassesDir.map { it.asFile })
@@ -229,6 +233,23 @@ class ComposePreviewPlugin : Plugin<Project> {
         aggregateMetadata.configure { dependsOn(collectTask) }
         aggregateRender.configure { dependsOn(renderTask) }
         renderTask.configure { dependsOn(collectTask) }
+        renderTask.configure {
+            if (project.tasks.names.contains(kotlinCompileTaskName)) {
+                dependsOn(kotlinCompileTaskName)
+            }
+            if (project.tasks.names.contains(javaCompileTaskName)) {
+                dependsOn(javaCompileTaskName)
+            }
+            if (project.tasks.names.contains(processResourcesTaskName)) {
+                dependsOn(processResourcesTaskName)
+            }
+            if (project.tasks.names.contains(mergeResourcesTaskName)) {
+                dependsOn(mergeResourcesTaskName)
+            }
+            if (project.tasks.names.contains(mergeAssetsTaskName)) {
+                dependsOn(mergeAssetsTaskName)
+            }
+        }
         aggregateManifest.configure {
             manifestFiles.from(renderTask.flatMap { it.manifestFile })
             expectedManifestPaths.addAll(
