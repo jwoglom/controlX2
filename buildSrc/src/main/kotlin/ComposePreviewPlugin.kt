@@ -5,9 +5,16 @@ import com.android.build.api.dsl.LibraryExtension
 import com.android.build.api.variant.AndroidComponentsExtension
 import com.android.build.api.variant.Variant
 import java.io.File
+import java.io.FileOutputStream
+import java.io.InputStream
 import java.util.Locale
 import java.util.Properties
 import java.util.concurrent.atomic.AtomicBoolean
+import java.security.MessageDigest
+import java.nio.file.Files
+import java.nio.file.StandardCopyOption
+import java.util.zip.ZipEntry
+import java.util.zip.ZipInputStream
 import org.gradle.api.Plugin
 import org.gradle.api.Project
 import org.gradle.api.Task
@@ -17,6 +24,7 @@ import org.gradle.api.tasks.TaskProvider
 import org.gradle.kotlin.dsl.register
 
 class ComposePreviewPlugin : Plugin<Project> {
+
     override fun apply(project: Project) {
         val rootProject = project.rootProject
         val aggregateMetadata = ensureAggregateTask(
@@ -184,7 +192,7 @@ class ComposePreviewPlugin : Plugin<Project> {
 
             packageName.set(namespace)
             resourcePackageNames.set(resourcePackages.toMutableList())
-            compileSdkVersion.set(compileSdk)
+            compileSdkVersion.set(project.provider { compileSdk })
 
             mergedResources.from(
                 project.layout.buildDirectory.dir(
@@ -295,6 +303,7 @@ class ComposePreviewPlugin : Plugin<Project> {
         replaceFirstChar { if (it.isLowerCase()) it.titlecase(Locale.US) else it.toString() }
 
     private companion object {
+        val layoutlibExtractionLock = Any()
         const val TASK_GROUP = "compose previews"
         const val DEFAULT_COMPILE_SDK = 33
     }
@@ -372,7 +381,85 @@ class ComposePreviewPlugin : Plugin<Project> {
             isVisible = false
         }
 
-        return runCatching { configuration.singleFile }.getOrNull()
+        val layoutlibArchive = runCatching { configuration.singleFile }.getOrNull() ?: return null
+        val version = dependencyNotation.substringAfterLast(':').ifBlank { "unspecified" }
+        val runtimeRoot = project.rootProject.layout.buildDirectory
+            .dir("composePreviews/layoutlib/$version")
+            .get()
+            .asFile
+        val dataDir = File(runtimeRoot, "data")
+        val targetJar = File(dataDir, "layoutlib.jar")
+        val checksumFile = File(runtimeRoot, "layoutlib.sha256")
+        val archiveChecksum = layoutlibArchive.sha256()
+
+        synchronized(layoutlibExtractionLock) {
+            if (targetJar.exists() && checksumFile.takeIf(File::exists)?.readText()?.trim() == archiveChecksum) {
+                return targetJar
+            }
+
+            if (runtimeRoot.exists()) {
+                runtimeRoot.deleteRecursively()
+            }
+            dataDir.mkdirs()
+
+            Files.copy(layoutlibArchive.toPath(), targetJar.toPath(), StandardCopyOption.REPLACE_EXISTING)
+            extractRuntimePayload(layoutlibArchive, runtimeRoot)
+
+            checksumFile.writeText(archiveChecksum)
+        }
+
+        return targetJar
+    }
+
+    private fun extractRuntimePayload(sourceArchive: File, runtimeRoot: File) {
+        ZipInputStream(sourceArchive.inputStream().buffered()).use { zipStream ->
+            var entry: ZipEntry? = zipStream.nextEntry
+            while (entry != null) {
+                val entryName = entry.name
+                if (entry.isDirectory) {
+                    if (entryName.startsWith("data/")) {
+                        File(runtimeRoot, entryName).mkdirs()
+                    }
+                    zipStream.closeEntry()
+                    entry = zipStream.nextEntry
+                    continue
+                }
+
+                if (entryName.startsWith("data/")) {
+                    val output = File(runtimeRoot, entryName)
+                    output.parentFile?.mkdirs()
+                    FileOutputStream(output).use { outputStream ->
+                        zipStream.copyTo(outputStream)
+                    }
+                }
+
+                zipStream.closeEntry()
+                entry = zipStream.nextEntry
+            }
+        }
+    }
+
+    private fun File.sha256(): String {
+        val digest = MessageDigest.getInstance("SHA-256")
+        inputStream().use { stream ->
+            stream.buffered().copyToDigest(digest)
+        }
+        return digest.digest().joinToString(separator = "") { byte ->
+            ((byte.toInt() and 0xFF) + 0x100).toString(16).substring(1)
+        }
+    }
+
+    private fun InputStream.copyToDigest(digest: MessageDigest) {
+        val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
+        while (true) {
+            val read = read(buffer)
+            if (read == -1) {
+                break
+            }
+            if (read > 0) {
+                digest.update(buffer, 0, read)
+            }
+        }
     }
 
     private fun findAndroidSdkDirectory(project: Project): File? {
