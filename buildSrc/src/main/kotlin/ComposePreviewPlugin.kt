@@ -24,9 +24,6 @@ import org.gradle.api.tasks.TaskProvider
 import org.gradle.kotlin.dsl.register
 
 class ComposePreviewPlugin : Plugin<Project> {
-    companion object {
-        private val layoutlibExtractionLock = Any()
-    }
 
     override fun apply(project: Project) {
         val rootProject = project.rootProject
@@ -195,7 +192,7 @@ class ComposePreviewPlugin : Plugin<Project> {
 
             packageName.set(namespace)
             resourcePackageNames.set(resourcePackages.toMutableList())
-            compileSdkVersion.set(compileSdk)
+            compileSdkVersion.set(project.provider { compileSdk })
 
             mergedResources.from(
                 project.layout.buildDirectory.dir(
@@ -306,6 +303,7 @@ class ComposePreviewPlugin : Plugin<Project> {
         replaceFirstChar { if (it.isLowerCase()) it.titlecase(Locale.US) else it.toString() }
 
     private companion object {
+        val layoutlibExtractionLock = Any()
         const val TASK_GROUP = "compose previews"
         const val DEFAULT_COMPILE_SDK = 33
     }
