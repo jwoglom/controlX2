@@ -57,7 +57,7 @@ jobs:
           python3 scripts/generate-compose-preview-comment.py \
             --manifest build/composePreviews/aggregate/manifest.json \
             --image-root $GITHUB_WORKSPACE \
-            --image-mode link \
+            --image-mode inline \
             --artifact-url "$ARTIFACT_URL" \
             --output build/composePreviews/aggregate/comment.md
 
@@ -69,3 +69,4 @@ jobs:
           issue-number: ${{ github.event.pull_request.number }}
           body-path: build/composePreviews/aggregate/comment.md
           comment-identifier: controlx2-compose-previews
+          edit-mode: replace

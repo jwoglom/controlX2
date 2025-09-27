@@ -24,6 +24,28 @@
 - ✅ Verified `./gradlew renderAllComposePreviews` succeeds locally after wiring the
   corrected resource directories, compiled classpaths, and layoutlib detection into
   the preview renderer.
+- ✅ Ensured Paparazzi can render previews on CI even when the Android SDK's
+  layoutlib jar is unavailable by falling back to the Maven-distributed layoutlib
+  runtime, logging which source is used, and warning when neither path exists.
+- ✅ Hardened the Paparazzi renderer cleanup so failed renders preserve their
+  original exception messages instead of masking them with `lateinit` cleanup
+  errors when Paparazzi fails before initialization completes.
+- ✅ Ensured each render invocation drives Paparazzi through its `TestRule`
+  lifecycle so the internal `sdk` instance is initialized before snapshots run,
+  eliminating the `lateinit property sdk has not been initialized` failures
+  observed on every preview.
+- ✅ Switched the Compose preview workflow to embed rendered PNGs directly in the
+  PR comment via base64 data URIs (with inline download links), eliminating the
+  need for comment attachment uploads while still pointing reviewers at the
+  compose-previews artifact for the original files.
+- ✅ Hooked the render task into resource packaging so the generated R class jar
+  is produced before rendering kicks off, and added the packaged jar to the
+  preview runtime classpath so Paparazzi can load each module's `R` classes
+  without triggering "Missing Compose runtime dependency" errors.
+- ✅ Updated the render task wiring to include the canonical `R.jar` output path
+  emitted by the Android Gradle Plugin (alongside the existing fallback) so both
+  the mobile and wear previews always receive their module `R` classes at
+  runtime.
 
 ## Recommended Technical Approach
 
@@ -111,5 +133,5 @@ If direct usage of `PreviewRenderer` proves brittle, Square's [Paparazzi](https:
 1. ✅ Prototype the Gradle preview tooling scaffolding by introducing a `buildSrc` convention plugin for the `mobile` module (placeholder metadata/render tasks + aggregate entry points). Metadata collection now emits structured JSON and the render task provides deterministic placeholder PNGs plus a manifest for downstream tooling.
 2. ✅ Replace the placeholder renderer with real Compose rendering (via Paparazzi) so previews produce actual UI imagery. The renderer now instantiates composables via Compose reflection, drives Paparazzi with module resources/runtime classpaths, expands `@PreviewParameter` providers, and emits PNGs plus manifest metadata for each invocation.
 3. ✅ Extend the plugin to handle the `wear` module and generate a consolidated manifest for PR consumption. The aggregate manifest task now runs after all module renders, merges manifests from both apps, resolves image paths relative to the repo root, and enforces that required resources and screenshots are present.
-4. ✅ Author scripts for Markdown generation and integrate with GitHub Actions as outlined. The helpers now produce sticky-comment Markdown that uploads preview images as comment attachments, and the `compose-previews` workflow drives rendering, artifact uploads, and comment updates on pull requests.
+4. ✅ Author scripts for Markdown generation and integrate with GitHub Actions as outlined. The helpers now produce sticky-comment Markdown that embeds previews directly (with inline download links), and the `compose-previews` workflow drives rendering, artifact uploads, and comment updates on pull requests.
 5. ✅ Run the preview rendering command locally as proof-of-concept, then open the implementation PR with CI validation.

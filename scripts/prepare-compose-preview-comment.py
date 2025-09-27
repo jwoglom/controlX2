@@ -8,7 +8,6 @@ import json
 import mimetypes
 import os
 import re
-import uuid
 from pathlib import Path
 from typing import Dict
 from urllib import error, parse, request
@@ -24,7 +23,18 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--comment", required=True, help="Path to the Markdown file to rewrite")
     parser.add_argument("--image-root", required=True, help="Root directory used for relative attachment paths")
     parser.add_argument("--repo", required=True, help="GitHub repository in the form owner/repo")
-    parser.add_argument("--issue-number", type=int, required=True, help="Pull request or issue number for the comment")
+    parser.add_argument(
+        "--issue-number",
+        type=int,
+        required=False,
+        help="Pull request or issue number for the comment (optional when --comment-id is provided)",
+    )
+    parser.add_argument(
+        "--comment-id",
+        type=int,
+        required=False,
+        help="Existing GitHub comment ID to associate attachments with",
+    )
     parser.add_argument(
         "--token",
         required=False,
@@ -34,16 +44,22 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
-def upload_attachment(*, token: str, owner: str, repo: str, issue_number: int, file_path: Path) -> str:
+def upload_attachment(
+    *,
+    token: str,
+    owner: str,
+    repo: str,
+    issue_number: int | None,
+    comment_id: int,
+    file_path: Path,
+) -> str:
     if not token:
         raise RuntimeError("A GitHub token is required to upload attachments")
     url = (
-        f"https://uploads.github.com/repos/{owner}/{repo}/issues/{issue_number}/comments/"
-        f"assets?name={parse.quote(file_path.name)}"
+        f"https://uploads.github.com/repos/{owner}/{repo}/issues/comments/{comment_id}/attachments"
+        f"?name={parse.quote(file_path.name)}"
     )
     content_type = mimetypes.guess_type(file_path.name)[0] or "application/octet-stream"
-    boundary = f"----compose-preview-boundary-{uuid.uuid4().hex}"
-    boundary_bytes = boundary.encode("utf-8")
     file_bytes = file_path.read_bytes()
     file_size = len(file_bytes)
     if file_size > MAX_ATTACHMENT_BYTES:
@@ -52,20 +68,17 @@ def upload_attachment(*, token: str, owner: str, repo: str, issue_number: int, f
             f"{file_size} bytes > {MAX_ATTACHMENT_BYTES} bytes"
         )
 
+    boundary = f"------------------------{os.urandom(16).hex()}"
     disposition = (
-        f'Content-Disposition: form-data; name="attachment"; filename="{file_path.name}"\r\n'
-    ).encode("utf-8")
-    part_headers = (
-        f"Content-Type: {content_type}\r\n"
-        "Content-Transfer-Encoding: binary\r\n\r\n"
-    ).encode("utf-8")
-    body = (
-        b"--" + boundary_bytes + b"\r\n"
-        + disposition
-        + part_headers
-        + file_bytes
-        + b"\r\n--" + boundary_bytes + b"--\r\n"
+        f"Content-Disposition: form-data; name=\"file\"; filename=\"{file_path.name}\""
     )
+    part_headers = [disposition, f"Content-Type: {content_type}"]
+    body = bytearray()
+    body.extend(f"--{boundary}\r\n".encode("utf-8"))
+    body.extend(("\r\n".join(part_headers) + "\r\n\r\n").encode("utf-8"))
+    body.extend(file_bytes)
+    body.extend(f"\r\n--{boundary}--\r\n".encode("utf-8"))
+
     headers = {
         "Authorization": f"Bearer {token}",
         "Accept": "application/vnd.github+json",
@@ -74,7 +87,7 @@ def upload_attachment(*, token: str, owner: str, repo: str, issue_number: int, f
         "X-GitHub-Api-Version": "2022-11-28",
         "User-Agent": "compose-preview-comment-uploader",
     }
-    req = request.Request(url, data=body, method="POST", headers=headers)
+    req = request.Request(url, data=bytes(body), method="POST", headers=headers)
     try:
         with request.urlopen(req) as resp:
             payload = json.loads(resp.read().decode("utf-8"))
@@ -86,8 +99,13 @@ def upload_attachment(*, token: str, owner: str, repo: str, issue_number: int, f
             hint = (
                 " GitHub reported \"Bad Size\" for the uploaded payload. "
                 "Verify the Compose renderer downscaled outputs correctly, confirm the attachment is under the "
-                f"{MAX_ATTACHMENT_BYTES} byte limit, and ensure the multipart request body matches GitHub's expected format. "
+                f"{MAX_ATTACHMENT_BYTES} byte limit, and ensure the HTTP request streamed the expected number of bytes. "
                 f"Current file size: {size} bytes."
+            )
+        elif exc.status == 400 and "Multipart form data required" in message:
+            hint = (
+                " GitHub rejected the upload because the request was not encoded as multipart/form-data. "
+                "Double-check the request boundary and ensure the file bytes are wrapped in a `file` form field."
             )
         raise RuntimeError(
             f"Failed to upload {file_path}: {exc.status} {exc.reason}: {message}{hint}"
@@ -106,7 +124,8 @@ def rewrite_comment(
     image_root: Path,
     owner: str,
     repo: str,
-    issue_number: int,
+    issue_number: int | None,
+    comment_id: int,
     token: str,
 ) -> None:
     content = comment_path.read_text(encoding="utf-8")
@@ -124,6 +143,7 @@ def rewrite_comment(
                 owner=owner,
                 repo=repo,
                 issue_number=issue_number,
+                comment_id=comment_id,
                 file_path=candidate,
             )
         return f"![{alt}]({cache[candidate]})"
@@ -140,12 +160,15 @@ def main() -> None:
     image_root = Path(args.image_root).resolve()
     comment_path = Path(args.comment).resolve()
     token = args.token or ""
+    if args.comment_id is None:
+        raise SystemExit("--comment-id is required to upload attachments")
     rewrite_comment(
         comment_path=comment_path,
         image_root=image_root,
         owner=owner,
         repo=repo,
         issue_number=args.issue_number,
+        comment_id=args.comment_id,
         token=token,
     )
 

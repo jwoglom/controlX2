@@ -255,9 +255,29 @@ def format_image_cell(
 ) -> str:
     alt_text = html.escape(preview.display_name or key.label or "Preview")
     if inline:
+        data_uri = f"data:image/png;base64,{inline}"
+        escaped_uri = html.escape(data_uri, quote=True)
+        download_name = "preview.png"
+        if rel_path:
+            download_name = Path(rel_path).name
+        elif key.label:
+            download_name = f"{key.label}.png"
+        escaped_download = html.escape(download_name, quote=True)
+        caption_parts: List[str] = []
+        if rel_path:
+            normalized = rel_path.replace(os.sep, "/")
+            caption_parts.append(f"<code>{html.escape(normalized)}</code>")
+        caption_parts.append(
+            f'<a href="{escaped_uri}" download="{escaped_download}">Download</a>'
+        )
+        caption = f"<br><sub>{' · '.join(caption_parts)}</sub>" if caption_parts else ""
         return (
-            f'<img src="data:image/png;base64,{inline}" alt="{alt_text}" '
+            f'<a href="{escaped_uri}" download="{escaped_download}" '
+            f'title="Download {html.escape(download_name)}">'
+            f'<img src="{escaped_uri}" alt="{alt_text}" '
             "style=\"max-width: 100%; height: auto;\" />"
+            "</a>"
+            f"{caption}"
         )
     if image_mode == IMAGE_MODE_ATTACHMENT and rel_path:
         return f"![{alt_text}](attachment://{rel_path})"
@@ -377,7 +397,7 @@ def generate_comment(
     header_lines.append("")
     summary = f"Rendered {total_previews} previews across {total_modules} module(s)."
     header_lines.append(summary)
-    if artifact_url and image_mode == IMAGE_MODE_LINK:
+    if artifact_url:
         header_lines.append("")
         header_lines.append(
             f"📦 Preview images are available in the [compose-previews artifact]({artifact_url})."

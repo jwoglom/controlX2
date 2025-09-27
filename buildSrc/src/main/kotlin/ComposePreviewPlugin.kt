@@ -11,10 +11,10 @@ import java.util.concurrent.atomic.AtomicBoolean
 import org.gradle.api.Plugin
 import org.gradle.api.Project
 import org.gradle.api.Task
-import org.gradle.api.tasks.TaskProvider
-import org.gradle.kotlin.dsl.register
 import org.gradle.api.attributes.Attribute
 import org.gradle.api.artifacts.type.ArtifactTypeDefinition
+import org.gradle.api.tasks.TaskProvider
+import org.gradle.kotlin.dsl.register
 
 class ComposePreviewPlugin : Plugin<Project> {
     override fun apply(project: Project) {
@@ -137,6 +137,8 @@ class ComposePreviewPlugin : Plugin<Project> {
         val runtimeConfigurationName = "${variantName}RuntimeClasspath"
         val runtimeConfiguration = project.configurations.findByName(runtimeConfigurationName)
         val layoutlibCandidate = locateLayoutlibJar(project)
+        val layoutlibFallback = layoutlibCandidate ?: layoutlibFallbackFromDependencies(project)
+        val resolvedLayoutlib = layoutlibFallback
         val namespace: String = runCatching { variant.namespace.get() }.getOrElse { throwable ->
             val fallback = project.name
             val reason = throwable.message?.takeIf { it.isNotBlank() }
@@ -150,9 +152,14 @@ class ComposePreviewPlugin : Plugin<Project> {
         val compileSdk = determineCompileSdk(project) ?: DEFAULT_COMPILE_SDK
         val resourcePackages: List<String> = listOf(namespace)
 
+        val processResourcesTaskName = "process${taskSuffix}Resources"
+        val mergeResourcesTaskName = "merge${taskSuffix}Resources"
+        val mergeAssetsTaskName = "merge${taskSuffix}Assets"
+
         renderTask.configure {
             runtimeClasspath.from(kotlinClassesDir.map { it.asFile })
             runtimeClasspath.from(javaClassesDir.map { it.asFile })
+            runtimeClasspath.from(compiledRClassJar)
             runtimeConfiguration?.let { configuration ->
                 val artifactType = Attribute.of("artifactType", String::class.java)
 
@@ -191,6 +198,11 @@ class ComposePreviewPlugin : Plugin<Project> {
 
             compiledRClassJar.from(
                 project.layout.buildDirectory.file(
+                    "intermediates/compile_and_runtime_not_namespaced_r_class_jar/$variantName/R.jar"
+                ).map { it.asFile }
+            )
+            compiledRClassJar.from(
+                project.layout.buildDirectory.file(
                     "intermediates/compile_and_runtime_not_namespaced_r_class_jar/$variantName/" +
                         "process${taskSuffix}Resources/R.jar"
                 ).map { it.asFile }
@@ -202,14 +214,48 @@ class ComposePreviewPlugin : Plugin<Project> {
                 ).map { it.asFile }
             )
 
-            layoutlibCandidate?.let { candidate ->
-                layoutlibJar.set(project.objects.fileProperty().fileValue(candidate))
+            if (resolvedLayoutlib != null) {
+                val fileProvider = project.providers.provider {
+                    project.objects.fileProperty().fileValue(resolvedLayoutlib).get()
+                }
+                layoutlibJar.set(fileProvider)
+                doFirst {
+                    val source = if (layoutlibCandidate != null) "Android SDK" else "Maven"
+                    logger.lifecycle(
+                        "Compose preview task for ${project.path}#$variantName using $source layoutlib runtime at " +
+                            resolvedLayoutlib.absolutePath
+                    )
+                }
+            } else {
+                doFirst {
+                    logger.warn(
+                        "Compose preview task for ${project.path}#$variantName could not locate a layoutlib runtime. " +
+                            "Rendered previews will report the missing layoutlib."
+                    )
+                }
             }
         }
 
         aggregateMetadata.configure { dependsOn(collectTask) }
         aggregateRender.configure { dependsOn(renderTask) }
         renderTask.configure { dependsOn(collectTask) }
+        renderTask.configure {
+            if (project.tasks.names.contains(kotlinCompileTaskName)) {
+                dependsOn(kotlinCompileTaskName)
+            }
+            if (project.tasks.names.contains(javaCompileTaskName)) {
+                dependsOn(javaCompileTaskName)
+            }
+            if (project.tasks.names.contains(processResourcesTaskName)) {
+                dependsOn(processResourcesTaskName)
+            }
+            if (project.tasks.names.contains(mergeResourcesTaskName)) {
+                dependsOn(mergeResourcesTaskName)
+            }
+            if (project.tasks.names.contains(mergeAssetsTaskName)) {
+                dependsOn(mergeAssetsTaskName)
+            }
+        }
         aggregateManifest.configure {
             manifestFiles.from(renderTask.flatMap { it.manifestFile })
             expectedManifestPaths.addAll(
@@ -316,6 +362,17 @@ class ComposePreviewPlugin : Plugin<Project> {
         }
 
         return null
+    }
+
+    private fun layoutlibFallbackFromDependencies(project: Project): File? {
+        val dependencyNotation = "com.android.tools.layoutlib:layoutlib:14.0.11"
+        val dependency = project.dependencies.create(dependencyNotation)
+        val configuration = project.configurations.detachedConfiguration(dependency).apply {
+            isCanBeConsumed = false
+            isVisible = false
+        }
+
+        return runCatching { configuration.singleFile }.getOrNull()
     }
 
     private fun findAndroidSdkDirectory(project: Project): File? {
