@@ -27,6 +27,12 @@
 - ✅ Ensured Paparazzi can render previews on CI even when the Android SDK's
   layoutlib jar is unavailable by falling back to the Maven-distributed layoutlib
   runtime, logging which source is used, and warning when neither path exists.
+- 🟡 Reshaped the Maven layoutlib fallback so the downloaded archive is expanded
+  into a synthetic `<runtime>/data/layoutlib.jar` layout within
+  `build/composePreviews/layoutlib/`, matching the directory structure expected
+  by Paparazzi when it derives runtime and resource roots. Pending validation of
+  renders with the synthesized runtime to confirm previews graduate from the
+  "Layoutlib jar not configured" placeholder frames.
 - ✅ Hardened the Paparazzi renderer cleanup so failed renders preserve their
   original exception messages instead of masking them with `lateinit` cleanup
   errors when Paparazzi fails before initialization completes.
