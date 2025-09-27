@@ -42,6 +42,10 @@
   is produced before rendering kicks off, and added the packaged jar to the
   preview runtime classpath so Paparazzi can load each module's `R` classes
   without triggering "Missing Compose runtime dependency" errors.
+- ✅ Updated the render task wiring to include the canonical `R.jar` output path
+  emitted by the Android Gradle Plugin (alongside the existing fallback) so both
+  the mobile and wear previews always receive their module `R` classes at
+  runtime.
 
 ## Recommended Technical Approach
 

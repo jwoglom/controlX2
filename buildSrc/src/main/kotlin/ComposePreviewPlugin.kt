@@ -198,6 +198,11 @@ class ComposePreviewPlugin : Plugin<Project> {
 
             compiledRClassJar.from(
                 project.layout.buildDirectory.file(
+                    "intermediates/compile_and_runtime_not_namespaced_r_class_jar/$variantName/R.jar"
+                ).map { it.asFile }
+            )
+            compiledRClassJar.from(
+                project.layout.buildDirectory.file(
                     "intermediates/compile_and_runtime_not_namespaced_r_class_jar/$variantName/" +
                         "process${taskSuffix}Resources/R.jar"
                 ).map { it.asFile }
