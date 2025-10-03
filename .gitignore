@@ -23,3 +23,6 @@ mobile/release/
 wear/release/
 mobile/src/main/assets/paperwork.json
 wear/src/main/assets/paperwork.json
+.kotlin
+buildSrc/.kotlin
+buildSrc/build
