@@ -42,8 +42,6 @@ jobs:
             -DRELEASE_STORE_PASSWORD='${{ secrets.RELEASE_STORE_PASSWORD }}' \
             -DRELEASE_KEY_ALIAS='${{ secrets.RELEASE_KEY_ALIAS }}' \
             -DRELEASE_KEY_PASSWORD='${{ secrets.RELEASE_KEY_PASSWORD }}'
-      - name: List Files
-        run: find .
 
       - name: Upload release mobile APK
         uses: actions/upload-artifact@v4
@@ -68,6 +66,10 @@ jobs:
       - name: Android Test Report
         uses: asadmansr/android-test-report-action@v1.2.0
         if: ${{ always() }} # IMPORTANT: run Android Test Report regardless
+
+      - name: List Files
+        run: find .
+        if: ${{ always() }} 
 
       - name: Validate Gradle wrapper
         uses: gradle/actions/wrapper-validation@v3
