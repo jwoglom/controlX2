@@ -1,4 +1,4 @@
-name: Compose Preview Screenshots
+name: Paparazzi Test Generation
 
 on:
   pull_request:
@@ -42,8 +42,8 @@ jobs:
       - name: Render Compose previews
         run: ./gradlew --stacktrace renderAllComposePreviews
 
-      - name: Upload Compose preview artifacts
-        id: upload_previews
+      - name: Upload artifacts
+        id: upload_artifacts
         uses: actions/upload-artifact@v4
         with:
           name: compose-previews
@@ -55,23 +55,23 @@ jobs:
             wear/src/test/java/com/jwoglom/controlx2/test/snapshots
           if-no-files-found: error
 
-      - name: Generate Compose preview comment
+      - name: Generate comment
         env:
-          ARTIFACT_URL: ${{ steps.upload_previews.outputs.artifact-url != '' && steps.upload_previews.outputs.artifact-url || format('https://github.com/{0}/actions/runs/{1}', github.repository, github.run_id) }}
+          ARTIFACT_URL: ${{ steps.upload_artifacts.outputs.artifact-url != '' && steps.upload_artifacts.outputs.artifact-url || format('https://github.com/{0}/actions/runs/{1}', github.repository, github.run_id) }}
         run: |
           python3 scripts/generate-compose-preview-comment.py \
             --manifest build/composePreviews/aggregate/manifest.json \
             --image-root $GITHUB_WORKSPACE \
             --image-mode inline \
             --artifact-url "$ARTIFACT_URL" \
-            --output build/composePreviews/aggregate/comment.md
+            --output /tmp/comment.md
 
-      - name: Post Compose preview comment
+      - name: Post comment
         if: ${{ github.event_name == 'pull_request' }}
         uses: peter-evans/create-or-update-comment@v3
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           issue-number: ${{ github.event.pull_request.number }}
-          body-path: build/composePreviews/aggregate/comment.md
+          body-path: /tmp/comment.md
           comment-identifier: controlx2-compose-previews
           edit-mode: replace
