@@ -56,8 +56,11 @@ fun ControlX2Theme(
     val view = LocalView.current
     if (!view.isInEditMode) {
         SideEffect {
-            (view.context as Activity).window.statusBarColor = colorScheme.primary.toArgb()
-            ViewCompat.getWindowInsetsController(view)?.isAppearanceLightStatusBars = darkTheme
+            val context = view.context
+            if (context is Activity) {
+                context.window.statusBarColor = colorScheme.primary.toArgb()
+                ViewCompat.getWindowInsetsController(view)?.isAppearanceLightStatusBars = darkTheme
+            }
         }
     }
 
