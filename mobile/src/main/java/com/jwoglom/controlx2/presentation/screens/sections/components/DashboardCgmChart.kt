@@ -98,7 +98,7 @@ private fun cgmEntry(index: Int, mgdl: Int): HistoryLog {
 
 @Preview(showBackground = true)
 @Composable
-private fun DefaultPreview() {
+internal fun DashboardCgmChartDefaultPreview() {
     ControlX2Theme() {
         Surface(
             modifier = Modifier.fillMaxSize(),

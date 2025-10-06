@@ -561,7 +561,7 @@ val cgmActionsFields = listOf(
 
 @Preview(showBackground = true)
 @Composable
-private fun DefaultPreview() {
+internal fun CGMActionsDefaultPreview() {
     ControlX2Theme() {
         Surface(
             modifier = Modifier.fillMaxSize(),
@@ -579,7 +579,7 @@ private fun DefaultPreview() {
 
 @Preview(showBackground = true)
 @Composable
-private fun DefaultPreviewCgmStart() {
+internal fun CGMActionsDefaultPreviewCgmStart() {
     ControlX2Theme() {
         Surface(
             modifier = Modifier.fillMaxSize(),

@@ -685,7 +685,7 @@ val actionsFields = listOf(
 
 @Preview(showBackground = true)
 @Composable
-private fun DefaultPreviewInsulinActive() {
+internal fun ActionsDefaultPreviewInsulinActive() {
     ControlX2Theme() {
         Surface(
             modifier = Modifier.fillMaxSize(),
@@ -704,7 +704,7 @@ private fun DefaultPreviewInsulinActive() {
 
 @Preview(showBackground = true)
 @Composable
-private fun DefaultPreviewInsulinActive_StopMenuOpen() {
+internal fun ActionsDefaultPreviewInsulinActive_StopMenuOpen() {
     ControlX2Theme() {
         Surface(
             modifier = Modifier.fillMaxSize(),
@@ -724,7 +724,7 @@ private fun DefaultPreviewInsulinActive_StopMenuOpen() {
 
 @Preview(showBackground = true)
 @Composable
-private fun DefaultPreviewInsulinSuspended() {
+internal fun ActionsDefaultPreviewInsulinSuspended() {
     ControlX2Theme() {
         Surface(
             modifier = Modifier.fillMaxSize(),
@@ -744,7 +744,7 @@ private fun DefaultPreviewInsulinSuspended() {
 
 @Preview(showBackground = true)
 @Composable
-private fun DefaultPreviewInsulinSuspended_ResumeMenuOpen() {
+internal fun ActionsDefaultPreviewInsulinSuspended_ResumeMenuOpen() {
     ControlX2Theme() {
         Surface(
             modifier = Modifier.fillMaxSize(),
@@ -765,6 +765,6 @@ private fun DefaultPreviewInsulinSuspended_ResumeMenuOpen() {
 
 @Preview(showBackground = true)
 @Composable
-private fun DefaultPreview_StartTempRate() {
+internal fun ActionsDefaultPreview_StartTempRate() {
     TempRatePreview()
 }

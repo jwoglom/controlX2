@@ -377,7 +377,7 @@ val dashboardFields = listOf(
 
 @Preview(showBackground = true)
 @Composable
-private fun DefaultPreview() {
+internal fun DashboardDefaultPreview() {
     ControlX2Theme() {
         Surface(
             modifier = Modifier.fillMaxSize(),

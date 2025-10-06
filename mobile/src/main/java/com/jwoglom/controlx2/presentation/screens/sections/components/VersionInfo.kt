@@ -66,7 +66,7 @@ fun VersionInfo(
 
 @Preview(showBackground = true)
 @Composable
-private fun DefaultPreview() {
+internal fun VersionInfoDefaultPreview() {
     ControlX2Theme() {
         Surface(
             modifier = Modifier.fillMaxSize(),

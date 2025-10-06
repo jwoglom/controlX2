@@ -461,7 +461,7 @@ fun setUpPreviewState(ds: DataStore) {
 
 @Preview(showBackground = true)
 @Composable
-private fun DefaultPreview() {
+internal fun LandingDefaultPreview() {
     ControlX2Theme() {
         Surface(
             modifier = Modifier.fillMaxSize(),
@@ -523,7 +523,7 @@ fun TempRatePreview() {
 
 @Preview(showBackground = true)
 @Composable
-private fun DebugPreview() {
+internal fun LandingDebugPreview() {
     ControlX2Theme() {
         Surface(
             modifier = Modifier.fillMaxSize(),
@@ -543,7 +543,7 @@ private fun DebugPreview() {
 
 @Preview(showBackground = true)
 @Composable
-private fun SettingsPreview() {
+internal fun LandingSettingsPreview() {
     ControlX2Theme() {
         Surface(
             modifier = Modifier.fillMaxSize(),

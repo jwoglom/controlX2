@@ -338,7 +338,7 @@ fun AppSetup(
 
 @Preview(showBackground = true)
 @Composable
-private fun DefaultPreview() {
+internal fun AppSetupDefaultPreview() {
     ControlX2Theme() {
         Surface(
             modifier = Modifier.fillMaxSize(),

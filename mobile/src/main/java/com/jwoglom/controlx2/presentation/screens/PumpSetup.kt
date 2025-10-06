@@ -585,7 +585,7 @@ enum class PumpSetupStage(val step: Int, val description: String) {
 
 @Preview(showBackground = true)
 @Composable
-private fun DefaultPreview() {
+internal fun PumpSetupDefaultPreview() {
     ControlX2Theme() {
         Surface(
             modifier = Modifier.fillMaxSize(),

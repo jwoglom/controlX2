@@ -48,7 +48,7 @@ fun PumpStatusBar(middleContent: @Composable () -> Unit = {}) {
 
 @Preview(showBackground = true)
 @Composable
-private fun DefaultPreview() {
+internal fun PumpStatusBarDefaultPreview() {
     ControlX2Theme() {
         Surface(
             color = Color.White,

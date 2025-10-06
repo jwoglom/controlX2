@@ -266,7 +266,7 @@ fun Settings(
 
 @Preview(showBackground = true)
 @Composable
-private fun DefaultPreview() {
+internal fun SettingsDefaultPreview() {
     ControlX2Theme() {
         Surface(
             modifier = Modifier.fillMaxSize(),

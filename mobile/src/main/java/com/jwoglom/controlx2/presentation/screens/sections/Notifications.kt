@@ -217,7 +217,7 @@ val notificationsFields = listOf(
 
 @Preview(showBackground = true)
 @Composable
-private fun DefaultPreview() {
+internal fun NotificationsDefaultPreview() {
     ControlX2Theme() {
         Surface(
             modifier = Modifier.fillMaxSize(),
@@ -234,7 +234,7 @@ private fun DefaultPreview() {
 
 @Preview(showBackground = true)
 @Composable
-private fun DefaultPreview_WithNotifications() {
+internal fun NotificationsDefaultPreview_WithNotifications() {
     ControlX2Theme() {
         Surface(
             modifier = Modifier.fillMaxSize(),

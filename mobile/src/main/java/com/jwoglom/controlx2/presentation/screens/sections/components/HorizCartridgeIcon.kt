@@ -82,7 +82,7 @@ fun getPainterForCartridgePercent(percent: Int): Painter {
 
 @Preview
 @Composable
-private fun Preview0() {
+internal fun HorizCartridgeIconPreview0() {
     Surface(
         color = Color.White,
     ) {
@@ -92,7 +92,7 @@ private fun Preview0() {
 
 @Preview
 @Composable
-private fun Preview20() {
+internal fun HorizCartridgeIconPreview20() {
     Surface(
         color = Color.White,
     ) {
@@ -102,7 +102,7 @@ private fun Preview20() {
 
 @Preview
 @Composable
-private fun Preview30() {
+internal fun HorizCartridgeIconPreview30() {
     Surface(
         color = Color.White,
     ) {
@@ -112,7 +112,7 @@ private fun Preview30() {
 
 @Preview
 @Composable
-private fun Preview40() {
+internal fun HorizCartridgeIconPreview40() {
     Surface(
         color = Color.White,
     ) {
@@ -122,7 +122,7 @@ private fun Preview40() {
 
 @Preview
 @Composable
-private fun Preview60() {
+internal fun HorizCartridgeIconPreview60() {
     Surface(
         color = Color.White,
     ) {
@@ -132,7 +132,7 @@ private fun Preview60() {
 
 @Preview
 @Composable
-private fun Preview80() {
+internal fun HorizCartridgeIconPreview80() {
     Surface(
         color = Color.White,
     ) {
@@ -142,7 +142,7 @@ private fun Preview80() {
 
 @Preview
 @Composable
-private fun PreviewPlus() {
+internal fun HorizCartridgeIconPreviewPlus() {
     Surface(
         color = Color.White,
     ) {

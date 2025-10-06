@@ -740,7 +740,7 @@ val cartridgeActionsFields = listOf(
 
 @Preview(showBackground = true)
 @Composable
-private fun DefaultPreview() {
+internal fun CartridgeActionsDefaultPreview() {
     ControlX2Theme() {
         Surface(
             modifier = Modifier.fillMaxSize(),
@@ -758,7 +758,7 @@ private fun DefaultPreview() {
 
 @Preview(showBackground = true)
 @Composable
-private fun DefaultPreviewChangeCartridge_InsulinNotStopped() {
+internal fun CartridgeActionsDefaultPreviewChangeCartridge_InsulinNotStopped() {
     ControlX2Theme() {
         Surface(
             modifier = Modifier.fillMaxSize(),
@@ -778,7 +778,7 @@ private fun DefaultPreviewChangeCartridge_InsulinNotStopped() {
 
 @Preview(showBackground = true)
 @Composable
-private fun DefaultPreviewChangeCartridge_InsulinStopped() {
+internal fun CartridgeActionsDefaultPreviewChangeCartridge_InsulinStopped() {
     ControlX2Theme() {
         Surface(
             modifier = Modifier.fillMaxSize(),

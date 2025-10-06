@@ -69,7 +69,7 @@ fun getPainterForBatteryPercent(batteryPercent: Int): Painter {
 
 @Preview
 @Composable
-private fun Preview0() {
+internal fun HorizBatteryIconPreview0() {
     Surface(
         color = Color.White,
     ) {
@@ -79,7 +79,7 @@ private fun Preview0() {
 
 @Preview
 @Composable
-private fun Preview20() {
+internal fun HorizBatteryIconPreview20() {
     Surface(
         color = Color.White,
     ) {
@@ -89,7 +89,7 @@ private fun Preview20() {
 
 @Preview
 @Composable
-private fun Preview30() {
+internal fun HorizBatteryIconPreview30() {
     Surface(
         color = Color.White,
     ) {
@@ -99,7 +99,7 @@ private fun Preview30() {
 
 @Preview
 @Composable
-private fun Preview40() {
+internal fun HorizBatteryIconPreview40() {
     Surface(
         color = Color.White,
     ) {
@@ -109,7 +109,7 @@ private fun Preview40() {
 
 @Preview
 @Composable
-private fun Preview60() {
+internal fun HorizBatteryIconPreview60() {
     Surface(
         color = Color.White,
     ) {
@@ -119,7 +119,7 @@ private fun Preview60() {
 
 @Preview
 @Composable
-private fun Preview80() {
+internal fun HorizBatteryIconPreview80() {
     Surface(
         color = Color.White,
     ) {

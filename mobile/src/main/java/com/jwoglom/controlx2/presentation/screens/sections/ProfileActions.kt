@@ -449,7 +449,7 @@ val profileActionsFields = listOf(
 
 @Preview(showBackground = true)
 @Composable
-private fun DefaultPreview() {
+internal fun ProfileActionsDefaultPreview() {
     ControlX2Theme() {
         Surface(
             modifier = Modifier.fillMaxSize(),

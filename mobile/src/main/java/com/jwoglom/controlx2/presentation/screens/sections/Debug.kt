@@ -1227,7 +1227,7 @@ fun historyLogToJson(it: Map.Entry<Long, HistoryLog>): String {
 
 @Preview(showBackground = true)
 @Composable
-private fun DefaultPreview() {
+internal fun DebugDefaultPreview() {
     ControlX2Theme() {
         Surface(
             modifier = Modifier.fillMaxSize(),

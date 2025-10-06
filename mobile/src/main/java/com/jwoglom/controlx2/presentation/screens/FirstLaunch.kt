@@ -76,7 +76,7 @@ fun FirstLaunch(
 
 @Preview(showBackground = true)
 @Composable
-private fun DefaultPreview() {
+internal fun FirstLaunchDefaultPreview() {
     ControlX2Theme() {
         Surface(
             modifier = Modifier.fillMaxSize(),
