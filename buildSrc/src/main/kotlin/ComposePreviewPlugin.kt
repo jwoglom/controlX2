@@ -120,6 +120,22 @@ class ComposePreviewPlugin : Plugin<Project> {
             }
         }
 
+        val generateTestsTask = project.tasks.register<GeneratePaparazziTestsTask>(
+            "generatePaparazziTests$taskSuffix"
+        ) {
+            group = TASK_GROUP
+            description = "Generate Paparazzi test file for the $variantName variant of ${project.path}."
+            metadataFile.set(collectTask.flatMap { it.outputFile })
+            packageName.set(variant.namespace)
+            modulePath.set(project.path)
+            outputTestFile.set(
+                variant.namespace.map { ns ->
+                    project.layout.projectDirectory.file("src/test/java/${ns.replace('.', '/')}/test/ComposePreviewPaparazziTest.kt")
+                }
+            )
+            dependsOn(collectTask)
+        }
+
         val renderTask = project.tasks.register<RenderComposePreviewsTask>(
             "renderComposePreviews$taskSuffix"
         ) {
@@ -139,18 +155,7 @@ class ComposePreviewPlugin : Plugin<Project> {
         val layoutlibCandidate = locateLayoutlibJar(project)
         val layoutlibFallback = layoutlibCandidate ?: layoutlibFallbackFromDependencies(project)
         val resolvedLayoutlib = layoutlibFallback
-        val namespace: String = runCatching { variant.namespace.get() }.getOrElse { throwable ->
-            val fallback = project.name
-            val reason = throwable.message?.takeIf { it.isNotBlank() }
-                ?: throwable::class.java.simpleName
-            project.logger.warn(
-                "Unable to determine namespace for ${project.path}#$variantName from Android Gradle APIs; " +
-                    "defaulting to '$fallback'. Reason: $reason"
-            )
-            fallback
-        }
         val compileSdk = determineCompileSdk(project) ?: DEFAULT_COMPILE_SDK
-        val resourcePackages: List<String> = listOf(namespace)
 
         val processResourcesTaskName = "process${taskSuffix}Resources"
         val mergeResourcesTaskName = "merge${taskSuffix}Resources"
@@ -182,8 +187,8 @@ class ComposePreviewPlugin : Plugin<Project> {
                 runtimeClasspath.from(androidDirectoryArtifacts)
             }
 
-            packageName.set(namespace)
-            resourcePackageNames.set(resourcePackages.toMutableList())
+            packageName.set(variant.namespace)
+            resourcePackageNames.set(variant.namespace.map { listOf(it) })
             compileSdkVersion.set(compileSdk)
 
             mergedResources.from(
@@ -196,11 +201,6 @@ class ComposePreviewPlugin : Plugin<Project> {
                     .map { it.asFile }
             )
 
-            compiledRClassJar.from(
-                project.layout.buildDirectory.file(
-                    "intermediates/compile_and_runtime_not_namespaced_r_class_jar/$variantName/R.jar"
-                ).map { it.asFile }
-            )
             compiledRClassJar.from(
                 project.layout.buildDirectory.file(
                     "intermediates/compile_and_runtime_not_namespaced_r_class_jar/$variantName/" +
