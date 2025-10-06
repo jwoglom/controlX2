@@ -5,8 +5,13 @@ This script consumes the aggregate manifest produced by the
 ``aggregateComposePreviewManifests`` Gradle task and emits a Markdown
 report suitable for posting as a pull-request comment. The report groups
 previews by module and composable, emits attachment placeholders (or
-optionally inlines PNG images using data URIs), and highlights any
-rendering issues.
+optionally inlines PNG images using data URIs), highlights any
+rendering issues, and includes information about generated Paparazzi test files.
+
+The workflow now includes:
+1. Generate Paparazzi test files: `./gradlew collectAllComposePreviewMetadata`
+2. Render Compose previews: `./gradlew renderAllComposePreviews`
+3. Generate this comment with preview results and test file information
 
 Usage:
     python generate-compose-preview-comment.py \
@@ -397,6 +402,12 @@ def generate_comment(
     header_lines.append("")
     summary = f"Rendered {total_previews} previews across {total_modules} module(s)."
     header_lines.append(summary)
+    header_lines.append("")
+    header_lines.append("📝 **Paparazzi test files generated:**")
+    header_lines.append("- `mobile/src/test/java/com/jwoglom/controlx2/test/snapshots/ComposePreviewPaparazziTest.kt`")
+    header_lines.append("- `wear/src/test/java/com/jwoglom/controlx2/test/snapshots/ComposePreviewPaparazziTest.kt`")
+    header_lines.append("")
+    header_lines.append("These test files contain snapshot tests for all Compose previews and are automatically regenerated when previews change.")
     if artifact_url:
         header_lines.append("")
         header_lines.append(

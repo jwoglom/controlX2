@@ -36,6 +36,9 @@ jobs:
           use_local_pumpx2=false
           PROPS
 
+      - name: Generate Paparazzi test files
+        run: ./gradlew --stacktrace collectAllComposePreviewMetadata
+
       - name: Render Compose previews
         run: ./gradlew --stacktrace renderAllComposePreviews
 
@@ -48,6 +51,8 @@ jobs:
             build/composePreviews
             mobile/build/composePreviews
             wear/build/composePreviews
+            mobile/src/test/java/com/jwoglom/controlx2/test/snapshots
+            wear/src/test/java/com/jwoglom/controlx2/test/snapshots
           if-no-files-found: error
 
       - name: Generate Compose preview comment

@@ -1,5 +1,14 @@
 #!/usr/bin/env python3
-"""Resolve attachment placeholders in Compose preview comments."""
+"""Resolve attachment placeholders in Compose preview comments.
+
+This script works with the updated Compose preview workflow that includes:
+1. Generate Paparazzi test files: `./gradlew collectAllComposePreviewMetadata`
+2. Render Compose previews: `./gradlew renderAllComposePreviews`
+3. Generate comments with preview results and test file information
+
+The script uploads image attachments to GitHub and rewrites Markdown
+to reference the uploaded attachments instead of local file paths.
+"""
 
 from __future__ import annotations
 
