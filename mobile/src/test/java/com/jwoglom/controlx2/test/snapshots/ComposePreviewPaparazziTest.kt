@@ -13,9 +13,9 @@ class attributes {
     )
 
     @Test
-    fun test_com_jwoglom_controlx2_presentation_MobileAppKt_DefaultPreview_1_() {
+    fun presentation_MobileAppKt_DefaultPreview_1_() {
         try {
-            paparazzi.snapshot(name = "com_jwoglom_controlx2_presentation_MobileAppKt/DefaultPreview_1") {
+            paparazzi.snapshot(name = "preview") {
                 com.jwoglom.controlx2.presentation.DefaultPreview()
             }
         } catch (e: ClassCastException) {
@@ -28,9 +28,9 @@ class attributes {
     }
 
     @Test
-    fun test_com_jwoglom_controlx2_presentation_screens_AppSetupKt_AppSetupDefaultPreview_1_() {
+    fun presentation_screens_AppSetupKt_AppSetupDefaultPreview_1_() {
         try {
-            paparazzi.snapshot(name = "com_jwoglom_controlx2_presentation_screens_AppSetupKt/AppSetupDefaultPreview_1") {
+            paparazzi.snapshot(name = "preview") {
                 com.jwoglom.controlx2.presentation.screens.AppSetupDefaultPreview()
             }
         } catch (e: ClassCastException) {
@@ -43,9 +43,9 @@ class attributes {
     }
 
     @Test
-    fun test_com_jwoglom_controlx2_presentation_screens_FirstLaunchKt_FirstLaunchDefaultPreview_1_() {
+    fun presentation_screens_FirstLaunchKt_FirstLaunchDefaultPreview_1_() {
         try {
-            paparazzi.snapshot(name = "com_jwoglom_controlx2_presentation_screens_FirstLaunchKt/FirstLaunchDefaultPreview_1") {
+            paparazzi.snapshot(name = "preview") {
                 com.jwoglom.controlx2.presentation.screens.FirstLaunchDefaultPreview()
             }
         } catch (e: ClassCastException) {
@@ -58,9 +58,9 @@ class attributes {
     }
 
     @Test
-    fun test_com_jwoglom_controlx2_presentation_screens_LandingKt_BolusPreview_1_() {
+    fun presentation_screens_LandingKt_BolusPreview_1_() {
         try {
-            paparazzi.snapshot(name = "com_jwoglom_controlx2_presentation_screens_LandingKt/BolusPreview_1") {
+            paparazzi.snapshot(name = "preview") {
                 com.jwoglom.controlx2.presentation.screens.BolusPreview()
             }
         } catch (e: ClassCastException) {
@@ -73,9 +73,9 @@ class attributes {
     }
 
     @Test
-    fun test_com_jwoglom_controlx2_presentation_screens_LandingKt_LandingDebugPreview_1_() {
+    fun presentation_screens_LandingKt_LandingDebugPreview_1_() {
         try {
-            paparazzi.snapshot(name = "com_jwoglom_controlx2_presentation_screens_LandingKt/LandingDebugPreview_1") {
+            paparazzi.snapshot(name = "preview") {
                 com.jwoglom.controlx2.presentation.screens.LandingDebugPreview()
             }
         } catch (e: ClassCastException) {
@@ -88,9 +88,9 @@ class attributes {
     }
 
     @Test
-    fun test_com_jwoglom_controlx2_presentation_screens_LandingKt_LandingDefaultPreview_1_() {
+    fun presentation_screens_LandingKt_LandingDefaultPreview_1_() {
         try {
-            paparazzi.snapshot(name = "com_jwoglom_controlx2_presentation_screens_LandingKt/LandingDefaultPreview_1") {
+            paparazzi.snapshot(name = "preview") {
                 com.jwoglom.controlx2.presentation.screens.LandingDefaultPreview()
             }
         } catch (e: ClassCastException) {
@@ -103,9 +103,9 @@ class attributes {
     }
 
     @Test
-    fun test_com_jwoglom_controlx2_presentation_screens_LandingKt_LandingSettingsPreview_1_() {
+    fun presentation_screens_LandingKt_LandingSettingsPreview_1_() {
         try {
-            paparazzi.snapshot(name = "com_jwoglom_controlx2_presentation_screens_LandingKt/LandingSettingsPreview_1") {
+            paparazzi.snapshot(name = "preview") {
                 com.jwoglom.controlx2.presentation.screens.LandingSettingsPreview()
             }
         } catch (e: ClassCastException) {
@@ -118,9 +118,9 @@ class attributes {
     }
 
     @Test
-    fun test_com_jwoglom_controlx2_presentation_screens_LandingKt_TempRatePreview_1_() {
+    fun presentation_screens_LandingKt_TempRatePreview_1_() {
         try {
-            paparazzi.snapshot(name = "com_jwoglom_controlx2_presentation_screens_LandingKt/TempRatePreview_1") {
+            paparazzi.snapshot(name = "preview") {
                 com.jwoglom.controlx2.presentation.screens.TempRatePreview()
             }
         } catch (e: ClassCastException) {
@@ -133,9 +133,9 @@ class attributes {
     }
 
     @Test
-    fun test_com_jwoglom_controlx2_presentation_screens_PumpSetupKt_PumpSetupDefaultPreview_1_() {
+    fun presentation_screens_PumpSetupKt_PumpSetupDefaultPreview_1_() {
         try {
-            paparazzi.snapshot(name = "com_jwoglom_controlx2_presentation_screens_PumpSetupKt/PumpSetupDefaultPreview_1") {
+            paparazzi.snapshot(name = "preview") {
                 com.jwoglom.controlx2.presentation.screens.PumpSetupDefaultPreview()
             }
         } catch (e: ClassCastException) {
@@ -148,9 +148,9 @@ class attributes {
     }
 
     @Test
-    fun test_com_jwoglom_controlx2_presentation_screens_sections_ActionsKt_ActionsDefaultPreviewInsulinActive_1_() {
+    fun presentation_screens_sections_ActionsKt_ActionsDefaultPreviewInsulinActive_1_() {
         try {
-            paparazzi.snapshot(name = "com_jwoglom_controlx2_presentation_screens_sections_ActionsKt/ActionsDefaultPreviewInsulinActive_1") {
+            paparazzi.snapshot(name = "preview") {
                 com.jwoglom.controlx2.presentation.screens.sections.ActionsDefaultPreviewInsulinActive()
             }
         } catch (e: ClassCastException) {
@@ -163,9 +163,9 @@ class attributes {
     }
 
     @Test
-    fun test_com_jwoglom_controlx2_presentation_screens_sections_ActionsKt_ActionsDefaultPreviewInsulinActive_StopMenuOpen_1_() {
+    fun presentation_screens_sections_ActionsKt_ActionsDefaultPreviewInsulinActive_StopMenuOpen_1_() {
         try {
-            paparazzi.snapshot(name = "com_jwoglom_controlx2_presentation_screens_sections_ActionsKt/ActionsDefaultPreviewInsulinActive_StopMenuOpen_1") {
+            paparazzi.snapshot(name = "preview") {
                 com.jwoglom.controlx2.presentation.screens.sections.ActionsDefaultPreviewInsulinActive_StopMenuOpen()
             }
         } catch (e: ClassCastException) {
@@ -178,9 +178,9 @@ class attributes {
     }
 
     @Test
-    fun test_com_jwoglom_controlx2_presentation_screens_sections_ActionsKt_ActionsDefaultPreviewInsulinSuspended_1_() {
+    fun presentation_screens_sections_ActionsKt_ActionsDefaultPreviewInsulinSuspended_1_() {
         try {
-            paparazzi.snapshot(name = "com_jwoglom_controlx2_presentation_screens_sections_ActionsKt/ActionsDefaultPreviewInsulinSuspended_1") {
+            paparazzi.snapshot(name = "preview") {
                 com.jwoglom.controlx2.presentation.screens.sections.ActionsDefaultPreviewInsulinSuspended()
             }
         } catch (e: ClassCastException) {
@@ -193,9 +193,9 @@ class attributes {
     }
 
     @Test
-    fun test_com_jwoglom_controlx2_presentation_screens_sections_ActionsKt_ActionsDefaultPreviewInsulinSuspended_ResumeMenuOpen_1_() {
+    fun presentation_screens_sections_ActionsKt_ActionsDefaultPreviewInsulinSuspended_ResumeMenuOpen_1_() {
         try {
-            paparazzi.snapshot(name = "com_jwoglom_controlx2_presentation_screens_sections_ActionsKt/ActionsDefaultPreviewInsulinSuspended_ResumeMenuOpen_1") {
+            paparazzi.snapshot(name = "preview") {
                 com.jwoglom.controlx2.presentation.screens.sections.ActionsDefaultPreviewInsulinSuspended_ResumeMenuOpen()
             }
         } catch (e: ClassCastException) {
@@ -208,9 +208,9 @@ class attributes {
     }
 
     @Test
-    fun test_com_jwoglom_controlx2_presentation_screens_sections_ActionsKt_ActionsDefaultPreview_StartTempRate_1_() {
+    fun presentation_screens_sections_ActionsKt_ActionsDefaultPreview_StartTempRate_1_() {
         try {
-            paparazzi.snapshot(name = "com_jwoglom_controlx2_presentation_screens_sections_ActionsKt/ActionsDefaultPreview_StartTempRate_1") {
+            paparazzi.snapshot(name = "preview") {
                 com.jwoglom.controlx2.presentation.screens.sections.ActionsDefaultPreview_StartTempRate()
             }
         } catch (e: ClassCastException) {
@@ -223,9 +223,9 @@ class attributes {
     }
 
     @Test
-    fun test_com_jwoglom_controlx2_presentation_screens_sections_BolusWindowKt_DefaultBolusPreview_1_() {
+    fun presentation_screens_sections_BolusWindowKt_DefaultBolusPreview_1_() {
         try {
-            paparazzi.snapshot(name = "com_jwoglom_controlx2_presentation_screens_sections_BolusWindowKt/DefaultBolusPreview_1") {
+            paparazzi.snapshot(name = "preview") {
                 com.jwoglom.controlx2.presentation.screens.sections.DefaultBolusPreview()
             }
         } catch (e: ClassCastException) {
@@ -238,9 +238,9 @@ class attributes {
     }
 
     @Test
-    fun test_com_jwoglom_controlx2_presentation_screens_sections_CGMActionsKt_CGMActionsDefaultPreview_1_() {
+    fun presentation_screens_sections_CGMActionsKt_CGMActionsDefaultPreview_1_() {
         try {
-            paparazzi.snapshot(name = "com_jwoglom_controlx2_presentation_screens_sections_CGMActionsKt/CGMActionsDefaultPreview_1") {
+            paparazzi.snapshot(name = "preview") {
                 com.jwoglom.controlx2.presentation.screens.sections.CGMActionsDefaultPreview()
             }
         } catch (e: ClassCastException) {
@@ -253,9 +253,9 @@ class attributes {
     }
 
     @Test
-    fun test_com_jwoglom_controlx2_presentation_screens_sections_CGMActionsKt_CGMActionsDefaultPreviewCgmStart_1_() {
+    fun presentation_screens_sections_CGMActionsKt_CGMActionsDefaultPreviewCgmStart_1_() {
         try {
-            paparazzi.snapshot(name = "com_jwoglom_controlx2_presentation_screens_sections_CGMActionsKt/CGMActionsDefaultPreviewCgmStart_1") {
+            paparazzi.snapshot(name = "preview") {
                 com.jwoglom.controlx2.presentation.screens.sections.CGMActionsDefaultPreviewCgmStart()
             }
         } catch (e: ClassCastException) {
@@ -268,9 +268,9 @@ class attributes {
     }
 
     @Test
-    fun test_com_jwoglom_controlx2_presentation_screens_sections_CartridgeActionsKt_CartridgeActionsDefaultPreview_1_() {
+    fun presentation_screens_sections_CartridgeActionsKt_CartridgeActionsDefaultPreview_1_() {
         try {
-            paparazzi.snapshot(name = "com_jwoglom_controlx2_presentation_screens_sections_CartridgeActionsKt/CartridgeActionsDefaultPreview_1") {
+            paparazzi.snapshot(name = "preview") {
                 com.jwoglom.controlx2.presentation.screens.sections.CartridgeActionsDefaultPreview()
             }
         } catch (e: ClassCastException) {
@@ -283,9 +283,9 @@ class attributes {
     }
 
     @Test
-    fun test_com_jwoglom_controlx2_presentation_screens_sections_CartridgeActionsKt_CartridgeActionsDefaultPreviewChangeCartridge_InsulinNotStopped_1_() {
+    fun presentation_screens_sections_CartridgeActionsKt_CartridgeActionsDefaultPreviewChangeCartridge_InsulinNotStopped_1_() {
         try {
-            paparazzi.snapshot(name = "com_jwoglom_controlx2_presentation_screens_sections_CartridgeActionsKt/CartridgeActionsDefaultPreviewChangeCartridge_InsulinNotStopped_1") {
+            paparazzi.snapshot(name = "preview") {
                 com.jwoglom.controlx2.presentation.screens.sections.CartridgeActionsDefaultPreviewChangeCartridge_InsulinNotStopped()
             }
         } catch (e: ClassCastException) {
@@ -298,9 +298,9 @@ class attributes {
     }
 
     @Test
-    fun test_com_jwoglom_controlx2_presentation_screens_sections_CartridgeActionsKt_CartridgeActionsDefaultPreviewChangeCartridge_InsulinStopped_1_() {
+    fun presentation_screens_sections_CartridgeActionsKt_CartridgeActionsDefaultPreviewChangeCartridge_InsulinStopped_1_() {
         try {
-            paparazzi.snapshot(name = "com_jwoglom_controlx2_presentation_screens_sections_CartridgeActionsKt/CartridgeActionsDefaultPreviewChangeCartridge_InsulinStopped_1") {
+            paparazzi.snapshot(name = "preview") {
                 com.jwoglom.controlx2.presentation.screens.sections.CartridgeActionsDefaultPreviewChangeCartridge_InsulinStopped()
             }
         } catch (e: ClassCastException) {
@@ -313,9 +313,9 @@ class attributes {
     }
 
     @Test
-    fun test_com_jwoglom_controlx2_presentation_screens_sections_DashboardKt_DashboardDefaultPreview_1_() {
+    fun presentation_screens_sections_DashboardKt_DashboardDefaultPreview_1_() {
         try {
-            paparazzi.snapshot(name = "com_jwoglom_controlx2_presentation_screens_sections_DashboardKt/DashboardDefaultPreview_1") {
+            paparazzi.snapshot(name = "preview") {
                 com.jwoglom.controlx2.presentation.screens.sections.DashboardDefaultPreview()
             }
         } catch (e: ClassCastException) {
@@ -328,9 +328,9 @@ class attributes {
     }
 
     @Test
-    fun test_com_jwoglom_controlx2_presentation_screens_sections_DebugKt_DebugDefaultPreview_1_() {
+    fun presentation_screens_sections_DebugKt_DebugDefaultPreview_1_() {
         try {
-            paparazzi.snapshot(name = "com_jwoglom_controlx2_presentation_screens_sections_DebugKt/DebugDefaultPreview_1") {
+            paparazzi.snapshot(name = "preview") {
                 com.jwoglom.controlx2.presentation.screens.sections.DebugDefaultPreview()
             }
         } catch (e: ClassCastException) {
@@ -343,9 +343,9 @@ class attributes {
     }
 
     @Test
-    fun test_com_jwoglom_controlx2_presentation_screens_sections_NotificationsKt_NotificationsDefaultPreview_1_() {
+    fun presentation_screens_sections_NotificationsKt_NotificationsDefaultPreview_1_() {
         try {
-            paparazzi.snapshot(name = "com_jwoglom_controlx2_presentation_screens_sections_NotificationsKt/NotificationsDefaultPreview_1") {
+            paparazzi.snapshot(name = "preview") {
                 com.jwoglom.controlx2.presentation.screens.sections.NotificationsDefaultPreview()
             }
         } catch (e: ClassCastException) {
@@ -358,9 +358,9 @@ class attributes {
     }
 
     @Test
-    fun test_com_jwoglom_controlx2_presentation_screens_sections_NotificationsKt_NotificationsDefaultPreview_WithNotifications_1_() {
+    fun presentation_screens_sections_NotificationsKt_NotificationsDefaultPreview_WithNotifications_1_() {
         try {
-            paparazzi.snapshot(name = "com_jwoglom_controlx2_presentation_screens_sections_NotificationsKt/NotificationsDefaultPreview_WithNotifications_1") {
+            paparazzi.snapshot(name = "preview") {
                 com.jwoglom.controlx2.presentation.screens.sections.NotificationsDefaultPreview_WithNotifications()
             }
         } catch (e: ClassCastException) {
@@ -373,9 +373,9 @@ class attributes {
     }
 
     @Test
-    fun test_com_jwoglom_controlx2_presentation_screens_sections_ProfileActionsKt_ProfileActionsDefaultPreview_1_() {
+    fun presentation_screens_sections_ProfileActionsKt_ProfileActionsDefaultPreview_1_() {
         try {
-            paparazzi.snapshot(name = "com_jwoglom_controlx2_presentation_screens_sections_ProfileActionsKt/ProfileActionsDefaultPreview_1") {
+            paparazzi.snapshot(name = "preview") {
                 com.jwoglom.controlx2.presentation.screens.sections.ProfileActionsDefaultPreview()
             }
         } catch (e: ClassCastException) {
@@ -388,9 +388,9 @@ class attributes {
     }
 
     @Test
-    fun test_com_jwoglom_controlx2_presentation_screens_sections_SettingsKt_SettingsDefaultPreview_1_() {
+    fun presentation_screens_sections_SettingsKt_SettingsDefaultPreview_1_() {
         try {
-            paparazzi.snapshot(name = "com_jwoglom_controlx2_presentation_screens_sections_SettingsKt/SettingsDefaultPreview_1") {
+            paparazzi.snapshot(name = "preview") {
                 com.jwoglom.controlx2.presentation.screens.sections.SettingsDefaultPreview()
             }
         } catch (e: ClassCastException) {
@@ -403,9 +403,9 @@ class attributes {
     }
 
     @Test
-    fun test_com_jwoglom_controlx2_presentation_screens_sections_TempRateWindowKt_DefaultTempRateWindow_1_() {
+    fun presentation_screens_sections_TempRateWindowKt_DefaultTempRateWindow_1_() {
         try {
-            paparazzi.snapshot(name = "com_jwoglom_controlx2_presentation_screens_sections_TempRateWindowKt/DefaultTempRateWindow_1") {
+            paparazzi.snapshot(name = "preview") {
                 com.jwoglom.controlx2.presentation.screens.sections.DefaultTempRateWindow()
             }
         } catch (e: ClassCastException) {
@@ -418,9 +418,9 @@ class attributes {
     }
 
     @Test
-    fun test_com_jwoglom_controlx2_presentation_screens_sections_TempRateWindowKt_DefaultTempRateWindow_Filled_1_() {
+    fun presentation_screens_sections_TempRateWindowKt_DefaultTempRateWindow_Filled_1_() {
         try {
-            paparazzi.snapshot(name = "com_jwoglom_controlx2_presentation_screens_sections_TempRateWindowKt/DefaultTempRateWindow_Filled_1") {
+            paparazzi.snapshot(name = "preview") {
                 com.jwoglom.controlx2.presentation.screens.sections.DefaultTempRateWindow_Filled()
             }
         } catch (e: ClassCastException) {
@@ -433,9 +433,9 @@ class attributes {
     }
 
     @Test
-    fun test_com_jwoglom_controlx2_presentation_screens_sections_components_DashboardCgmChartKt_DashboardCgmChartDefaultPreview_1_() {
+    fun presentation_screens_sections_components_DashboardCgmChartKt_DashboardCgmChartDefaultPreview_1_() {
         try {
-            paparazzi.snapshot(name = "com_jwoglom_controlx2_presentation_screens_sections_components_DashboardCgmChartKt/DashboardCgmChartDefaultPreview_1") {
+            paparazzi.snapshot(name = "preview") {
                 com.jwoglom.controlx2.presentation.screens.sections.components.DashboardCgmChartDefaultPreview()
             }
         } catch (e: ClassCastException) {
@@ -448,9 +448,9 @@ class attributes {
     }
 
     @Test
-    fun test_com_jwoglom_controlx2_presentation_screens_sections_components_HorizBatteryIconKt_HorizBatteryIconPreview0_1_() {
+    fun presentation_screens_sections_components_HorizBatteryIconKt_HorizBatteryIconPreview0_1_() {
         try {
-            paparazzi.snapshot(name = "com_jwoglom_controlx2_presentation_screens_sections_components_HorizBatteryIconKt/HorizBatteryIconPreview0_1") {
+            paparazzi.snapshot(name = "preview") {
                 com.jwoglom.controlx2.presentation.screens.sections.components.HorizBatteryIconPreview0()
             }
         } catch (e: ClassCastException) {
@@ -463,9 +463,9 @@ class attributes {
     }
 
     @Test
-    fun test_com_jwoglom_controlx2_presentation_screens_sections_components_HorizBatteryIconKt_HorizBatteryIconPreview20_1_() {
+    fun presentation_screens_sections_components_HorizBatteryIconKt_HorizBatteryIconPreview20_1_() {
         try {
-            paparazzi.snapshot(name = "com_jwoglom_controlx2_presentation_screens_sections_components_HorizBatteryIconKt/HorizBatteryIconPreview20_1") {
+            paparazzi.snapshot(name = "preview") {
                 com.jwoglom.controlx2.presentation.screens.sections.components.HorizBatteryIconPreview20()
             }
         } catch (e: ClassCastException) {
@@ -478,9 +478,9 @@ class attributes {
     }
 
     @Test
-    fun test_com_jwoglom_controlx2_presentation_screens_sections_components_HorizBatteryIconKt_HorizBatteryIconPreview30_1_() {
+    fun presentation_screens_sections_components_HorizBatteryIconKt_HorizBatteryIconPreview30_1_() {
         try {
-            paparazzi.snapshot(name = "com_jwoglom_controlx2_presentation_screens_sections_components_HorizBatteryIconKt/HorizBatteryIconPreview30_1") {
+            paparazzi.snapshot(name = "preview") {
                 com.jwoglom.controlx2.presentation.screens.sections.components.HorizBatteryIconPreview30()
             }
         } catch (e: ClassCastException) {
@@ -493,9 +493,9 @@ class attributes {
     }
 
     @Test
-    fun test_com_jwoglom_controlx2_presentation_screens_sections_components_HorizBatteryIconKt_HorizBatteryIconPreview40_1_() {
+    fun presentation_screens_sections_components_HorizBatteryIconKt_HorizBatteryIconPreview40_1_() {
         try {
-            paparazzi.snapshot(name = "com_jwoglom_controlx2_presentation_screens_sections_components_HorizBatteryIconKt/HorizBatteryIconPreview40_1") {
+            paparazzi.snapshot(name = "preview") {
                 com.jwoglom.controlx2.presentation.screens.sections.components.HorizBatteryIconPreview40()
             }
         } catch (e: ClassCastException) {
@@ -508,9 +508,9 @@ class attributes {
     }
 
     @Test
-    fun test_com_jwoglom_controlx2_presentation_screens_sections_components_HorizBatteryIconKt_HorizBatteryIconPreview60_1_() {
+    fun presentation_screens_sections_components_HorizBatteryIconKt_HorizBatteryIconPreview60_1_() {
         try {
-            paparazzi.snapshot(name = "com_jwoglom_controlx2_presentation_screens_sections_components_HorizBatteryIconKt/HorizBatteryIconPreview60_1") {
+            paparazzi.snapshot(name = "preview") {
                 com.jwoglom.controlx2.presentation.screens.sections.components.HorizBatteryIconPreview60()
             }
         } catch (e: ClassCastException) {
@@ -523,9 +523,9 @@ class attributes {
     }
 
     @Test
-    fun test_com_jwoglom_controlx2_presentation_screens_sections_components_HorizBatteryIconKt_HorizBatteryIconPreview80_1_() {
+    fun presentation_screens_sections_components_HorizBatteryIconKt_HorizBatteryIconPreview80_1_() {
         try {
-            paparazzi.snapshot(name = "com_jwoglom_controlx2_presentation_screens_sections_components_HorizBatteryIconKt/HorizBatteryIconPreview80_1") {
+            paparazzi.snapshot(name = "preview") {
                 com.jwoglom.controlx2.presentation.screens.sections.components.HorizBatteryIconPreview80()
             }
         } catch (e: ClassCastException) {
@@ -538,9 +538,9 @@ class attributes {
     }
 
     @Test
-    fun test_com_jwoglom_controlx2_presentation_screens_sections_components_HorizCartridgeIconKt_HorizCartridgeIconPreview0_1_() {
+    fun presentation_screens_sections_components_HorizCartridgeIconKt_HorizCartridgeIconPreview0_1_() {
         try {
-            paparazzi.snapshot(name = "com_jwoglom_controlx2_presentation_screens_sections_components_HorizCartridgeIconKt/HorizCartridgeIconPreview0_1") {
+            paparazzi.snapshot(name = "preview") {
                 com.jwoglom.controlx2.presentation.screens.sections.components.HorizCartridgeIconPreview0()
             }
         } catch (e: ClassCastException) {
@@ -553,9 +553,9 @@ class attributes {
     }
 
     @Test
-    fun test_com_jwoglom_controlx2_presentation_screens_sections_components_HorizCartridgeIconKt_HorizCartridgeIconPreview20_1_() {
+    fun presentation_screens_sections_components_HorizCartridgeIconKt_HorizCartridgeIconPreview20_1_() {
         try {
-            paparazzi.snapshot(name = "com_jwoglom_controlx2_presentation_screens_sections_components_HorizCartridgeIconKt/HorizCartridgeIconPreview20_1") {
+            paparazzi.snapshot(name = "preview") {
                 com.jwoglom.controlx2.presentation.screens.sections.components.HorizCartridgeIconPreview20()
             }
         } catch (e: ClassCastException) {
@@ -568,9 +568,9 @@ class attributes {
     }
 
     @Test
-    fun test_com_jwoglom_controlx2_presentation_screens_sections_components_HorizCartridgeIconKt_HorizCartridgeIconPreview30_1_() {
+    fun presentation_screens_sections_components_HorizCartridgeIconKt_HorizCartridgeIconPreview30_1_() {
         try {
-            paparazzi.snapshot(name = "com_jwoglom_controlx2_presentation_screens_sections_components_HorizCartridgeIconKt/HorizCartridgeIconPreview30_1") {
+            paparazzi.snapshot(name = "preview") {
                 com.jwoglom.controlx2.presentation.screens.sections.components.HorizCartridgeIconPreview30()
             }
         } catch (e: ClassCastException) {
@@ -583,9 +583,9 @@ class attributes {
     }
 
     @Test
-    fun test_com_jwoglom_controlx2_presentation_screens_sections_components_HorizCartridgeIconKt_HorizCartridgeIconPreview40_1_() {
+    fun presentation_screens_sections_components_HorizCartridgeIconKt_HorizCartridgeIconPreview40_1_() {
         try {
-            paparazzi.snapshot(name = "com_jwoglom_controlx2_presentation_screens_sections_components_HorizCartridgeIconKt/HorizCartridgeIconPreview40_1") {
+            paparazzi.snapshot(name = "preview") {
                 com.jwoglom.controlx2.presentation.screens.sections.components.HorizCartridgeIconPreview40()
             }
         } catch (e: ClassCastException) {
@@ -598,9 +598,9 @@ class attributes {
     }
 
     @Test
-    fun test_com_jwoglom_controlx2_presentation_screens_sections_components_HorizCartridgeIconKt_HorizCartridgeIconPreview60_1_() {
+    fun presentation_screens_sections_components_HorizCartridgeIconKt_HorizCartridgeIconPreview60_1_() {
         try {
-            paparazzi.snapshot(name = "com_jwoglom_controlx2_presentation_screens_sections_components_HorizCartridgeIconKt/HorizCartridgeIconPreview60_1") {
+            paparazzi.snapshot(name = "preview") {
                 com.jwoglom.controlx2.presentation.screens.sections.components.HorizCartridgeIconPreview60()
             }
         } catch (e: ClassCastException) {
@@ -613,9 +613,9 @@ class attributes {
     }
 
     @Test
-    fun test_com_jwoglom_controlx2_presentation_screens_sections_components_HorizCartridgeIconKt_HorizCartridgeIconPreview80_1_() {
+    fun presentation_screens_sections_components_HorizCartridgeIconKt_HorizCartridgeIconPreview80_1_() {
         try {
-            paparazzi.snapshot(name = "com_jwoglom_controlx2_presentation_screens_sections_components_HorizCartridgeIconKt/HorizCartridgeIconPreview80_1") {
+            paparazzi.snapshot(name = "preview") {
                 com.jwoglom.controlx2.presentation.screens.sections.components.HorizCartridgeIconPreview80()
             }
         } catch (e: ClassCastException) {
@@ -628,9 +628,9 @@ class attributes {
     }
 
     @Test
-    fun test_com_jwoglom_controlx2_presentation_screens_sections_components_HorizCartridgeIconKt_HorizCartridgeIconPreviewPlus_1_() {
+    fun presentation_screens_sections_components_HorizCartridgeIconKt_HorizCartridgeIconPreviewPlus_1_() {
         try {
-            paparazzi.snapshot(name = "com_jwoglom_controlx2_presentation_screens_sections_components_HorizCartridgeIconKt/HorizCartridgeIconPreviewPlus_1") {
+            paparazzi.snapshot(name = "preview") {
                 com.jwoglom.controlx2.presentation.screens.sections.components.HorizCartridgeIconPreviewPlus()
             }
         } catch (e: ClassCastException) {
@@ -643,9 +643,9 @@ class attributes {
     }
 
     @Test
-    fun test_com_jwoglom_controlx2_presentation_screens_sections_components_PumpStatusBarKt_PumpStatusBarDefaultPreview_1_() {
+    fun presentation_screens_sections_components_PumpStatusBarKt_PumpStatusBarDefaultPreview_1_() {
         try {
-            paparazzi.snapshot(name = "com_jwoglom_controlx2_presentation_screens_sections_components_PumpStatusBarKt/PumpStatusBarDefaultPreview_1") {
+            paparazzi.snapshot(name = "preview") {
                 com.jwoglom.controlx2.presentation.screens.sections.components.PumpStatusBarDefaultPreview()
             }
         } catch (e: ClassCastException) {
@@ -658,9 +658,9 @@ class attributes {
     }
 
     @Test
-    fun test_com_jwoglom_controlx2_presentation_screens_sections_components_VersionInfoKt_VersionInfoDefaultPreview_1_() {
+    fun presentation_screens_sections_components_VersionInfoKt_VersionInfoDefaultPreview_1_() {
         try {
-            paparazzi.snapshot(name = "com_jwoglom_controlx2_presentation_screens_sections_components_VersionInfoKt/VersionInfoDefaultPreview_1") {
+            paparazzi.snapshot(name = "preview") {
                 com.jwoglom.controlx2.presentation.screens.sections.components.VersionInfoDefaultPreview()
             }
         } catch (e: ClassCastException) {

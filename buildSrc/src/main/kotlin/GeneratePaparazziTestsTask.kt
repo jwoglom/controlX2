@@ -75,17 +75,11 @@ abstract class GeneratePaparazziTestsTask : DefaultTask() {
                 val id = previewObj["id"]?.jsonPrimitive?.content ?: "preview_$index"
                 val methodName = previewObj["methodName"]?.jsonPrimitive?.content ?: "preview_$index"
                 val packageNameValue = previewObj["packageName"]?.jsonPrimitive?.content ?: ""
-                val fqcn = previewObj["fqcn"]?.jsonPrimitive?.content ?: ""
-                val previewIndex = id.substringAfter("[").substringBefore("]").toIntOrNull() ?: 1
 
                 // Create a safe test method name
-                val testMethodName = "test_${id.replace("#", "_").replace("[", "_").replace("]", "_").replace(".", "_")}"
+                val testMethodName = "${id.replace("#", "_").replace("[", "_").replace("]", "_").replace(".", "_").replace("com_jwoglom_controlx2_", "")}"
 
-                // Create folder path based on FQCN and file name based on method name
-                // Example: com_jwoglom_controlx2_presentation_screens_AppSetupKt/AppSetupDefaultPreview_1
-                val folderPath = fqcn.replace('.', '_')
-                val fileName = "${methodName}_${previewIndex}"
-                val snapshotName = "$folderPath/$fileName"
+                val snapshotName = "preview"
 
                 appendLine("    @Test")
                 appendLine("    fun $testMethodName() {")
