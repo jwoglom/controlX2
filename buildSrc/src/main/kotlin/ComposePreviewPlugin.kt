@@ -27,11 +27,19 @@ class ComposePreviewPlugin : Plugin<Project> {
         )
         // Render task removed - we now use Paparazzi test files instead of PNG generation
 
+        val aggregateRender = ensureAggregateTask(
+            rootProject,
+            key = "controlx2.compose.aggregate.render",
+            name = "renderAllComposePreviews",
+            description = "Renders Compose previews across all modules."
+        )
+        val aggregateManifest = ensureAggregateManifestTask(rootProject)
+
         project.pluginManager.withPlugin("com.android.application") {
-            configureWhenKotlinReady(project, aggregateMetadata)
+            configureWhenKotlinReady(project, aggregateMetadata, aggregateRender, aggregateManifest)
         }
         project.pluginManager.withPlugin("com.android.library") {
-            configureWhenKotlinReady(project, aggregateMetadata)
+            configureWhenKotlinReady(project, aggregateMetadata, aggregateRender, aggregateManifest)
         }
     }
 
