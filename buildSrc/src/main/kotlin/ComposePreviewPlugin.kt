@@ -130,7 +130,7 @@ class ComposePreviewPlugin : Plugin<Project> {
             modulePath.set(project.path)
             outputTestFile.set(
                 variant.namespace.map { ns ->
-                    project.layout.projectDirectory.file("src/test/java/${ns.replace('.', '/')}/test/ComposePreviewPaparazziTest.kt")
+                    project.layout.projectDirectory.file("src/test/java/${ns.replace('.', '/')}/test/snapshots/ComposePreviewPaparazziTest.kt")
                 }
             )
             dependsOn(collectTask)
@@ -239,6 +239,12 @@ class ComposePreviewPlugin : Plugin<Project> {
         aggregateMetadata.configure { dependsOn(collectTask) }
         aggregateRender.configure { dependsOn(renderTask) }
         renderTask.configure { dependsOn(collectTask) }
+        
+        // Make test generation run when unit tests are executed
+        val unitTestTaskName = "test${taskSuffix}UnitTest"
+        project.tasks.findByName(unitTestTaskName)?.let { unitTestTask ->
+            unitTestTask.dependsOn(generateTestsTask)
+        }
         renderTask.configure {
             if (project.tasks.names.contains(kotlinCompileTaskName)) {
                 dependsOn(kotlinCompileTaskName)

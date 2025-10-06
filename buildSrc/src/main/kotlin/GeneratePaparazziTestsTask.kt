@@ -51,10 +51,10 @@ abstract class GeneratePaparazziTestsTask : DefaultTask() {
     }
 
     private fun generateTestClass(packageName: String, previews: kotlinx.serialization.json.JsonArray): String {
-        val className = "ComposePreviewPaparazziTest"
+        val className = "attributes"
 
         return buildString {
-            appendLine("package $packageName.test")
+            appendLine("package $packageName.test.snapshots")
             appendLine()
             appendLine("import app.cash.paparazzi.DeviceConfig")
             appendLine("import app.cash.paparazzi.Paparazzi")
@@ -64,7 +64,7 @@ abstract class GeneratePaparazziTestsTask : DefaultTask() {
             appendLine("class $className {")
             appendLine("    @get:Rule")
             appendLine("    val paparazzi = Paparazzi(")
-            appendLine("        deviceConfig = ${if (packageName == "wear") "DeviceConfig.WEAR_OS_SMALL_ROUND" else "DeviceConfig.PIXEL_5"},")
+            appendLine("        deviceConfig = ${if (modulePath.get().contains(":wear")) "DeviceConfig.WEAR_OS_SMALL_ROUND" else "DeviceConfig.PIXEL_5"},")
             appendLine("        showSystemUi = false")
             appendLine("    )")
             appendLine()
