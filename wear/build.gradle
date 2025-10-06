@@ -128,4 +128,8 @@ dependencies {
     implementation "androidx.wear.watchface:watchface-editor:${project.androidx_watchface_version}"
     implementation "androidx.wear.watchface:watchface-complications-rendering:${project.androidx_watchface_version}"
 
+    // SLF4J for Paparazzi tests (pumpx2 library uses it)
+    testImplementation 'org.slf4j:slf4j-api:2.0.16'
+    testImplementation 'org.slf4j:slf4j-simple:2.0.16'
+
 }

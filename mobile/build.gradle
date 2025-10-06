@@ -138,5 +138,9 @@ dependencies {
     testImplementation("androidx.room:room-testing:$room_version")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3")
 
+    // SLF4J for Paparazzi tests (pumpx2 library uses it)
+    testImplementation 'org.slf4j:slf4j-api:2.0.16'
+    testImplementation 'org.slf4j:slf4j-simple:2.0.16'
+
     wearApp project(":wear")
 }
