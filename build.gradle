@@ -26,3 +26,26 @@ plugins {
     id 'org.jetbrains.kotlin.plugin.compose' version '2.0.0' apply false
     id 'app.cash.paparazzi' version '1.3.4' apply false
 }
+
+// Connected Android tests can hang on CI when Gradle attempts to exercise
+// every Android subproject (including dependency helper modules that are not
+// meant to run instrumentation tests in automation). The coverage workflow only
+// needs the mobile app's device tests, so disable the other connected test
+// tasks when we know we're running in CI. This prevents the emulator job from
+// waiting forever for tests that will never finish.
+if (System.getenv("CI") == "true") {
+    subprojects { subproject ->
+        if (subproject.name != "mobile") {
+            subproject.afterEvaluate {
+                subproject.tasks.matching { task ->
+                    task.name.startsWith("connected") && task.name.endsWith("AndroidTest")
+                }.configureEach { task ->
+                    task.enabled = false
+                    if (task.project == subproject) {
+                        task.logger.lifecycle("Skipping ${subproject.path}:${task.name} on CI")
+                    }
+                }
+            }
+        }
+    }
+}
