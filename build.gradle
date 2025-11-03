@@ -10,7 +10,7 @@ buildscript {
             use_local_pumpx2 = (properties.getProperty('use_local_pumpx2') ?: '') == 'true'
         }
         m2_repository = "${System.properties['user.home']}/.m2/repository"
-        compose_version = '1.7.8'
+        compose_bom_version = '2025.09.00'
         androidx_watchface_version = '1.2.1'
         kotlin_version = "2.0.0"
     }
