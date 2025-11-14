@@ -18,6 +18,7 @@ import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import timber.log.Timber
 import java.lang.Long.max
+import java.lang.Long.min
 
 const val InitialHistoryLogCount = 5000
 const val FetchGroupTimeoutMs = 7000
@@ -95,10 +96,23 @@ class HistoryLogFetcher(val context: Context, val pump: TandemPump, val peripher
         val dbLatest = historyLogRepo.getLatest(pumpSid).firstOrNull()
         val dbLatestId = dbLatest?.seqId
         val dbCount = historyLogRepo.getCount(pumpSid).firstOrNull() ?: 0
+        
+        val catchupThreshold = message.lastSequenceNum - InitialHistoryLogCount
+        var startId = when {
+            dbLatestId != null && dbLatestId >= catchupThreshold && dbLatestId <= message.lastSequenceNum -> dbLatestId
+            else -> catchupThreshold
+        }
 
-        var startId = dbLatestId ?: (message.lastSequenceNum - InitialHistoryLogCount)
-        if ((dbLatestId ?: 0) < message.lastSequenceNum - InitialHistoryLogCount) {
-            startId = message.lastSequenceNum - InitialHistoryLogCount
+        // don't try and fetch earlier than the first available seq number on the pump
+        // (this is not always 0; after a pump has been used for a long period old
+        // data is retentioned away and deleted while keeping id numbers consistent)
+        startId = max(startId, message.firstSequenceNum)
+        // ...or the latest sequence num
+        startId = min(startId, message.lastSequenceNum)
+
+        // should not be possible
+        if (startId < 0) {
+            startId = 0
         }
 
         val diffCount = message.lastSequenceNum - startId
@@ -111,6 +125,8 @@ class HistoryLogFetcher(val context: Context, val pump: TandemPump, val peripher
         missingIds.forEach {
             missingIdsTotal += (it.last - it.first + 1)
         }
+
+        
         Timber.i("HistoryLogFetcher.onStatusResponse: missingIds=${missingIdsTotal} $missingIds")
 
         scope.launch {
