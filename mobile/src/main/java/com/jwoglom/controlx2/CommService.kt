@@ -16,8 +16,10 @@ import android.content.SharedPreferences
 import android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_CONNECTED_DEVICE
 import android.media.RingtoneManager
 import android.os.Handler
+import android.os.HandlerThread
 import android.os.Looper
 import android.os.Message
+import android.os.Process
 import android.widget.Toast
 import androidx.core.app.NotificationCompat
 import androidx.core.graphics.drawable.IconCompat
@@ -766,14 +768,6 @@ class CommService : Service() {
     override fun onCreate() {
         super.onCreate()
 
-        // Start up the thread running the service.  Note that we create a
-        // separate thread because the service normally runs in the process's
-        // main thread, which we don't want to block.  We also make it
-        // background priority so CPU-intensive work will not disrupt our UI.
-//        HandlerThread("PumpCommServiceThread", THREAD_PRIORITY_FOREGROUND).apply {
-//            start()
-//            Timber.d("service thread start")
-
         // Timber already set in up MUA, but for good measure:
         setupTimber("MWC",
             context = this,
@@ -797,6 +791,17 @@ class CommService : Service() {
             return
         }
 
+        // Start up the thread running the service. Note that we create a
+        // separate thread because the service normally runs in the process's
+        // main thread, which we don't want to block. We also make it
+        // background priority so CPU-intensive work will not disrupt our UI.
+        val handlerThread = HandlerThread("PumpCommServiceThread", Process.THREAD_PRIORITY_FOREGROUND)
+        handlerThread.start()
+        Timber.d("service thread start")
+
+        // Get the HandlerThread's Looper and use it for our Handler
+        serviceLooper = handlerThread.looper
+
         messageBus = MessageBusFactory.createMessageBus(this)
         messageBus.addMessageListener(object : MessageListener {
             override fun onMessageReceived(path: String, data: ByteArray, sourceNodeId: String) {
@@ -804,13 +809,10 @@ class CommService : Service() {
             }
         })
 
-        // Get the HandlerThread's Looper and use it for our Handler
-        serviceLooper = looper
-
         if (Prefs(applicationContext).pumpFinderServiceEnabled()) {
-            pumpFinderCommHandler = PumpFinderCommHandler(looper)
+            pumpFinderCommHandler = PumpFinderCommHandler(serviceLooper!!)
         } else {
-            pumpCommHandler = PumpCommHandler(looper)
+            pumpCommHandler = PumpCommHandler(serviceLooper!!)
 
             pumpCommHandler?.postDelayed(periodicUpdateTask, periodicUpdateIntervalMs)
             pumpCommHandler?.postDelayed(checkForUpdatesTask, checkForUpdatesDelayMs)
@@ -839,7 +841,7 @@ class CommService : Service() {
                 Timber.i("stop-pump-finder")
                 sendStopPumpFinderComm()
                 if (String(data) == "init_comm") {
-                    pumpCommHandler = PumpCommHandler(looper)
+                    pumpCommHandler = PumpCommHandler(serviceLooper!!)
                     val filterToMac = Prefs(applicationContext).pumpFinderPumpMac().orEmpty()
                     Prefs(applicationContext).setPumpFinderServiceEnabled(false)
                     Timber.i("stop-pump-finder-next: filterToMac=$filterToMac")
@@ -850,7 +852,7 @@ class CommService : Service() {
             "/to-phone/restart-pump-finder" -> {
                 Timber.i("restart-pump-finder")
                 sendStopPumpFinderComm()
-                pumpCommHandler = PumpCommHandler(looper)
+                pumpCommHandler = PumpCommHandler(serviceLooper!!)
                 Prefs(applicationContext).setPumpFinderServiceEnabled(true)
                 Timber.i("restart-pump-finder")
                 triggerAppReload(applicationContext)

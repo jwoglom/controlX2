@@ -2,7 +2,11 @@ package com.jwoglom.controlx2.messaging
 
 import android.content.Context
 import com.google.android.gms.wearable.DataClient
-import com.google.android.gms.wearable.PutDataRequest
+import com.google.android.gms.wearable.DataEvent
+import com.google.android.gms.wearable.DataEventBuffer
+import com.google.android.gms.wearable.DataMap
+import com.google.android.gms.wearable.DataMapItem
+import com.google.android.gms.wearable.PutDataMapRequest
 import com.google.android.gms.wearable.Wearable
 import com.jwoglom.controlx2.shared.messaging.StateSyncBus
 import kotlinx.coroutines.channels.awaitClose
@@ -29,16 +33,17 @@ class WearStateSyncBus(context: Context) : StateSyncBus {
         try {
             if (value == null) {
                 // Delete the data item
-                val uri = PutDataRequest.create("/state/$key").uri
+                val uri = PutDataMapRequest.create("/state/$key").uri
                 dataClient.deleteDataItems(uri).await()
             } else {
-                // Put the data item
-                val data = "${value.first};;${value.second.toEpochMilli()}".toByteArray()
-                val request = PutDataRequest.create("/state/$key")
-                    .setData(data)
-                    .setUrgent()
+                // Put the data item using DataMap
+                val putDataMapReq = PutDataMapRequest.create("/state/$key")
+                putDataMapReq.dataMap.putString("value", value.first)
+                putDataMapReq.dataMap.putLong("timestamp", value.second.toEpochMilli())
+                putDataMapReq.setUrgent()
 
-                dataClient.putDataItem(request).await()
+                val putDataReq = putDataMapReq.asPutDataRequest()
+                dataClient.putDataItem(putDataReq).await()
             }
         } catch (e: Exception) {
             Timber.e(e, "Error putting state: $key")
@@ -47,23 +52,25 @@ class WearStateSyncBus(context: Context) : StateSyncBus {
 
     override suspend fun getState(key: String): Pair<String, Instant>? {
         return try {
-            val dataItems = dataClient.dataItems.await()
-            dataItems.use { buffer ->
-                for (i in 0 until buffer.count) {
-                    val dataItem = buffer.get(i)
-                    val path = dataItem.uri.path
+            val dataItems = dataClient.getDataItems(android.net.Uri.parse("wear://*/state/$key")).await()
+            try {
+                if (dataItems.count > 0) {
+                    val dataItem = dataItems.get(0)
+                    val dataMap = DataMapItem.fromDataItem(dataItem).dataMap
+                    val valueStr = dataMap.getString("value")
+                    val timestamp = dataMap.getLong("timestamp")
 
-                    if (path == "/state/$key") {
-                        dataItem.data?.let { data ->
-                            val parts = String(data).split(";;", limit = 2)
-                            if (parts.size == 2) {
-                                return Pair(parts[0], Instant.ofEpochMilli(parts[1].toLong()))
-                            }
-                        }
+                    if (valueStr != null) {
+                        Pair(valueStr, Instant.ofEpochMilli(timestamp))
+                    } else {
+                        null
                     }
+                } else {
+                    null
                 }
+            } finally {
+                dataItems.release()
             }
-            null
         } catch (e: Exception) {
             Timber.e(e, "Error getting state: $key")
             null
@@ -74,22 +81,25 @@ class WearStateSyncBus(context: Context) : StateSyncBus {
         val result = mutableMapOf<String, Pair<String, Instant>>()
 
         try {
-            val dataItems = dataClient.dataItems.await()
-            dataItems.use { buffer ->
-                for (i in 0 until buffer.count) {
-                    val dataItem = buffer.get(i)
+            val dataItems = dataClient.getDataItems(android.net.Uri.parse("wear://*/state/*")).await()
+            try {
+                for (i in 0 until dataItems.count) {
+                    val dataItem = dataItems.get(i)
                     val path = dataItem.uri.path
 
                     if (path?.startsWith("/state/") == true) {
                         val key = path.removePrefix("/state/")
-                        dataItem.data?.let { data ->
-                            val parts = String(data).split(";;", limit = 2)
-                            if (parts.size == 2) {
-                                result[key] = Pair(parts[0], Instant.ofEpochMilli(parts[1].toLong()))
-                            }
+                        val dataMap = DataMapItem.fromDataItem(dataItem).dataMap
+                        val valueStr = dataMap.getString("value")
+                        val timestamp = dataMap.getLong("timestamp")
+
+                        if (valueStr != null) {
+                            result[key] = Pair(valueStr, Instant.ofEpochMilli(timestamp))
                         }
                     }
                 }
+            } finally {
+                dataItems.release()
             }
         } catch (e: Exception) {
             Timber.e(e, "Error getting all states")
@@ -100,17 +110,24 @@ class WearStateSyncBus(context: Context) : StateSyncBus {
     }
 
     override fun observeState(key: String): Flow<Pair<String, Instant>?> = callbackFlow {
-        val listener = DataClient.OnDataChangedListener { dataEvents ->
-            dataEvents.forEach { event ->
-                if (event.dataItem.uri.path == "/state/$key") {
-                    event.dataItem.data?.let { data ->
-                        val parts = String(data).split(";;", limit = 2)
-                        if (parts.size == 2) {
-                            trySend(Pair(parts[0], Instant.ofEpochMilli(parts[1].toLong())))
+        val listener = DataClient.OnDataChangedListener { dataEvents: DataEventBuffer ->
+            dataEvents.forEach { event: DataEvent ->
+                if (event.type == DataEvent.TYPE_CHANGED &&
+                    event.dataItem.uri.path == "/state/$key") {
+                    try {
+                        val dataMap = DataMapItem.fromDataItem(event.dataItem).dataMap
+                        val valueStr = dataMap.getString("value")
+                        val timestamp = dataMap.getLong("timestamp")
+
+                        if (valueStr != null) {
+                            trySend(Pair(valueStr, Instant.ofEpochMilli(timestamp)))
                         }
+                    } catch (e: Exception) {
+                        Timber.e(e, "Error in observeState listener")
                     }
                 }
             }
+            dataEvents.release()
         }
 
         dataClient.addListener(listener)
@@ -128,16 +145,14 @@ class WearStateSyncBus(context: Context) : StateSyncBus {
         Timber.d("WearStateSyncBus.clearAllStates")
 
         try {
-            val dataItems = dataClient.dataItems.await()
-            dataItems.use { buffer ->
-                for (i in 0 until buffer.count) {
-                    val dataItem = buffer.get(i)
-                    val path = dataItem.uri.path
-
-                    if (path?.startsWith("/state/") == true) {
-                        dataClient.deleteDataItems(dataItem.uri).await()
-                    }
+            val dataItems = dataClient.getDataItems(android.net.Uri.parse("wear://*/state/*")).await()
+            try {
+                for (i in 0 until dataItems.count) {
+                    val dataItem = dataItems.get(i)
+                    dataClient.deleteDataItems(dataItem.uri).await()
                 }
+            } finally {
+                dataItems.release()
             }
         } catch (e: Exception) {
             Timber.e(e, "Error clearing all states")
