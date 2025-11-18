@@ -40,7 +40,7 @@ jobs:
         run: ./gradlew --stacktrace collectAllComposePreviewMetadata
 
       - name: Render Compose previews
-        run: ./gradlew --stacktrace renderAllComposePreviews
+        run: ./gradlew --stacktrace renderAllComposePreviews aggregateComposePreviewManifests
 
       - name: Upload artifacts
         id: upload_artifacts
