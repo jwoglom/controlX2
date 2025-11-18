@@ -36,6 +36,9 @@ jobs:
           use_local_pumpx2=false
           PROPS
 
+      - name: Compile modules for preview collection
+        run: ./gradlew --stacktrace :mobile:compileDebugKotlin :wear:compileDebugKotlin :shared:compileDebugKotlin
+
       - name: Generate Paparazzi test files
         run: ./gradlew --stacktrace collectAllComposePreviewMetadata
 
