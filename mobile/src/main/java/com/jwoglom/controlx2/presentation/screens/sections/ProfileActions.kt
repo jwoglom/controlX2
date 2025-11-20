@@ -105,6 +105,7 @@ fun ProfileActions(
 
     var showProfileDetails by remember { mutableStateOf<IDPManager.Profile?>(null) }
     var showAddProfileDialog by remember { mutableStateOf(false) }
+    var showAddSegmentDialog by remember { mutableStateOf<IDPManager.Profile?>(null) }
 
     val context = LocalContext.current
     val ds = LocalDataStore.current
@@ -357,6 +358,25 @@ fun ProfileActions(
 
                                                     item {
                                                         Divider()
+                                                    }
+
+                                                    item {
+                                                        ListItem(
+                                                            headlineContent = {
+                                                                Text("Add Segment")
+                                                            },
+                                                            leadingContent = {
+                                                                Icon(
+                                                                    Icons.Filled.Add,
+                                                                    contentDescription = null,
+                                                                )
+                                                            },
+                                                            modifier = Modifier.clickable {
+                                                                refreshScope.launch {
+                                                                    showAddSegmentDialog = profile
+                                                                }
+                                                            }
+                                                        )
                                                     }
 
                                                     item {
@@ -616,6 +636,169 @@ fun ProfileActions(
                 TextButton(
                     onClick = {
                         showAddProfileDialog = false
+                    }
+                ) {
+                    Text("Cancel")
+                }
+            }
+        )
+    }
+
+    // Add Segment Dialog
+    if (showAddSegmentDialog != null) {
+        var startTimeHours by remember { mutableStateOf("") }
+        var startTimeMinutes by remember { mutableStateOf("") }
+        var basalRate by remember { mutableStateOf("") }
+        var carbRatio by remember { mutableStateOf("") }
+        var targetBG by remember { mutableStateOf("") }
+        var isf by remember { mutableStateOf("") }
+        var errorMessage by remember { mutableStateOf("") }
+
+        AlertDialog(
+            onDismissRequest = {
+                showAddSegmentDialog = null
+            },
+            title = {
+                Text("Add Profile Segment")
+            },
+            text = {
+                LazyColumn(
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 0.dp),
+                ) {
+                    item {
+                        Text("Enter segment details:", fontSize = 14.sp)
+                    }
+                    item {
+                        OutlinedTextField(
+                            value = startTimeHours,
+                            onValueChange = { startTimeHours = it },
+                            label = { Text("Start Time (Hours)") },
+                            placeholder = { Text("0-23") },
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                    }
+                    item {
+                        OutlinedTextField(
+                            value = startTimeMinutes,
+                            onValueChange = { startTimeMinutes = it },
+                            label = { Text("Start Time (Minutes)") },
+                            placeholder = { Text("0-59") },
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                    }
+                    item {
+                        OutlinedTextField(
+                            value = basalRate,
+                            onValueChange = { basalRate = it },
+                            label = { Text("Basal Rate (u/hr)") },
+                            placeholder = { Text("e.g., 1.0") },
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                    }
+                    item {
+                        OutlinedTextField(
+                            value = carbRatio,
+                            onValueChange = { carbRatio = it },
+                            label = { Text("Carb Ratio") },
+                            placeholder = { Text("e.g., 10") },
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                    }
+                    item {
+                        OutlinedTextField(
+                            value = targetBG,
+                            onValueChange = { targetBG = it },
+                            label = { Text("Target BG") },
+                            placeholder = { Text("e.g., 110") },
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                    }
+                    item {
+                        OutlinedTextField(
+                            value = isf,
+                            onValueChange = { isf = it },
+                            label = { Text("ISF (Insulin Sensitivity Factor)") },
+                            placeholder = { Text("e.g., 50") },
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                    }
+                    if (errorMessage.isNotEmpty()) {
+                        item {
+                            Text(
+                                errorMessage,
+                                color = Color.Red,
+                                fontSize = 12.sp
+                            )
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        try {
+                            val hours = startTimeHours.toIntOrNull() ?: 0
+                            val minutes = startTimeMinutes.toIntOrNull() ?: 0
+                            val startTime = MinsTime(hours, minutes)
+                            val basalRateFloat = basalRate.toFloatOrNull() ?: 0f
+                            val carbRatioLong = carbRatio.toLongOrNull() ?: 0L
+                            val targetBGInt = targetBG.toIntOrNull() ?: 0
+                            val isfInt = isf.toIntOrNull() ?: 0
+
+                            if (hours < 0 || hours > 23 || minutes < 0 || minutes > 59) {
+                                errorMessage = "Invalid time. Hours must be 0-23, minutes must be 0-59."
+                                return@TextButton
+                            }
+                            if (basalRateFloat <= 0) {
+                                errorMessage = "Basal rate must be greater than 0"
+                                return@TextButton
+                            }
+                            if (carbRatioLong <= 0) {
+                                errorMessage = "Carb ratio must be greater than 0"
+                                return@TextButton
+                            }
+                            if (targetBGInt <= 0) {
+                                errorMessage = "Target BG must be greater than 0"
+                                return@TextButton
+                            }
+                            if (isfInt <= 0) {
+                                errorMessage = "ISF must be greater than 0"
+                                return@TextButton
+                            }
+
+                            refreshScope.launch {
+                                sendPumpCommands(
+                                    SendType.BUST_CACHE,
+                                    listOf(
+                                        showAddSegmentDialog!!.createSegmentMessage(
+                                            startTime,
+                                            basalRateFloat,
+                                            carbRatioLong,
+                                            targetBGInt,
+                                            isfInt
+                                        )
+                                    )
+                                )
+                                showAddSegmentDialog = null
+                                showProfileDetails = null
+                                refresh()
+                            }
+                        } catch (e: Exception) {
+                            errorMessage = "Error: ${e.message}"
+                            Timber.e(e, "Error creating segment")
+                        }
+                    }
+                ) {
+                    Text("Add Segment")
+                }
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = {
+                        showAddSegmentDialog = null
                     }
                 ) {
                     Text("Cancel")
