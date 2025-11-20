@@ -108,6 +108,23 @@ class CommService : Service() {
 
     private lateinit var messageBus: MessageBus
 
+    private var serviceStatusAcknowledged = false
+    private val serviceStatusTask = object : Runnable {
+        override fun run() {
+            if (!serviceStatusAcknowledged) {
+                Timber.i("Periodically sending service status (not yet acknowledged)")
+                if (Prefs(applicationContext).pumpFinderServiceEnabled()) {
+                    sendWearCommMessage("/to-phone/pump-finder-started", "".toByteArray())
+                } else {
+                    sendWearCommMessage("/to-phone/comm-started", "".toByteArray())
+                }
+                serviceLooper?.let { looper ->
+                    Handler(looper).postDelayed(this, 2000)
+                }
+            }
+        }
+    }
+
     private var lastResponseMessage: MutableMap<Pair<Characteristic, Byte>, Pair<com.jwoglom.pumpx2.pump.messages.Message, Instant>> = Collections.synchronizedMap(mutableMapOf())
     private var historyLogCache: MutableMap<Long, HistoryLog> = Collections.synchronizedMap(mutableMapOf())
     private var lastTimeSinceReset: TimeSinceResetResponse? = null
@@ -823,13 +840,10 @@ class CommService : Service() {
         }
 
 
-        Thread {
-            if (Prefs(applicationContext).pumpFinderServiceEnabled()) {
-                sendWearCommMessage("/to-phone/pump-finder-started", "".toByteArray())
-            } else {
-                sendWearCommMessage("/to-phone/comm-started", "".toByteArray())
-            }
-        }.start()
+        // Start periodic status sender (will stop when acknowledged)
+        serviceLooper?.let { looper ->
+            Handler(looper).postDelayed(serviceStatusTask, 500)
+        }
     }
 
     override fun onBind(intent: Intent?) = null
@@ -865,6 +879,18 @@ class CommService : Service() {
             "/to-phone/check-pump-finder-found-pumps" -> {
                 Timber.i("check-pump-finder-found-pumps")
                 sendCheckPumpFinderFoundPumps()
+            }
+            "/to-phone/request-service-status" -> {
+                Timber.i("request-service-status received, responding with current status")
+                if (Prefs(applicationContext).pumpFinderServiceEnabled()) {
+                    sendWearCommMessage("/to-phone/pump-finder-started", "".toByteArray())
+                } else {
+                    sendWearCommMessage("/to-phone/comm-started", "".toByteArray())
+                }
+            }
+            "/to-phone/service-status-acknowledged" -> {
+                Timber.i("service-status acknowledged, stopping periodic sender")
+                serviceStatusAcknowledged = true
             }
             "/to-phone/stop-comm" -> {
                 Timber.w("stop-comm")

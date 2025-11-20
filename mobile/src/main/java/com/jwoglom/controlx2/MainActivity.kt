@@ -27,11 +27,10 @@ import androidx.compose.runtime.compositionLocalOf
 import androidx.core.app.ActivityCompat
 import com.google.android.gms.common.ConnectionResult
 import com.google.android.gms.common.GoogleApiAvailability
-import com.google.android.gms.wearable.MessageClient
-import com.google.android.gms.wearable.MessageEvent
-import com.google.android.gms.wearable.Node
-import com.google.android.gms.wearable.Wearable
 import com.jwoglom.controlx2.db.historylog.HistoryLogDatabase
+import com.jwoglom.controlx2.messaging.MessageBusFactory
+import com.jwoglom.controlx2.shared.messaging.MessageBus
+import com.jwoglom.controlx2.shared.messaging.MessageListener
 import com.jwoglom.controlx2.db.historylog.HistoryLogRepo
 import com.jwoglom.controlx2.db.historylog.HistoryLogViewModel
 import com.jwoglom.controlx2.db.historylog.HistoryLogViewModelFactory
@@ -110,8 +109,8 @@ import kotlin.system.exitProcess
 var dataStore = DataStore()
 val LocalDataStore = compositionLocalOf { dataStore }
 
-class MainActivity : ComponentActivity(), MessageClient.OnMessageReceivedListener {
-    private lateinit var messageClient: MessageClient
+class MainActivity : ComponentActivity() {
+    private lateinit var messageBus: MessageBus
 
     private val applicationScope = CoroutineScope(SupervisorJob())
     private val historyLogDb by lazy { HistoryLogDatabase.getDatabase(this) }
@@ -158,18 +157,19 @@ class MainActivity : ComponentActivity(), MessageClient.OnMessageReceivedListene
             )
         }
 
+        // Initialize MessageBus and register as listener
         if (checkPlayServicesAndInitialize()) {
-            reinitializeGoogleApiClient()
+            messageBus = MessageBusFactory.createMessageBus(this)
+            messageBus.addMessageListener(object : MessageListener {
+                override fun onMessageReceived(path: String, data: ByteArray, sourceNodeId: String) {
+                    handleMessageReceived(path, data, sourceNodeId)
+                }
+            })
         }
         checkNotificationPermissions()
 
 
         startCommServiceWithPreconditions()
-    }
-
-    private fun reinitializeGoogleApiClient() {
-        messageClient = Wearable.getMessageClient(this)
-        messageClient.addListener(this)
     }
 
     private fun checkNotificationPermissions() {
@@ -208,16 +208,25 @@ class MainActivity : ComponentActivity(), MessageClient.OnMessageReceivedListene
         } else {
             startBTPermissionsCheck()
         }
+
+        // Request service status when resuming, in case app was started in background
+        if (dataStore.pumpSetupStage.value == PumpSetupStage.WAITING_PUMP_FINDER_INIT &&
+            Prefs(applicationContext).serviceEnabled()) {
+            Timber.i("onResume: requesting service status (currently in WAITING_PUMP_FINDER_INIT)")
+            sendMessage("/to-phone/request-service-status", "".toByteArray())
+        }
+
         super.onResume()
     }
 
     override fun onStop() {
         super.onStop()
-        messageClient.removeListener(this)
     }
 
     override fun onDestroy() {
-        messageClient.removeListener(this)
+        if (::messageBus.isInitialized) {
+            messageBus.close()
+        }
         super.onDestroy()
     }
 
@@ -248,6 +257,8 @@ class MainActivity : ComponentActivity(), MessageClient.OnMessageReceivedListene
             //retrieve an instance of the service here from the IBinder returned
             //from the onBind method to communicate with
             Timber.i("CommService onServiceConnected")
+            // Request service status now that we're ready to receive it
+            sendMessage("/to-phone/request-service-status", "".toByteArray())
         }
 
         override fun onServiceDisconnected(name: ComponentName) {
@@ -296,32 +307,8 @@ class MainActivity : ComponentActivity(), MessageClient.OnMessageReceivedListene
     }
 
     private fun sendMessage(path: String, message: ByteArray) {
-        val messageClient = Wearable.getMessageClient(this)
-        val nodeClient = Wearable.getNodeClient(this)
         Timber.i("mobile sendMessage: $path ${String(message)}")
-
-        fun inner(node: Node) {
-            messageClient.sendMessage(node.id, path, message)
-                .addOnSuccessListener {
-                    Timber.d("Message sent: ${path} ${String(message)}")
-                }
-                .addOnFailureListener {
-                    Timber.e("mobile sendMessage callback: $it")
-                }
-        }
-        if (!path.startsWith("/to-wear")) {
-            nodeClient.localNode.addOnSuccessListener { localNode ->
-                Timber.d("mobile sendMessage local: ${localNode}")
-                inner(localNode)
-            }
-        }
-        nodeClient.connectedNodes
-            .addOnSuccessListener { nodes ->
-                Timber.d("mobile sendMessage nodes: $nodes")
-                nodes.forEach { node ->
-                    inner(node)
-                }
-            }
+        messageBus.sendMessage(path, message)
     }
 
     private fun sendPumpCommands(type: SendType, msgs: List<Message>) {
@@ -406,12 +393,12 @@ class MainActivity : ComponentActivity(), MessageClient.OnMessageReceivedListene
     }
 
 
-    // Message received from Wear or CommService
-    override fun onMessageReceived(messageEvent: MessageEvent) {
-        Timber.i("phone messageReceived: ${messageEvent.path}: ${String(messageEvent.data)}")
-        when (messageEvent.path) {
+    // Message received from Wear or CommService via MessageBus
+    private fun handleMessageReceived(path: String, data: ByteArray, sourceNodeId: String) {
+        Timber.i("phone messageReceived: $path: ${String(data)} from $sourceNodeId")
+        when (path) {
             "/to-phone/start-comm" -> {
-                when (String(messageEvent.data)) {
+                when (String(data)) {
                     "skip_notif_permission" -> {
                         startBTPermissionsCheck()
                         startCommServiceWithPreconditions()
@@ -439,10 +426,12 @@ class MainActivity : ComponentActivity(), MessageClient.OnMessageReceivedListene
 
             "/to-phone/comm-started" -> {
                 dataStore.pumpSetupStage.value = dataStore.pumpSetupStage.value?.nextStage(PumpSetupStage.PUMPX2_SEARCHING_FOR_PUMP)
+                // Acknowledge receipt to stop periodic sender
+                sendMessage("/to-phone/service-status-acknowledged", "".toByteArray())
             }
 
             "/to-phone/start-pump-finder" -> {
-                when (String(messageEvent.data)) {
+                when (String(data)) {
                     "skip_notif_permission" -> {
                         startBTPermissionsCheck()
                         startCommServiceWithPreconditions()
@@ -470,10 +459,12 @@ class MainActivity : ComponentActivity(), MessageClient.OnMessageReceivedListene
 
             "/to-phone/pump-finder-started" -> {
                 dataStore.pumpSetupStage.value = dataStore.pumpSetupStage.value?.nextStage(PumpSetupStage.PUMP_FINDER_SEARCHING_FOR_PUMPS)
+                // Acknowledge receipt to stop periodic sender
+                sendMessage("/to-phone/service-status-acknowledged", "".toByteArray())
             }
 
             "/from-pump/pump-finder-found-pumps" -> {
-                dataStore.pumpFinderPumps.value = String(messageEvent.data).split(";").map {
+                dataStore.pumpFinderPumps.value = String(data).split(";").map {
                     Pair(it.substringBefore("="), it.substringAfter("="))
                 }
                 if (dataStore.pumpSetupStage.value == PumpSetupStage.PUMP_FINDER_SEARCHING_FOR_PUMPS) {
@@ -482,7 +473,7 @@ class MainActivity : ComponentActivity(), MessageClient.OnMessageReceivedListene
             }
 
             "/to-phone/set-pairing-code" -> {
-                val pairingCodeText = String(messageEvent.data)
+                val pairingCodeText = String(data)
                 PumpState.setPairingCode(applicationContext, pairingCodeText)
                 Toast.makeText(applicationContext, "Set pairing code: $pairingCodeText", Toast.LENGTH_SHORT).show()
 
@@ -507,20 +498,20 @@ class MainActivity : ComponentActivity(), MessageClient.OnMessageReceivedListene
 
             "/from-pump/pump-discovered" -> {
                 dataStore.pumpSetupStage.value = dataStore.pumpSetupStage.value?.nextStage(PumpSetupStage.PUMPX2_PUMP_DISCOVERED)
-                dataStore.setupDeviceName.value = String(messageEvent.data)
-                extractPumpSid(String(messageEvent.data))?.let {
+                dataStore.setupDeviceName.value = String(data)
+                extractPumpSid(String(data))?.let {
                     dataStore.pumpSid.value = it
                 }
             }
 
             "/from-pump/pump-model" -> {
-                dataStore.setupDeviceModel.value = String(messageEvent.data)
+                dataStore.setupDeviceModel.value = String(data)
                 dataStore.pumpSetupStage.value = dataStore.pumpSetupStage.value?.nextStage(PumpSetupStage.PUMPX2_PUMP_MODEL_METADATA)
             }
 
             "/from-pump/initial-pump-connection" -> {
-                dataStore.setupDeviceName.value = String(messageEvent.data)
-                extractPumpSid(String(messageEvent.data))?.let {
+                dataStore.setupDeviceName.value = String(data)
+                extractPumpSid(String(data))?.let {
                     dataStore.pumpSid.value = it
                 }
                 dataStore.pumpSetupStage.value = dataStore.pumpSetupStage.value?.nextStage(PumpSetupStage.PUMPX2_INITIAL_PUMP_CONNECTION)
@@ -542,14 +533,14 @@ class MainActivity : ComponentActivity(), MessageClient.OnMessageReceivedListene
             }
 
             "/from-pump/pump-critical-error" -> {
-                Timber.w("pump-critical-error: ${String(messageEvent.data)}")
-                dataStore.pumpCriticalError.value = Pair(String(messageEvent.data), Instant.now())
+                Timber.w("pump-critical-error: ${String(data)}")
+                dataStore.pumpCriticalError.value = Pair(String(data), Instant.now())
             }
 
             "/from-pump/pump-connected" -> {
                 dataStore.pumpSetupStage.value = dataStore.pumpSetupStage.value?.nextStage(PumpSetupStage.PUMPX2_PUMP_CONNECTED)
-                dataStore.setupDeviceName.value = String(messageEvent.data)
-                extractPumpSid(String(messageEvent.data))?.let {
+                dataStore.setupDeviceName.value = String(data)
+                extractPumpSid(String(data))?.let {
                     dataStore.pumpSid.value = it
                 }
                 dataStore.pumpConnected.value = true
@@ -559,7 +550,7 @@ class MainActivity : ComponentActivity(), MessageClient.OnMessageReceivedListene
             // on explicit disconnection
             "/from-pump/pump-disconnected" -> {
                 dataStore.pumpSetupStage.value = dataStore.pumpSetupStage.value?.nextStage(PumpSetupStage.PUMPX2_PUMP_DISCONNECTED)
-                dataStore.setupDeviceModel.value = String(messageEvent.data)
+                dataStore.setupDeviceModel.value = String(data)
                 dataStore.pumpConnected.value = false
             }
 
@@ -573,23 +564,23 @@ class MainActivity : ComponentActivity(), MessageClient.OnMessageReceivedListene
             }
 
             "/from-pump/receive-message" -> {
-                val pumpMessage = PumpMessageSerializer.fromBytes(messageEvent.data)
+                val pumpMessage = PumpMessageSerializer.fromBytes(data)
                 onPumpMessageReceived(pumpMessage, false)
                 dataStore.pumpLastMessageTimestamp.value = Instant.now()
             }
             "/from-pump/receive-cached-message" -> {
-                val pumpMessage = PumpMessageSerializer.fromBytes(messageEvent.data)
+                val pumpMessage = PumpMessageSerializer.fromBytes(data)
                 onPumpMessageReceived(pumpMessage, true)
                 dataStore.pumpLastMessageTimestamp.value = Instant.now()
             }
 
             "/from-pump/debug-message-cache" -> {
-                val processed = PumpMessageSerializer.fromDebugMessageCacheBytes(messageEvent.data)
+                val processed = PumpMessageSerializer.fromDebugMessageCacheBytes(data)
                 dataStore.debugMessageCache.value = processed
             }
 
             "/from-pump/debug-historylog-cache" -> {
-                val processed = PumpMessageSerializer.fromDebugHistoryLogCacheBytes(messageEvent.data)
+                val processed = PumpMessageSerializer.fromDebugHistoryLogCacheBytes(data)
                 var mp = dataStore.historyLogCache.value
                 if (mp == null) {
                      mp = mutableMapOf()
@@ -639,20 +630,17 @@ class MainActivity : ComponentActivity(), MessageClient.OnMessageReceivedListene
 
         if (NotificationBundle.isNotificationResponse(message)) {
             synchronized(dataStore.notificationBundle) {
-                // returns an instance of itself: ensures that watchers get the updated values
-                dataStore.notificationBundle.value = (dataStore.notificationBundle.value ?: NotificationBundle()).add(message);
+                val updated = (dataStore.notificationBundle.value ?: NotificationBundle()).add(message)
+                // re-create to trigger state update via object change
+                dataStore.notificationBundle.value = NotificationBundle(updated)
             }
         }
 
         if (IDPManager.isIDPManagerResponse(message)) {
             synchronized(dataStore.idpManager) {
-                // processMessage returns an instance of itself: ensures that watchers get the updated values
-                val isComplete = dataStore.idpManager.value?.isComplete == true
-                dataStore.idpManager.value = (dataStore.idpManager.value ?: IDPManager()).processMessage(message)
-                // re-create self when complete to trigger state update via object change
-                if (isComplete != dataStore.idpManager.value?.isComplete) {
-                    dataStore.idpManager.value = IDPManager(dataStore.idpManager.value)
-                }
+                val updated = (dataStore.idpManager.value ?: IDPManager()).processMessage(message)
+                // re-create to trigger state update via object change
+                dataStore.idpManager.value = IDPManager(updated)
             }
         }
         when (message) {
