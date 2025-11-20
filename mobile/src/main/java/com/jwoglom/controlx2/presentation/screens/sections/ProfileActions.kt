@@ -18,6 +18,7 @@ import androidx.compose.foundation.layout.wrapContentSize
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.ExperimentalMaterialApi
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Delete
@@ -34,6 +35,7 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.ListItemDefaults
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -102,6 +104,7 @@ fun ProfileActions(
     val coroutineScope = rememberCoroutineScope()
 
     var showProfileDetails by remember { mutableStateOf<IDPManager.Profile?>(null) }
+    var showAddProfileDialog by remember { mutableStateOf(false) }
 
     val context = LocalContext.current
     val ds = LocalDataStore.current
@@ -437,6 +440,31 @@ fun ProfileActions(
                     Box(
                         modifier = Modifier
                             .fillMaxSize()
+                            .wrapContentSize(Alignment.TopStart)
+                    ) {
+                        ListItem(
+                            headlineContent = {
+                                Text(
+                                    "Add New Profile"
+                                )
+                            },
+                            supportingContent = {
+                                Text("Create a new insulin delivery profile")
+                            },
+                            leadingContent = {
+                                Icon(Icons.Filled.Add, contentDescription = null)
+                            },
+                            modifier = Modifier.clickable {
+                                showAddProfileDialog = true
+                            }
+                        )
+                    }
+                }
+
+                item {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
                             .wrapContentSize(Alignment.BottomStart)
                     ) {
                         ListItem(
@@ -455,6 +483,142 @@ fun ProfileActions(
                             }
                         )
                     }
+                }
+            }
+        )
+    }
+
+    // Add Profile Dialog
+    if (showAddProfileDialog) {
+        var profileName by remember { mutableStateOf("") }
+        var carbRatio by remember { mutableStateOf("10") }
+        var basalRate by remember { mutableStateOf("1.0") }
+        var targetBG by remember { mutableStateOf("110") }
+        var isf by remember { mutableStateOf("50") }
+        var insulinDuration by remember { mutableStateOf("240") }
+        var carbEntryEnabled by remember { mutableStateOf(true) }
+
+        AlertDialog(
+            onDismissRequest = {
+                showAddProfileDialog = false
+            },
+            title = {
+                Text("Add New Profile")
+            },
+            text = {
+                LazyColumn(
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 8.dp)
+                ) {
+                    item {
+                        OutlinedTextField(
+                            value = profileName,
+                            onValueChange = { profileName = it },
+                            label = { Text("Profile Name") },
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                    }
+                    item {
+                        Text(
+                            "Default Settings for First Segment",
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier.padding(top = 8.dp)
+                        )
+                    }
+                    item {
+                        OutlinedTextField(
+                            value = carbRatio,
+                            onValueChange = { carbRatio = it },
+                            label = { Text("Carb Ratio (g/u)") },
+                            supportingText = { Text("Example: 10 = 1:10 ratio") },
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                    }
+                    item {
+                        OutlinedTextField(
+                            value = basalRate,
+                            onValueChange = { basalRate = it },
+                            label = { Text("Basal Rate (u/hr)") },
+                            supportingText = { Text("Example: 1.0") },
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                    }
+                    item {
+                        OutlinedTextField(
+                            value = targetBG,
+                            onValueChange = { targetBG = it },
+                            label = { Text("Target BG (mg/dL)") },
+                            supportingText = { Text("Example: 110") },
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                    }
+                    item {
+                        OutlinedTextField(
+                            value = isf,
+                            onValueChange = { isf = it },
+                            label = { Text("ISF (mg/dL per u)") },
+                            supportingText = { Text("Example: 50 = 1:50") },
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                    }
+                    item {
+                        OutlinedTextField(
+                            value = insulinDuration,
+                            onValueChange = { insulinDuration = it },
+                            label = { Text("Insulin Duration (minutes)") },
+                            supportingText = { Text("Example: 240 = 4 hours") },
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        refreshScope.launch {
+                            try {
+                                val carbRatioInt = (carbRatio.toFloatOrNull() ?: 10f) * 1000
+                                val basalRateMilliunits = ((basalRate.toFloatOrNull() ?: 1.0f) * 1000).toInt()
+                                val targetBGInt = targetBG.toIntOrNull() ?: 110
+                                val isfInt = isf.toIntOrNull() ?: 50
+                                val insulinDurationInt = insulinDuration.toIntOrNull() ?: 240
+
+                                val message = (ds.idpManager.value ?: IDPManager()).createNewProfileMessage(
+                                    profileName,
+                                    carbRatioInt.toInt(),
+                                    basalRateMilliunits,
+                                    targetBGInt,
+                                    isfInt,
+                                    insulinDurationInt,
+                                    carbEntryEnabled
+                                )
+
+                                sendPumpCommands(
+                                    SendType.BUST_CACHE,
+                                    listOf(message)
+                                )
+
+                                showAddProfileDialog = false
+                                refresh()
+                            } catch (e: Exception) {
+                                Timber.e(e, "Error creating profile")
+                            }
+                        }
+                    },
+                    enabled = profileName.isNotBlank()
+                ) {
+                    Text("Create")
+                }
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = {
+                        showAddProfileDialog = false
+                    }
+                ) {
+                    Text("Cancel")
                 }
             }
         )
