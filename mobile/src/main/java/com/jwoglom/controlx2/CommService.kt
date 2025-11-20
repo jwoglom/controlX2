@@ -625,9 +625,13 @@ class CommService : WearableListenerService(), MessageClient.OnMessageReceivedLi
             }
 
             override fun onDiscoveredPump(peripheral: BluetoothPeripheral?, scanResult: ScanResult?) {
-                var key = "${peripheral?.name}=${peripheral?.address}"
+                val name = when {
+                    peripheral?.name.isNullOrEmpty() -> "NO NAME"
+                    else -> peripheral?.name
+                }
+                val key = "${name}=${peripheral?.address}"
                 // onDiscoveredPump is typically called quite extensively, each time it sees
-                // a BT packet, which can be quite spamy
+                // a BT packet, which can be quite spammy
                 if (foundPumps.contains(key)) {
                     return
                 }

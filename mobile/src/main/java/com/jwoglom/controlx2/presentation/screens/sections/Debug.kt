@@ -117,6 +117,7 @@ import java.lang.reflect.InvocationTargetException
 import java.time.Instant
 import java.util.stream.Collectors
 import kotlin.math.ceil
+import kotlin.math.max
 import kotlin.math.min
 
 
@@ -893,7 +894,7 @@ fun triggerHistoryLogRequestDialog(
     input1.inputType = InputType.TYPE_CLASS_NUMBER or InputType.TYPE_NUMBER_VARIATION_NORMAL
     input1.width = 200
     if (historyLogStatus != null) {
-        input1.setText("${historyLogStatus.lastSequenceNum-255}")
+        input1.setText("${max(0, historyLogStatus.lastSequenceNum-255)}")
     }
     val layout = LinearLayout(context)
     layout.addView(input1)
@@ -902,7 +903,7 @@ fun triggerHistoryLogRequestDialog(
         val slider = Slider(context)
         slider.valueFrom = historyLogStatus.firstSequenceNum.toFloat()
         slider.valueTo = historyLogStatus.lastSequenceNum.toFloat()
-        slider.value = (historyLogStatus.lastSequenceNum-255).toFloat()
+        slider.value = max(0, historyLogStatus.lastSequenceNum-255).toFloat()
         slider.stepSize = 1.0f
         slider.addOnChangeListener { slider, value, fromUser -> input1.setText("${value.toLong()}") }
         layout.addView(slider)
