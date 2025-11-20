@@ -10,12 +10,14 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.wrapContentSize
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.material.ExperimentalMaterialApi
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
@@ -42,6 +44,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.livedata.observeAsState
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -71,6 +74,8 @@ import com.jwoglom.controlx2.db.historylog.HistoryLogViewModel
 import com.jwoglom.controlx2.presentation.components.HeaderLine
 import com.jwoglom.controlx2.presentation.components.Line
 import com.jwoglom.controlx2.presentation.components.LoadSpinner
+import com.jwoglom.controlx2.presentation.screens.sections.components.AddProfileDialog
+import com.jwoglom.controlx2.presentation.screens.sections.components.AddSegmentDialog
 import com.jwoglom.controlx2.presentation.screens.setUpPreviewState
 import com.jwoglom.controlx2.presentation.theme.ControlX2Theme
 import com.jwoglom.controlx2.presentation.util.LifecycleStateObserver
@@ -510,301 +515,63 @@ fun ProfileActions(
 
     // Add Profile Dialog
     if (showAddProfileDialog) {
-        var profileName by remember { mutableStateOf("") }
-        var carbRatio by remember { mutableStateOf("10") }
-        var basalRate by remember { mutableStateOf("1.0") }
-        var targetBG by remember { mutableStateOf("110") }
-        var isf by remember { mutableStateOf("50") }
-        var insulinDuration by remember { mutableStateOf("240") }
-        var carbEntryEnabled by remember { mutableStateOf(true) }
+        AddProfileDialog(
+            onDismiss = { showAddProfileDialog = false },
+            onConfirm = { profileName, carbRatioInt, basalRateMilliunits, targetBGInt, isfInt, insulinDurationInt, carbEntryEnabled ->
+                refreshScope.launch {
+                    try {
+                        val message = (ds.idpManager.value ?: IDPManager()).createNewProfileMessage(
+                            profileName,
+                            carbRatioInt,
+                            basalRateMilliunits,
+                            targetBGInt,
+                            isfInt,
+                            insulinDurationInt,
+                            carbEntryEnabled
+                        )
 
-        AlertDialog(
-            onDismissRequest = {
-                showAddProfileDialog = false
-            },
-            title = {
-                Text("Add New Profile")
-            },
-            text = {
-                LazyColumn(
-                    verticalArrangement = Arrangement.spacedBy(8.dp),
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(vertical = 8.dp)
-                ) {
-                    item {
-                        OutlinedTextField(
-                            value = profileName,
-                            onValueChange = { profileName = it },
-                            label = { Text("Profile Name") },
-                            modifier = Modifier.fillMaxWidth()
+                        sendPumpCommands(
+                            SendType.BUST_CACHE,
+                            listOf(message)
                         )
-                    }
-                    item {
-                        Text(
-                            "Default Settings for First Segment",
-                            fontWeight = FontWeight.Bold,
-                            modifier = Modifier.padding(top = 8.dp)
-                        )
-                    }
-                    item {
-                        OutlinedTextField(
-                            value = carbRatio,
-                            onValueChange = { carbRatio = it },
-                            label = { Text("Carb Ratio (g/u)") },
-                            supportingText = { Text("Example: 10 = 1:10 ratio") },
-                            modifier = Modifier.fillMaxWidth()
-                        )
-                    }
-                    item {
-                        OutlinedTextField(
-                            value = basalRate,
-                            onValueChange = { basalRate = it },
-                            label = { Text("Basal Rate (u/hr)") },
-                            supportingText = { Text("Example: 1.0") },
-                            modifier = Modifier.fillMaxWidth()
-                        )
-                    }
-                    item {
-                        OutlinedTextField(
-                            value = targetBG,
-                            onValueChange = { targetBG = it },
-                            label = { Text("Target BG (mg/dL)") },
-                            supportingText = { Text("Example: 110") },
-                            modifier = Modifier.fillMaxWidth()
-                        )
-                    }
-                    item {
-                        OutlinedTextField(
-                            value = isf,
-                            onValueChange = { isf = it },
-                            label = { Text("ISF (mg/dL per u)") },
-                            supportingText = { Text("Example: 50 = 1:50") },
-                            modifier = Modifier.fillMaxWidth()
-                        )
-                    }
-                    item {
-                        OutlinedTextField(
-                            value = insulinDuration,
-                            onValueChange = { insulinDuration = it },
-                            label = { Text("Insulin Duration (minutes)") },
-                            supportingText = { Text("Example: 240 = 4 hours") },
-                            modifier = Modifier.fillMaxWidth()
-                        )
-                    }
-                }
-            },
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        refreshScope.launch {
-                            try {
-                                val carbRatioInt = (carbRatio.toFloatOrNull() ?: 10f) * 1000
-                                val basalRateMilliunits = ((basalRate.toFloatOrNull() ?: 1.0f) * 1000).toInt()
-                                val targetBGInt = targetBG.toIntOrNull() ?: 110
-                                val isfInt = isf.toIntOrNull() ?: 50
-                                val insulinDurationInt = insulinDuration.toIntOrNull() ?: 240
 
-                                val message = (ds.idpManager.value ?: IDPManager()).createNewProfileMessage(
-                                    profileName,
-                                    carbRatioInt.toInt(),
-                                    basalRateMilliunits,
-                                    targetBGInt,
-                                    isfInt,
-                                    insulinDurationInt,
-                                    carbEntryEnabled
-                                )
-
-                                sendPumpCommands(
-                                    SendType.BUST_CACHE,
-                                    listOf(message)
-                                )
-
-                                showAddProfileDialog = false
-                                refresh()
-                            } catch (e: Exception) {
-                                Timber.e(e, "Error creating profile")
-                            }
-                        }
-                    },
-                    enabled = profileName.isNotBlank()
-                ) {
-                    Text("Create")
-                }
-            },
-            dismissButton = {
-                TextButton(
-                    onClick = {
                         showAddProfileDialog = false
+                        refresh()
+                    } catch (e: Exception) {
+                        Timber.e(e, "Error creating profile")
                     }
-                ) {
-                    Text("Cancel")
                 }
             }
         )
     }
 
     // Add Segment Dialog
-    if (showAddSegmentDialog != null) {
-        var startTimeHours by remember { mutableStateOf("") }
-        var startTimeMinutes by remember { mutableStateOf("") }
-        var basalRate by remember { mutableStateOf("") }
-        var carbRatio by remember { mutableStateOf("") }
-        var targetBG by remember { mutableStateOf("") }
-        var isf by remember { mutableStateOf("") }
-        var errorMessage by remember { mutableStateOf("") }
-
-        AlertDialog(
-            onDismissRequest = {
-                showAddSegmentDialog = null
-            },
-            title = {
-                Text("Add Profile Segment")
-            },
-            text = {
-                LazyColumn(
-                    verticalArrangement = Arrangement.spacedBy(8.dp),
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 0.dp),
-                ) {
-                    item {
-                        Text("Enter segment details:", fontSize = 14.sp)
-                    }
-                    item {
-                        OutlinedTextField(
-                            value = startTimeHours,
-                            onValueChange = { startTimeHours = it },
-                            label = { Text("Start Time (Hours)") },
-                            placeholder = { Text("0-23") },
-                            modifier = Modifier.fillMaxWidth()
-                        )
-                    }
-                    item {
-                        OutlinedTextField(
-                            value = startTimeMinutes,
-                            onValueChange = { startTimeMinutes = it },
-                            label = { Text("Start Time (Minutes)") },
-                            placeholder = { Text("0-59") },
-                            modifier = Modifier.fillMaxWidth()
-                        )
-                    }
-                    item {
-                        OutlinedTextField(
-                            value = basalRate,
-                            onValueChange = { basalRate = it },
-                            label = { Text("Basal Rate (u/hr)") },
-                            placeholder = { Text("e.g., 1.0") },
-                            modifier = Modifier.fillMaxWidth()
-                        )
-                    }
-                    item {
-                        OutlinedTextField(
-                            value = carbRatio,
-                            onValueChange = { carbRatio = it },
-                            label = { Text("Carb Ratio") },
-                            placeholder = { Text("e.g., 10") },
-                            modifier = Modifier.fillMaxWidth()
-                        )
-                    }
-                    item {
-                        OutlinedTextField(
-                            value = targetBG,
-                            onValueChange = { targetBG = it },
-                            label = { Text("Target BG") },
-                            placeholder = { Text("e.g., 110") },
-                            modifier = Modifier.fillMaxWidth()
-                        )
-                    }
-                    item {
-                        OutlinedTextField(
-                            value = isf,
-                            onValueChange = { isf = it },
-                            label = { Text("ISF (Insulin Sensitivity Factor)") },
-                            placeholder = { Text("e.g., 50") },
-                            modifier = Modifier.fillMaxWidth()
-                        )
-                    }
-                    if (errorMessage.isNotEmpty()) {
-                        item {
-                            Text(
-                                errorMessage,
-                                color = Color.Red,
-                                fontSize = 12.sp
-                            )
-                        }
-                    }
-                }
-            },
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        try {
-                            val hours = startTimeHours.toIntOrNull() ?: 0
-                            val minutes = startTimeMinutes.toIntOrNull() ?: 0
-                            val startTime = MinsTime(hours, minutes)
-                            val basalRateFloat = basalRate.toFloatOrNull() ?: 0f
-                            val carbRatioLong = carbRatio.toLongOrNull() ?: 0L
-                            val targetBGInt = targetBG.toIntOrNull() ?: 0
-                            val isfInt = isf.toIntOrNull() ?: 0
-
-                            if (hours < 0 || hours > 23 || minutes < 0 || minutes > 59) {
-                                errorMessage = "Invalid time. Hours must be 0-23, minutes must be 0-59."
-                                return@TextButton
-                            }
-                            if (basalRateFloat <= 0) {
-                                errorMessage = "Basal rate must be greater than 0"
-                                return@TextButton
-                            }
-                            if (carbRatioLong <= 0) {
-                                errorMessage = "Carb ratio must be greater than 0"
-                                return@TextButton
-                            }
-                            if (targetBGInt <= 0) {
-                                errorMessage = "Target BG must be greater than 0"
-                                return@TextButton
-                            }
-                            if (isfInt <= 0) {
-                                errorMessage = "ISF must be greater than 0"
-                                return@TextButton
-                            }
-
-                            refreshScope.launch {
-                                sendPumpCommands(
-                                    SendType.BUST_CACHE,
-                                    listOf(
-                                        showAddSegmentDialog!!.createSegmentMessage(
-                                            startTime,
-                                            basalRateFloat,
-                                            carbRatioLong,
-                                            targetBGInt,
-                                            isfInt
-                                        )
-                                    )
+    showAddSegmentDialog?.let { profile ->
+        key(profile.idpId) {
+            AddSegmentDialog(
+                profile = profile,
+                onDismiss = { showAddSegmentDialog = null },
+                onConfirm = { startTime, basalRateFloat, carbRatioLong, targetBGInt, isfInt ->
+                    refreshScope.launch {
+                        sendPumpCommands(
+                            SendType.BUST_CACHE,
+                            listOf(
+                                profile.createSegmentMessage(
+                                    startTime,
+                                    basalRateFloat,
+                                    carbRatioLong,
+                                    targetBGInt,
+                                    isfInt
                                 )
-                                showAddSegmentDialog = null
-                                showProfileDetails = null
-                                refresh()
-                            }
-                        } catch (e: Exception) {
-                            errorMessage = "Error: ${e.message}"
-                            Timber.e(e, "Error creating segment")
-                        }
-                    }
-                ) {
-                    Text("Add Segment")
-                }
-            },
-            dismissButton = {
-                TextButton(
-                    onClick = {
+                            )
+                        )
                         showAddSegmentDialog = null
+                        showProfileDetails = null
+                        refresh()
                     }
-                ) {
-                    Text("Cancel")
                 }
-            }
-        )
+            )
+        }
     }
 }
 
