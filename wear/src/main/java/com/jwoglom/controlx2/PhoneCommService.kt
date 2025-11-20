@@ -15,16 +15,14 @@ import android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_CONNECTED_DEVICE
 import android.os.Build
 import android.os.Bundle
 import androidx.core.app.ActivityCompat
+import android.app.Service
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.graphics.drawable.IconCompat
-import com.google.android.gms.common.ConnectionResult
-import com.google.android.gms.wearable.MessageClient
-import com.google.android.gms.wearable.MessageEvent
-import com.google.android.gms.wearable.Node
-import com.google.android.gms.wearable.Wearable
-import com.google.android.gms.wearable.WearableListenerService
+import com.jwoglom.controlx2.messaging.WearMessageBus
 import com.jwoglom.controlx2.presentation.navigation.Screen
+import com.jwoglom.controlx2.shared.messaging.MessageBus
+import com.jwoglom.controlx2.shared.messaging.MessageListener
 import com.jwoglom.controlx2.shared.PumpMessageSerializer
 import com.jwoglom.controlx2.shared.util.setupTimber
 import com.jwoglom.controlx2.util.ConnectedState
@@ -41,11 +39,11 @@ import timber.log.Timber
 import java.time.Instant
 
 
-class PhoneCommService : WearableListenerService(), MessageClient.OnMessageReceivedListener  {
+class PhoneCommService : Service() {
     private var connected: ConnectedState = ConnectedState.UNKNOWN
     private var notificationId = 0
 
-    private lateinit var messageClient: MessageClient
+    private lateinit var messageBus: MessageBus
     private val notificationManagerCompat: NotificationManagerCompat by lazy { NotificationManagerCompat.from(this) }
 
     override fun onCreate() {
@@ -53,11 +51,14 @@ class PhoneCommService : WearableListenerService(), MessageClient.OnMessageRecei
         setupTimber("WPC", context = this)
         Timber.d("wear service onCreate")
 
+        messageBus = WearMessageBus(this)
+        messageBus.addMessageListener(object : MessageListener {
+            override fun onMessageReceived(path: String, data: ByteArray, sourceNodeId: String) {
+                handleMessageReceived(path, data, sourceNodeId)
+            }
+        })
 
-        messageClient = Wearable.getMessageClient(this)
-        messageClient.addListener(this)
-
-        Timber.d("create: messageClient: $messageClient")
+        Timber.d("create: messageBus: $messageBus")
 
         updateNotification()
     }
@@ -111,9 +112,9 @@ class PhoneCommService : WearableListenerService(), MessageClient.OnMessageRecei
             .build()
     }
 
-    override fun onMessageReceived(messageEvent: MessageEvent) {
-        Timber.i("wear service onMessageReceived ${messageEvent.path}: ${String(messageEvent.data)}")
-        when (messageEvent.path) {
+    private fun handleMessageReceived(path: String, data: ByteArray, sourceNodeId: String) {
+        Timber.i("wear service handleMessageReceived $path: ${String(data)} from $sourceNodeId")
+        when (path) {
             "/to-wear/open-activity" -> {
                 startActivity(
                     Intent(applicationContext, MainActivity::class.java)
@@ -143,7 +144,7 @@ class PhoneCommService : WearableListenerService(), MessageClient.OnMessageRecei
                     .putExtra("route", Screen.BolusNotEnabled.route)
             }
             "/to-wear/service-receive-message" -> {
-                val pumpMessage = PumpMessageSerializer.fromBytes(messageEvent.data)
+                val pumpMessage = PumpMessageSerializer.fromBytes(data)
                 onPumpMessageReceived(pumpMessage, false)
             }
         }
@@ -168,19 +169,11 @@ class PhoneCommService : WearableListenerService(), MessageClient.OnMessageRecei
         }
     }
 
-    override fun onConnectedNodes(nodes: MutableList<Node>) {
-        Timber.i("onConnectedNodes: ${nodes.size}: $nodes")
-        super.onConnectedNodes(nodes)
-    }
+    override fun onBind(intent: Intent?) = null
 
-    override fun onPeerDisconnected(node: Node) {
-        Timber.i("onPeerDisconnected $node")
-        super.onPeerDisconnected(node)
-        connected = ConnectedState.PHONE_DISCONNECTED
-        StatePrefs(this).connected = Pair(connected.name, Instant.now())
-        // disconnectedNotification("phone disconnected")
-        updateNotification()
-    }
+    // Note: Connection state changes are now handled via MessageBus.observeConnectionState()
+    // if needed in the future. The peer disconnection logic from WearableListenerService
+    // callbacks has been removed as they are no longer invoked with the Service base class.
 
     private fun disconnectedNotification(reason: String) {
         Thread {
@@ -214,41 +207,8 @@ class PhoneCommService : WearableListenerService(), MessageClient.OnMessageRecei
     }
 
     private fun sendMessage(path: String, message: ByteArray) {
-        val messageClient = Wearable.getMessageClient(this)
-        val nodeClient = Wearable.getNodeClient(this)
-
-        var connected = false
-        while (!connected) {
-            Timber.d("wear service sendMessage waiting for connect $path ${String(message)}")
-            nodeClient.localNode.addOnSuccessListener {
-                connected = true
-            }
-            Thread.sleep(100)
-        }
-
         Timber.i("wear sendMessage: $path ${String(message)}")
-        fun inner(node: Node) {
-            messageClient.sendMessage(node.id, path, message)
-                .addOnSuccessListener {
-                    Timber.i("Wear message sent: $path ${String(message)} to ${node.displayName}")
-                }
-                .addOnFailureListener {
-                    Timber.w("wear sendMessage callback: ${it} to ${node.displayName}")
-                }
-        }
-        if (path.startsWith("/to-wear")) {
-            nodeClient.localNode
-                .addOnSuccessListener { localNode ->
-                    inner(localNode)
-            }
-        }
-        nodeClient.connectedNodes
-            .addOnSuccessListener { nodes ->
-                Timber.d("wear sendMessage nodes: ${nodes}")
-                nodes.forEach { node ->
-                    inner(node)
-                }
-            }
+        messageBus.sendMessage(path, message)
     }
 
     private fun isForegrounded(): Boolean {

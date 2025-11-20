@@ -6,6 +6,7 @@ import android.app.NotificationManager
 import android.app.PendingIntent
 import android.app.PendingIntent.FLAG_IMMUTABLE
 import android.app.PendingIntent.FLAG_ONE_SHOT
+import android.app.Service
 import android.bluetooth.le.ScanResult
 import android.content.BroadcastReceiver
 import android.content.Context
@@ -15,19 +16,19 @@ import android.content.SharedPreferences
 import android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_CONNECTED_DEVICE
 import android.media.RingtoneManager
 import android.os.Handler
+import android.os.HandlerThread
 import android.os.Looper
 import android.os.Message
+import android.os.Process
 import android.widget.Toast
 import androidx.core.app.NotificationCompat
 import androidx.core.graphics.drawable.IconCompat
-import com.google.android.gms.wearable.MessageClient
-import com.google.android.gms.wearable.MessageEvent
-import com.google.android.gms.wearable.Node
-import com.google.android.gms.wearable.Wearable
-import com.google.android.gms.wearable.WearableListenerService
 import com.jwoglom.controlx2.db.historylog.HistoryLogDatabase
 import com.jwoglom.controlx2.db.historylog.HistoryLogRepo
+import com.jwoglom.controlx2.messaging.MessageBusFactory
 import com.jwoglom.controlx2.presentation.util.ShouldLogToFile
+import com.jwoglom.controlx2.shared.messaging.MessageBus
+import com.jwoglom.controlx2.shared.messaging.MessageListener
 import com.jwoglom.controlx2.shared.CommServiceCodes
 import com.jwoglom.controlx2.shared.InitiateConfirmedBolusSerializer
 import com.jwoglom.controlx2.shared.PumpMessageSerializer
@@ -97,7 +98,7 @@ import java.util.function.Supplier
 
 const val CacheSeconds = 30
 
-class CommService : WearableListenerService(), MessageClient.OnMessageReceivedListener {
+class CommService : Service() {
     private val supervisorJob = SupervisorJob()
     private val scope = CoroutineScope(supervisorJob + Dispatchers.Main.immediate)
 
@@ -105,7 +106,7 @@ class CommService : WearableListenerService(), MessageClient.OnMessageReceivedLi
     private var pumpCommHandler: PumpCommHandler? = null
     private var pumpFinderCommHandler: PumpFinderCommHandler? = null
 
-    private lateinit var messageClient: MessageClient
+    private lateinit var messageBus: MessageBus
 
     private var lastResponseMessage: MutableMap<Pair<Characteristic, Byte>, Pair<com.jwoglom.pumpx2.pump.messages.Message, Instant>> = Collections.synchronizedMap(mutableMapOf())
     private var historyLogCache: MutableMap<Long, HistoryLog> = Collections.synchronizedMap(mutableMapOf())
@@ -696,26 +697,7 @@ class CommService : WearableListenerService(), MessageClient.OnMessageReceivedLi
 
     fun sendWearCommMessage(path: String, message: ByteArray) {
         Timber.i("service sendMessage: $path ${String(message)}")
-        fun inner(node: Node) {
-            messageClient.sendMessage(node.id, path, message)
-                .addOnSuccessListener {
-                    Timber.d("service message sent: $path ${String(message)} to: $node")
-                }
-                .addOnFailureListener {
-                    Timber.w("service sendMessage callback: ${it} for: $path ${String(message)}")
-                }
-        }
-        if (!path.startsWith("/to-wear")) {
-            Wearable.getNodeClient(this).localNode.addOnSuccessListener { localNode ->
-                // If needed, send to the local node
-                inner(localNode)
-            }
-        }
-        Wearable.getNodeClient(this).connectedNodes.addOnSuccessListener { nodes ->
-            nodes.forEach { node ->
-                inner(node)
-            }
-        }
+        messageBus.sendMessage(path, message)
     }
 
     enum class BondState(val id: Int) {
@@ -790,14 +772,6 @@ class CommService : WearableListenerService(), MessageClient.OnMessageReceivedLi
     override fun onCreate() {
         super.onCreate()
 
-        // Start up the thread running the service.  Note that we create a
-        // separate thread because the service normally runs in the process's
-        // main thread, which we don't want to block.  We also make it
-        // background priority so CPU-intensive work will not disrupt our UI.
-//        HandlerThread("PumpCommServiceThread", THREAD_PRIORITY_FOREGROUND).apply {
-//            start()
-//            Timber.d("service thread start")
-
         // Timber already set in up MUA, but for good measure:
         setupTimber("MWC",
             context = this,
@@ -821,16 +795,28 @@ class CommService : WearableListenerService(), MessageClient.OnMessageReceivedLi
             return
         }
 
-        messageClient = Wearable.getMessageClient(this)
-        messageClient.addListener(this)
+        // Start up the thread running the service. Note that we create a
+        // separate thread because the service normally runs in the process's
+        // main thread, which we don't want to block. We also make it
+        // background priority so CPU-intensive work will not disrupt our UI.
+        val handlerThread = HandlerThread("PumpCommServiceThread", Process.THREAD_PRIORITY_FOREGROUND)
+        handlerThread.start()
+        Timber.d("service thread start")
 
         // Get the HandlerThread's Looper and use it for our Handler
-        serviceLooper = looper
+        serviceLooper = handlerThread.looper
+
+        messageBus = MessageBusFactory.createMessageBus(this)
+        messageBus.addMessageListener(object : MessageListener {
+            override fun onMessageReceived(path: String, data: ByteArray, sourceNodeId: String) {
+                handleMessageReceived(path, data, sourceNodeId)
+            }
+        })
 
         if (Prefs(applicationContext).pumpFinderServiceEnabled()) {
-            pumpFinderCommHandler = PumpFinderCommHandler(looper)
+            pumpFinderCommHandler = PumpFinderCommHandler(serviceLooper!!)
         } else {
-            pumpCommHandler = PumpCommHandler(looper)
+            pumpCommHandler = PumpCommHandler(serviceLooper!!)
 
             pumpCommHandler?.postDelayed(periodicUpdateTask, periodicUpdateIntervalMs)
             pumpCommHandler?.postDelayed(checkForUpdatesTask, checkForUpdatesDelayMs)
@@ -846,9 +832,11 @@ class CommService : WearableListenerService(), MessageClient.OnMessageReceivedLi
         }.start()
     }
 
-    override fun onMessageReceived(messageEvent: MessageEvent) {
-        Timber.i("service messageReceived: ${messageEvent.path} ${String(messageEvent.data)}")
-        when (messageEvent.path) {
+    override fun onBind(intent: Intent?) = null
+
+    private fun handleMessageReceived(path: String, data: ByteArray, sourceNodeId: String) {
+        Timber.i("service messageReceived: $path ${String(data)} from $sourceNodeId")
+        when (path) {
             "/to-phone/force-reload" -> {
                 Timber.i("force-reload")
                 triggerAppReload(applicationContext)
@@ -856,8 +844,8 @@ class CommService : WearableListenerService(), MessageClient.OnMessageReceivedLi
             "/to-phone/stop-pump-finder" -> {
                 Timber.i("stop-pump-finder")
                 sendStopPumpFinderComm()
-                if (String(messageEvent.data) == "init_comm") {
-                    pumpCommHandler = PumpCommHandler(looper)
+                if (String(data) == "init_comm") {
+                    pumpCommHandler = PumpCommHandler(serviceLooper!!)
                     val filterToMac = Prefs(applicationContext).pumpFinderPumpMac().orEmpty()
                     Prefs(applicationContext).setPumpFinderServiceEnabled(false)
                     Timber.i("stop-pump-finder-next: filterToMac=$filterToMac")
@@ -868,7 +856,7 @@ class CommService : WearableListenerService(), MessageClient.OnMessageReceivedLi
             "/to-phone/restart-pump-finder" -> {
                 Timber.i("restart-pump-finder")
                 sendStopPumpFinderComm()
-                pumpCommHandler = PumpCommHandler(looper)
+                pumpCommHandler = PumpCommHandler(serviceLooper!!)
                 Prefs(applicationContext).setPumpFinderServiceEnabled(true)
                 Timber.i("restart-pump-finder")
                 triggerAppReload(applicationContext)
@@ -890,11 +878,11 @@ class CommService : WearableListenerService(), MessageClient.OnMessageReceivedLi
             }
             "/to-phone/bolus-request-wear" -> {
                 // removed: initialized check
-                confirmBolusRequest(PumpMessageSerializer.fromBytes(messageEvent.data) as InitiateBolusRequest, BolusRequestSource.WEAR)
+                confirmBolusRequest(PumpMessageSerializer.fromBytes(data) as InitiateBolusRequest, BolusRequestSource.WEAR)
             }
             "/to-phone/bolus-request-phone" -> {
                 // removed: initialized check
-                confirmBolusRequest(PumpMessageSerializer.fromBytes(messageEvent.data) as InitiateBolusRequest, BolusRequestSource.PHONE)
+                confirmBolusRequest(PumpMessageSerializer.fromBytes(data) as InitiateBolusRequest, BolusRequestSource.PHONE)
             }
             "/to-phone/bolus-cancel" -> {
                 Timber.i("bolus state cancelled")
@@ -904,7 +892,7 @@ class CommService : WearableListenerService(), MessageClient.OnMessageReceivedLi
                 // removed: initialized check
                 val secretKey = prefs(this)?.getString("initiateBolusSecret", "") ?: ""
                 val confirmedBolus =
-                    InitiateConfirmedBolusSerializer.fromBytes(secretKey, messageEvent.data)
+                    InitiateConfirmedBolusSerializer.fromBytes(secretKey, data)
 
                 val messageOk = confirmedBolus.left
                 val initiateMessage = confirmedBolus.right
@@ -921,23 +909,23 @@ class CommService : WearableListenerService(), MessageClient.OnMessageReceivedLi
                 }
 
                 Timber.i("sending confirmed bolus request: $initiateMessage")
-                sendPumpCommBolusMessage(messageEvent.data)
+                sendPumpCommBolusMessage(data)
             }
             "/to-phone/write-characteristic-failed-callback" -> {
                 Timber.i("writeCharacteristicFailedCallback from message")
-                handleWriteCharacteristicFailedCallback(String(messageEvent.data))
+                handleWriteCharacteristicFailedCallback(String(data))
             }
             "/to-pump/command" -> {
-                sendPumpCommMessage(messageEvent.data)
+                sendPumpCommMessage(data)
             }
             "/to-pump/commands" -> {
-                sendPumpCommMessages(messageEvent.data)
+                sendPumpCommMessages(data)
             }
             "/to-pump/commands-bust-cache" -> {
-                sendPumpCommMessagesBustCache(messageEvent.data)
+                sendPumpCommMessagesBustCache(data)
             }
             "/to-pump/cached-commands" -> {
-                handleCachedCommandsRequest(messageEvent.data)
+                handleCachedCommandsRequest(data)
             }
             "/to-pump/debug-message-cache" -> {
                 handleDebugGetMessageCache()
@@ -1251,7 +1239,7 @@ class CommService : WearableListenerService(), MessageClient.OnMessageReceivedLi
     override fun onDestroy() {
         super.onDestroy()
         scope.cancel()
-        messageClient.removeListener(this)
+        messageBus.close()
         Toast.makeText(this, "ControlX2 service destroyed", Toast.LENGTH_SHORT).show()
     }
 
