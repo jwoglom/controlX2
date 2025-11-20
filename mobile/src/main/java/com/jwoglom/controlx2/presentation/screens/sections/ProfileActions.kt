@@ -30,6 +30,7 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Divider
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.ListItemDefaults
@@ -211,7 +212,7 @@ fun ProfileActions(
             content = {
                 item {
                     HeaderLine("Profile Actions")
-                    Divider()
+                    HorizontalDivider()
 
                     val model = determinePumpModel(deviceName.value ?: "")
                     if (model == KnownDeviceModel.TSLIM_X2) {
@@ -221,6 +222,29 @@ fun ProfileActions(
                 }
 
                 if (idpManager.value?.isComplete == true) {
+                    if (idpManager.value?.profiles?.isEmpty() == true) {
+                        item {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .wrapContentSize(Alignment.TopStart)
+                            ) {
+                                ListItem(
+                                    headlineContent = {
+                                        Text(
+                                            "No profiles present"
+                                        )
+                                    },
+                                    supportingContent = {
+                                        Text(
+                                            "To continue, please configure at least one profile"
+                                        )
+                                    },
+                                )
+                            }
+
+                        }
+                    }
                     idpManager.value?.profiles?.forEachIndexed { profileIndex, profile ->
                         item {
                             Box(
