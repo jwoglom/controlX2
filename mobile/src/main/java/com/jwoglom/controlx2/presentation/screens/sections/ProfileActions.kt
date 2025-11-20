@@ -76,6 +76,7 @@ import com.jwoglom.controlx2.presentation.components.Line
 import com.jwoglom.controlx2.presentation.components.LoadSpinner
 import com.jwoglom.controlx2.presentation.screens.sections.components.AddProfileDialog
 import com.jwoglom.controlx2.presentation.screens.sections.components.AddSegmentDialog
+import com.jwoglom.controlx2.presentation.screens.sections.components.EditSegmentDialog
 import com.jwoglom.controlx2.presentation.screens.setUpPreviewState
 import com.jwoglom.controlx2.presentation.theme.ControlX2Theme
 import com.jwoglom.controlx2.presentation.util.LifecycleStateObserver
@@ -111,6 +112,7 @@ fun ProfileActions(
     var showProfileDetails by remember { mutableStateOf<IDPManager.Profile?>(null) }
     var showAddProfileDialog by remember { mutableStateOf(false) }
     var showAddSegmentDialog by remember { mutableStateOf<IDPManager.Profile?>(null) }
+    var showEditSegmentDialog by remember { mutableStateOf<Pair<IDPManager.Profile, Int>?>(null) } // Profile and segment index
 
     val context = LocalContext.current
     val ds = LocalDataStore.current
@@ -355,6 +357,11 @@ fun ProfileActions(
                                                                         append("Target BG: ${segment.profileTargetBG}")
                                                                         append("\n")
                                                                     })
+                                                                },
+                                                                modifier = Modifier.clickable {
+                                                                    refreshScope.launch {
+                                                                        showEditSegmentDialog = Pair(profile, segmentIndex)
+                                                                    }
                                                                 }
                                                             )
                                                         }
@@ -571,6 +578,39 @@ fun ProfileActions(
                     }
                 }
             )
+        }
+    }
+
+    // Edit Segment Dialog
+    showEditSegmentDialog?.let { (profile, segmentIndex) ->
+        profile.segments?.getOrNull(segmentIndex)?.let { segment ->
+            key("${profile.idpId}-$segmentIndex") {
+                EditSegmentDialog(
+                    profile = profile,
+                    segment = segment,
+                    segmentIndex = segmentIndex,
+                    onDismiss = { showEditSegmentDialog = null },
+                    onConfirm = { startTime, basalRateFloat, carbRatioLong, targetBGInt, isfInt ->
+                        refreshScope.launch {
+                            sendPumpCommands(
+                                SendType.BUST_CACHE,
+                                listOf(
+                                    profile.createSegmentMessage(
+                                        startTime,
+                                        basalRateFloat,
+                                        carbRatioLong,
+                                        targetBGInt,
+                                        isfInt
+                                    )
+                                )
+                            )
+                            showEditSegmentDialog = null
+                            showProfileDetails = null
+                            refresh()
+                        }
+                    }
+                )
+            }
         }
     }
 }
