@@ -20,22 +20,27 @@ object MessageBusFactory {
     /**
      * Create a MessageBus instance with automatic implementation detection.
      * @param context Android context
-     * @return MessageBus implementation (LocalMessageBus or WearMessageBus)
+     * @return MessageBus implementation (HybridMessageBus, BroadcastMessageBus, or LocalMessageBus)
      */
     fun createMessageBus(context: Context): MessageBus {
         return when {
             shouldUseWearOs(context) -> {
-                Timber.i("MessageBusFactory: Using WearMessageBus (Wear OS available)")
+                Timber.i("MessageBusFactory: Using HybridMessageBus (Wear OS + Broadcast for cross-process)")
                 try {
-                    WearMessageBus(context)
+                    // Create both transports
+                    val broadcastBus = BroadcastMessageBus(context)
+                    val wearBus = WearMessageBus(context)
+
+                    // Wrap them in a hybrid bus
+                    HybridMessageBus(broadcastBus, wearBus)
                 } catch (e: Exception) {
-                    Timber.w(e, "Failed to create WearMessageBus, falling back to LocalMessageBus")
-                    LocalMessageBus(context)
+                    Timber.w(e, "Failed to create HybridMessageBus, falling back to BroadcastMessageBus")
+                    BroadcastMessageBus(context)
                 }
             }
             else -> {
-                Timber.i("MessageBusFactory: Using LocalMessageBus (phone-only mode)")
-                LocalMessageBus(context)
+                Timber.i("MessageBusFactory: Using BroadcastMessageBus (phone-only mode, cross-process capable)")
+                BroadcastMessageBus(context)
             }
         }
     }
