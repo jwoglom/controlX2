@@ -63,6 +63,7 @@ import com.jwoglom.pumpx2.pump.messages.request.control.SetPumpSoundsRequest
 import com.jwoglom.pumpx2.pump.messages.response.currentStatus.PumpGlobalsResponse
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import timber.log.Timber
@@ -147,17 +148,46 @@ fun SoundSettingsActions(
     var cgmAText by remember { mutableStateOf("") }
     var cgmBText by remember { mutableStateOf("") }
     var changeBitmaskText by remember { mutableStateOf("") }
+    var globalsText by remember { mutableStateOf("") }
+
+    LaunchedEffect(quickBolusText, generalText, reminderText, alertText, alarmText, cgmAText, cgmBText) {
+        if (pumpGlobals.value == null) return@LaunchedEffect
+        var changed = mutableListOf<SetPumpSoundsRequest.ChangeBitmask>()
+        if (quickBolusText != pumpGlobals.value?.quickBolusAnnun?.id().toString()) {
+            changed.add(SetPumpSoundsRequest.ChangeBitmask.QUICK_BOLUS)
+        }
+        if (generalText != pumpGlobals.value?.fillTubingAnnun?.id().toString()) {
+            changed.add(SetPumpSoundsRequest.ChangeBitmask.GENERAL)
+        }
+        if (reminderText != pumpGlobals.value?.reminderAnnun?.id().toString()) {
+            changed.add(SetPumpSoundsRequest.ChangeBitmask.REMINDER)
+        }
+        if (alertText != pumpGlobals.value?.alertAnnun?.id().toString()) {
+            changed.add(SetPumpSoundsRequest.ChangeBitmask.ALERT)
+        }
+        if (alarmText != pumpGlobals.value?.alarmAnnun?.id().toString()) {
+            changed.add(SetPumpSoundsRequest.ChangeBitmask.ALARM)
+        }
+
+        changeBitmaskText = SetPumpSoundsRequest.ChangeBitmask.toBitmask(*changed.toTypedArray()).toString();
+    }
 
     LaunchedEffect(pumpGlobals.value) {
         pumpGlobals.value?.let { globals ->
-            val cargo = globals.cargo
-            if (cargo != null && cargo.size >= 14) {
-                quickBolusText = cargo[8].toUByte().toInt().toString()
-                generalText = cargo[9].toUByte().toInt().toString()
-                reminderText = cargo[10].toUByte().toInt().toString()
-                alertText = cargo[11].toUByte().toInt().toString()
-                alarmText = cargo[12].toUByte().toInt().toString()
-            }
+            globalsText = listOf(
+                    "buttonAnnun = ${globals.cargo[7]}",
+                    "quickBolusAnnun = ${globals.cargo[8]}",
+                    "bolusAnnun = ${globals.cargo[9]}",
+                    "reminderAnnun = ${globals.cargo[10]}",
+                    "alertAnnun = ${globals.cargo[11]}",
+                    "alarmAnnun = ${globals.cargo[12]}",
+                    "fillTubingAnnun = ${globals.cargo[13]}",
+                ).joinToString(" \n");
+            quickBolusText = globals.quickBolusAnnun.id().toString()
+            generalText = globals.fillTubingAnnun.id().toString()
+            reminderText = globals.reminderAnnun.id().toString()
+            alertText = globals.alertAnnun.id().toString()
+            alarmText = globals.alarmAnnun.id().toString()
             if (cgmAText.isBlank()) {
                 cgmAText = "0"
             }
@@ -165,7 +195,7 @@ fun SoundSettingsActions(
                 cgmBText = "0"
             }
             if (changeBitmaskText.isBlank()) {
-                changeBitmaskText = SetPumpSoundsRequest.ChangeBitmask.toBitmask(*SetPumpSoundsRequest.ChangeBitmask.values()).toString()
+                changeBitmaskText = "0"
             }
         }
     }
@@ -205,6 +235,10 @@ fun SoundSettingsActions(
                     item {
                         LoadSpinner("Loading sound settings..." )
                     }
+                }
+                
+                item {
+                    Text("Globals:\n${globalsText}")
                 }
 
                 item {
@@ -296,6 +330,12 @@ fun SoundSettingsActions(
                                 changeBitmaskText.toIntOrNull() ?: 0,
                             )
                             sendPumpCommands(SendType.STANDARD, listOf(message))
+
+                            refreshScope.launch {
+                                kotlinx.coroutines.delay(500)
+                                refresh()
+                            }
+
                         }
                     )
                 }
