@@ -94,6 +94,7 @@ import com.jwoglom.pumpx2.pump.messages.response.currentStatus.HomeScreenMirrorR
 import com.jwoglom.pumpx2.pump.messages.response.currentStatus.InsulinStatusResponse
 import com.jwoglom.pumpx2.pump.messages.response.currentStatus.LastBGResponse
 import com.jwoglom.pumpx2.pump.messages.response.currentStatus.LastBolusStatusAbstractResponse
+import com.jwoglom.pumpx2.pump.messages.response.currentStatus.PumpGlobalsResponse
 import com.jwoglom.pumpx2.pump.messages.response.currentStatus.TempRateResponse
 import com.jwoglom.pumpx2.pump.messages.response.currentStatus.TimeSinceResetResponse
 import com.jwoglom.pumpx2.pump.messages.response.historyLog.BolusDeliveryHistoryLog
@@ -754,6 +755,9 @@ class MainActivity : ComponentActivity() {
             }
             is LastBGResponse -> {
                 dataStore.bolusCalcLastBG.value = message
+            }
+            is PumpGlobalsResponse -> {
+                dataStore.pumpGlobalsResponse.value = message
             }
             is GlobalMaxBolusSettingsResponse -> {
                 dataStore.maxBolusAmount.value = message.maxBolus

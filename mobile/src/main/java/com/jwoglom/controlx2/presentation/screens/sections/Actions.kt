@@ -666,6 +666,27 @@ fun Actions(
                         )
                     }
                 }
+                item {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .wrapContentSize(Alignment.TopStart)
+                    ) {
+                        ListItem(
+                            headlineContent = { Text(
+                                "Sound Settings"
+                            )},
+                            supportingContent = {
+                            },
+                            leadingContent = {
+                                Icon(Icons.Filled.Settings, contentDescription = null)
+                            },
+                            modifier = Modifier.clickable {
+                                navigateToSection(LandingSection.SOUND_SETTINGS_ACTIONS)
+                            }
+                        )
+                    }
+                }
             }
         )
     }
