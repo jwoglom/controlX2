@@ -1849,28 +1849,28 @@ fun triggerSetPumpSoundsRequestMessage(
     layout.orientation = LinearLayout.VERTICAL
     val quickBolusInput = EditText(context)
     quickBolusInput.hint = "Quick bolus annunciation"
-    quickBolusInput.inputType = InputType.TYPE_CLASS_NUMBER
+    quickBolusInput.inputType = InputType.TYPE_CLASS_NUMBER or InputType.TYPE_NUMBER_FLAG_SIGNED
     val generalInput = EditText(context)
     generalInput.hint = "General annunciation"
-    generalInput.inputType = InputType.TYPE_CLASS_NUMBER
+    generalInput.inputType = InputType.TYPE_CLASS_NUMBER or InputType.TYPE_NUMBER_FLAG_SIGNED
     val reminderInput = EditText(context)
     reminderInput.hint = "Reminder annunciation"
-    reminderInput.inputType = InputType.TYPE_CLASS_NUMBER
+    reminderInput.inputType = InputType.TYPE_CLASS_NUMBER or InputType.TYPE_NUMBER_FLAG_SIGNED
     val alertInput = EditText(context)
     alertInput.hint = "Alert annunciation"
-    alertInput.inputType = InputType.TYPE_CLASS_NUMBER
+    alertInput.inputType = InputType.TYPE_CLASS_NUMBER or InputType.TYPE_NUMBER_FLAG_SIGNED
     val alarmInput = EditText(context)
     alarmInput.hint = "Alarm annunciation"
-    alarmInput.inputType = InputType.TYPE_CLASS_NUMBER
+    alarmInput.inputType = InputType.TYPE_CLASS_NUMBER or InputType.TYPE_NUMBER_FLAG_SIGNED
     val cgmAInput = EditText(context)
     cgmAInput.hint = "CGM alert annunciation A"
-    cgmAInput.inputType = InputType.TYPE_CLASS_NUMBER
+    cgmAInput.inputType = InputType.TYPE_CLASS_NUMBER or InputType.TYPE_NUMBER_FLAG_SIGNED
     val cgmBInput = EditText(context)
     cgmBInput.hint = "CGM alert annunciation B"
-    cgmBInput.inputType = InputType.TYPE_CLASS_NUMBER
+    cgmBInput.inputType = InputType.TYPE_CLASS_NUMBER or InputType.TYPE_NUMBER_FLAG_SIGNED
     val changeBitmaskInput = EditText(context)
     changeBitmaskInput.hint = "Change bitmask"
-    changeBitmaskInput.inputType = InputType.TYPE_CLASS_NUMBER
+    changeBitmaskInput.inputType = InputType.TYPE_CLASS_NUMBER or InputType.TYPE_NUMBER_FLAG_SIGNED
     listOf(
         quickBolusInput,
         generalInput,
@@ -1882,6 +1882,21 @@ fun triggerSetPumpSoundsRequestMessage(
         changeBitmaskInput,
     ).forEach { layout.addView(it) }
     builder.setView(layout)
+//    builder.setNeutralButton("RunTest") { dialog, _ ->
+//        dialog.dismiss()
+//        val message = {r: Int -> SetPumpSoundsRequest(
+//            r,
+//            3,
+//            r,
+//            3,
+//            3,
+//            3,
+//            0,
+//            0,
+//            4,
+//        )}
+//        sendPumpCommands(SendType.DEBUG_PROMPT, (-127..128).flatMap { i -> listOf(message(i)) } )
+//    }
     builder.setPositiveButton("Send") { dialog, _ ->
         val message = SetPumpSoundsRequest(
             quickBolusInput.text.toString().toInt(),
