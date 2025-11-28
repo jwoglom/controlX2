@@ -7,6 +7,7 @@ import com.google.android.gms.wearable.Node
 import com.google.android.gms.wearable.Wearable
 import com.jwoglom.controlx2.shared.messaging.ConnectionState
 import com.jwoglom.controlx2.shared.messaging.MessageBus
+import com.jwoglom.controlx2.shared.messaging.MessageBusSender
 import com.jwoglom.controlx2.shared.messaging.MessageListener
 import com.jwoglom.controlx2.shared.messaging.MessageNode
 import kotlinx.coroutines.flow.Flow
@@ -33,8 +34,8 @@ class WearMessageBus(private val context: Context) : MessageBus, MessageClient.O
         updateConnectionState()
     }
 
-    override fun sendMessage(path: String, data: ByteArray) {
-        Timber.i("WearMessageBus (watch).sendMessage: $path ${String(data)}")
+    override fun sendMessage(path: String, data: ByteArray, sender: MessageBusSender) {
+        Timber.i("WearMessageBus (watch).sendMessage: $path ${String(data)} (sender: $sender)")
 
         fun sendToNode(node: Node) {
             messageClient.sendMessage(node.id, path, data)

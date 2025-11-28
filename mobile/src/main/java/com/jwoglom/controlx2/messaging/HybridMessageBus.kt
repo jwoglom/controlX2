@@ -2,6 +2,7 @@ package com.jwoglom.controlx2.messaging
 
 import com.jwoglom.controlx2.shared.messaging.ConnectionState
 import com.jwoglom.controlx2.shared.messaging.MessageBus
+import com.jwoglom.controlx2.shared.messaging.MessageBusSender
 import com.jwoglom.controlx2.shared.messaging.MessageListener
 import com.jwoglom.controlx2.shared.messaging.MessageNode
 import kotlinx.coroutines.flow.Flow
@@ -39,6 +40,14 @@ class HybridMessageBus(
     private val wearProxyListener = object : MessageListener {
         override fun onMessageReceived(path: String, data: ByteArray, sourceNodeId: String) {
             Timber.d("HybridMessageBus: Message from Wear transport: $path")
+
+            // Special handling: /to-phone/* from Wear needs to reach BOTH CommService and Mobile UI
+            // Re-broadcast locally so both components receive it
+            if (path.startsWith("/to-phone/")) {
+                Timber.d("HybridMessageBus: Re-broadcasting /to-phone/* from Wear locally")
+                broadcastBus.sendMessage(path, data, MessageBusSender.WEAR_UI)
+            }
+
             notifyListeners(path, data, sourceNodeId)
         }
     }
@@ -57,15 +66,54 @@ class HybridMessageBus(
         updateConnectionState()
     }
 
-    override fun sendMessage(path: String, data: ByteArray) {
-        Timber.i("HybridMessageBus.sendMessage: $path (sending via both transports)")
+    override fun sendMessage(path: String, data: ByteArray, sender: MessageBusSender) {
+        Timber.i("HybridMessageBus.sendMessage: $path (sender: $sender)")
 
-        // Send through BOTH transports
-        // Broadcast handles phone-to-phone communication
-        broadcastBus.sendMessage(path, data)
+        when {
+            // Messages TO CommService from Mobile UI
+            path.startsWith("/to-phone/") && sender == MessageBusSender.MOBILE_UI -> {
+                Timber.d("Routing /to-phone/* from Mobile UI → Broadcast only")
+                broadcastBus.sendMessage(path, data, sender)
+            }
 
-        // Wear handles phone-to-watch communication
-        wearBus.sendMessage(path, data)
+            // Messages TO CommService+Mobile UI from Wear UI
+            path.startsWith("/to-phone/") && sender == MessageBusSender.WEAR_UI -> {
+                Timber.d("Routing /to-phone/* from Wear UI → Wear only (will re-broadcast on phone)")
+                wearBus.sendMessage(path, data, sender)
+            }
+
+            // Messages TO Wear from Mobile UI or CommService
+            path.startsWith("/to-wear/") -> {
+                Timber.d("Routing /to-wear/* → Wear only")
+                wearBus.sendMessage(path, data, sender)
+            }
+
+            // Messages TO Pump from Mobile UI
+            path.startsWith("/to-pump/") && sender == MessageBusSender.MOBILE_UI -> {
+                Timber.d("Routing /to-pump/* from Mobile UI → Broadcast only")
+                broadcastBus.sendMessage(path, data, sender)
+            }
+
+            // Messages TO Pump from Wear UI
+            path.startsWith("/to-pump/") && sender == MessageBusSender.WEAR_UI -> {
+                Timber.d("Routing /to-pump/* from Wear UI → Wear only")
+                wearBus.sendMessage(path, data, sender)
+            }
+
+            // Messages FROM Pump (broadcast to all UIs)
+            path.startsWith("/from-pump/") -> {
+                Timber.d("Routing /from-pump/* → Both transports (broadcast to all)")
+                broadcastBus.sendMessage(path, data, sender)
+                wearBus.sendMessage(path, data, sender)
+            }
+
+            else -> {
+                // Unknown pattern - send via both for safety
+                Timber.w("Unknown message pattern: $path (sender: $sender) - sending via both transports")
+                broadcastBus.sendMessage(path, data, sender)
+                wearBus.sendMessage(path, data, sender)
+            }
+        }
     }
 
     override fun addMessageListener(listener: MessageListener) {

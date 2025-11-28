@@ -3,6 +3,7 @@ package com.jwoglom.controlx2.messaging
 import android.content.Context
 import com.jwoglom.controlx2.shared.messaging.ConnectionState
 import com.jwoglom.controlx2.shared.messaging.MessageBus
+import com.jwoglom.controlx2.shared.messaging.MessageBusSender
 import com.jwoglom.controlx2.shared.messaging.MessageListener
 import com.jwoglom.controlx2.shared.messaging.MessageNode
 import kotlinx.coroutines.flow.Flow
@@ -32,8 +33,8 @@ class LocalMessageBus(private val context: Context) : MessageBus {
         Timber.d("LocalMessageBus initialized for phone-only mode")
     }
 
-    override fun sendMessage(path: String, data: ByteArray) {
-        Timber.i("LocalMessageBus.sendMessage: $path ${String(data)}")
+    override fun sendMessage(path: String, data: ByteArray, sender: MessageBusSender) {
+        Timber.i("LocalMessageBus.sendMessage: $path ${String(data)} (sender: $sender)")
 
         // Deliver message to all listeners immediately (in-process)
         listeners.forEach { listener ->

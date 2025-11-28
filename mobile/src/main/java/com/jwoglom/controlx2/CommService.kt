@@ -28,6 +28,7 @@ import com.jwoglom.controlx2.db.historylog.HistoryLogRepo
 import com.jwoglom.controlx2.messaging.MessageBusFactory
 import com.jwoglom.controlx2.presentation.util.ShouldLogToFile
 import com.jwoglom.controlx2.shared.messaging.MessageBus
+import com.jwoglom.controlx2.shared.messaging.MessageBusSender
 import com.jwoglom.controlx2.shared.messaging.MessageListener
 import com.jwoglom.controlx2.shared.CommServiceCodes
 import com.jwoglom.controlx2.shared.InitiateConfirmedBolusSerializer
@@ -714,7 +715,7 @@ class CommService : Service() {
 
     fun sendWearCommMessage(path: String, message: ByteArray) {
         Timber.i("service sendMessage: $path ${String(message)}")
-        messageBus.sendMessage(path, message)
+        messageBus.sendMessage(path, message, MessageBusSender.COMM_SERVICE)
     }
 
     enum class BondState(val id: Int) {

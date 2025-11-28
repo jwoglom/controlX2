@@ -6,6 +6,7 @@ import android.content.Intent
 import android.content.IntentFilter
 import com.jwoglom.controlx2.shared.messaging.ConnectionState
 import com.jwoglom.controlx2.shared.messaging.MessageBus
+import com.jwoglom.controlx2.shared.messaging.MessageBusSender
 import com.jwoglom.controlx2.shared.messaging.MessageListener
 import com.jwoglom.controlx2.shared.messaging.MessageNode
 import kotlinx.coroutines.flow.Flow
@@ -64,14 +65,15 @@ class BroadcastMessageBus(private val context: Context) : MessageBus {
         }
     }
 
-    override fun sendMessage(path: String, data: ByteArray) {
-        Timber.i("BroadcastMessageBus.sendMessage: $path")
+    override fun sendMessage(path: String, data: ByteArray, sender: MessageBusSender) {
+        Timber.i("BroadcastMessageBus.sendMessage: $path (sender: $sender)")
 
         try {
             val intent = Intent(ACTION_MESSAGE).apply {
                 putExtra(EXTRA_PATH, path)
                 putExtra(EXTRA_DATA, data)
                 putExtra(EXTRA_SOURCE_NODE_ID, localNode.id)
+                putExtra(EXTRA_SENDER, sender.name)
                 // Make the broadcast explicit to the same app package
                 setPackage(context.packageName)
             }
@@ -118,5 +120,6 @@ class BroadcastMessageBus(private val context: Context) : MessageBus {
         private const val EXTRA_PATH = "path"
         private const val EXTRA_DATA = "data"
         private const val EXTRA_SOURCE_NODE_ID = "sourceNodeId"
+        private const val EXTRA_SENDER = "sender"
     }
 }

@@ -3,6 +3,20 @@ package com.jwoglom.controlx2.shared.messaging
 import kotlinx.coroutines.flow.Flow
 
 /**
+ * Identifies the sender of a message for routing purposes
+ */
+enum class MessageBusSender {
+    /** Message originates from the wear UI (watch) */
+    WEAR_UI,
+
+    /** Message originates from the mobile UI (phone app) */
+    MOBILE_UI,
+
+    /** Message originates from CommService (background service on phone) */
+    COMM_SERVICE
+}
+
+/**
  * Abstraction for sending and receiving messages between components.
  * Implementations include:
  * - LocalMessageBus: In-process communication for phone-only mode
@@ -13,8 +27,9 @@ interface MessageBus {
      * Send a message to all connected nodes
      * @param path The message path (e.g., "/from-pump/pump-connected")
      * @param data The message data as bytes
+     * @param sender The component sending this message (for routing decisions)
      */
-    fun sendMessage(path: String, data: ByteArray)
+    fun sendMessage(path: String, data: ByteArray, sender: MessageBusSender = MessageBusSender.COMM_SERVICE)
 
     /**
      * Add a listener for incoming messages

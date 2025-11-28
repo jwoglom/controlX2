@@ -30,6 +30,7 @@ import com.google.android.gms.common.GoogleApiAvailability
 import com.jwoglom.controlx2.db.historylog.HistoryLogDatabase
 import com.jwoglom.controlx2.messaging.MessageBusFactory
 import com.jwoglom.controlx2.shared.messaging.MessageBus
+import com.jwoglom.controlx2.shared.messaging.MessageBusSender
 import com.jwoglom.controlx2.shared.messaging.MessageListener
 import com.jwoglom.controlx2.db.historylog.HistoryLogRepo
 import com.jwoglom.controlx2.db.historylog.HistoryLogViewModel
@@ -308,7 +309,7 @@ class MainActivity : ComponentActivity() {
 
     private fun sendMessage(path: String, message: ByteArray) {
         Timber.i("mobile sendMessage: $path ${String(message)}")
-        messageBus.sendMessage(path, message)
+        messageBus.sendMessage(path, message, MessageBusSender.MOBILE_UI)
     }
 
     private fun sendPumpCommands(type: SendType, msgs: List<Message>) {
