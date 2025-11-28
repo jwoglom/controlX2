@@ -84,7 +84,30 @@ import com.jwoglom.pumpx2.pump.messages.annotations.HistoryLogProps
 import com.jwoglom.pumpx2.pump.messages.annotations.MessageProps
 import com.jwoglom.pumpx2.pump.messages.request.control.BolusPermissionReleaseRequest
 import com.jwoglom.pumpx2.pump.messages.request.control.CancelBolusRequest
+import com.jwoglom.pumpx2.pump.messages.request.control.ChangeControlIQSettingsRequest
+import com.jwoglom.pumpx2.pump.messages.request.control.ChangeTimeDateRequest
+import com.jwoglom.pumpx2.pump.messages.request.control.CreateIDPRequest
+import com.jwoglom.pumpx2.pump.messages.request.control.DeleteIDPRequest
+import com.jwoglom.pumpx2.pump.messages.request.control.DismissNotificationRequest
+import com.jwoglom.pumpx2.pump.messages.request.control.FillCannulaRequest
 import com.jwoglom.pumpx2.pump.messages.request.control.InitiateBolusRequest
+import com.jwoglom.pumpx2.pump.messages.request.control.RemoteBgEntryRequest
+import com.jwoglom.pumpx2.pump.messages.request.control.RemoteCarbEntryRequest
+import com.jwoglom.pumpx2.pump.messages.request.control.RenameIDPRequest
+import com.jwoglom.pumpx2.pump.messages.request.control.SetActiveIDPRequest
+import com.jwoglom.pumpx2.pump.messages.request.control.SetG6TransmitterIdRequest
+import com.jwoglom.pumpx2.pump.messages.request.control.SetIDPSegmentRequest
+import com.jwoglom.pumpx2.pump.messages.request.control.SetIDPSettingsRequest
+import com.jwoglom.pumpx2.pump.messages.request.control.SetMaxBasalLimitRequest
+import com.jwoglom.pumpx2.pump.messages.request.control.SetMaxBolusLimitRequest
+import com.jwoglom.pumpx2.pump.messages.request.control.SetModesRequest
+import com.jwoglom.pumpx2.pump.messages.request.control.SetPumpAlertSnoozeRequest
+import com.jwoglom.pumpx2.pump.messages.request.control.SetPumpSoundsRequest
+import com.jwoglom.pumpx2.pump.messages.request.control.SetQuickBolusSettingsRequest
+import com.jwoglom.pumpx2.pump.messages.request.control.SetSleepScheduleRequest
+import com.jwoglom.pumpx2.pump.messages.request.control.SetTempRateRequest
+import com.jwoglom.pumpx2.pump.messages.request.control.StartDexcomG6SensorSessionRequest
+import com.jwoglom.pumpx2.pump.messages.request.control.SetDexcomG7PairingCodeRequest
 import com.jwoglom.pumpx2.pump.messages.request.currentStatus.BolusPermissionChangeReasonRequest
 import com.jwoglom.pumpx2.pump.messages.request.currentStatus.HistoryLogRequest
 import com.jwoglom.pumpx2.pump.messages.request.currentStatus.HistoryLogStatusRequest
@@ -281,6 +304,75 @@ fun Debug(
                                                 sendPumpCommands,
                                                 BolusPermissionReleaseRequest::class.java
                                             )
+                                            return@DropdownMenuItem
+                                        } else if (className == RemoteBgEntryRequest::class.java.name) {
+                                            triggerRemoteBgEntryRequestMessage(context, sendPumpCommands)
+                                            return@DropdownMenuItem
+                                        } else if (className == RemoteCarbEntryRequest::class.java.name) {
+                                            triggerRemoteCarbEntryRequestMessage(context, sendPumpCommands)
+                                            return@DropdownMenuItem
+                                        } else if (className == SetModesRequest::class.java.name) {
+                                            triggerSetModesRequestMessage(context, sendPumpCommands)
+                                            return@DropdownMenuItem
+                                        } else if (className == SetSleepScheduleRequest::class.java.name) {
+                                            triggerSetSleepScheduleRequestMessage(context, sendPumpCommands)
+                                            return@DropdownMenuItem
+                                        } else if (className == SetTempRateRequest::class.java.name) {
+                                            triggerSetTempRateRequestMessage(context, sendPumpCommands)
+                                            return@DropdownMenuItem
+                                        } else if (className == ChangeControlIQSettingsRequest::class.java.name) {
+                                            triggerChangeControlIQSettingsRequestMessage(context, sendPumpCommands)
+                                            return@DropdownMenuItem
+                                        } else if (className == SetQuickBolusSettingsRequest::class.java.name) {
+                                            triggerSetQuickBolusSettingsRequestMessage(context, sendPumpCommands)
+                                            return@DropdownMenuItem
+                                        } else if (className == DismissNotificationRequest::class.java.name) {
+                                            triggerDismissNotificationRequestMessage(context, sendPumpCommands)
+                                            return@DropdownMenuItem
+                                        } else if (className == SetG6TransmitterIdRequest::class.java.name) {
+                                            triggerSetG6TransmitterIdRequestMessage(context, sendPumpCommands)
+                                            return@DropdownMenuItem
+                                        } else if (className == StartDexcomG6SensorSessionRequest::class.java.name) {
+                                            triggerStartDexcomG6SensorSessionRequestMessage(context, sendPumpCommands)
+                                            return@DropdownMenuItem
+                                        } else if (className == SetDexcomG7PairingCodeRequest::class.java.name) {
+                                            triggerSetDexcomG7PairingCodeRequestMessage(context, sendPumpCommands)
+                                            return@DropdownMenuItem
+                                        } else if (className == FillCannulaRequest::class.java.name) {
+                                            triggerFillCannulaRequestMessage(context, sendPumpCommands)
+                                            return@DropdownMenuItem
+                                        } else if (className == ChangeTimeDateRequest::class.java.name) {
+                                            triggerChangeTimeDateRequestMessage(context, sendPumpCommands)
+                                            return@DropdownMenuItem
+                                        } else if (className == SetActiveIDPRequest::class.java.name) {
+                                            triggerSetActiveIDPRequestMessage(context, sendPumpCommands)
+                                            return@DropdownMenuItem
+                                        } else if (className == CreateIDPRequest::class.java.name) {
+                                            triggerCreateIDPRequestMessage(context, sendPumpCommands)
+                                            return@DropdownMenuItem
+                                        } else if (className == RenameIDPRequest::class.java.name) {
+                                            triggerRenameIDPRequestMessage(context, sendPumpCommands)
+                                            return@DropdownMenuItem
+                                        } else if (className == DeleteIDPRequest::class.java.name) {
+                                            triggerDeleteIDPRequestMessage(context, sendPumpCommands)
+                                            return@DropdownMenuItem
+                                        } else if (className == SetIDPSettingsRequest::class.java.name) {
+                                            triggerSetIDPSettingsRequestMessage(context, sendPumpCommands)
+                                            return@DropdownMenuItem
+                                        } else if (className == SetIDPSegmentRequest::class.java.name) {
+                                            triggerSetIDPSegmentRequestMessage(context, sendPumpCommands)
+                                            return@DropdownMenuItem
+                                        } else if (className == SetMaxBolusLimitRequest::class.java.name) {
+                                            triggerSetMaxBolusLimitRequestMessage(context, sendPumpCommands)
+                                            return@DropdownMenuItem
+                                        } else if (className == SetMaxBasalLimitRequest::class.java.name) {
+                                            triggerSetMaxBasalLimitRequestMessage(context, sendPumpCommands)
+                                            return@DropdownMenuItem
+                                        } else if (className == SetPumpSoundsRequest::class.java.name) {
+                                            triggerSetPumpSoundsRequestMessage(context, sendPumpCommands)
+                                            return@DropdownMenuItem
+                                        } else if (className == SetPumpAlertSnoozeRequest::class.java.name) {
+                                            triggerSetPumpAlertSnoozeRequestMessage(context, sendPumpCommands)
                                             return@DropdownMenuItem
                                         }
                                         val clazz = Class.forName(className)
@@ -1139,6 +1231,699 @@ fun triggerMessageWithBolusIdParameter(
     builder.setNegativeButton(
         "Cancel"
     ) { dialog, which -> dialog.cancel() }
+    builder.show()
+}
+
+
+fun parseBoolInput(text: String): Boolean = text == "1" || text.equals("true", ignoreCase = true)
+
+fun triggerRemoteBgEntryRequestMessage(
+    context: Context,
+    sendPumpCommands: (SendType, List<Message>) -> Unit,
+) {
+    val builder = AlertDialog.Builder(context)
+    builder.setTitle("RemoteBgEntryRequest")
+    val layout = LinearLayout(context)
+    layout.orientation = LinearLayout.VERTICAL
+    val bgInput = EditText(context)
+    bgInput.hint = "BG (mg/dL)"
+    bgInput.inputType = InputType.TYPE_CLASS_NUMBER
+    val calibrationInput = EditText(context)
+    calibrationInput.hint = "Use for CGM calibration? (true/false/1/0)"
+    val autopopInput = EditText(context)
+    autopopInput.hint = "Is autopop BG? (true/false/1/0)"
+    val pumpTimeInput = EditText(context)
+    pumpTimeInput.hint = "Pump time seconds since boot"
+    pumpTimeInput.inputType = InputType.TYPE_CLASS_NUMBER
+    val bolusIdInput = EditText(context)
+    bolusIdInput.hint = "Bolus ID"
+    bolusIdInput.inputType = InputType.TYPE_CLASS_NUMBER
+    listOf(bgInput, calibrationInput, autopopInput, pumpTimeInput, bolusIdInput).forEach {
+        layout.addView(it)
+    }
+    builder.setView(layout)
+    builder.setPositiveButton("Send") { dialog, _ ->
+        val message = RemoteBgEntryRequest(
+            bgInput.text.toString().toInt(),
+            parseBoolInput(calibrationInput.text.toString()),
+            parseBoolInput(autopopInput.text.toString()),
+            pumpTimeInput.text.toString().toLong(),
+            bolusIdInput.text.toString().toInt(),
+        )
+        sendPumpCommands(SendType.DEBUG_PROMPT, listOf(message))
+        dialog.dismiss()
+    }
+    builder.setNegativeButton("Cancel") { dialog, _ -> dialog.cancel() }
+    builder.show()
+}
+
+fun triggerRemoteCarbEntryRequestMessage(
+    context: Context,
+    sendPumpCommands: (SendType, List<Message>) -> Unit,
+) {
+    val builder = AlertDialog.Builder(context)
+    builder.setTitle("RemoteCarbEntryRequest")
+    val layout = LinearLayout(context)
+    layout.orientation = LinearLayout.VERTICAL
+    val carbsInput = EditText(context)
+    carbsInput.hint = "Carbs (g)"
+    carbsInput.inputType = InputType.TYPE_CLASS_NUMBER
+    val pumpTimeInput = EditText(context)
+    pumpTimeInput.hint = "Pump time seconds since boot"
+    pumpTimeInput.inputType = InputType.TYPE_CLASS_NUMBER
+    val bolusIdInput = EditText(context)
+    bolusIdInput.hint = "Bolus ID"
+    bolusIdInput.inputType = InputType.TYPE_CLASS_NUMBER
+    listOf(carbsInput, pumpTimeInput, bolusIdInput).forEach { layout.addView(it) }
+    builder.setView(layout)
+    builder.setPositiveButton("Send") { dialog, _ ->
+        val message = RemoteCarbEntryRequest(
+            carbsInput.text.toString().toInt(),
+            pumpTimeInput.text.toString().toLong(),
+            bolusIdInput.text.toString().toInt(),
+        )
+        sendPumpCommands(SendType.DEBUG_PROMPT, listOf(message))
+        dialog.dismiss()
+    }
+    builder.setNegativeButton("Cancel") { dialog, _ -> dialog.cancel() }
+    builder.show()
+}
+
+fun triggerSetModesRequestMessage(
+    context: Context,
+    sendPumpCommands: (SendType, List<Message>) -> Unit,
+) {
+    val builder = AlertDialog.Builder(context)
+    builder.setTitle("SetModesRequest")
+    val input = EditText(context)
+    input.hint = "Mode bitmap (1-4)"
+    input.inputType = InputType.TYPE_CLASS_NUMBER
+    builder.setView(input)
+    builder.setPositiveButton("Send") { dialog, _ ->
+        val bitmap = input.text.toString().toInt()
+        sendPumpCommands(SendType.DEBUG_PROMPT, listOf(SetModesRequest(bitmap)))
+        dialog.dismiss()
+    }
+    builder.setNegativeButton("Cancel") { dialog, _ -> dialog.cancel() }
+    builder.show()
+}
+
+fun triggerSetSleepScheduleRequestMessage(
+    context: Context,
+    sendPumpCommands: (SendType, List<Message>) -> Unit,
+) {
+    val builder = AlertDialog.Builder(context)
+    builder.setTitle("SetSleepScheduleRequest")
+    val layout = LinearLayout(context)
+    layout.orientation = LinearLayout.VERTICAL
+    val slotInput = EditText(context)
+    slotInput.hint = "Slot"
+    slotInput.inputType = InputType.TYPE_CLASS_NUMBER
+    val scheduleInput = EditText(context)
+    scheduleInput.hint = "Schedule bytes (comma-separated)"
+    val flagInput = EditText(context)
+    flagInput.hint = "Flag"
+    flagInput.inputType = InputType.TYPE_CLASS_NUMBER
+    listOf(slotInput, scheduleInput, flagInput).forEach { layout.addView(it) }
+    builder.setView(layout)
+    builder.setPositiveButton("Send") { dialog, _ ->
+        val scheduleBytes = scheduleInput.text.toString()
+            .split(',')
+            .filter { it.isNotBlank() }
+            .map { it.trim().toInt().toByte() }
+            .toByteArray()
+        val message = SetSleepScheduleRequest(
+            slotInput.text.toString().toInt(),
+            scheduleBytes,
+            flagInput.text.toString().toInt(),
+        )
+        sendPumpCommands(SendType.DEBUG_PROMPT, listOf(message))
+        dialog.dismiss()
+    }
+    builder.setNegativeButton("Cancel") { dialog, _ -> dialog.cancel() }
+    builder.show()
+}
+
+fun triggerSetTempRateRequestMessage(
+    context: Context,
+    sendPumpCommands: (SendType, List<Message>) -> Unit,
+) {
+    val builder = AlertDialog.Builder(context)
+    builder.setTitle("SetTempRateRequest")
+    val layout = LinearLayout(context)
+    layout.orientation = LinearLayout.VERTICAL
+    val minutesInput = EditText(context)
+    minutesInput.hint = "Minutes (>=15)"
+    minutesInput.inputType = InputType.TYPE_CLASS_NUMBER
+    val percentInput = EditText(context)
+    percentInput.hint = "Percent (0-250)"
+    percentInput.inputType = InputType.TYPE_CLASS_NUMBER
+    listOf(minutesInput, percentInput).forEach { layout.addView(it) }
+    builder.setView(layout)
+    builder.setPositiveButton("Send") { dialog, _ ->
+        val message = SetTempRateRequest(
+            minutesInput.text.toString().toInt(),
+            percentInput.text.toString().toInt(),
+        )
+        sendPumpCommands(SendType.DEBUG_PROMPT, listOf(message))
+        dialog.dismiss()
+    }
+    builder.setNegativeButton("Cancel") { dialog, _ -> dialog.cancel() }
+    builder.show()
+}
+
+fun triggerChangeControlIQSettingsRequestMessage(
+    context: Context,
+    sendPumpCommands: (SendType, List<Message>) -> Unit,
+) {
+    val builder = AlertDialog.Builder(context)
+    builder.setTitle("ChangeControlIQSettingsRequest")
+    val layout = LinearLayout(context)
+    layout.orientation = LinearLayout.VERTICAL
+    val enabledInput = EditText(context)
+    enabledInput.hint = "Enabled (true/false/1/0)"
+    val weightInput = EditText(context)
+    weightInput.hint = "Weight lbs"
+    weightInput.inputType = InputType.TYPE_CLASS_NUMBER
+    val tdiInput = EditText(context)
+    tdiInput.hint = "Total daily insulin units"
+    tdiInput.inputType = InputType.TYPE_CLASS_NUMBER
+    listOf(enabledInput, weightInput, tdiInput).forEach { layout.addView(it) }
+    builder.setView(layout)
+    builder.setPositiveButton("Send") { dialog, _ ->
+        val message = ChangeControlIQSettingsRequest(
+            parseBoolInput(enabledInput.text.toString()),
+            weightInput.text.toString().toInt(),
+            tdiInput.text.toString().toInt(),
+        )
+        sendPumpCommands(SendType.DEBUG_PROMPT, listOf(message))
+        dialog.dismiss()
+    }
+    builder.setNegativeButton("Cancel") { dialog, _ -> dialog.cancel() }
+    builder.show()
+}
+
+fun triggerSetQuickBolusSettingsRequestMessage(
+    context: Context,
+    sendPumpCommands: (SendType, List<Message>) -> Unit,
+) {
+    val builder = AlertDialog.Builder(context)
+    builder.setTitle("SetQuickBolusSettingsRequest")
+    val layout = LinearLayout(context)
+    layout.orientation = LinearLayout.VERTICAL
+    val enabledInput = EditText(context)
+    enabledInput.hint = "Enabled (true/false/1/0)"
+    val modeInput = EditText(context)
+    modeInput.hint = "Mode (UNITS or CARBS)"
+    val incrementInput = EditText(context)
+    incrementInput.hint = "Increment enum (e.g., UNITS_0_5)"
+    listOf(enabledInput, modeInput, incrementInput).forEach { layout.addView(it) }
+    builder.setView(layout)
+    builder.setPositiveButton("Send") { dialog, _ ->
+        val enabled = parseBoolInput(enabledInput.text.toString())
+        val mode = SetQuickBolusSettingsRequest.QuickBolusMode.valueOf(modeInput.text.toString().uppercase())
+        val increment = SetQuickBolusSettingsRequest.QuickBolusIncrement.valueOf(
+            incrementInput.text.toString().uppercase()
+        )
+        val message = SetQuickBolusSettingsRequest(enabled, mode, increment)
+        sendPumpCommands(SendType.DEBUG_PROMPT, listOf(message))
+        dialog.dismiss()
+    }
+    builder.setNegativeButton("Cancel") { dialog, _ -> dialog.cancel() }
+    builder.show()
+}
+
+fun triggerDismissNotificationRequestMessage(
+    context: Context,
+    sendPumpCommands: (SendType, List<Message>) -> Unit,
+) {
+    val builder = AlertDialog.Builder(context)
+    builder.setTitle("DismissNotificationRequest")
+    val layout = LinearLayout(context)
+    layout.orientation = LinearLayout.VERTICAL
+    val notificationIdInput = EditText(context)
+    notificationIdInput.hint = "Notification ID"
+    notificationIdInput.inputType = InputType.TYPE_CLASS_NUMBER
+    val notificationTypeInput = EditText(context)
+    notificationTypeInput.hint = "Notification type (0-3)"
+    notificationTypeInput.inputType = InputType.TYPE_CLASS_NUMBER
+    listOf(notificationIdInput, notificationTypeInput).forEach { layout.addView(it) }
+    builder.setView(layout)
+    builder.setPositiveButton("Send") { dialog, _ ->
+        val message = DismissNotificationRequest(
+            DismissNotificationRequest.NotificationType.fromId(
+                notificationTypeInput.text.toString().toInt()
+            ) ?: DismissNotificationRequest.NotificationType.REMINDER,
+            notificationIdInput.text.toString().toLong(),
+        )
+        sendPumpCommands(SendType.DEBUG_PROMPT, listOf(message))
+        dialog.dismiss()
+    }
+    builder.setNegativeButton("Cancel") { dialog, _ -> dialog.cancel() }
+    builder.show()
+}
+
+fun triggerSetG6TransmitterIdRequestMessage(
+    context: Context,
+    sendPumpCommands: (SendType, List<Message>) -> Unit,
+) {
+    val builder = AlertDialog.Builder(context)
+    builder.setTitle("SetG6TransmitterIdRequest")
+    val input = EditText(context)
+    input.hint = "Transmitter ID"
+    builder.setView(input)
+    builder.setPositiveButton("Send") { dialog, _ ->
+        sendPumpCommands(SendType.DEBUG_PROMPT, listOf(SetG6TransmitterIdRequest(input.text.toString())))
+        dialog.dismiss()
+    }
+    builder.setNegativeButton("Cancel") { dialog, _ -> dialog.cancel() }
+    builder.show()
+}
+
+fun triggerStartDexcomG6SensorSessionRequestMessage(
+    context: Context,
+    sendPumpCommands: (SendType, List<Message>) -> Unit,
+) {
+    val builder = AlertDialog.Builder(context)
+    builder.setTitle("StartDexcomG6SensorSessionRequest")
+    val input = EditText(context)
+    input.hint = "Sensor code (0 for no code)"
+    input.inputType = InputType.TYPE_CLASS_NUMBER
+    builder.setView(input)
+    builder.setPositiveButton("Send") { dialog, _ ->
+        val code = if (input.text.isNullOrBlank()) 0 else input.text.toString().toInt()
+        sendPumpCommands(SendType.DEBUG_PROMPT, listOf(StartDexcomG6SensorSessionRequest(code)))
+        dialog.dismiss()
+    }
+    builder.setNegativeButton("Cancel") { dialog, _ -> dialog.cancel() }
+    builder.show()
+}
+
+fun triggerSetDexcomG7PairingCodeRequestMessage(
+    context: Context,
+    sendPumpCommands: (SendType, List<Message>) -> Unit,
+) {
+    val builder = AlertDialog.Builder(context)
+    builder.setTitle("SetDexcomG7PairingCodeRequest")
+    val input = EditText(context)
+    input.hint = "Pairing code"
+    input.inputType = InputType.TYPE_CLASS_NUMBER
+    builder.setView(input)
+    builder.setPositiveButton("Send") { dialog, _ ->
+        sendPumpCommands(SendType.DEBUG_PROMPT, listOf(SetDexcomG7PairingCodeRequest(input.text.toString().toInt())))
+        dialog.dismiss()
+    }
+    builder.setNegativeButton("Cancel") { dialog, _ -> dialog.cancel() }
+    builder.show()
+}
+
+fun triggerFillCannulaRequestMessage(
+    context: Context,
+    sendPumpCommands: (SendType, List<Message>) -> Unit,
+) {
+    val builder = AlertDialog.Builder(context)
+    builder.setTitle("FillCannulaRequest")
+    val input = EditText(context)
+    input.hint = "Prime size (milliunits)"
+    input.inputType = InputType.TYPE_CLASS_NUMBER
+    builder.setView(input)
+    builder.setPositiveButton("Send") { dialog, _ ->
+        sendPumpCommands(SendType.DEBUG_PROMPT, listOf(FillCannulaRequest(input.text.toString().toInt())))
+        dialog.dismiss()
+    }
+    builder.setNegativeButton("Cancel") { dialog, _ -> dialog.cancel() }
+    builder.show()
+}
+
+fun triggerChangeTimeDateRequestMessage(
+    context: Context,
+    sendPumpCommands: (SendType, List<Message>) -> Unit,
+) {
+    val builder = AlertDialog.Builder(context)
+    builder.setTitle("ChangeTimeDateRequest")
+    val input = EditText(context)
+    input.hint = "Tandem epoch seconds"
+    input.inputType = InputType.TYPE_CLASS_NUMBER
+    builder.setView(input)
+    builder.setPositiveButton("Send") { dialog, _ ->
+        sendPumpCommands(SendType.DEBUG_PROMPT, listOf(ChangeTimeDateRequest(input.text.toString().toLong())))
+        dialog.dismiss()
+    }
+    builder.setNegativeButton("Cancel") { dialog, _ -> dialog.cancel() }
+    builder.show()
+}
+
+fun triggerSetActiveIDPRequestMessage(
+    context: Context,
+    sendPumpCommands: (SendType, List<Message>) -> Unit,
+) {
+    val builder = AlertDialog.Builder(context)
+    builder.setTitle("SetActiveIDPRequest")
+    val input = EditText(context)
+    input.hint = "IDP ID"
+    input.inputType = InputType.TYPE_CLASS_NUMBER
+    builder.setView(input)
+    builder.setPositiveButton("Send") { dialog, _ ->
+        sendPumpCommands(SendType.DEBUG_PROMPT, listOf(SetActiveIDPRequest(input.text.toString().toInt())))
+        dialog.dismiss()
+    }
+    builder.setNegativeButton("Cancel") { dialog, _ -> dialog.cancel() }
+    builder.show()
+}
+
+fun triggerCreateIDPRequestMessage(
+    context: Context,
+    sendPumpCommands: (SendType, List<Message>) -> Unit,
+) {
+    val builder = AlertDialog.Builder(context)
+    builder.setTitle("CreateIDPRequest")
+    val layout = LinearLayout(context)
+    layout.orientation = LinearLayout.VERTICAL
+    val nameInput = EditText(context)
+    nameInput.hint = "Profile name"
+    val carbRatioInput = EditText(context)
+    carbRatioInput.hint = "First segment carb ratio"
+    carbRatioInput.inputType = InputType.TYPE_CLASS_NUMBER
+    val basalRateInput = EditText(context)
+    basalRateInput.hint = "First segment basal rate"
+    basalRateInput.inputType = InputType.TYPE_CLASS_NUMBER
+    val targetBgInput = EditText(context)
+    targetBgInput.hint = "First segment target BG"
+    targetBgInput.inputType = InputType.TYPE_CLASS_NUMBER
+    val isfInput = EditText(context)
+    isfInput.hint = "First segment ISF"
+    isfInput.inputType = InputType.TYPE_CLASS_NUMBER
+    val durationInput = EditText(context)
+    durationInput.hint = "Insulin duration"
+    durationInput.inputType = InputType.TYPE_CLASS_NUMBER
+    val carbEntryInput = EditText(context)
+    carbEntryInput.hint = "Carb entry"
+    carbEntryInput.inputType = InputType.TYPE_CLASS_NUMBER
+    val sourceIdInput = EditText(context)
+    sourceIdInput.hint = "Source IDP ID (blank for new)"
+    listOf(
+        nameInput,
+        carbRatioInput,
+        basalRateInput,
+        targetBgInput,
+        isfInput,
+        durationInput,
+        carbEntryInput,
+        sourceIdInput,
+    ).forEach { layout.addView(it) }
+    builder.setView(layout)
+    builder.setPositiveButton("Send") { dialog, _ ->
+        val message = if (sourceIdInput.text.isNullOrBlank()) {
+            CreateIDPRequest(
+                nameInput.text.toString(),
+                carbRatioInput.text.toString().toInt(),
+                basalRateInput.text.toString().toInt(),
+                targetBgInput.text.toString().toInt(),
+                isfInput.text.toString().toInt(),
+                durationInput.text.toString().toInt(),
+                carbEntryInput.text.toString().toInt(),
+            )
+        } else {
+            CreateIDPRequest(
+                nameInput.text.toString(),
+                sourceIdInput.text.toString().toInt(),
+            )
+        }
+        sendPumpCommands(SendType.DEBUG_PROMPT, listOf(message))
+        dialog.dismiss()
+    }
+    builder.setNegativeButton("Cancel") { dialog, _ -> dialog.cancel() }
+    builder.show()
+}
+
+fun triggerRenameIDPRequestMessage(
+    context: Context,
+    sendPumpCommands: (SendType, List<Message>) -> Unit,
+) {
+    val builder = AlertDialog.Builder(context)
+    builder.setTitle("RenameIDPRequest")
+    val layout = LinearLayout(context)
+    layout.orientation = LinearLayout.VERTICAL
+    val idInput = EditText(context)
+    idInput.hint = "IDP ID"
+    idInput.inputType = InputType.TYPE_CLASS_NUMBER
+    val nameInput = EditText(context)
+    nameInput.hint = "New profile name"
+    listOf(idInput, nameInput).forEach { layout.addView(it) }
+    builder.setView(layout)
+    builder.setPositiveButton("Send") { dialog, _ ->
+        sendPumpCommands(SendType.DEBUG_PROMPT, listOf(RenameIDPRequest(idInput.text.toString().toInt(), nameInput.text.toString())))
+        dialog.dismiss()
+    }
+    builder.setNegativeButton("Cancel") { dialog, _ -> dialog.cancel() }
+    builder.show()
+}
+
+fun triggerDeleteIDPRequestMessage(
+    context: Context,
+    sendPumpCommands: (SendType, List<Message>) -> Unit,
+) {
+    val builder = AlertDialog.Builder(context)
+    builder.setTitle("DeleteIDPRequest")
+    val input = EditText(context)
+    input.hint = "IDP ID"
+    input.inputType = InputType.TYPE_CLASS_NUMBER
+    builder.setView(input)
+    builder.setPositiveButton("Send") { dialog, _ ->
+        sendPumpCommands(SendType.DEBUG_PROMPT, listOf(DeleteIDPRequest(input.text.toString().toInt())))
+        dialog.dismiss()
+    }
+    builder.setNegativeButton("Cancel") { dialog, _ -> dialog.cancel() }
+    builder.show()
+}
+
+fun triggerSetIDPSettingsRequestMessage(
+    context: Context,
+    sendPumpCommands: (SendType, List<Message>) -> Unit,
+) {
+    val builder = AlertDialog.Builder(context)
+    builder.setTitle("SetIDPSettingsRequest")
+    val layout = LinearLayout(context)
+    layout.orientation = LinearLayout.VERTICAL
+    val idInput = EditText(context)
+    idInput.hint = "IDP ID"
+    idInput.inputType = InputType.TYPE_CLASS_NUMBER
+    val insulinDurationInput = EditText(context)
+    insulinDurationInput.hint = "Insulin duration"
+    insulinDurationInput.inputType = InputType.TYPE_CLASS_NUMBER
+    val carbEntryInput = EditText(context)
+    carbEntryInput.hint = "Carb entry"
+    carbEntryInput.inputType = InputType.TYPE_CLASS_NUMBER
+    val changeTypeInput = EditText(context)
+    changeTypeInput.hint = "Change type (CHANGE_INSULIN_DURATION or CHANGE_CARB_ENTRY)"
+    listOf(idInput, insulinDurationInput, carbEntryInput, changeTypeInput).forEach { layout.addView(it) }
+    builder.setView(layout)
+    builder.setPositiveButton("Send") { dialog, _ ->
+        val changeType = SetIDPSettingsRequest.ChangeType.valueOf(changeTypeInput.text.toString().uppercase())
+        val message = SetIDPSettingsRequest(
+            idInput.text.toString().toInt(),
+            insulinDurationInput.text.toString().toInt(),
+            carbEntryInput.text.toString().toInt(),
+            changeType,
+        )
+        sendPumpCommands(SendType.DEBUG_PROMPT, listOf(message))
+        dialog.dismiss()
+    }
+    builder.setNegativeButton("Cancel") { dialog, _ -> dialog.cancel() }
+    builder.show()
+}
+
+fun triggerSetIDPSegmentRequestMessage(
+    context: Context,
+    sendPumpCommands: (SendType, List<Message>) -> Unit,
+) {
+    val builder = AlertDialog.Builder(context)
+    builder.setTitle("SetIDPSegmentRequest")
+    val layout = LinearLayout(context)
+    layout.orientation = LinearLayout.VERTICAL
+    val idpIdInput = EditText(context)
+    idpIdInput.hint = "IDP ID"
+    idpIdInput.inputType = InputType.TYPE_CLASS_NUMBER
+    val unknownIdInput = EditText(context)
+    unknownIdInput.hint = "Unknown ID"
+    unknownIdInput.inputType = InputType.TYPE_CLASS_NUMBER
+    val segmentIndexInput = EditText(context)
+    segmentIndexInput.hint = "Segment index"
+    segmentIndexInput.inputType = InputType.TYPE_CLASS_NUMBER
+    val operationInput = EditText(context)
+    operationInput.hint = "Operation (MODIFY_SEGMENT_ID/CREATE_SEGMENT/DELETE_SEGMENT_ID)"
+    val startTimeInput = EditText(context)
+    startTimeInput.hint = "Profile start time"
+    startTimeInput.inputType = InputType.TYPE_CLASS_NUMBER
+    val basalRateInput = EditText(context)
+    basalRateInput.hint = "Profile basal rate"
+    basalRateInput.inputType = InputType.TYPE_CLASS_NUMBER
+    val carbRatioInput = EditText(context)
+    carbRatioInput.hint = "Profile carb ratio"
+    carbRatioInput.inputType = InputType.TYPE_CLASS_NUMBER
+    val targetBgInput = EditText(context)
+    targetBgInput.hint = "Profile target BG"
+    targetBgInput.inputType = InputType.TYPE_CLASS_NUMBER
+    val isfInput = EditText(context)
+    isfInput.hint = "Profile ISF"
+    isfInput.inputType = InputType.TYPE_CLASS_NUMBER
+    val statusInput = EditText(context)
+    statusInput.hint = "Status bitmask"
+    statusInput.inputType = InputType.TYPE_CLASS_NUMBER
+    listOf(
+        idpIdInput,
+        unknownIdInput,
+        segmentIndexInput,
+        operationInput,
+        startTimeInput,
+        basalRateInput,
+        carbRatioInput,
+        targetBgInput,
+        isfInput,
+        statusInput,
+    ).forEach { layout.addView(it) }
+    builder.setView(layout)
+    builder.setPositiveButton("Send") { dialog, _ ->
+        val message = SetIDPSegmentRequest(
+            idpIdInput.text.toString().toInt(),
+            unknownIdInput.text.toString().toInt(),
+            segmentIndexInput.text.toString().toInt(),
+            SetIDPSegmentRequest.IDPSegmentOperation.valueOf(operationInput.text.toString().uppercase()),
+            startTimeInput.text.toString().toInt(),
+            basalRateInput.text.toString().toInt(),
+            carbRatioInput.text.toString().toLong(),
+            targetBgInput.text.toString().toInt(),
+            isfInput.text.toString().toInt(),
+            statusInput.text.toString().toInt(),
+        )
+        sendPumpCommands(SendType.DEBUG_PROMPT, listOf(message))
+        dialog.dismiss()
+    }
+    builder.setNegativeButton("Cancel") { dialog, _ -> dialog.cancel() }
+    builder.show()
+}
+
+fun triggerSetMaxBolusLimitRequestMessage(
+    context: Context,
+    sendPumpCommands: (SendType, List<Message>) -> Unit,
+) {
+    val builder = AlertDialog.Builder(context)
+    builder.setTitle("SetMaxBolusLimitRequest")
+    val input = EditText(context)
+    input.hint = "Max bolus (milliunits)"
+    input.inputType = InputType.TYPE_CLASS_NUMBER
+    builder.setView(input)
+    builder.setPositiveButton("Send") { dialog, _ ->
+        sendPumpCommands(SendType.DEBUG_PROMPT, listOf(SetMaxBolusLimitRequest(input.text.toString().toInt())))
+        dialog.dismiss()
+    }
+    builder.setNegativeButton("Cancel") { dialog, _ -> dialog.cancel() }
+    builder.show()
+}
+
+fun triggerSetMaxBasalLimitRequestMessage(
+    context: Context,
+    sendPumpCommands: (SendType, List<Message>) -> Unit,
+) {
+    val builder = AlertDialog.Builder(context)
+    builder.setTitle("SetMaxBasalLimitRequest")
+    val input = EditText(context)
+    input.hint = "Max hourly basal (milliunits)"
+    input.inputType = InputType.TYPE_CLASS_NUMBER
+    builder.setView(input)
+    builder.setPositiveButton("Send") { dialog, _ ->
+        sendPumpCommands(SendType.DEBUG_PROMPT, listOf(SetMaxBasalLimitRequest(input.text.toString().toInt())))
+        dialog.dismiss()
+    }
+    builder.setNegativeButton("Cancel") { dialog, _ -> dialog.cancel() }
+    builder.show()
+}
+
+fun triggerSetPumpSoundsRequestMessage(
+    context: Context,
+    sendPumpCommands: (SendType, List<Message>) -> Unit,
+) {
+    val builder = AlertDialog.Builder(context)
+    builder.setTitle("SetPumpSoundsRequest")
+    val layout = LinearLayout(context)
+    layout.orientation = LinearLayout.VERTICAL
+    val quickBolusInput = EditText(context)
+    quickBolusInput.hint = "Quick bolus annunciation"
+    quickBolusInput.inputType = InputType.TYPE_CLASS_NUMBER
+    val generalInput = EditText(context)
+    generalInput.hint = "General annunciation"
+    generalInput.inputType = InputType.TYPE_CLASS_NUMBER
+    val reminderInput = EditText(context)
+    reminderInput.hint = "Reminder annunciation"
+    reminderInput.inputType = InputType.TYPE_CLASS_NUMBER
+    val alertInput = EditText(context)
+    alertInput.hint = "Alert annunciation"
+    alertInput.inputType = InputType.TYPE_CLASS_NUMBER
+    val alarmInput = EditText(context)
+    alarmInput.hint = "Alarm annunciation"
+    alarmInput.inputType = InputType.TYPE_CLASS_NUMBER
+    val cgmAInput = EditText(context)
+    cgmAInput.hint = "CGM alert annunciation A"
+    cgmAInput.inputType = InputType.TYPE_CLASS_NUMBER
+    val cgmBInput = EditText(context)
+    cgmBInput.hint = "CGM alert annunciation B"
+    cgmBInput.inputType = InputType.TYPE_CLASS_NUMBER
+    val changeBitmaskInput = EditText(context)
+    changeBitmaskInput.hint = "Change bitmask"
+    changeBitmaskInput.inputType = InputType.TYPE_CLASS_NUMBER
+    listOf(
+        quickBolusInput,
+        generalInput,
+        reminderInput,
+        alertInput,
+        alarmInput,
+        cgmAInput,
+        cgmBInput,
+        changeBitmaskInput,
+    ).forEach { layout.addView(it) }
+    builder.setView(layout)
+    builder.setPositiveButton("Send") { dialog, _ ->
+        val message = SetPumpSoundsRequest(
+            quickBolusInput.text.toString().toInt(),
+            generalInput.text.toString().toInt(),
+            reminderInput.text.toString().toInt(),
+            alertInput.text.toString().toInt(),
+            alarmInput.text.toString().toInt(),
+            cgmAInput.text.toString().toInt(),
+            cgmBInput.text.toString().toInt(),
+            changeBitmaskInput.text.toString().toInt(),
+        )
+        sendPumpCommands(SendType.DEBUG_PROMPT, listOf(message))
+        dialog.dismiss()
+    }
+    builder.setNegativeButton("Cancel") { dialog, _ -> dialog.cancel() }
+    builder.show()
+}
+
+fun triggerSetPumpAlertSnoozeRequestMessage(
+    context: Context,
+    sendPumpCommands: (SendType, List<Message>) -> Unit,
+) {
+    val builder = AlertDialog.Builder(context)
+    builder.setTitle("SetPumpAlertSnoozeRequest")
+    val layout = LinearLayout(context)
+    layout.orientation = LinearLayout.VERTICAL
+    val enabledInput = EditText(context)
+    enabledInput.hint = "Snooze enabled (true/false/1/0)"
+    val durationInput = EditText(context)
+    durationInput.hint = "Snooze duration minutes"
+    durationInput.inputType = InputType.TYPE_CLASS_NUMBER
+    listOf(enabledInput, durationInput).forEach { layout.addView(it) }
+    builder.setView(layout)
+    builder.setPositiveButton("Send") { dialog, _ ->
+        val message = SetPumpAlertSnoozeRequest(
+            parseBoolInput(enabledInput.text.toString()),
+            durationInput.text.toString().toInt(),
+        )
+        sendPumpCommands(SendType.DEBUG_PROMPT, listOf(message))
+        dialog.dismiss()
+    }
+    builder.setNegativeButton("Cancel") { dialog, _ -> dialog.cancel() }
     builder.show()
 }
 
