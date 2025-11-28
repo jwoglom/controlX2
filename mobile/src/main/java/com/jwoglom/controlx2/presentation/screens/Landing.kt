@@ -83,6 +83,7 @@ import com.jwoglom.controlx2.presentation.screens.sections.Notifications
 import com.jwoglom.controlx2.presentation.screens.sections.ProfileActions
 import com.jwoglom.controlx2.presentation.screens.sections.Settings
 import com.jwoglom.controlx2.presentation.screens.sections.TempRateWindow
+import com.jwoglom.controlx2.presentation.screens.sections.SoundSettingsActions
 import com.jwoglom.controlx2.presentation.screens.sections.dashboardCommands
 import com.jwoglom.controlx2.presentation.screens.sections.dashboardFields
 import com.jwoglom.controlx2.presentation.screens.sections.resetBolusDataStoreState
@@ -320,6 +321,17 @@ fun Landing(
                                 },
                             )
                         }
+                        LandingSection.SOUND_SETTINGS_ACTIONS -> {
+                            SoundSettingsActions(
+                                innerPadding = innerPadding,
+                                navController = navController,
+                                sendMessage = sendMessage,
+                                sendPumpCommands = sendPumpCommands,
+                                navigateBack = {
+                                    selectedItem = LandingSection.ACTIONS
+                                },
+                            )
+                        }
                         LandingSection.DEBUG -> {
                             Debug(
                                 innerPadding = innerPadding,
@@ -433,6 +445,7 @@ enum class LandingSection(val label: String, val icon: ImageVector, val showInNa
     CGM_ACTIONS("Actions", Icons.Filled.Create, false),
     CARTRIDGE_ACTIONS("Actions", Icons.Filled.Create, false),
     PROFILE_ACTIONS("Profiles", Icons.Filled.Create, false),
+    SOUND_SETTINGS_ACTIONS("Profiles", Icons.Filled.Create, false),
 
     SETTINGS("Settings", Icons.Filled.Settings, true),
     DEBUG("Settings", Icons.Filled.Settings, false),

@@ -31,6 +31,7 @@ import com.jwoglom.pumpx2.pump.messages.response.controlStream.FillCannulaStateS
 import com.jwoglom.pumpx2.pump.messages.response.controlStream.FillTubingStateStreamResponse
 import com.jwoglom.pumpx2.pump.messages.response.controlStream.PumpingStateStreamResponse
 import com.jwoglom.pumpx2.pump.messages.response.currentStatus.AlertStatusResponse
+import com.jwoglom.pumpx2.pump.messages.response.currentStatus.PumpGlobalsResponse
 import com.jwoglom.pumpx2.pump.messages.response.currentStatus.TempRateResponse
 import timber.log.Timber
 import java.time.Instant
@@ -61,6 +62,7 @@ class DataStore {
     var basalStatus = MutableLiveData<BasalStatus>()
     var tempRateActive = MutableLiveData<Boolean>()
     var tempRateDetails = MutableLiveData<TempRateResponse>()
+    val pumpGlobalsResponse = MutableLiveData<PumpGlobalsResponse>()
     val cgmSessionState = MutableLiveData<CGMSessionState>()
     val cgmSessionExpireRelative = MutableLiveData<String>()
     val cgmSessionExpireExact = MutableLiveData<String>()
@@ -150,6 +152,7 @@ class DataStore {
         basalStatus.observeForever { t -> Timber.i("DataStore.basalStatus=$t") }
         tempRateActive.observeForever { t -> Timber.i("DataStore.tempRateActive=$t") }
         tempRateDetails.observeForever { t -> Timber.i("DataStore.tempRateDetails=$t") }
+        pumpGlobalsResponse.observeForever { t -> Timber.i("DataStore.pumpGlobalsResponse=$t") }
         cgmSessionState.observeForever { t -> Timber.i("DataStore.cgmSessionState=$t") }
         cgmSessionExpireRelative.observeForever { t -> Timber.i("DataStore.cgmSessionExpireRelative=$t") }
         cgmSessionExpireExact.observeForever { t -> Timber.i("DataStore.cgmSessionExpireExact=$t") }
