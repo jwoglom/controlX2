@@ -41,14 +41,17 @@ class HybridMessageBus(
         override fun onMessageReceived(path: String, data: ByteArray, sourceNodeId: String) {
             Timber.d("HybridMessageBus: Message from Wear transport: $path")
 
-            // Special handling: /to-phone/* from Wear needs to reach BOTH CommService and Mobile UI
-            // Re-broadcast locally so both components receive it
+            // Only forward /to-phone/* messages from Wear transport
+            // Other messages (like /from-pump/*) will come via Broadcast transport instead
             if (path.startsWith("/to-phone/")) {
                 Timber.d("HybridMessageBus: Re-broadcasting /to-phone/* from Wear locally")
                 broadcastBus.sendMessage(path, data, MessageBusSender.WEAR_UI)
-            }
 
-            notifyListeners(path, data, sourceNodeId)
+                // Also notify listeners directly (for any components listening to Wear messages)
+                notifyListeners(path, data, sourceNodeId)
+            } else {
+                Timber.d("HybridMessageBus: Ignoring non-/to-phone/* message from Wear transport (will come via Broadcast): $path")
+            }
         }
     }
 
