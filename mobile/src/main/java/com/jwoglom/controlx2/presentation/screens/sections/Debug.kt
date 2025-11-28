@@ -1313,6 +1313,7 @@ fun OpCodeTestingPopup(
                                             runOpCodeTest(
                                                 characteristic = selectedCharacteristic,
                                                 sendPumpCommands = sendPumpCommands,
+                                                isPumpConnected = { ds.pumpConnected.value == true },
                                                 onProgress = { msg, opCode, tested, total, errors ->
                                                     progress = msg
                                                     currentOpCode = opCode
@@ -1386,6 +1387,7 @@ fun OpCodeTestingPopup(
 suspend fun runOpCodeTest(
     characteristic: Characteristic,
     sendPumpCommands: (SendType, List<Message>) -> Unit,
+    isPumpConnected: () -> Boolean,
     onProgress: (String, Byte?, Int, Int, Int) -> Unit
 ) = withContext(Dispatchers.IO) {
     Timber.i("Starting OpCode test for characteristic: ${characteristic.name}")
@@ -1437,9 +1439,55 @@ suspend fun runOpCodeTest(
     Timber.i("Testing ${unknownOpCodes.size} unknown opCodes (removed ${knownOpCodes.size} known)")
     onProgress("Testing ${unknownOpCodes.size} unknown opCodes...", null, 0, unknownOpCodes.size, 0)
 
+    // Helper function to wait for pump connection
+    suspend fun waitForPumpConnection(opCode: Byte?) {
+        var waitCount = 0
+        while (!isPumpConnected()) {
+            waitCount++
+            val opCodeStr = opCode?.let { "0x${String.format("%02X", it)}" } ?: "N/A"
+            Timber.w("Pump disconnected, waiting for reconnection... (${waitCount}s) [opCode=$opCodeStr]")
+
+            withContext(Dispatchers.Main) {
+                onProgress(
+                    "⚠ Pump disconnected - waiting for reconnection... (${waitCount}s)",
+                    opCode,
+                    0,
+                    unknownOpCodes.size,
+                    errorCount
+                )
+            }
+
+            kotlinx.coroutines.delay(1000)
+
+            // Safety timeout after 5 minutes
+            if (waitCount > 300) {
+                Timber.e("Pump reconnection timeout after 5 minutes")
+                throw RuntimeException("Pump failed to reconnect after 5 minutes")
+            }
+        }
+
+        if (waitCount > 0) {
+            Timber.i("Pump reconnected after ${waitCount}s")
+            withContext(Dispatchers.Main) {
+                onProgress(
+                    "✓ Pump reconnected - resuming test",
+                    opCode,
+                    0,
+                    unknownOpCodes.size,
+                    errorCount
+                )
+            }
+            // Give a bit more time after reconnection to stabilize
+            kotlinx.coroutines.delay(2000)
+        }
+    }
+
     // Step 4: Send each unknown opCode one at a time
     var errorCount = 0
     unknownOpCodes.forEachIndexed { index, opCode ->
+        // Wait for pump connection before testing each opCode
+        waitForPumpConnection(opCode)
+
         Timber.i("Testing opCode ${index + 1}/${unknownOpCodes.size}: 0x${String.format("%02X", opCode)} ($opCode)")
         withContext(Dispatchers.Main) {
             onProgress(
@@ -1483,6 +1531,9 @@ suspend fun runOpCodeTest(
             // Wait a bit longer after errors to allow reconnection
             kotlinx.coroutines.delay(2000)
         }
+
+        // Check connection status after sending and wait if disconnected
+        waitForPumpConnection(null)
     }
 
     Timber.i("OpCode test completed. Tested ${unknownOpCodes.size} opCodes with $errorCount errors")
