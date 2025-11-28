@@ -80,6 +80,7 @@ import androidx.navigation.NavHostController
 import com.google.android.material.slider.Slider
 import com.google.common.base.Splitter
 import com.jwoglom.pumpx2.pump.messages.Message
+import com.jwoglom.pumpx2.pump.messages.MessageType
 import com.jwoglom.pumpx2.pump.messages.annotations.HistoryLogProps
 import com.jwoglom.pumpx2.pump.messages.annotations.MessageProps
 import com.jwoglom.pumpx2.pump.messages.bluetooth.Characteristic
@@ -1211,6 +1212,8 @@ fun OpCodeTestingPopup(
     var errorCount by remember { mutableStateOf(0) }
 
     val coroutineScope = rememberCoroutineScope()
+    val ds = LocalDataStore.current
+    val pumpConnected = ds.pumpConnected.observeAsState()
 
     Popup(
         onDismissRequest = { if (!isRunning) onDismiss() }
@@ -1283,9 +1286,23 @@ fun OpCodeTestingPopup(
                     }
 
                     item {
+                        val isPumpConnected = pumpConnected.value == true
+
+                        if (!isPumpConnected) {
+                            Text(
+                                text = "⚠ Pump not connected",
+                                color = Color.Red,
+                                style = TextStyle(fontSize = 14.sp)
+                            )
+                        }
+                    }
+
+                    item {
+                        val isPumpConnected = pumpConnected.value == true
+
                         Button(
                             onClick = {
-                                if (!isRunning) {
+                                if (!isRunning && isPumpConnected) {
                                     isRunning = true
                                     testedCount = 0
                                     errorCount = 0
@@ -1314,7 +1331,7 @@ fun OpCodeTestingPopup(
                                     }
                                 }
                             },
-                            enabled = !isRunning,
+                            enabled = !isRunning && isPumpConnected,
                             modifier = Modifier.fillMaxWidth()
                         ) {
                             Text(if (isRunning) "Testing..." else "Start Test")
@@ -1481,11 +1498,56 @@ suspend fun runOpCodeTest(
 }
 
 fun createMessageWithOpCode(opCode: Byte, characteristic: Characteristic): Message {
-    // Create a minimal anonymous Message implementation with the given opCode
+    // First, create the response message class (opCode should be odd for responses)
+    // According to pumpX2, request opCodes are even, response opCodes are odd
+    val responseOpCode = (opCode.toInt() + 1).toByte()
+
+    // Create test response message
+    val testResponseClass = object : Message() {
+        override fun opCode(): Byte = responseOpCode
+        override fun type(): MessageType = MessageType.RESPONSE
+        override fun getCharacteristic(): Characteristic = characteristic
+        override fun getCargo(): ByteArray = ByteArray(0)
+        override fun signed(): Boolean = false
+        override fun stream(): Boolean = false
+
+        override fun parse(raw: ByteArray) {
+            // Empty implementation - just accept any data
+            this.cargo = if (raw.isEmpty()) EMPTY else raw
+        }
+
+        override fun getRequestClass(): Class<out Message> {
+            // Return a dummy class - this won't be used for our test
+            @Suppress("UNCHECKED_CAST")
+            return this::class.java.superclass as Class<out Message>
+        }
+
+        // Override props() to return null to avoid annotation lookup failures
+        override fun props(): MessageProps? = null
+    }
+
+    // Create test request message with the given opCode
     return object : Message() {
         override fun opCode(): Byte = opCode
+        override fun type(): MessageType = MessageType.REQUEST
         override fun getCharacteristic(): Characteristic = characteristic
         override fun getCargo(): ByteArray = ByteArray(0) // Empty cargo (0 arguments)
+        override fun signed(): Boolean = false
+        override fun stream(): Boolean = false
+
+        override fun parse(raw: ByteArray) {
+            // Empty implementation - just accept any data
+            this.cargo = if (raw.isEmpty()) EMPTY else raw
+        }
+
+        override fun getResponseClass(): Class<out Message> {
+            // Return the test response class
+            @Suppress("UNCHECKED_CAST")
+            return testResponseClass::class.java as Class<out Message>
+        }
+
+        // Override props() to return null to avoid annotation lookup failures
+        override fun props(): MessageProps? = null
     }
 }
 
