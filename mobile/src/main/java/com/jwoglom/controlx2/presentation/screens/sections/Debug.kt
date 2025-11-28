@@ -82,6 +82,7 @@ import com.google.common.base.Splitter
 import com.jwoglom.pumpx2.pump.messages.Message
 import com.jwoglom.pumpx2.pump.messages.annotations.HistoryLogProps
 import com.jwoglom.pumpx2.pump.messages.annotations.MessageProps
+import com.jwoglom.pumpx2.pump.messages.bluetooth.Characteristic
 import com.jwoglom.pumpx2.pump.messages.request.control.BolusPermissionReleaseRequest
 import com.jwoglom.pumpx2.pump.messages.request.control.CancelBolusRequest
 import com.jwoglom.pumpx2.pump.messages.request.control.InitiateBolusRequest
@@ -136,6 +137,7 @@ fun Debug(
     var showMessageCache by remember { mutableStateOf(false) }
     var showHistoryLogs by remember { mutableStateOf(false) }
     var showPumpState by remember { mutableStateOf(false) }
+    var showOpCodeTest by remember { mutableStateOf(false) }
 
     val context = LocalContext.current
     val ds = LocalDataStore.current
@@ -408,6 +410,33 @@ fun Debug(
                             }
                         }
                     }
+                }
+            }
+
+            item {
+                Divider()
+            }
+
+            item {
+                ListItem(
+                    headlineContent = { Text("OpCode Testing") },
+                    supportingContent = { Text("Send invalid opCodes to test pump resilience.") },
+                    leadingContent = {
+                        Icon(
+                            Icons.Filled.Build,
+                            contentDescription = null,
+                        )
+                    },
+                    modifier = Modifier.clickable {
+                        showOpCodeTest = true
+                    }
+                )
+
+                if (showOpCodeTest) {
+                    OpCodeTestingPopup(
+                        onDismiss = { showOpCodeTest = false },
+                        sendPumpCommands = sendPumpCommands
+                    )
                 }
             }
 
@@ -1166,6 +1195,298 @@ fun messagePropsToJson(props: MessageProps): JSONObject? {
             .withKeyValueSeparator('=')
             .split(raw) as Map<*, *>?
     return spl?.let { JSONObject(it) }
+}
+
+@Composable
+fun OpCodeTestingPopup(
+    onDismiss: () -> Unit,
+    sendPumpCommands: (SendType, List<Message>) -> Unit
+) {
+    var selectedCharacteristic by remember { mutableStateOf(Characteristic.CURRENT_STATUS) }
+    var isRunning by remember { mutableStateOf(false) }
+    var progress by remember { mutableStateOf("") }
+    var currentOpCode by remember { mutableStateOf<Byte?>(null) }
+    var testedCount by remember { mutableStateOf(0) }
+    var totalCount by remember { mutableStateOf(0) }
+    var errorCount by remember { mutableStateOf(0) }
+
+    val coroutineScope = rememberCoroutineScope()
+
+    Popup(
+        onDismissRequest = { if (!isRunning) onDismiss() }
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(Color.Black.copy(alpha = 0.5f))
+                .padding(16.dp)
+        ) {
+            Surface(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .align(Alignment.Center),
+                color = Color.White
+            ) {
+                LazyColumn(
+                    modifier = Modifier.padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    item {
+                        Text(
+                            text = "OpCode Testing",
+                            style = TextStyle(fontSize = 20.sp)
+                        )
+                    }
+
+                    item { Divider() }
+
+                    item {
+                        Text("Select Characteristic:")
+                    }
+
+                    item {
+                        Box {
+                            var expanded by remember { mutableStateOf(false) }
+
+                            Button(
+                                onClick = { if (!isRunning) expanded = true },
+                                enabled = !isRunning,
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Text(selectedCharacteristic.name)
+                                Icon(
+                                    if (expanded) Icons.Filled.KeyboardArrowUp else Icons.Filled.KeyboardArrowDown,
+                                    contentDescription = null
+                                )
+                            }
+
+                            DropdownMenu(
+                                expanded = expanded,
+                                onDismissRequest = { expanded = false }
+                            ) {
+                                DropdownMenuItem(
+                                    text = { Text("CURRENT_STATUS") },
+                                    onClick = {
+                                        selectedCharacteristic = Characteristic.CURRENT_STATUS
+                                        expanded = false
+                                    }
+                                )
+                                DropdownMenuItem(
+                                    text = { Text("CONTROL") },
+                                    onClick = {
+                                        selectedCharacteristic = Characteristic.CONTROL
+                                        expanded = false
+                                    }
+                                )
+                            }
+                        }
+                    }
+
+                    item {
+                        Button(
+                            onClick = {
+                                if (!isRunning) {
+                                    isRunning = true
+                                    testedCount = 0
+                                    errorCount = 0
+                                    progress = "Starting test..."
+
+                                    coroutineScope.launch {
+                                        try {
+                                            runOpCodeTest(
+                                                characteristic = selectedCharacteristic,
+                                                sendPumpCommands = sendPumpCommands,
+                                                onProgress = { msg, opCode, tested, total, errors ->
+                                                    progress = msg
+                                                    currentOpCode = opCode
+                                                    testedCount = tested
+                                                    totalCount = total
+                                                    errorCount = errors
+                                                }
+                                            )
+                                        } catch (e: Exception) {
+                                            Timber.e(e, "OpCode test failed")
+                                            progress = "Test failed: ${e.message}"
+                                        } finally {
+                                            isRunning = false
+                                            currentOpCode = null
+                                        }
+                                    }
+                                }
+                            },
+                            enabled = !isRunning,
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text(if (isRunning) "Testing..." else "Start Test")
+                        }
+                    }
+
+                    if (progress.isNotEmpty()) {
+                        item { Divider() }
+
+                        item {
+                            Text(
+                                text = "Progress:",
+                                style = TextStyle(fontSize = 16.sp)
+                            )
+                        }
+
+                        if (totalCount > 0) {
+                            item {
+                                Text("Tested: $testedCount / $totalCount")
+                            }
+                            item {
+                                Text("Errors: $errorCount")
+                            }
+                        }
+
+                        currentOpCode?.let { opCode ->
+                            item {
+                                Text("Current OpCode: 0x${String.format("%02X", opCode)} ($opCode)")
+                            }
+                        }
+
+                        item {
+                            Text(progress)
+                        }
+                    }
+
+                    item {
+                        Button(
+                            onClick = { if (!isRunning) onDismiss() },
+                            enabled = !isRunning,
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text("Close")
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+suspend fun runOpCodeTest(
+    characteristic: Characteristic,
+    sendPumpCommands: (SendType, List<Message>) -> Unit,
+    onProgress: (String, Byte?, Int, Int, Int) -> Unit
+) = withContext(Dispatchers.IO) {
+    Timber.i("Starting OpCode test for characteristic: ${characteristic.name}")
+    onProgress("Collecting known opCodes for ${characteristic.name}...", null, 0, 0, 0)
+
+    // Step 1: Collect all known opCodes for the characteristic
+    val knownOpCodes = mutableSetOf<Byte>()
+    val requestMessages = MessageHelpers.getAllPumpRequestMessages()
+
+    for (messageName in requestMessages) {
+        try {
+            val className = "${MessageHelpers.REQUEST_PACKAGE}.${messageName}"
+            val clazz = Class.forName(className)
+
+            // Try to instantiate to get the characteristic
+            val instance = try {
+                clazz.newInstance() as Message
+            } catch (e: Exception) {
+                // Skip messages that require parameters
+                continue
+            }
+
+            if (instance.characteristic == characteristic) {
+                knownOpCodes.add(instance.opCode())
+                Timber.d("Found known opCode for ${characteristic.name}: ${instance.opCode()} from ${messageName}")
+            }
+        } catch (e: Exception) {
+            Timber.w(e, "Failed to check message: $messageName")
+        }
+    }
+
+    Timber.i("Found ${knownOpCodes.size} known opCodes for ${characteristic.name}")
+    onProgress("Found ${knownOpCodes.size} known opCodes", null, 0, 0, 0)
+
+    // Step 2: Generate all even byte values (-128 to 127, where value % 2 == 0)
+    val allEvenBytes = mutableListOf<Byte>()
+    for (i in -128..127) {
+        val byteVal = i.toByte()
+        if (byteVal % 2 == 0) {
+            allEvenBytes.add(byteVal)
+        }
+    }
+
+    Timber.i("Generated ${allEvenBytes.size} even byte values")
+
+    // Step 3: Remove known opCodes
+    val unknownOpCodes = allEvenBytes.filter { it !in knownOpCodes }
+
+    Timber.i("Testing ${unknownOpCodes.size} unknown opCodes (removed ${knownOpCodes.size} known)")
+    onProgress("Testing ${unknownOpCodes.size} unknown opCodes...", null, 0, unknownOpCodes.size, 0)
+
+    // Step 4: Send each unknown opCode one at a time
+    var errorCount = 0
+    unknownOpCodes.forEachIndexed { index, opCode ->
+        Timber.i("Testing opCode ${index + 1}/${unknownOpCodes.size}: 0x${String.format("%02X", opCode)} ($opCode)")
+        withContext(Dispatchers.Main) {
+            onProgress(
+                "Testing opCode 0x${String.format("%02X", opCode)} ($opCode)",
+                opCode,
+                index,
+                unknownOpCodes.size,
+                errorCount
+            )
+        }
+
+        try {
+            // Create a message with the unknown opCode using reflection
+            val testMessage = createMessageWithOpCode(opCode, characteristic)
+
+            Timber.d("Sending test message: opCode=0x${String.format("%02X", opCode)}, characteristic=${characteristic.name}")
+
+            // Send the message - this may cause disconnection!
+            withContext(Dispatchers.Main) {
+                sendPumpCommands(SendType.DEBUG_PROMPT, listOf(testMessage))
+            }
+
+            // Wait a bit for response and potential disconnection
+            kotlinx.coroutines.delay(500)
+
+            Timber.d("Completed test for opCode 0x${String.format("%02X", opCode)}")
+
+        } catch (e: Exception) {
+            errorCount++
+            Timber.e(e, "Error testing opCode 0x${String.format("%02X", opCode)}: ${e.message}")
+            withContext(Dispatchers.Main) {
+                onProgress(
+                    "Error with opCode 0x${String.format("%02X", opCode)}: ${e.message}",
+                    opCode,
+                    index,
+                    unknownOpCodes.size,
+                    errorCount
+                )
+            }
+
+            // Wait a bit longer after errors to allow reconnection
+            kotlinx.coroutines.delay(2000)
+        }
+    }
+
+    Timber.i("OpCode test completed. Tested ${unknownOpCodes.size} opCodes with $errorCount errors")
+    withContext(Dispatchers.Main) {
+        onProgress(
+            "Test completed! Tested ${unknownOpCodes.size} opCodes with $errorCount errors",
+            null,
+            unknownOpCodes.size,
+            unknownOpCodes.size,
+            errorCount
+        )
+    }
+}
+
+fun createMessageWithOpCode(opCode: Byte, characteristic: Characteristic): Message {
+    // Create a minimal anonymous Message implementation with the given opCode
+    return object : Message() {
+        override fun opCode(): Byte = opCode
+        override fun getCharacteristic(): Characteristic = characteristic
+        override fun getCargo(): ByteArray = ByteArray(0) // Empty cargo (0 arguments)
+    }
 }
 
 fun shortPumpMessageTitle(message: Any): String {
