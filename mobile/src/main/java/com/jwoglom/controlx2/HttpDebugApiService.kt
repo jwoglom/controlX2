@@ -4,7 +4,7 @@ import android.content.Context
 import android.util.Base64
 import com.jwoglom.pumpx2.pump.messages.Message
 import com.jwoglom.pumpx2.pump.messages.bluetooth.Characteristic
-import com.jwoglom.pumpx2.pump.messages.util.PumpMessageSerializer
+import com.jwoglom.controlx2.shared.PumpMessageSerializer
 import fi.iki.elonen.NanoHTTPD
 import org.json.JSONArray
 import org.json.JSONObject
