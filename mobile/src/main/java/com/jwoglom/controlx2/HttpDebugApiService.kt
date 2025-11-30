@@ -91,8 +91,12 @@ class HttpDebugApiService(private val context: Context, private val port: Int = 
     fun onMessagingReceived(path: String, data: ByteArray, sourceNodeId: String) {
         val dataString = String(data)
         val dataHex = data.joinToString("") { "%02x".format(it) }
-        val json = """{"path":"$path","sourceNodeId":"$sourceNodeId","dataString":"$dataString","dataHex":"$dataHex"}"""
-        broadcastToMessagingClients(json)
+        val jsonObject = JSONObject()
+        jsonObject.put("path", path)
+        jsonObject.put("sourceNodeId", sourceNodeId)
+        jsonObject.put("dataString", dataString)
+        jsonObject.put("dataHex", dataHex)
+        broadcastToMessagingClients(jsonObject.toString())
     }
 
     private fun broadcastToPumpMessageClients(message: String) {
@@ -194,335 +198,24 @@ class HttpDebugApiService(private val context: Context, private val port: Int = 
         }
 
         private fun handleOpenApiSpec(): Response {
-            val spec = """
-{
-  "openapi": "3.0.0",
-  "info": {
-    "title": "ControlX2 HTTP Debug API",
-    "version": "1.0.0",
-    "description": "HTTP API for debugging and managing ControlX2 pump communication"
-  },
-  "servers": [
-    {
-      "url": "http://0.0.0.0:18282",
-      "description": "Local debug server"
-    }
-  ],
-  "security": [
-    {
-      "basicAuth": []
-    }
-  ],
-  "components": {
-    "securitySchemes": {
-      "basicAuth": {
-        "type": "http",
-        "scheme": "basic",
-        "description": "HTTP Basic Authentication with username and password configured in Settings > Debug"
-      }
-    },
-    "schemas": {
-      "PumpData": {
-        "type": "object",
-        "properties": {
-          "statusText": {"type": "string"},
-          "connectionTime": {"type": "string", "format": "date-time", "nullable": true},
-          "lastMessageTime": {"type": "string", "format": "date-time", "nullable": true},
-          "batteryPercent": {"type": "integer", "nullable": true},
-          "iobUnits": {"type": "number", "nullable": true},
-          "cartridgeRemainingUnits": {"type": "integer", "nullable": true}
-        }
-      },
-      "PumpMessage": {
-        "type": "object",
-        "description": "Pump message in JSON format from PumpMessageSerializer",
-        "additionalProperties": true
-      },
-      "MessagingStreamEvent": {
-        "type": "object",
-        "properties": {
-          "path": {"type": "string"},
-          "sourceNodeId": {"type": "string"},
-          "dataString": {"type": "string"},
-          "dataHex": {"type": "string"}
-        },
-        "required": ["path", "sourceNodeId", "dataString", "dataHex"]
-      },
-      "Preferences": {
-        "type": "object",
-        "additionalProperties": true,
-        "description": "All SharedPreferences key-value pairs"
-      },
-      "MessagingRequest": {
-        "type": "object",
-        "properties": {
-          "path": {"type": "string", "description": "Message bus path"},
-          "dataString": {"type": "string", "description": "Message data as string (use either dataString or dataHex)"},
-          "dataHex": {"type": "string", "description": "Message data as hex string (use either dataString or dataHex)"}
-        },
-        "required": ["path"]
-      },
-      "Error": {
-        "type": "object",
-        "properties": {
-          "error": {"type": "string"}
-        }
-      },
-      "Success": {
-        "type": "object",
-        "properties": {
-          "success": {"type": "boolean"}
-        }
-      }
-    }
-  },
-  "paths": {
-    "/openapi.json": {
-      "get": {
-        "summary": "OpenAPI specification",
-        "description": "Returns this OpenAPI v3 specification document",
-        "responses": {
-          "200": {
-            "description": "OpenAPI specification",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object"
-                }
-              }
+            try {
+                val inputStream = context.assets.open("openapi.json")
+                val spec = inputStream.bufferedReader().use { it.readText() }
+                return newFixedLengthResponse(
+                    Response.Status.OK,
+                    "application/json",
+                    spec
+                )
+            } catch (e: Exception) {
+                Timber.e(e, "Error loading OpenAPI specification")
+                val errorJson = JSONObject()
+                errorJson.put("error", "Failed to load OpenAPI specification: ${e.message}")
+                return newFixedLengthResponse(
+                    Response.Status.INTERNAL_ERROR,
+                    "application/json",
+                    errorJson.toString()
+                )
             }
-          }
-        }
-      }
-    },
-    "/api/pump/current": {
-      "get": {
-        "summary": "Get current pump data",
-        "description": "Returns the current pump data including battery, IOB, and cartridge status",
-        "responses": {
-          "200": {
-            "description": "Current pump data",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "${'$'}ref": "#/components/schemas/PumpData"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Unauthorized"
-          }
-        }
-      }
-    },
-    "/api/pump/messages": {
-      "get": {
-        "summary": "Stream pump messages",
-        "description": "Streaming endpoint that returns newline-delimited JSON (jsonlines) of pump messages as they are received",
-        "responses": {
-          "200": {
-            "description": "Stream of pump messages",
-            "content": {
-              "application/x-ndjson": {
-                "schema": {
-                  "type": "string",
-                  "description": "Newline-delimited JSON stream of PumpMessage objects"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Unauthorized"
-          }
-        }
-      },
-      "post": {
-        "summary": "Send pump message(s) and wait for responses",
-        "description": "Sends one or more pump messages and waits for responses (30 second timeout per message). Accepts either a single message object or an array of messages.",
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "oneOf": [
-                  {"${'$'}ref": "#/components/schemas/PumpMessage"},
-                  {
-                    "type": "array",
-                    "items": {"${'$'}ref": "#/components/schemas/PumpMessage"}
-                  }
-                ]
-              },
-              "examples": {
-                "singleMessage": {
-                  "summary": "Single message",
-                  "value": {
-                    "opCode": 123,
-                    "characteristic": "CURRENT_STATUS"
-                  }
-                },
-                "multipleMessages": {
-                  "summary": "Multiple messages",
-                  "value": [
-                    {"opCode": 123, "characteristic": "CURRENT_STATUS"},
-                    {"opCode": 124, "characteristic": "CURRENT_STATUS"}
-                  ]
-                }
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Array of response messages",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "array",
-                  "items": {"${'$'}ref": "#/components/schemas/PumpMessage"}
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Bad request",
-            "content": {
-              "application/json": {
-                "schema": {"${'$'}ref": "#/components/schemas/Error"}
-              }
-            }
-          },
-          "401": {
-            "description": "Unauthorized"
-          },
-          "500": {
-            "description": "Internal server error",
-            "content": {
-              "application/json": {
-                "schema": {"${'$'}ref": "#/components/schemas/Error"}
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/messaging/stream": {
-      "get": {
-        "summary": "Stream message bus events",
-        "description": "Streaming endpoint that returns newline-delimited JSON (jsonlines) of message bus events as they occur",
-        "responses": {
-          "200": {
-            "description": "Stream of message bus events",
-            "content": {
-              "application/x-ndjson": {
-                "schema": {
-                  "type": "string",
-                  "description": "Newline-delimited JSON stream of MessagingStreamEvent objects"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Unauthorized"
-          }
-        }
-      }
-    },
-    "/api/prefs": {
-      "get": {
-        "summary": "Get all preferences",
-        "description": "Returns all SharedPreferences as a JSON object",
-        "responses": {
-          "200": {
-            "description": "All preferences",
-            "content": {
-              "application/json": {
-                "schema": {"${'$'}ref": "#/components/schemas/Preferences"}
-              }
-            }
-          },
-          "401": {
-            "description": "Unauthorized"
-          },
-          "500": {
-            "description": "Internal server error",
-            "content": {
-              "application/json": {
-                "schema": {"${'$'}ref": "#/components/schemas/Error"}
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/messaging": {
-      "post": {
-        "summary": "Send message bus message",
-        "description": "Sends a message to the message bus. Does not wait for or return a response.",
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {"${'$'}ref": "#/components/schemas/MessagingRequest"},
-              "examples": {
-                "withDataString": {
-                  "summary": "Using dataString",
-                  "value": {
-                    "path": "/to-pump/command",
-                    "dataString": "test"
-                  }
-                },
-                "withDataHex": {
-                  "summary": "Using dataHex",
-                  "value": {
-                    "path": "/to-pump/command",
-                    "dataHex": "74657374"
-                  }
-                }
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Message sent successfully",
-            "content": {
-              "application/json": {
-                "schema": {"${'$'}ref": "#/components/schemas/Success"}
-              }
-            }
-          },
-          "400": {
-            "description": "Bad request",
-            "content": {
-              "application/json": {
-                "schema": {"${'$'}ref": "#/components/schemas/Error"}
-              }
-            }
-          },
-          "401": {
-            "description": "Unauthorized"
-          },
-          "500": {
-            "description": "Internal server error",
-            "content": {
-              "application/json": {
-                "schema": {"${'$'}ref": "#/components/schemas/Error"}
-              }
-            }
-          }
-        }
-      }
-    }
-  }
-}
-            """.trimIndent()
-
-            return newFixedLengthResponse(
-                Response.Status.OK,
-                "application/json",
-                spec
-            )
         }
 
         private fun handlePumpCurrent(): Response {
@@ -596,10 +289,12 @@ class HttpDebugApiService(private val context: Context, private val port: Int = 
                 )
             } catch (e: Exception) {
                 Timber.e(e, "Error getting preferences")
+                val errorJson = JSONObject()
+                errorJson.put("error", e.message)
                 return newFixedLengthResponse(
                     Response.Status.INTERNAL_ERROR,
                     "application/json",
-                    """{"error":"${e.message}"}"""
+                    errorJson.toString()
                 )
             }
         }
@@ -636,19 +331,23 @@ class HttpDebugApiService(private val context: Context, private val port: Int = 
                     if (message != null) {
                         messages.add(message)
                     } else {
+                        val errorJson = JSONObject()
+                        errorJson.put("error", "Failed to deserialize message")
                         return newFixedLengthResponse(
                             Response.Status.BAD_REQUEST,
                             "application/json",
-                            """{"error":"Failed to deserialize message"}"""
+                            errorJson.toString()
                         )
                     }
                 }
 
                 if (messages.isEmpty()) {
+                    val errorJson = JSONObject()
+                    errorJson.put("error", "No valid messages provided")
                     return newFixedLengthResponse(
                         Response.Status.BAD_REQUEST,
                         "application/json",
-                        """{"error":"No valid messages provided"}"""
+                        errorJson.toString()
                     )
                 }
 
@@ -665,10 +364,12 @@ class HttpDebugApiService(private val context: Context, private val port: Int = 
                 val messagesBytes = PumpMessageSerializer.toBytes(messages.toTypedArray())
                 sendPumpMessagesCallback?.invoke(messagesBytes) ?: run {
                     futures.keys.forEach { pendingPumpRequests.remove(it) }
+                    val errorJson = JSONObject()
+                    errorJson.put("error", "sendPumpMessagesCallback not configured")
                     return newFixedLengthResponse(
                         Response.Status.INTERNAL_ERROR,
                         "application/json",
-                        """{"error":"sendPumpMessagesCallback not configured"}"""
+                        errorJson.toString()
                     )
                 }
 
@@ -700,10 +401,12 @@ class HttpDebugApiService(private val context: Context, private val port: Int = 
 
             } catch (e: Exception) {
                 Timber.e(e, "Error handling POST /api/pump/messages")
+                val errorJson = JSONObject()
+                errorJson.put("error", e.message)
                 return newFixedLengthResponse(
                     Response.Status.INTERNAL_ERROR,
                     "application/json",
-                    """{"error":"${e.message}"}"""
+                    errorJson.toString()
                 )
             }
         }
@@ -722,10 +425,12 @@ class HttpDebugApiService(private val context: Context, private val port: Int = 
                 val path = jsonObj.optString("path")
 
                 if (path.isEmpty()) {
+                    val errorJson = JSONObject()
+                    errorJson.put("error", "Missing 'path' field")
                     return newFixedLengthResponse(
                         Response.Status.BAD_REQUEST,
                         "application/json",
-                        """{"error":"Missing 'path' field"}"""
+                        errorJson.toString()
                     )
                 }
 
@@ -738,34 +443,42 @@ class HttpDebugApiService(private val context: Context, private val port: Int = 
                         hex.chunked(2).map { it.toInt(16).toByte() }.toByteArray()
                     }
                     else -> {
+                        val errorJson = JSONObject()
+                        errorJson.put("error", "Missing 'dataString' or 'dataHex' field")
                         return newFixedLengthResponse(
                             Response.Status.BAD_REQUEST,
                             "application/json",
-                            """{"error":"Missing 'dataString' or 'dataHex' field"}"""
+                            errorJson.toString()
                         )
                     }
                 }
 
                 sendMessagingCallback?.invoke(path, data) ?: run {
+                    val errorJson = JSONObject()
+                    errorJson.put("error", "sendMessagingCallback not configured")
                     return newFixedLengthResponse(
                         Response.Status.INTERNAL_ERROR,
                         "application/json",
-                        """{"error":"sendMessagingCallback not configured"}"""
+                        errorJson.toString()
                     )
                 }
 
+                val successJson = JSONObject()
+                successJson.put("success", true)
                 return newFixedLengthResponse(
                     Response.Status.OK,
                     "application/json",
-                    """{"success":true}"""
+                    successJson.toString()
                 )
 
             } catch (e: Exception) {
                 Timber.e(e, "Error handling POST /api/messaging")
+                val errorJson = JSONObject()
+                errorJson.put("error", e.message)
                 return newFixedLengthResponse(
                     Response.Status.INTERNAL_ERROR,
                     "application/json",
-                    """{"error":"${e.message}"}"""
+                    errorJson.toString()
                 )
             }
         }
