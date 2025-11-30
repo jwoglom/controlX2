@@ -993,6 +993,7 @@ fun Debug(
                     headlineContent = { Text("API Endpoints") },
                     supportingContent = {
                         Text(
+                            "GET /openapi.json - OpenAPI v3 specification\n" +
                             "GET /api/pump/current - Current pump data\n" +
                             "GET /api/pump/messages - Streaming pump messages (jsonlines)\n" +
                             "GET /api/messaging/stream - Streaming message bus (jsonlines)\n" +

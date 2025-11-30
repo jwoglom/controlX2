@@ -153,6 +153,7 @@ class HttpDebugApiService(private val context: Context, private val port: Int = 
             Timber.d("HTTP API request: $method $uri")
 
             return when {
+                method == Method.GET && uri == "/openapi.json" -> handleOpenApiSpec()
                 method == Method.GET && uri == "/api/pump/current" -> handlePumpCurrent()
                 method == Method.GET && uri == "/api/pump/messages" -> handlePumpMessagesStream(session)
                 method == Method.GET && uri == "/api/messaging/stream" -> handleMessagingStream(session)
@@ -190,6 +191,338 @@ class HttpDebugApiService(private val context: Context, private val port: Int = 
                 Timber.w(e, "Error decoding auth header")
                 return false
             }
+        }
+
+        private fun handleOpenApiSpec(): Response {
+            val spec = """
+{
+  "openapi": "3.0.0",
+  "info": {
+    "title": "ControlX2 HTTP Debug API",
+    "version": "1.0.0",
+    "description": "HTTP API for debugging and managing ControlX2 pump communication"
+  },
+  "servers": [
+    {
+      "url": "http://0.0.0.0:18282",
+      "description": "Local debug server"
+    }
+  ],
+  "security": [
+    {
+      "basicAuth": []
+    }
+  ],
+  "components": {
+    "securitySchemes": {
+      "basicAuth": {
+        "type": "http",
+        "scheme": "basic",
+        "description": "HTTP Basic Authentication with username and password configured in Settings > Debug"
+      }
+    },
+    "schemas": {
+      "PumpData": {
+        "type": "object",
+        "properties": {
+          "statusText": {"type": "string"},
+          "connectionTime": {"type": "string", "format": "date-time", "nullable": true},
+          "lastMessageTime": {"type": "string", "format": "date-time", "nullable": true},
+          "batteryPercent": {"type": "integer", "nullable": true},
+          "iobUnits": {"type": "number", "nullable": true},
+          "cartridgeRemainingUnits": {"type": "integer", "nullable": true}
+        }
+      },
+      "PumpMessage": {
+        "type": "object",
+        "description": "Pump message in JSON format from PumpMessageSerializer",
+        "additionalProperties": true
+      },
+      "MessagingStreamEvent": {
+        "type": "object",
+        "properties": {
+          "path": {"type": "string"},
+          "sourceNodeId": {"type": "string"},
+          "dataString": {"type": "string"},
+          "dataHex": {"type": "string"}
+        },
+        "required": ["path", "sourceNodeId", "dataString", "dataHex"]
+      },
+      "Preferences": {
+        "type": "object",
+        "additionalProperties": true,
+        "description": "All SharedPreferences key-value pairs"
+      },
+      "MessagingRequest": {
+        "type": "object",
+        "properties": {
+          "path": {"type": "string", "description": "Message bus path"},
+          "dataString": {"type": "string", "description": "Message data as string (use either dataString or dataHex)"},
+          "dataHex": {"type": "string", "description": "Message data as hex string (use either dataString or dataHex)"}
+        },
+        "required": ["path"]
+      },
+      "Error": {
+        "type": "object",
+        "properties": {
+          "error": {"type": "string"}
+        }
+      },
+      "Success": {
+        "type": "object",
+        "properties": {
+          "success": {"type": "boolean"}
+        }
+      }
+    }
+  },
+  "paths": {
+    "/openapi.json": {
+      "get": {
+        "summary": "OpenAPI specification",
+        "description": "Returns this OpenAPI v3 specification document",
+        "responses": {
+          "200": {
+            "description": "OpenAPI specification",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/pump/current": {
+      "get": {
+        "summary": "Get current pump data",
+        "description": "Returns the current pump data including battery, IOB, and cartridge status",
+        "responses": {
+          "200": {
+            "description": "Current pump data",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "${'$'}ref": "#/components/schemas/PumpData"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          }
+        }
+      }
+    },
+    "/api/pump/messages": {
+      "get": {
+        "summary": "Stream pump messages",
+        "description": "Streaming endpoint that returns newline-delimited JSON (jsonlines) of pump messages as they are received",
+        "responses": {
+          "200": {
+            "description": "Stream of pump messages",
+            "content": {
+              "application/x-ndjson": {
+                "schema": {
+                  "type": "string",
+                  "description": "Newline-delimited JSON stream of PumpMessage objects"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          }
+        }
+      },
+      "post": {
+        "summary": "Send pump message(s) and wait for responses",
+        "description": "Sends one or more pump messages and waits for responses (30 second timeout per message). Accepts either a single message object or an array of messages.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "oneOf": [
+                  {"${'$'}ref": "#/components/schemas/PumpMessage"},
+                  {
+                    "type": "array",
+                    "items": {"${'$'}ref": "#/components/schemas/PumpMessage"}
+                  }
+                ]
+              },
+              "examples": {
+                "singleMessage": {
+                  "summary": "Single message",
+                  "value": {
+                    "opCode": 123,
+                    "characteristic": "CURRENT_STATUS"
+                  }
+                },
+                "multipleMessages": {
+                  "summary": "Multiple messages",
+                  "value": [
+                    {"opCode": 123, "characteristic": "CURRENT_STATUS"},
+                    {"opCode": 124, "characteristic": "CURRENT_STATUS"}
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Array of response messages",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {"${'$'}ref": "#/components/schemas/PumpMessage"}
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request",
+            "content": {
+              "application/json": {
+                "schema": {"${'$'}ref": "#/components/schemas/Error"}
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "500": {
+            "description": "Internal server error",
+            "content": {
+              "application/json": {
+                "schema": {"${'$'}ref": "#/components/schemas/Error"}
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/messaging/stream": {
+      "get": {
+        "summary": "Stream message bus events",
+        "description": "Streaming endpoint that returns newline-delimited JSON (jsonlines) of message bus events as they occur",
+        "responses": {
+          "200": {
+            "description": "Stream of message bus events",
+            "content": {
+              "application/x-ndjson": {
+                "schema": {
+                  "type": "string",
+                  "description": "Newline-delimited JSON stream of MessagingStreamEvent objects"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          }
+        }
+      }
+    },
+    "/api/prefs": {
+      "get": {
+        "summary": "Get all preferences",
+        "description": "Returns all SharedPreferences as a JSON object",
+        "responses": {
+          "200": {
+            "description": "All preferences",
+            "content": {
+              "application/json": {
+                "schema": {"${'$'}ref": "#/components/schemas/Preferences"}
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "500": {
+            "description": "Internal server error",
+            "content": {
+              "application/json": {
+                "schema": {"${'$'}ref": "#/components/schemas/Error"}
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/messaging": {
+      "post": {
+        "summary": "Send message bus message",
+        "description": "Sends a message to the message bus. Does not wait for or return a response.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {"${'$'}ref": "#/components/schemas/MessagingRequest"},
+              "examples": {
+                "withDataString": {
+                  "summary": "Using dataString",
+                  "value": {
+                    "path": "/to-pump/command",
+                    "dataString": "test"
+                  }
+                },
+                "withDataHex": {
+                  "summary": "Using dataHex",
+                  "value": {
+                    "path": "/to-pump/command",
+                    "dataHex": "74657374"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Message sent successfully",
+            "content": {
+              "application/json": {
+                "schema": {"${'$'}ref": "#/components/schemas/Success"}
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request",
+            "content": {
+              "application/json": {
+                "schema": {"${'$'}ref": "#/components/schemas/Error"}
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "500": {
+            "description": "Internal server error",
+            "content": {
+              "application/json": {
+                "schema": {"${'$'}ref": "#/components/schemas/Error"}
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
+            """.trimIndent()
+
+            return newFixedLengthResponse(
+                Response.Status.OK,
+                "application/json",
+                spec
+            )
         }
 
         private fun handlePumpCurrent(): Response {
