@@ -143,7 +143,40 @@ class Prefs(val context: Context) {
         prefs().edit().putBoolean("auto-fetch-history-logs", b).commit()
     }
 
-    private fun prefs(): SharedPreferences {
+    /**
+     * Whether the HTTP Debug API is enabled
+     */
+    fun httpDebugApiEnabled(): Boolean {
+        return prefs().getBoolean("http-debug-api-enabled", false)
+    }
+
+    fun setHttpDebugApiEnabled(b: Boolean) {
+        prefs().edit().putBoolean("http-debug-api-enabled", b).commit()
+    }
+
+    /**
+     * HTTP Debug API username for Basic Authentication
+     */
+    fun httpDebugApiUsername(): String {
+        return prefs().getString("http-debug-api-username", "admin") ?: "admin"
+    }
+
+    fun setHttpDebugApiUsername(s: String) {
+        prefs().edit().putString("http-debug-api-username", s).commit()
+    }
+
+    /**
+     * HTTP Debug API password for Basic Authentication
+     */
+    fun httpDebugApiPassword(): String {
+        return prefs().getString("http-debug-api-password", "") ?: ""
+    }
+
+    fun setHttpDebugApiPassword(s: String) {
+        prefs().edit().putString("http-debug-api-password", s).commit()
+    }
+
+    fun prefs(): SharedPreferences {
         return context.getSharedPreferences("WearX2", WearableListenerService.MODE_PRIVATE)
     }
 }
