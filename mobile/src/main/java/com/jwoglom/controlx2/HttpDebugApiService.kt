@@ -78,7 +78,8 @@ class HttpDebugApiService(private val context: Context, private val port: Int = 
      * Called when a pump message is received (from CommService.PumpCommHandler.Pump.onReceiveMessage)
      */
     fun onPumpMessageReceived(message: Message) {
-        val jsonString = message.jsonToString()
+        val messageBytes = PumpMessageSerializer.toBytes(message)
+        val jsonString = if (messageBytes != null) String(messageBytes) else return
         broadcastToPumpMessageClients(jsonString)
 
         // Check if this message is a response to a pending request
@@ -329,7 +330,7 @@ class HttpDebugApiService(private val context: Context, private val port: Int = 
                     val jsonArray = JSONArray(jsonBody)
                     for (i in 0 until jsonArray.length()) {
                         val jsonObj = jsonArray.getJSONObject(i)
-                        val message = PumpMessageSerializer.fromJSON(jsonObj.toString())
+                        val message = PumpMessageSerializer.fromBytes(jsonObj.toString().toByteArray())
                         if (message != null) {
                             messages.add(message)
                         } else {
@@ -338,7 +339,7 @@ class HttpDebugApiService(private val context: Context, private val port: Int = 
                     }
                 } else {
                     // Single message
-                    val message = PumpMessageSerializer.fromJSON(jsonBody)
+                    val message = PumpMessageSerializer.fromBytes(jsonBody.toByteArray())
                     if (message != null) {
                         messages.add(message)
                     } else {
@@ -372,7 +373,7 @@ class HttpDebugApiService(private val context: Context, private val port: Int = 
                 }
 
                 // Send messages
-                val messagesBytes = PumpMessageSerializer.toBytes(messages.toTypedArray())
+                val messagesBytes = PumpMessageSerializer.toBulkBytes(messages)
                 sendPumpMessagesCallback?.invoke(messagesBytes) ?: run {
                     futures.keys.forEach { pendingPumpRequests.remove(it) }
                     val errorJson = JSONObject()
@@ -401,7 +402,8 @@ class HttpDebugApiService(private val context: Context, private val port: Int = 
                 // Convert responses to JSON array
                 val jsonArray = JSONArray()
                 responses.forEach { response ->
-                    jsonArray.put(JSONObject(response.jsonToString()))
+                    val responseJson = String(PumpMessageSerializer.toBytes(response))
+                    jsonArray.put(JSONObject(responseJson))
                 }
 
                 return newFixedLengthResponse(
