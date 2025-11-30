@@ -5,6 +5,7 @@ import android.util.Base64
 import com.jwoglom.pumpx2.pump.messages.Message
 import com.jwoglom.pumpx2.pump.messages.bluetooth.Characteristic
 import com.jwoglom.controlx2.shared.PumpMessageSerializer
+import com.jwoglom.controlx2.util.AppVersionInfo
 import fi.iki.elonen.NanoHTTPD
 import org.json.JSONArray
 import org.json.JSONObject
@@ -78,8 +79,14 @@ class HttpDebugApiService(private val context: Context, private val port: Int = 
      * Called when a pump message is received (from CommService.PumpCommHandler.Pump.onReceiveMessage)
      */
     fun onPumpMessageReceived(message: Message) {
+        Timber.d("onPumpMessageReceived: $message")
         val messageBytes = PumpMessageSerializer.toBytes(message)
-        val jsonString = if (messageBytes != null) String(messageBytes) else return
+        if (messageBytes == null) {
+            Timber.w("Failed to serialize pump message: $message")
+            return
+        }
+        val jsonString = String(messageBytes)
+        Timber.d("Broadcasting pump message to ${pumpMessageStreamClients.size} clients: ${jsonString.take(100)}")
         broadcastToPumpMessageClients(jsonString)
 
         // Check if this message is a response to a pending request
@@ -108,10 +115,11 @@ class HttpDebugApiService(private val context: Context, private val port: Int = 
                 writer.println(message)
                 writer.flush()
                 if (writer.checkError()) {
+                    Timber.w("Error writing to pump message stream client (checkError)")
                     toRemove.add(writer)
                 }
             } catch (e: Exception) {
-                Timber.w(e, "Error writing to pump message stream client")
+                Timber.w(e, "Error writing to pump message stream client (exception)")
                 toRemove.add(writer)
             }
         }
@@ -159,6 +167,7 @@ class HttpDebugApiService(private val context: Context, private val port: Int = 
             Timber.d("HTTP API request: $method $uri")
 
             return when {
+                method == Method.GET && uri == "/" -> handleIndex()
                 method == Method.GET && uri == "/openapi.json" -> handleOpenApiSpec()
                 method == Method.GET && uri == "/api/pump/current" -> handlePumpCurrent()
                 method == Method.GET && uri == "/api/pump/messages" -> handlePumpMessagesStream(session)
@@ -169,7 +178,7 @@ class HttpDebugApiService(private val context: Context, private val port: Int = 
                 else -> newFixedLengthResponse(
                     Response.Status.NOT_FOUND,
                     MIME_PLAINTEXT,
-                    "Not Found"
+                    "Not Found: ${method} ${uri}"
                 )
             }
         }
@@ -197,6 +206,25 @@ class HttpDebugApiService(private val context: Context, private val port: Int = 
                 Timber.w(e, "Error decoding auth header")
                 return false
             }
+        }
+
+        private fun handleIndex(): Response {
+            val ver = AppVersionInfo(context)
+
+            val versionInfo = JSONObject()
+            versionInfo.put("version", ver.version)
+            versionInfo.put("buildVersion", ver.buildVersion)
+            versionInfo.put("buildTime", ver.buildTime)
+            val px2Version = JSONObject()
+            px2Version.put("version", ver.pumpX2)
+            px2Version.put("buildTime", ver.pumpX2BuildTime)
+            versionInfo.put("pumpx2", px2Version)
+
+            return newFixedLengthResponse(
+                Response.Status.OK,
+                "application/json",
+                versionInfo.toString()
+            )
         }
 
         private fun handleOpenApiSpec(): Response {
@@ -232,16 +260,28 @@ class HttpDebugApiService(private val context: Context, private val port: Int = 
         private fun handlePumpMessagesStream(session: IHTTPSession): Response {
             val inputStream = object : java.io.InputStream() {
                 private val buffer = java.io.PipedOutputStream()
-                private val input = java.io.PipedInputStream(buffer)
+                private val input = java.io.PipedInputStream(buffer, 8192)  // Larger buffer
                 private val writer = PrintWriter(buffer, true)
 
                 init {
                     pumpMessageStreamClients.add(writer)
                     Timber.i("New pump messages stream client connected")
+
+                    // Send initial comment to prime the stream
+                    writer.println("# Connected to pump messages stream")
+                    writer.flush()
                 }
 
                 override fun read(): Int {
                     return input.read()
+                }
+
+                override fun read(b: ByteArray, off: Int, len: Int): Int {
+                    return input.read(b, off, len)
+                }
+
+                override fun available(): Int {
+                    return input.available()
                 }
 
                 override fun close() {
@@ -253,23 +293,35 @@ class HttpDebugApiService(private val context: Context, private val port: Int = 
             }
 
             val response = newFixedLengthResponse(Response.Status.OK, "application/x-ndjson", inputStream, -1)
-            response.addHeader("Transfer-Encoding", "chunked")
+            response.addHeader("Cache-Control", "no-cache")
             return response
         }
 
         private fun handleMessagingStream(session: IHTTPSession): Response {
             val inputStream = object : java.io.InputStream() {
                 private val buffer = java.io.PipedOutputStream()
-                private val input = java.io.PipedInputStream(buffer)
+                private val input = java.io.PipedInputStream(buffer, 8192)  // Larger buffer
                 private val writer = PrintWriter(buffer, true)
 
                 init {
                     messagingStreamClients.add(writer)
                     Timber.i("New messaging stream client connected")
+
+                    // Send initial comment to prime the stream
+                    writer.println("# Connected to messaging stream")
+                    writer.flush()
                 }
 
                 override fun read(): Int {
                     return input.read()
+                }
+
+                override fun read(b: ByteArray, off: Int, len: Int): Int {
+                    return input.read(b, off, len)
+                }
+
+                override fun available(): Int {
+                    return input.available()
                 }
 
                 override fun close() {
@@ -281,7 +333,7 @@ class HttpDebugApiService(private val context: Context, private val port: Int = 
             }
 
             val response = newFixedLengthResponse(Response.Status.OK, "application/x-ndjson", inputStream, -1)
-            response.addHeader("Transfer-Encoding", "chunked")
+            response.addHeader("Cache-Control", "no-cache")
             return response
         }
 

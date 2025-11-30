@@ -13,6 +13,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.Dp
@@ -22,26 +23,52 @@ import com.jwoglom.controlx2.R
 
 /**
  * @param batteryPercent from 0 to 100
+ * @param batteryCharging if charging, shows lightning bolt
  */
 @Composable
 fun HorizBatteryIcon(
     batteryPercent: Int?,
+    batteryCharging: Boolean? = null,
     height: Dp = 24.dp,
     color: Color = Color.Unspecified,
     modifier: Modifier = Modifier
 ) {
     batteryPercent?.let {
         Row(modifier.height(height)) {
-            Icon(
-                getPainterForBatteryPercent(it),
-                "Battery icon",
-                tint = color,
-                modifier = modifier.height(height)
-            )
+            Box(
+                modifier = Modifier.height(height),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    getPainterForBatteryPercent(it),
+                    "Battery icon",
+                    tint = color,
+                    modifier = modifier.height(height)
+                )
+                if (batteryCharging == true) {
+                    Box(
+                        contentAlignment = Alignment.Center,
+                        modifier = Modifier
+                            .height(height)
+                    ) {
+                        Text(
+                            when (batteryCharging) {
+                                true -> " ⚡"
+                                else -> ""
+                            },
+                            color = color,
+                            textAlign = TextAlign.Center,
+                            fontSize = 8.sp,
+                            fontWeight = FontWeight.Bold,
+                            lineHeight = 24.sp
+                        )
+                    }
+                }
+            }
             // HACK: text should be aligned with the icon as-is...
             Box(
                 contentAlignment = Alignment.Center,
-                modifier = Modifier.height(height - 2.dp)
+                modifier = Modifier.height(height - 0.dp)
             ) {
                 Text(
                     "${batteryPercent}%",
@@ -73,7 +100,7 @@ internal fun HorizBatteryIconPreview0() {
     Surface(
         color = Color.White,
     ) {
-        HorizBatteryIcon(0)
+        HorizBatteryIcon(0, false)
     }
 }
 
@@ -83,7 +110,7 @@ internal fun HorizBatteryIconPreview20() {
     Surface(
         color = Color.White,
     ) {
-        HorizBatteryIcon(20)
+        HorizBatteryIcon(20, false)
     }
 }
 
@@ -93,7 +120,7 @@ internal fun HorizBatteryIconPreview30() {
     Surface(
         color = Color.White,
     ) {
-        HorizBatteryIcon(30)
+        HorizBatteryIcon(30, false)
     }
 }
 
@@ -103,7 +130,7 @@ internal fun HorizBatteryIconPreview40() {
     Surface(
         color = Color.White,
     ) {
-        HorizBatteryIcon(40)
+        HorizBatteryIcon(40, false)
     }
 }
 
@@ -113,7 +140,7 @@ internal fun HorizBatteryIconPreview60() {
     Surface(
         color = Color.White,
     ) {
-        HorizBatteryIcon(60)
+        HorizBatteryIcon(60, false)
     }
 }
 
@@ -123,6 +150,67 @@ internal fun HorizBatteryIconPreview80() {
     Surface(
         color = Color.White,
     ) {
-        HorizBatteryIcon(80)
+        HorizBatteryIcon(80, false)
+    }
+}
+
+
+@Preview
+@Composable
+internal fun HorizBatteryIconPreview0Charging() {
+    Surface(
+        color = Color.White,
+    ) {
+        HorizBatteryIcon(0, true)
+    }
+}
+
+@Preview
+@Composable
+internal fun HorizBatteryIconPreview20Charging() {
+    Surface(
+        color = Color.White,
+    ) {
+        HorizBatteryIcon(20, true)
+    }
+}
+
+@Preview
+@Composable
+internal fun HorizBatteryIconPreview30Charging() {
+    Surface(
+        color = Color.White,
+    ) {
+        HorizBatteryIcon(30, true)
+    }
+}
+
+@Preview
+@Composable
+internal fun HorizBatteryIconPreview40Charging() {
+    Surface(
+        color = Color.White,
+    ) {
+        HorizBatteryIcon(40, true)
+    }
+}
+
+@Preview
+@Composable
+internal fun HorizBatteryIconPreview60Charging() {
+    Surface(
+        color = Color.White,
+    ) {
+        HorizBatteryIcon(60, true)
+    }
+}
+
+@Preview
+@Composable
+internal fun HorizBatteryIconPreview80Charging() {
+    Surface(
+        color = Color.White,
+    ) {
+        HorizBatteryIcon(80, true)
     }
 }

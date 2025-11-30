@@ -52,6 +52,7 @@ class DataStore {
 
     val notificationBundle = MutableLiveData<NotificationBundle>(NotificationBundle())
     val batteryPercent = MutableLiveData<Int>()
+    val batteryCharging = MutableLiveData<Boolean>()
     val iobUnits = MutableLiveData<Double>()
     val cartridgeRemainingUnits = MutableLiveData<Int>()
     val cartridgeRemainingEstimate = MutableLiveData<Boolean>()
@@ -142,6 +143,7 @@ class DataStore {
 
         notificationBundle.observeForever { t -> Timber.i("DataStore.notificationBundle=$t") }
         batteryPercent.observeForever { t -> Timber.i("DataStore.batteryPercent=$t") }
+        batteryCharging.observeForever { t -> Timber.i("DataStore.batteryCharging=$t") }
         iobUnits.observeForever { t -> Timber.i("DataStore.iobUnits=$t") }
         cartridgeRemainingUnits.observeForever { t -> Timber.i("DataStore.cartridgeRemainingUnits=$t") }
         cartridgeRemainingEstimate.observeForever { t -> Timber.i("DataStore.cartridgeRemainingEstimate=$t") }
