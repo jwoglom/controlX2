@@ -2,14 +2,15 @@ package com.jwoglom.controlx2
 
 import android.content.Context
 import android.util.Base64
-import com.jwoglom.pumpx2.pump.messages.Characteristic
 import com.jwoglom.pumpx2.pump.messages.Message
+import com.jwoglom.pumpx2.pump.messages.bluetooth.Characteristic
 import com.jwoglom.pumpx2.pump.messages.util.PumpMessageSerializer
 import fi.iki.elonen.NanoHTTPD
 import org.json.JSONArray
 import org.json.JSONObject
 import timber.log.Timber
 import java.io.IOException
+import java.io.OutputStream
 import java.io.PrintWriter
 import java.time.Instant
 import java.util.concurrent.CompletableFuture
@@ -228,49 +229,59 @@ class HttpDebugApiService(private val context: Context, private val port: Int = 
         }
 
         private fun handlePumpMessagesStream(session: IHTTPSession): Response {
-            return newChunkedResponse(
-                Response.Status.OK,
-                "application/x-ndjson"
-            ) { output ->
-                val writer = PrintWriter(output, true)
-                pumpMessageStreamClients.add(writer)
-                Timber.i("New pump messages stream client connected")
+            val inputStream = object : java.io.InputStream() {
+                private val buffer = java.io.PipedOutputStream()
+                private val input = java.io.PipedInputStream(buffer)
+                private val writer = PrintWriter(buffer, true)
 
-                try {
-                    // Keep connection open by waiting for client to disconnect
-                    while (!writer.checkError()) {
-                        Thread.sleep(1000)
-                    }
-                } catch (e: InterruptedException) {
-                    Timber.d("Pump messages stream interrupted")
-                } finally {
+                init {
+                    pumpMessageStreamClients.add(writer)
+                    Timber.i("New pump messages stream client connected")
+                }
+
+                override fun read(): Int {
+                    return input.read()
+                }
+
+                override fun close() {
                     pumpMessageStreamClients.remove(writer)
+                    buffer.close()
+                    input.close()
                     Timber.i("Pump messages stream client disconnected")
                 }
             }
+
+            val response = newFixedLengthResponse(Response.Status.OK, "application/x-ndjson", inputStream, -1)
+            response.addHeader("Transfer-Encoding", "chunked")
+            return response
         }
 
         private fun handleMessagingStream(session: IHTTPSession): Response {
-            return newChunkedResponse(
-                Response.Status.OK,
-                "application/x-ndjson"
-            ) { output ->
-                val writer = PrintWriter(output, true)
-                messagingStreamClients.add(writer)
-                Timber.i("New messaging stream client connected")
+            val inputStream = object : java.io.InputStream() {
+                private val buffer = java.io.PipedOutputStream()
+                private val input = java.io.PipedInputStream(buffer)
+                private val writer = PrintWriter(buffer, true)
 
-                try {
-                    // Keep connection open by waiting for client to disconnect
-                    while (!writer.checkError()) {
-                        Thread.sleep(1000)
-                    }
-                } catch (e: InterruptedException) {
-                    Timber.d("Messaging stream interrupted")
-                } finally {
+                init {
+                    messagingStreamClients.add(writer)
+                    Timber.i("New messaging stream client connected")
+                }
+
+                override fun read(): Int {
+                    return input.read()
+                }
+
+                override fun close() {
                     messagingStreamClients.remove(writer)
+                    buffer.close()
+                    input.close()
                     Timber.i("Messaging stream client disconnected")
                 }
             }
+
+            val response = newFixedLengthResponse(Response.Status.OK, "application/x-ndjson", inputStream, -1)
+            response.addHeader("Transfer-Encoding", "chunked")
+            return response
         }
 
         private fun handlePrefsGet(): Response {
