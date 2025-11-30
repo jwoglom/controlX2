@@ -148,5 +148,8 @@ dependencies {
     testImplementation 'org.slf4j:slf4j-api:2.0.16'
     testImplementation 'org.slf4j:slf4j-simple:2.0.16'
 
+    // HTTP server for debug API
+    implementation 'org.nanohttpd:nanohttpd:2.3.1'
+
     wearApp project(":wear")
 }

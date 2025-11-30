@@ -901,6 +901,110 @@ fun Debug(
                     }
                 )
             }
+
+            item {
+                Divider()
+            }
+
+            item {
+                HeaderLine("HTTP Debug API")
+                Text(
+                    text = "When enabled, exposes an HTTP API on 0.0.0.0:18282 with Basic Auth",
+                    style = TextStyle(fontSize = 12.sp),
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+                )
+            }
+
+            item {
+                var httpDebugApiEnabled by remember { mutableStateOf(Prefs(context).httpDebugApiEnabled()) }
+                ListItem(
+                    headlineContent = { Text(if (httpDebugApiEnabled) "Disable HTTP Debug API" else "Enable HTTP Debug API") },
+                    supportingContent = { Text("Toggle the HTTP Debug API on port 18282. Service restart required.") },
+                    leadingContent = {
+                        Icon(
+                            if (httpDebugApiEnabled) Icons.Filled.Check else Icons.Filled.Close,
+                            contentDescription = null,
+                        )
+                    },
+                    modifier = Modifier.clickable {
+                        httpDebugApiEnabled = !httpDebugApiEnabled
+                        Prefs(context).setHttpDebugApiEnabled(httpDebugApiEnabled)
+                        Toast.makeText(context, "HTTP Debug API ${if (httpDebugApiEnabled) "enabled" else "disabled"}. Restart service to apply.", Toast.LENGTH_SHORT).show()
+                    }
+                )
+            }
+
+            item {
+                var username by remember { mutableStateOf(Prefs(context).httpDebugApiUsername()) }
+                ListItem(
+                    headlineContent = { Text("API Username") },
+                    supportingContent = {
+                        OutlinedTextField(
+                            value = username,
+                            onValueChange = {
+                                username = it
+                                Prefs(context).setHttpDebugApiUsername(it)
+                            },
+                            label = { Text("Username") },
+                            singleLine = true,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(top = 8.dp)
+                        )
+                    },
+                    leadingContent = {
+                        Icon(
+                            Icons.Filled.Info,
+                            contentDescription = null,
+                        )
+                    }
+                )
+            }
+
+            item {
+                var password by remember { mutableStateOf(Prefs(context).httpDebugApiPassword()) }
+                ListItem(
+                    headlineContent = { Text("API Password") },
+                    supportingContent = {
+                        OutlinedTextField(
+                            value = password,
+                            onValueChange = {
+                                password = it
+                                Prefs(context).setHttpDebugApiPassword(it)
+                            },
+                            label = { Text("Password") },
+                            singleLine = true,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(top = 8.dp)
+                        )
+                    },
+                    leadingContent = {
+                        Icon(
+                            Icons.Filled.Info,
+                            contentDescription = null,
+                        )
+                    }
+                )
+            }
+
+            item {
+                ListItem(
+                    headlineContent = { Text("API Endpoints") },
+                    supportingContent = {
+                        Text(
+                            "GET /openapi.json - OpenAPI v3 specification\n" +
+                            "GET /api/pump/current - Current pump data\n" +
+                            "GET /api/pump/messages - Streaming pump messages (jsonlines)\n" +
+                            "GET /api/messaging/stream - Streaming message bus (jsonlines)\n" +
+                            "GET /api/prefs - All SharedPreferences as JSON\n" +
+                            "POST /api/pump/messages - Send pump message(s), wait for responses\n" +
+                            "POST /api/messaging - Send message bus message",
+                            style = TextStyle(fontSize = 12.sp)
+                        )
+                    }
+                )
+            }
         }
     )
 }
