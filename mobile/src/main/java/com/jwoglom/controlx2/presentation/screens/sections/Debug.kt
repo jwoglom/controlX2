@@ -995,7 +995,10 @@ fun Debug(
                         Text(
                             "GET /api/pump/current - Current pump data\n" +
                             "GET /api/pump/messages - Streaming pump messages (jsonlines)\n" +
-                            "GET /api/messaging/stream - Streaming message bus (jsonlines)",
+                            "GET /api/messaging/stream - Streaming message bus (jsonlines)\n" +
+                            "GET /api/prefs - All SharedPreferences as JSON\n" +
+                            "POST /api/pump/messages - Send pump message(s), wait for responses\n" +
+                            "POST /api/messaging - Send message bus message",
                             style = TextStyle(fontSize = 12.sp)
                         )
                     }

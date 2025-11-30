@@ -2,14 +2,20 @@ package com.jwoglom.controlx2
 
 import android.content.Context
 import android.util.Base64
+import com.jwoglom.pumpx2.pump.messages.Characteristic
 import com.jwoglom.pumpx2.pump.messages.Message
 import com.jwoglom.pumpx2.pump.messages.util.PumpMessageSerializer
 import fi.iki.elonen.NanoHTTPD
+import org.json.JSONArray
+import org.json.JSONObject
 import timber.log.Timber
 import java.io.IOException
-import java.io.OutputStream
 import java.io.PrintWriter
+import java.time.Instant
+import java.util.concurrent.CompletableFuture
+import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.CopyOnWriteArrayList
+import java.util.concurrent.TimeUnit
 
 class HttpDebugApiService(private val context: Context, private val port: Int = 18282) {
 
@@ -22,8 +28,17 @@ class HttpDebugApiService(private val context: Context, private val port: Int = 
     // Streaming clients for /api/messaging/stream
     private val messagingStreamClients = CopyOnWriteArrayList<PrintWriter>()
 
+    // Pending pump message requests waiting for responses
+    private val pendingPumpRequests = ConcurrentHashMap<Pair<Characteristic, Byte>, CompletableFuture<Message>>()
+
     // Callbacks to get current pump data from CommService
     var getCurrentPumpDataCallback: (() -> String)? = null
+
+    // Callback to send pump messages
+    var sendPumpMessagesCallback: ((ByteArray) -> Unit)? = null
+
+    // Callback to send messaging messages
+    var sendMessagingCallback: ((String, ByteArray) -> Unit)? = null
 
     fun start() {
         if (!prefs.httpDebugApiEnabled()) {
@@ -64,6 +79,10 @@ class HttpDebugApiService(private val context: Context, private val port: Int = 
     fun onPumpMessageReceived(message: Message) {
         val jsonString = message.jsonToString()
         broadcastToPumpMessageClients(jsonString)
+
+        // Check if this message is a response to a pending request
+        val key = Pair(message.characteristic, message.opCode())
+        pendingPumpRequests[key]?.complete(message)
     }
 
     /**
@@ -137,6 +156,9 @@ class HttpDebugApiService(private val context: Context, private val port: Int = 
                 method == Method.GET && uri == "/api/pump/current" -> handlePumpCurrent()
                 method == Method.GET && uri == "/api/pump/messages" -> handlePumpMessagesStream(session)
                 method == Method.GET && uri == "/api/messaging/stream" -> handleMessagingStream(session)
+                method == Method.GET && uri == "/api/prefs" -> handlePrefsGet()
+                method == Method.POST && uri == "/api/pump/messages" -> handlePumpMessagesPost(session)
+                method == Method.POST && uri == "/api/messaging" -> handleMessagingPost(session)
                 else -> newFixedLengthResponse(
                     Response.Status.NOT_FOUND,
                     MIME_PLAINTEXT,
@@ -222,6 +244,196 @@ class HttpDebugApiService(private val context: Context, private val port: Int = 
                     messagingStreamClients.remove(writer)
                     Timber.i("Messaging stream client disconnected")
                 }
+            }
+        }
+
+        private fun handlePrefsGet(): Response {
+            try {
+                val allPrefs = prefs.prefs().all
+                val jsonObject = JSONObject()
+
+                allPrefs.forEach { (key, value) ->
+                    jsonObject.put(key, value)
+                }
+
+                return newFixedLengthResponse(
+                    Response.Status.OK,
+                    "application/json",
+                    jsonObject.toString()
+                )
+            } catch (e: Exception) {
+                Timber.e(e, "Error getting preferences")
+                return newFixedLengthResponse(
+                    Response.Status.INTERNAL_ERROR,
+                    "application/json",
+                    """{"error":"${e.message}"}"""
+                )
+            }
+        }
+
+        private fun handlePumpMessagesPost(session: IHTTPSession): Response {
+            try {
+                // Read POST body
+                val contentLength = session.headers["content-length"]?.toIntOrNull() ?: 0
+                val body = ByteArray(contentLength)
+                session.inputStream.read(body)
+                val bodyString = String(body)
+
+                Timber.d("POST /api/pump/messages body: $bodyString")
+
+                // Parse JSON - can be single object or array
+                val messages = mutableListOf<Message>()
+                val jsonBody = bodyString.trim()
+
+                if (jsonBody.startsWith("[")) {
+                    // Array of messages
+                    val jsonArray = JSONArray(jsonBody)
+                    for (i in 0 until jsonArray.length()) {
+                        val jsonObj = jsonArray.getJSONObject(i)
+                        val message = PumpMessageSerializer.fromJSON(jsonObj.toString())
+                        if (message != null) {
+                            messages.add(message)
+                        } else {
+                            Timber.w("Failed to deserialize message at index $i")
+                        }
+                    }
+                } else {
+                    // Single message
+                    val message = PumpMessageSerializer.fromJSON(jsonBody)
+                    if (message != null) {
+                        messages.add(message)
+                    } else {
+                        return newFixedLengthResponse(
+                            Response.Status.BAD_REQUEST,
+                            "application/json",
+                            """{"error":"Failed to deserialize message"}"""
+                        )
+                    }
+                }
+
+                if (messages.isEmpty()) {
+                    return newFixedLengthResponse(
+                        Response.Status.BAD_REQUEST,
+                        "application/json",
+                        """{"error":"No valid messages provided"}"""
+                    )
+                }
+
+                // Register pending requests for each message
+                val futures = mutableMapOf<Pair<Characteristic, Byte>, CompletableFuture<Message>>()
+                messages.forEach { msg ->
+                    val key = Pair(msg.characteristic, msg.opCode())
+                    val future = CompletableFuture<Message>()
+                    pendingPumpRequests[key] = future
+                    futures[key] = future
+                }
+
+                // Send messages
+                val messagesBytes = PumpMessageSerializer.toBytes(messages.toTypedArray())
+                sendPumpMessagesCallback?.invoke(messagesBytes) ?: run {
+                    futures.keys.forEach { pendingPumpRequests.remove(it) }
+                    return newFixedLengthResponse(
+                        Response.Status.INTERNAL_ERROR,
+                        "application/json",
+                        """{"error":"sendPumpMessagesCallback not configured"}"""
+                    )
+                }
+
+                // Wait for responses (with 30 second timeout)
+                val responses = mutableListOf<Message>()
+                futures.values.forEach { future ->
+                    try {
+                        val response = future.get(30, TimeUnit.SECONDS)
+                        responses.add(response)
+                    } catch (e: Exception) {
+                        Timber.w(e, "Timeout or error waiting for pump message response")
+                    }
+                }
+
+                // Clean up pending requests
+                futures.keys.forEach { pendingPumpRequests.remove(it) }
+
+                // Convert responses to JSON array
+                val jsonArray = JSONArray()
+                responses.forEach { response ->
+                    jsonArray.put(JSONObject(response.jsonToString()))
+                }
+
+                return newFixedLengthResponse(
+                    Response.Status.OK,
+                    "application/json",
+                    jsonArray.toString()
+                )
+
+            } catch (e: Exception) {
+                Timber.e(e, "Error handling POST /api/pump/messages")
+                return newFixedLengthResponse(
+                    Response.Status.INTERNAL_ERROR,
+                    "application/json",
+                    """{"error":"${e.message}"}"""
+                )
+            }
+        }
+
+        private fun handleMessagingPost(session: IHTTPSession): Response {
+            try {
+                // Read POST body
+                val contentLength = session.headers["content-length"]?.toIntOrNull() ?: 0
+                val body = ByteArray(contentLength)
+                session.inputStream.read(body)
+                val bodyString = String(body)
+
+                Timber.d("POST /api/messaging body: $bodyString")
+
+                val jsonObj = JSONObject(bodyString)
+                val path = jsonObj.optString("path")
+
+                if (path.isEmpty()) {
+                    return newFixedLengthResponse(
+                        Response.Status.BAD_REQUEST,
+                        "application/json",
+                        """{"error":"Missing 'path' field"}"""
+                    )
+                }
+
+                val data: ByteArray = when {
+                    jsonObj.has("dataString") -> {
+                        jsonObj.getString("dataString").toByteArray()
+                    }
+                    jsonObj.has("dataHex") -> {
+                        val hex = jsonObj.getString("dataHex")
+                        hex.chunked(2).map { it.toInt(16).toByte() }.toByteArray()
+                    }
+                    else -> {
+                        return newFixedLengthResponse(
+                            Response.Status.BAD_REQUEST,
+                            "application/json",
+                            """{"error":"Missing 'dataString' or 'dataHex' field"}"""
+                        )
+                    }
+                }
+
+                sendMessagingCallback?.invoke(path, data) ?: run {
+                    return newFixedLengthResponse(
+                        Response.Status.INTERNAL_ERROR,
+                        "application/json",
+                        """{"error":"sendMessagingCallback not configured"}"""
+                    )
+                }
+
+                return newFixedLengthResponse(
+                    Response.Status.OK,
+                    "application/json",
+                    """{"success":true}"""
+                )
+
+            } catch (e: Exception) {
+                Timber.e(e, "Error handling POST /api/messaging")
+                return newFixedLengthResponse(
+                    Response.Status.INTERNAL_ERROR,
+                    "application/json",
+                    """{"error":"${e.message}"}"""
+                )
             }
         }
     }

@@ -176,7 +176,7 @@ class Prefs(val context: Context) {
         prefs().edit().putString("http-debug-api-password", s).commit()
     }
 
-    private fun prefs(): SharedPreferences {
+    fun prefs(): SharedPreferences {
         return context.getSharedPreferences("WearX2", WearableListenerService.MODE_PRIVATE)
     }
 }

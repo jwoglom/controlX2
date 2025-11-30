@@ -836,6 +836,8 @@ class CommService : Service() {
         // Initialize and start HTTP Debug API service
         httpDebugApiService = HttpDebugApiService(applicationContext)
         httpDebugApiService?.getCurrentPumpDataCallback = { getCurrentPumpDataJson() }
+        httpDebugApiService?.sendPumpMessagesCallback = { data -> sendPumpCommMessages(data) }
+        httpDebugApiService?.sendMessagingCallback = { path, data -> sendWearCommMessage(path, data) }
         httpDebugApiService?.start()
 
         if (Prefs(applicationContext).pumpFinderServiceEnabled()) {
