@@ -108,6 +108,7 @@ class CommService : Service() {
     private var pumpFinderCommHandler: PumpFinderCommHandler? = null
 
     private lateinit var messageBus: MessageBus
+    private var httpDebugApiService: HttpDebugApiService? = null
 
     private var serviceStatusAcknowledged = false
     private val serviceStatusTask = object : Runnable {
@@ -211,6 +212,7 @@ class CommService : Service() {
                     }
                 }
                 message?.let { updateNotificationWithPumpData(it) }
+                message?.let { httpDebugApiService?.onPumpMessageReceived(it) }
             }
 
             override fun onReceiveQualifyingEvent(
@@ -831,6 +833,11 @@ class CommService : Service() {
             }
         })
 
+        // Initialize and start HTTP Debug API service
+        httpDebugApiService = HttpDebugApiService(applicationContext)
+        httpDebugApiService?.getCurrentPumpDataCallback = { getCurrentPumpDataJson() }
+        httpDebugApiService?.start()
+
         if (Prefs(applicationContext).pumpFinderServiceEnabled()) {
             pumpFinderCommHandler = PumpFinderCommHandler(serviceLooper!!)
         } else {
@@ -851,6 +858,7 @@ class CommService : Service() {
 
     private fun handleMessageReceived(path: String, data: ByteArray, sourceNodeId: String) {
         Timber.i("service messageReceived: $path ${String(data)} from $sourceNodeId")
+        httpDebugApiService?.onMessagingReceived(path, data, sourceNodeId)
         when (path) {
             "/to-phone/force-reload" -> {
                 Timber.i("force-reload")
@@ -1027,6 +1035,11 @@ class CommService : Service() {
     )
 
     private val currentPumpData: DisplayablePumpData = DisplayablePumpData()
+
+    private fun getCurrentPumpDataJson(): String {
+        return """{"statusText":"${currentPumpData.statusText}","connectionTime":"${currentPumpData.connectionTime}","lastMessageTime":"${currentPumpData.lastMessageTime}","batteryPercent":${currentPumpData.batteryPercent},"iobUnits":${currentPumpData.iobUnits},"cartridgeRemainingUnits":${currentPumpData.cartridgeRemainingUnits}}"""
+    }
+
     fun updateNotificationWithPumpData(message: com.jwoglom.pumpx2.pump.messages.Message) {
         var changed = false
         when (message) {
@@ -1267,6 +1280,7 @@ class CommService : Service() {
         super.onDestroy()
         scope.cancel()
         messageBus.close()
+        httpDebugApiService?.stop()
         Toast.makeText(this, "ControlX2 service destroyed", Toast.LENGTH_SHORT).show()
     }
 
