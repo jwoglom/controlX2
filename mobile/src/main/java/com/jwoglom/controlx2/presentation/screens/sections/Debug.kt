@@ -29,6 +29,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.text.BasicText
 import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Build
 import androidx.compose.material.icons.filled.Check
@@ -37,6 +38,8 @@ import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.Send
+import androidx.compose.material.icons.filled.Visibility
+import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.Button
 import androidx.compose.material3.Divider
 import androidx.compose.material3.DropdownMenu
@@ -69,6 +72,9 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -907,15 +913,6 @@ fun Debug(
             }
 
             item {
-                HeaderLine("HTTP Debug API")
-                Text(
-                    text = "When enabled, exposes an HTTP API on 0.0.0.0:18282 with Basic Auth",
-                    style = TextStyle(fontSize = 12.sp),
-                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
-                )
-            }
-
-            item {
                 var httpDebugApiEnabled by remember { mutableStateOf(Prefs(context).httpDebugApiEnabled()) }
                 ListItem(
                     headlineContent = { Text(if (httpDebugApiEnabled) "Disable HTTP Debug API" else "Enable HTTP Debug API") },
@@ -932,78 +929,73 @@ fun Debug(
                         Toast.makeText(context, "HTTP Debug API ${if (httpDebugApiEnabled) "enabled" else "disabled"}. Restart service to apply.", Toast.LENGTH_SHORT).show()
                     }
                 )
-            }
 
-            item {
-                var username by remember { mutableStateOf(Prefs(context).httpDebugApiUsername()) }
-                ListItem(
-                    headlineContent = { Text("API Username") },
-                    supportingContent = {
-                        OutlinedTextField(
-                            value = username,
-                            onValueChange = {
-                                username = it
-                                Prefs(context).setHttpDebugApiUsername(it)
-                            },
-                            label = { Text("Username") },
-                            singleLine = true,
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(top = 8.dp)
-                        )
-                    },
-                    leadingContent = {
-                        Icon(
-                            Icons.Filled.Info,
-                            contentDescription = null,
-                        )
-                    }
-                )
-            }
+                if (httpDebugApiEnabled) {
+                    var username by remember { mutableStateOf(Prefs(context).httpDebugApiUsername()) }
+                    ListItem(
+                        headlineContent = { Text("API Username") },
+                        supportingContent = {
+                            OutlinedTextField(
+                                value = username,
+                                onValueChange = {
+                                    username = it
+                                    Prefs(context).setHttpDebugApiUsername(it)
+                                },
+                                label = { Text("Username") },
+                                singleLine = true,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(top = 8.dp)
+                            )
+                        },
+                        leadingContent = {
+                            Icon(
+                                Icons.Filled.Info,
+                                contentDescription = null,
+                            )
+                        }
+                    )
+                    var password by remember { mutableStateOf(Prefs(context).httpDebugApiPassword()) }
+                    var passwordVisible by remember { mutableStateOf(false) }
 
-            item {
-                var password by remember { mutableStateOf(Prefs(context).httpDebugApiPassword()) }
-                ListItem(
-                    headlineContent = { Text("API Password") },
-                    supportingContent = {
-                        OutlinedTextField(
-                            value = password,
-                            onValueChange = {
-                                password = it
-                                Prefs(context).setHttpDebugApiPassword(it)
-                            },
-                            label = { Text("Password") },
-                            singleLine = true,
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(top = 8.dp)
-                        )
-                    },
-                    leadingContent = {
-                        Icon(
-                            Icons.Filled.Info,
-                            contentDescription = null,
-                        )
-                    }
-                )
-            }
+                    ListItem(
+                        headlineContent = { Text("API Password") },
+                        supportingContent = {
+                            OutlinedTextField(
+                                value = password,
+                                onValueChange = {
+                                    password = it
+                                    Prefs(context).setHttpDebugApiPassword(it)
+                                },
+                                visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
+                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+                                label = { Text("Password") },
+                                trailingIcon = {
+                                    val image = if (passwordVisible)
+                                        Icons.Filled.Visibility
+                                    else Icons.Filled.VisibilityOff
 
-            item {
-                ListItem(
-                    headlineContent = { Text("API Endpoints") },
-                    supportingContent = {
-                        Text(
-                            "GET /openapi.json - OpenAPI v3 specification\n" +
-                            "GET /api/pump/current - Current pump data\n" +
-                            "GET /api/pump/messages - Streaming pump messages (jsonlines)\n" +
-                            "GET /api/messaging/stream - Streaming message bus (jsonlines)\n" +
-                            "GET /api/prefs - All SharedPreferences as JSON\n" +
-                            "POST /api/pump/messages - Send pump message(s), wait for responses\n" +
-                            "POST /api/messaging - Send message bus message",
-                            style = TextStyle(fontSize = 12.sp)
-                        )
-                    }
-                )
+                                    // Please provide localized description for accessibility services
+                                    val description = if (passwordVisible) "Hide password" else "Show password"
+
+                                    IconButton(onClick = {passwordVisible = !passwordVisible}){
+                                        Icon(imageVector  = image, description)
+                                    }
+                                },
+                                singleLine = true,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(top = 8.dp)
+                            )
+                        },
+                        leadingContent = {
+                            Icon(
+                                Icons.Filled.Info,
+                                contentDescription = null,
+                            )
+                        }
+                    )
+                }
             }
         }
     )

@@ -27,7 +27,7 @@ class HttpDebugApiService(private val context: Context, private val port: Int = 
     // Streaming clients for /api/pump/messages
     private val pumpMessageStreamClients = CopyOnWriteArrayList<PrintWriter>()
 
-    // Streaming clients for /api/messaging/stream
+    // Streaming clients for /api/comm/messages/stream
     private val messagingStreamClients = CopyOnWriteArrayList<PrintWriter>()
 
     // Pending pump message requests waiting for responses
@@ -80,13 +80,9 @@ class HttpDebugApiService(private val context: Context, private val port: Int = 
      */
     fun onPumpMessageReceived(message: Message) {
         Timber.d("onPumpMessageReceived: $message")
-        val messageBytes = PumpMessageSerializer.toBytes(message)
-        if (messageBytes == null) {
-            Timber.w("Failed to serialize pump message: $message")
-            return
-        }
-        val jsonString = String(messageBytes)
-        Timber.d("Broadcasting pump message to ${pumpMessageStreamClients.size} clients: ${jsonString.take(100)}")
+        // parse+decode to force as a single line
+        val jsonString = JSONObject(message.jsonToString()).toString()
+        Timber.d("Broadcasting pump message to ${pumpMessageStreamClients.size} clients")
         broadcastToPumpMessageClients(jsonString)
 
         // Check if this message is a response to a pending request
@@ -171,10 +167,10 @@ class HttpDebugApiService(private val context: Context, private val port: Int = 
                 method == Method.GET && uri == "/openapi.json" -> handleOpenApiSpec()
                 method == Method.GET && uri == "/api/pump/current" -> handlePumpCurrent()
                 method == Method.GET && uri == "/api/pump/messages" -> handlePumpMessagesStream(session)
-                method == Method.GET && uri == "/api/messaging/stream" -> handleMessagingStream(session)
-                method == Method.GET && uri == "/api/prefs" -> handlePrefsGet()
                 method == Method.POST && uri == "/api/pump/messages" -> handlePumpMessagesPost(session)
-                method == Method.POST && uri == "/api/messaging" -> handleMessagingPost(session)
+                method == Method.GET && uri == "/api/comm/messages" -> handleMessagingStream(session)
+                method == Method.POST && uri == "/api/comm/messages" -> handleMessagingPost(session)
+                method == Method.GET && uri == "/api/prefs" -> handlePrefsGet()
                 else -> newFixedLengthResponse(
                     Response.Status.NOT_FOUND,
                     MIME_PLAINTEXT,
@@ -268,7 +264,7 @@ class HttpDebugApiService(private val context: Context, private val port: Int = 
                     Timber.i("New pump messages stream client connected")
 
                     // Send initial comment to prime the stream
-                    writer.println("# Connected to pump messages stream")
+                    writer.println("\n")
                     writer.flush()
                 }
 
@@ -308,7 +304,7 @@ class HttpDebugApiService(private val context: Context, private val port: Int = 
                     Timber.i("New messaging stream client connected")
 
                     // Send initial comment to prime the stream
-                    writer.println("# Connected to messaging stream")
+                    writer.println("\n")
                     writer.flush()
                 }
 
@@ -418,7 +414,7 @@ class HttpDebugApiService(private val context: Context, private val port: Int = 
                 // Register pending requests for each message
                 val futures = mutableMapOf<Pair<Characteristic, Byte>, CompletableFuture<Message>>()
                 messages.forEach { msg ->
-                    val key = Pair(msg.characteristic, msg.opCode())
+                    val key = Pair(msg.characteristic, msg.responseOpCode)
                     val future = CompletableFuture<Message>()
                     pendingPumpRequests[key] = future
                     futures[key] = future
@@ -454,7 +450,7 @@ class HttpDebugApiService(private val context: Context, private val port: Int = 
                 // Convert responses to JSON array
                 val jsonArray = JSONArray()
                 responses.forEach { response ->
-                    val responseJson = String(PumpMessageSerializer.toBytes(response))
+                    val responseJson = JSONObject(response.jsonToString()).toString()
                     jsonArray.put(JSONObject(responseJson))
                 }
 
@@ -484,7 +480,7 @@ class HttpDebugApiService(private val context: Context, private val port: Int = 
                 session.inputStream.read(body)
                 val bodyString = String(body)
 
-                Timber.d("POST /api/messaging body: $bodyString")
+                Timber.d("POST /api/comm/messages body: $bodyString")
 
                 val jsonObj = JSONObject(bodyString)
                 val path = jsonObj.optString("path")
@@ -537,7 +533,7 @@ class HttpDebugApiService(private val context: Context, private val port: Int = 
                 )
 
             } catch (e: Exception) {
-                Timber.e(e, "Error handling POST /api/messaging")
+                Timber.e(e, "Error handling POST /api/comm/messages")
                 val errorJson = JSONObject()
                 errorJson.put("error", e.message)
                 return newFixedLengthResponse(

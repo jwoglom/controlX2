@@ -209,7 +209,7 @@
         }
       }
     },
-    "/api/messaging/stream": {
+    "/api/comm/messages": {
       "get": {
         "summary": "Stream message bus events",
         "description": "Streaming endpoint that returns newline-delimited JSON (jsonlines) of message bus events as they occur",
@@ -258,7 +258,7 @@
         }
       }
     },
-    "/api/messaging": {
+    "/api/comm/messages": {
       "post": {
         "summary": "Send message bus message",
         "description": "Sends a message to the message bus. Does not wait for or return a response.",
