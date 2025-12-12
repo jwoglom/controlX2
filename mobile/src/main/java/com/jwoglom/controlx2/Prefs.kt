@@ -176,6 +176,14 @@ class Prefs(val context: Context) {
         prefs().edit().putString("http-debug-api-password", s).commit()
     }
 
+    fun pumpModel(): String {
+        return prefs().getString("pump-model", "") ?: ""
+    }
+
+    fun setPumpModel(s: String) {
+        prefs().edit().putString("pump-model", s).commit()
+    }
+
     fun prefs(): SharedPreferences {
         return context.getSharedPreferences("WearX2", WearableListenerService.MODE_PRIVATE)
     }
