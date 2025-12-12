@@ -39,6 +39,8 @@ class NightscoutSyncCoordinator(
         ProcessorType.CGM_ALERT to ProcessCGMAlert(nightscoutApi, historyLogRepo),
         ProcessorType.USER_MODE to ProcessUserMode(nightscoutApi, historyLogRepo),
         ProcessorType.CARTRIDGE to ProcessCartridge(nightscoutApi, historyLogRepo),
+        ProcessorType.CARB to ProcessCarb(nightscoutApi, historyLogRepo),
+        ProcessorType.PROFILE to ProcessProfile(nightscoutApi, historyLogRepo),
         ProcessorType.DEVICE_STATUS to ProcessDeviceStatus(nightscoutApi, historyLogRepo, context)
     )
 
@@ -53,6 +55,8 @@ class NightscoutSyncCoordinator(
         ProcessorType.CGM_ALERT,
         ProcessorType.USER_MODE,
         ProcessorType.CARTRIDGE,
+        ProcessorType.CARB,
+        ProcessorType.PROFILE,
         ProcessorType.DEVICE_STATUS
     )
 

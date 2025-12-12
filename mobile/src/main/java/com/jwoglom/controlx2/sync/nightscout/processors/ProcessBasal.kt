@@ -93,7 +93,7 @@ class ProcessBasal(
             seqId = item.seqId,
             rate = basalData.rate,
             absolute = basalData.rate, // Nightscout uses absolute for the actual rate
-            duration = basalData.duration,
+            duration = basalData.duration?.toDouble(),
             notes = basalData.notes
         )
     }

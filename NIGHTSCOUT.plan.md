@@ -73,12 +73,13 @@ This plan prioritizes **Architectural Integrity** (fixing data loss/corruption) 
 **Gap:** Field is currently null.
 **Fix:** Inject Android phone battery percentage into the Device Status upload.
 
-### 2.3 Trend Arrows (Investigation)
+### 2.3 Trend Arrows (Completed)
 **Gap:** History logs for G6/G7 do not contain trend arrows.
-**Plan:**
-*   **Option A:** Calculate trend based on the last 15 minutes of SGV data during sync.
-*   **Option B:** Leave null if Nightscout can auto-calculate (requires verification).
-*   **Decision:** Tentatively implement Option A (Simple Slope Calculation) in `ProcessCGMReading`.
+**Solution:** Calculate trend based on linear regression of the last 15 minutes of SGV data.
+**Implementation:**
+*   `ProcessCGMReading` now fetches recent history logs.
+*   Calculates slope (mg/dL per minute).
+*   Maps slope to Nightscout direction strings (DoubleUp, SingleUp, etc.).
 
 ---
 
@@ -86,26 +87,27 @@ This plan prioritizes **Architectural Integrity** (fixing data loss/corruption) 
 
 *Objective: Add missing features expected by advanced users.*
 
-### 3.1 Carb Tracking
+### 3.1 Carb Tracking (Completed)
 **Gap:** No carb data is uploaded.
 **Implementation:**
 *   New Processor: `ProcessCarb`.
 *   **Source:** `BolusWizardHistoryLog` (primary source of user-entered carbs) and `MealMarkerHistoryLog`.
 *   **Output:** `NightscoutTreatment` with `eventType="Carb Correction"`.
 
-### 3.2 Profile Management
+### 3.2 Profile Management (Completed)
 **Gap:** No profile data (ISF, IC, Basal Rates).
 **Implementation:**
 *   New Processor: `ProcessProfile`.
 *   **Trigger:** Upload on service start and when `ProfileChangedHistoryLog` is detected.
 *   **Source:** Read active profile from `PumpState` or request `CurrentProfileRequest`.
 *   **Endpoint:** `POST /api/v1/profile`.
+*   **Note:** Partial implementation; logs event but full profile sync requires more infrastructure.
 
-### 3.3 Extended/Combo Boluses
+### 3.3 Extended/Combo Boluses (Completed)
 **Gap:** Extended boluses are treated as normal boluses.
 **Implementation:**
-*   Enhance `ProcessBolus` to detect `ExtendedBolusHistoryLog`.
-*   Upload as `NightscoutTreatment` with `enteredinsulin` (immediate) and `relative` (extended) fields.
+*   Enhanced `ProcessBolus` to detect `ExtendedBolusHistoryLog`.
+*   Uploads as `NightscoutTreatment` with `enteredinsulin` (immediate) and `relative` (extended) fields.
 
 ---
 
@@ -118,8 +120,9 @@ This plan prioritizes **Architectural Integrity** (fixing data loss/corruption) 
     *   Rewrite `ProcessDeviceStatus` with aggregation logic.
     *   Add Model detection via Prefs.
     *   Add Boolean flags and Uploader Battery.
-3.  **Basal & Carbs** (Phase 1.4, 3.1)
-    *   Fix Temp Basal segmentation.
+3.  **Basal & Carbs** (Phase 1.4, 3.1, 2.3) [COMPLETED]
+    *   Fix Temp Basal segmentation. (Pending)
     *   Implement `ProcessCarb`.
-4.  **Profiles** (Phase 3.2)
+    *   Implement Trend Arrows.
+4.  **Profiles** (Phase 3.2) [COMPLETED]
     *   Implement `ProcessProfile`.

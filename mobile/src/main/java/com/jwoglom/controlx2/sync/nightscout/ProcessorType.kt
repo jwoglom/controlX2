@@ -14,6 +14,8 @@ enum class ProcessorType(val displayName: String) {
     CGM_ALERT("CGM Alerts"),
     USER_MODE("User Mode"),
     CARTRIDGE("Cartridge"),
+    CARB("Carbs"),
+    PROFILE("Profile"),
     DEVICE_STATUS("Device Status");
 
     companion object {

@@ -30,7 +30,10 @@ interface NightscoutApi {
     suspend fun uploadDeviceStatus(status: NightscoutDeviceStatus): Result<Boolean>
 
     /**
-     * Get last N entries from Nightscout
+     * Upload profile to Nightscout
+     * POST /api/v1/profile
+     */
+    suspend fun uploadProfile(profile: Any): Result<Boolean>
      * GET /api/v1/entries?count=N
      */
     suspend fun getLastEntries(count: Int = 1): Result<List<NightscoutEntry>>
