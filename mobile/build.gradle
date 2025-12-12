@@ -6,6 +6,11 @@ plugins {
     id 'com.jwoglom.controlx2.composepreviews'
     id 'com.google.devtools.ksp' version '2.0.0-1.0.24'
     id 'app.cash.paparazzi'
+    id 'org.jetbrains.kotlin.plugin.noarg' version '2.2.21'
+}
+
+noArg {
+    annotation("androidx.annotation.Keep")
 }
 
 android {

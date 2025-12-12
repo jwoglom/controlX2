@@ -2,10 +2,12 @@ package com.jwoglom.controlx2
 
 import android.content.Context
 import android.util.Base64
+import com.google.android.gms.common.util.Hex
 import com.jwoglom.pumpx2.pump.messages.Message
 import com.jwoglom.pumpx2.pump.messages.bluetooth.Characteristic
 import com.jwoglom.controlx2.shared.PumpMessageSerializer
 import com.jwoglom.controlx2.util.AppVersionInfo
+import com.jwoglom.controlx2.util.createMessageWithOpCode
 import fi.iki.elonen.NanoHTTPD
 import org.json.JSONArray
 import org.json.JSONObject
@@ -373,12 +375,30 @@ class HttpDebugApiService(private val context: Context, private val port: Int = 
                 val messages = mutableListOf<Message>()
                 val jsonBody = bodyString.trim()
 
+                fun processMessage(jsonObj: JSONObject): Message? {
+                    var message: Message? = null
+                    try {
+                        message = PumpMessageSerializer.fromBytes(jsonObj.toString().toByteArray())
+                    } catch (e: Exception) {}
+
+                    if (message == null) {
+                        Timber.w("Failed to deserialize message: trying createMessageWithOpCode")
+                        message = createMessageWithOpCode(
+                            jsonObj.getInt("opCode").toByte(),
+                            Characteristic.valueOf(jsonObj.getString("characteristic")),
+                            Hex.stringToBytes(jsonObj.getString("cargo"))
+                        )
+                    }
+
+                    return message
+                }
+
                 if (jsonBody.startsWith("[")) {
                     // Array of messages
                     val jsonArray = JSONArray(jsonBody)
                     for (i in 0 until jsonArray.length()) {
                         val jsonObj = jsonArray.getJSONObject(i)
-                        val message = PumpMessageSerializer.fromBytes(jsonObj.toString().toByteArray())
+                        val message = processMessage(jsonObj)
                         if (message != null) {
                             messages.add(message)
                         } else {
@@ -387,7 +407,7 @@ class HttpDebugApiService(private val context: Context, private val port: Int = 
                     }
                 } else {
                     // Single message
-                    val message = PumpMessageSerializer.fromBytes(jsonBody.toByteArray())
+                    val message = processMessage(JSONObject(jsonBody))
                     if (message != null) {
                         messages.add(message)
                     } else {
