@@ -41,6 +41,7 @@ import com.jwoglom.controlx2.util.AppVersionCheck
 import com.jwoglom.controlx2.util.DataClientState
 import com.jwoglom.controlx2.util.HistoryLogFetcher
 import com.jwoglom.controlx2.util.extractPumpSid
+import com.jwoglom.controlx2.sync.nightscout.NightscoutSyncWorker
 import com.jwoglom.pumpx2.pump.PumpState
 import com.jwoglom.pumpx2.pump.TandemError
 import com.jwoglom.pumpx2.pump.bluetooth.TandemBluetoothHandler
@@ -313,6 +314,13 @@ class CommService : Service() {
 
                 historyLogFetcher = HistoryLogFetcher(this@CommService, pump, peripheral!!, pumpSid!!)
                 Timber.i("HistoryLogFetcher initialized")
+
+                // Start Nightscout sync worker if enabled
+                NightscoutSyncWorker.startIfEnabled(
+                    applicationContext,
+                    applicationContext.getSharedPreferences("controlx2", Context.MODE_PRIVATE),
+                    pumpSid!!
+                )
 
                 var numResponses = -99999
                 while (PumpState.processedResponseMessages != numResponses) {
