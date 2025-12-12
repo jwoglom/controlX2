@@ -63,8 +63,10 @@ class NightscoutModelsTest {
         )
 
         assertEquals("Bolus", treatment.eventType)
-        assertEquals(5.5, treatment.insulin, 0.001)
-        assertEquals(45.0, treatment.carbs, 0.001)
+        assertNotNull(treatment.insulin)
+        assertEquals(5.5, treatment.insulin!!, 0.001)
+        assertNotNull(treatment.carbs)
+        assertEquals(45.0, treatment.carbs!!, 0.001)
         assertNull(treatment.duration)
         assertNull(treatment.rate)
         assertEquals("Meal", treatment.reason)
@@ -98,8 +100,10 @@ class NightscoutModelsTest {
         assertNull(treatment.insulin)
         assertNull(treatment.carbs)
         assertEquals(30, treatment.duration)
-        assertEquals(1.5, treatment.rate, 0.001)
-        assertEquals(1.5, treatment.absolute, 0.001)
+        assertNotNull(treatment.rate)
+        assertEquals(1.5, treatment.rate!!, 0.001)
+        assertNotNull(treatment.absolute)
+        assertEquals(1.5, treatment.absolute!!, 0.001)
         assertEquals("High BG", treatment.reason)
         assertEquals("11111", treatment.pumpId)
     }
@@ -122,8 +126,10 @@ class NightscoutModelsTest {
 
         assertNotNull(status.pump)
         assertEquals(75, status.pump?.battery?.percent)
-        assertEquals(150.5, status.pump?.reservoir, 0.001)
-        assertEquals(3.2, status.pump?.iob?.iob, 0.001)
+        assertNotNull(status.pump?.reservoir)
+        assertEquals(150.5, status.pump?.reservoir!!, 0.001)
+        assertNotNull(status.pump?.iob?.iob)
+        assertEquals(3.2, status.pump?.iob?.iob!!, 0.001)
         assertEquals("normal", status.pump?.status?.status)
         assertEquals(timestamp.toString(), status.pump?.clock)
     }
@@ -156,8 +162,10 @@ class NightscoutModelsTest {
             timestamp = "2024-12-12T10:30:00"
         )
 
-        assertEquals(2.5, iob.bolusIob, 0.001)
-        assertEquals(3.0, iob.iob, 0.001)
+        assertNotNull(iob.bolusIob)
+        assertEquals(2.5, iob.bolusIob!!, 0.001)
+        assertNotNull(iob.iob)
+        assertEquals(3.0, iob.iob!!, 0.001)
         assertEquals("2024-12-12T10:30:00", iob.timestamp)
     }
 

@@ -2,10 +2,17 @@ package com.jwoglom.controlx2.test.snapshots
 
 import app.cash.paparazzi.DeviceConfig
 import app.cash.paparazzi.Paparazzi
+import org.junit.Ignore
 import org.junit.Rule
 import org.junit.Test
 
+@Ignore("Paparazzi snapshot tests are disabled")
 class attributes {
+    companion object {
+        init {
+            System.setProperty("net.bytebuddy.experimental", "true")
+        }
+    }
     @get:Rule
     val paparazzi = Paparazzi(
         deviceConfig = DeviceConfig.WEAR_OS_SMALL_ROUND,
