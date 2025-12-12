@@ -84,6 +84,7 @@ import com.jwoglom.controlx2.presentation.screens.sections.ProfileActions
 import com.jwoglom.controlx2.presentation.screens.sections.Settings
 import com.jwoglom.controlx2.presentation.screens.sections.TempRateWindow
 import com.jwoglom.controlx2.presentation.screens.sections.SoundSettingsActions
+import com.jwoglom.controlx2.presentation.screens.sections.NightscoutSettings
 import com.jwoglom.controlx2.presentation.screens.sections.dashboardCommands
 import com.jwoglom.controlx2.presentation.screens.sections.dashboardFields
 import com.jwoglom.controlx2.presentation.screens.sections.resetBolusDataStoreState
@@ -348,7 +349,17 @@ fun Landing(
                                 sendPumpCommands = sendPumpCommands,
                                 navigateToDebugOptions = {
                                     selectedItem = LandingSection.DEBUG
+                                },
+                                navigateToNightscoutSettings = {
+                                    selectedItem = LandingSection.NIGHTSCOUT_SETTINGS
                                 }
+                            )
+                        }
+                        LandingSection.NIGHTSCOUT_SETTINGS -> {
+                            NightscoutSettings(
+                                innerPadding = innerPadding,
+                                navController = navController,
+                                pumpSid = ds.pumpSid.observeAsState().value ?: 0
                             )
                         }
                     }
@@ -449,6 +460,7 @@ enum class LandingSection(val label: String, val icon: ImageVector, val showInNa
 
     SETTINGS("Settings", Icons.Filled.Settings, true),
     DEBUG("Settings", Icons.Filled.Settings, false),
+    NIGHTSCOUT_SETTINGS("Settings", Icons.Filled.Settings, false),
     ;
 }
 
