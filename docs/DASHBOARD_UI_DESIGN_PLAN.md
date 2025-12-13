@@ -83,11 +83,11 @@ val colorScheme = dynamicLightColorScheme(context)
 
 // Custom health-specific colors
 val GlucoseColors = object {
-    val Severe = Color(0xFFD32F2F)        // Red (< 70 mg/dL)
-    val Low = Color(0xFFFF6F00)           // Orange (70-79 mg/dL)
+    val Severe = Color(0xFFC62828)        // Deep Red (< 70 mg/dL)
+    val Low = Color(0xFFFF5252)           // Red Accent (70-79 mg/dL)
     val InRange = Color(0xFF1976D2)       // Blue (80-180 mg/dL)
-    val Elevated = Color(0xFFFFA726)      // Amber (181-250 mg/dL)
-    val High = Color(0xFFD32F2F)          // Red (> 250 mg/dL)
+    val Elevated = Color(0xFFFF9800)      // Orange (181-250 mg/dL)
+    val High = Color(0xFFE65100)          // Deep Orange (> 250 mg/dL)
 }
 
 val InsulinColors = object {
@@ -98,14 +98,14 @@ val InsulinColors = object {
 }
 
 val CarbColor = Color(0xFFFF8F00)         // Orange
-val TargetRangeColor = Color(0xFFE0F2F1) // Very light teal (background)
-val GridLineColor = Color(0xFFEEEEEE)     // Light gray
+val TargetRangeColor = Color(0xFFE0F2F1) // Background (Teal)
+val GridLineColor = Color(0xFFEEEEEE)     // Light Gray
 ```
 
 **Background & Surface:**
 ```kotlin
-val SurfaceBackground = Color(0xFFFAFAFA)   // Off-white
-val CardBackground = Color.White             // Pure white cards
+val SurfaceBackground = Color(0xFFFAFAFA)   // Background (Off-white)
+val CardBackground = Color(0xFFFFFFFF)      // Card Background (White)
 val CardElevation = 2.dp                     // Subtle shadow
 ```
 
