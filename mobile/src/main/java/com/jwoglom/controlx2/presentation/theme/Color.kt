@@ -23,3 +23,27 @@ val Colors = lightColorScheme(
     onSurfaceVariant = Color(0xFFDADCE0),
     onError = Color(0xFF000000)
 )
+
+// Glucose Status Colors
+object GlucoseColors {
+    val Severe = Color(0xFFC62828)        // Deep Red (< 70 mg/dL)
+    val Low = Color(0xFFFF5252)           // Red Accent (70-79 mg/dL)
+    val InRange = Color(0xFF1976D2)       // Blue (80-180 mg/dL)
+    val Elevated = Color(0xFFFF9800)      // Orange (181-250 mg/dL)
+    val High = Color(0xFFE65100)          // Deep Orange (> 250 mg/dL)
+}
+
+// Insulin Colors
+object InsulinColors {
+    val Bolus = Color(0xFF5E35B1)         // Purple
+    val AutoBolus = Color(0xFF7E57C2)     // Light Purple
+    val Basal = Color(0xFF1565C0)         // Dark Blue
+    val TempBasal = Color(0xFF42A5F5)     // Light Blue
+}
+
+// UI Elements & Other Colors
+val CarbColor = Color(0xFFFF8F00)         // Orange
+val TargetRangeColor = Color(0xFFE0F2F1) // Background (Teal)
+val GridLineColor = Color(0xFFEEEEEE)     // Light Gray
+val SurfaceBackground = Color(0xFFFAFAFA) // Background (Off-white)
+val CardBackground = Color(0xFFFFFFFF)    // Card Background (White)

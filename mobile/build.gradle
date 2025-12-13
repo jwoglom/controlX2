@@ -119,8 +119,10 @@ dependencies {
     implementation 'androidx.compose.runtime:runtime-livedata:1.7.8'
 
 
-    // charts
-    implementation("io.github.dautovicharis:charts:2.0.0")
+    // charts - Vico for advanced charting
+    implementation("com.patrykandpatrick.vico:compose:2.3.6")
+    implementation("com.patrykandpatrick.vico:compose-m3:2.3.6")
+    implementation("com.patrykandpatrick.vico:core:2.3.6")
 
 
     // https://issuetracker.google.com/issues/227767363
