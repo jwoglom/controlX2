@@ -382,16 +382,143 @@ fun VicoCgmChartCard(
     }
 }
 
-@Preview(showBackground = true)
+// Preview helper function to create CGM entries
+private fun createCgmEntry(index: Int, mgdl: Int, baseTimestamp: Long = 1700000000L): com.jwoglom.pumpx2.pump.messages.response.historyLog.HistoryLog {
+    return DexcomG6CGMHistoryLog(
+        baseTimestamp + (index * 300L), // 5 minutes apart
+        index.toLong(),
+        0, 1, -2, 6, -89,
+        mgdl,
+        baseTimestamp + (index * 300L),
+        481, 0
+    )
+}
+
+@Preview(showBackground = true, name = "Normal Range")
 @Composable
-internal fun VicoCgmChartCardPreview() {
+internal fun VicoCgmChartCardNormalPreview() {
     ControlX2Theme {
         Surface(
             modifier = Modifier.fillMaxSize(),
             color = SurfaceBackground
         ) {
+            val sampleData = listOf(
+                120, 125, 130, 128, 125, 122, 118, 115, 120, 125, 130, 135, 140, 145, 142, 138, 135, 130, 125, 120,
+                118, 115, 112, 110, 115, 120, 125, 130, 135, 138, 140, 142, 145, 148, 150, 152, 155, 158, 160, 162
+            ).mapIndexed { index, mgdl ->
+                createCgmEntry(index, mgdl)
+            }.map { com.jwoglom.controlx2.db.historylog.HistoryLogItem(it) }
+
             VicoCgmChartCard(
-                historyLogViewModel = null
+                historyLogViewModel = com.jwoglom.controlx2.db.historylog.HistoryLogViewModel(
+                    com.jwoglom.controlx2.db.historylog.HistoryLogRepo(
+                        com.jwoglom.controlx2.db.historylog.HistoryLogDummyDao(sampleData.toMutableList())
+                    ), 0
+                )
+            )
+        }
+    }
+}
+
+@Preview(showBackground = true, name = "High Glucose Spike")
+@Composable
+internal fun VicoCgmChartCardHighPreview() {
+    ControlX2Theme {
+        Surface(
+            modifier = Modifier.fillMaxSize(),
+            color = SurfaceBackground
+        ) {
+            val sampleData = listOf(
+                140, 145, 150, 160, 175, 190, 205, 220, 235, 250, 265, 280, 290, 295, 290, 280, 270, 255, 240, 225,
+                210, 195, 180, 170, 160, 155, 150, 145, 140, 135, 130, 125, 120, 118, 115, 120, 125, 130, 128, 125
+            ).mapIndexed { index, mgdl ->
+                createCgmEntry(index, mgdl)
+            }.map { com.jwoglom.controlx2.db.historylog.HistoryLogItem(it) }
+
+            VicoCgmChartCard(
+                historyLogViewModel = com.jwoglom.controlx2.db.historylog.HistoryLogViewModel(
+                    com.jwoglom.controlx2.db.historylog.HistoryLogRepo(
+                        com.jwoglom.controlx2.db.historylog.HistoryLogDummyDao(sampleData.toMutableList())
+                    ), 0
+                )
+            )
+        }
+    }
+}
+
+@Preview(showBackground = true, name = "Low Glucose")
+@Composable
+internal fun VicoCgmChartCardLowPreview() {
+    ControlX2Theme {
+        Surface(
+            modifier = Modifier.fillMaxSize(),
+            color = SurfaceBackground
+        ) {
+            val sampleData = listOf(
+                120, 115, 110, 105, 100, 95, 90, 85, 80, 75, 70, 65, 60, 58, 55, 58, 62, 68, 75, 82,
+                90, 98, 105, 112, 118, 125, 130, 135, 138, 140, 142, 140, 138, 135, 132, 130, 128, 125, 122, 120
+            ).mapIndexed { index, mgdl ->
+                createCgmEntry(index, mgdl)
+            }.map { com.jwoglom.controlx2.db.historylog.HistoryLogItem(it) }
+
+            VicoCgmChartCard(
+                historyLogViewModel = com.jwoglom.controlx2.db.historylog.HistoryLogViewModel(
+                    com.jwoglom.controlx2.db.historylog.HistoryLogRepo(
+                        com.jwoglom.controlx2.db.historylog.HistoryLogDummyDao(sampleData.toMutableList())
+                    ), 0
+                )
+            )
+        }
+    }
+}
+
+@Preview(showBackground = true, name = "Volatile Glucose")
+@Composable
+internal fun VicoCgmChartCardVolatilePreview() {
+    ControlX2Theme {
+        Surface(
+            modifier = Modifier.fillMaxSize(),
+            color = SurfaceBackground
+        ) {
+            val sampleData = listOf(
+                150, 165, 145, 170, 140, 180, 135, 190, 130, 200, 125, 210, 120, 205, 125, 195, 135, 180, 145, 165,
+                155, 150, 160, 145, 170, 140, 175, 138, 180, 135, 185, 132, 180, 135, 170, 140, 160, 145, 150, 148
+            ).mapIndexed { index, mgdl ->
+                createCgmEntry(index, mgdl)
+            }.map { com.jwoglom.controlx2.db.historylog.HistoryLogItem(it) }
+
+            VicoCgmChartCard(
+                historyLogViewModel = com.jwoglom.controlx2.db.historylog.HistoryLogViewModel(
+                    com.jwoglom.controlx2.db.historylog.HistoryLogRepo(
+                        com.jwoglom.controlx2.db.historylog.HistoryLogDummyDao(sampleData.toMutableList())
+                    ), 0
+                )
+            )
+        }
+    }
+}
+
+@Preview(showBackground = true, name = "Steady Trend")
+@Composable
+internal fun VicoCgmChartCardSteadyPreview() {
+    ControlX2Theme {
+        Surface(
+            modifier = Modifier.fillMaxSize(),
+            color = SurfaceBackground
+        ) {
+            val sampleData = listOf(
+                110, 110, 111, 111, 112, 112, 113, 113, 114, 114, 115, 115, 116, 116, 117, 117, 118, 118, 119, 119,
+                120, 120, 121, 121, 122, 122, 123, 123, 124, 124, 125, 125, 126, 126, 127, 127, 128, 128, 129, 129
+            ).mapIndexed { index, mgdl ->
+                createCgmEntry(index, mgdl)
+            }.map { com.jwoglom.controlx2.db.historylog.HistoryLogItem(it) }
+
+            VicoCgmChartCard(
+                historyLogViewModel = com.jwoglom.controlx2.db.historylog.HistoryLogViewModel(
+                    com.jwoglom.controlx2.db.historylog.HistoryLogRepo(
+                        com.jwoglom.controlx2.db.historylog.HistoryLogDummyDao(sampleData.toMutableList())
+                    ), 0
+                )
             )
         }
     }
