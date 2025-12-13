@@ -46,7 +46,8 @@ fun PumpStatusBar(middleContent: @Composable () -> Unit = {}) {
     ) {
         Box (Modifier.padding(horizontal = 8.dp)) {
             val batteryPercent = ds.batteryPercent.observeAsState()
-            HorizBatteryIcon(batteryPercent.value)
+            val batteryCharging = ds.batteryCharging.observeAsState()
+            HorizBatteryIcon(batteryPercent.value, batteryCharging.value)
         }
 
         Box {
@@ -174,6 +175,7 @@ internal fun PumpStatusBarDefaultPreview() {
     }
 }
 
+
 @Preview(showBackground = true)
 @Composable
 internal fun PumpStatusCardPreview() {
@@ -184,6 +186,20 @@ internal fun PumpStatusCardPreview() {
         ) {
             setUpPreviewState(LocalDataStore.current)
             PumpStatusCard()
+
+@Preview(showBackground = true)
+@Composable
+internal fun PumpStatusBarCharging() {
+    ControlX2Theme() {
+        Surface(
+            color = Color.White,
+        ) {
+            LocalDataStore.current.batteryCharging.value = true
+            setUpPreviewState(LocalDataStore.current)
+            PumpStatusBar(middleContent = {
+                Line("Last updated: stub", bold = true)
+            })
+
         }
     }
 }

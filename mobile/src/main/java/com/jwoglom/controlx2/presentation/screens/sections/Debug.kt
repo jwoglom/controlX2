@@ -29,6 +29,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.text.BasicText
 import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Build
 import androidx.compose.material.icons.filled.Check
@@ -37,6 +38,8 @@ import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.Send
+import androidx.compose.material.icons.filled.Visibility
+import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.Button
 import androidx.compose.material3.Divider
 import androidx.compose.material3.DropdownMenu
@@ -69,6 +72,9 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -900,6 +906,96 @@ fun Debug(
                         emptyDatabase(context)
                     }
                 )
+            }
+
+            item {
+                Divider()
+            }
+
+            item {
+                var httpDebugApiEnabled by remember { mutableStateOf(Prefs(context).httpDebugApiEnabled()) }
+                ListItem(
+                    headlineContent = { Text(if (httpDebugApiEnabled) "Disable HTTP Debug API" else "Enable HTTP Debug API") },
+                    supportingContent = { Text("Toggle the HTTP Debug API on port 18282. Service restart required.") },
+                    leadingContent = {
+                        Icon(
+                            if (httpDebugApiEnabled) Icons.Filled.Check else Icons.Filled.Close,
+                            contentDescription = null,
+                        )
+                    },
+                    modifier = Modifier.clickable {
+                        httpDebugApiEnabled = !httpDebugApiEnabled
+                        Prefs(context).setHttpDebugApiEnabled(httpDebugApiEnabled)
+                        Toast.makeText(context, "HTTP Debug API ${if (httpDebugApiEnabled) "enabled" else "disabled"}. Restart service to apply.", Toast.LENGTH_SHORT).show()
+                    }
+                )
+
+                if (httpDebugApiEnabled) {
+                    var username by remember { mutableStateOf(Prefs(context).httpDebugApiUsername()) }
+                    ListItem(
+                        headlineContent = { Text("API Username") },
+                        supportingContent = {
+                            OutlinedTextField(
+                                value = username,
+                                onValueChange = {
+                                    username = it
+                                    Prefs(context).setHttpDebugApiUsername(it)
+                                },
+                                label = { Text("Username") },
+                                singleLine = true,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(top = 8.dp)
+                            )
+                        },
+                        leadingContent = {
+                            Icon(
+                                Icons.Filled.Info,
+                                contentDescription = null,
+                            )
+                        }
+                    )
+                    var password by remember { mutableStateOf(Prefs(context).httpDebugApiPassword()) }
+                    var passwordVisible by remember { mutableStateOf(false) }
+
+                    ListItem(
+                        headlineContent = { Text("API Password") },
+                        supportingContent = {
+                            OutlinedTextField(
+                                value = password,
+                                onValueChange = {
+                                    password = it
+                                    Prefs(context).setHttpDebugApiPassword(it)
+                                },
+                                visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
+                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+                                label = { Text("Password") },
+                                trailingIcon = {
+                                    val image = if (passwordVisible)
+                                        Icons.Filled.Visibility
+                                    else Icons.Filled.VisibilityOff
+
+                                    // Please provide localized description for accessibility services
+                                    val description = if (passwordVisible) "Hide password" else "Show password"
+
+                                    IconButton(onClick = {passwordVisible = !passwordVisible}){
+                                        Icon(imageVector  = image, description)
+                                    }
+                                },
+                                singleLine = true,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(top = 8.dp)
+                            )
+                        },
+                        leadingContent = {
+                            Icon(
+                                Icons.Filled.Info,
+                                contentDescription = null,
+                            )
+                        }
+                    )
+                }
             }
         }
     )

@@ -41,6 +41,7 @@ import com.jwoglom.controlx2.util.AppVersionCheck
 import com.jwoglom.controlx2.util.DataClientState
 import com.jwoglom.controlx2.util.HistoryLogFetcher
 import com.jwoglom.controlx2.util.extractPumpSid
+import com.jwoglom.controlx2.sync.nightscout.NightscoutSyncWorker
 import com.jwoglom.pumpx2.pump.PumpState
 import com.jwoglom.pumpx2.pump.TandemError
 import com.jwoglom.pumpx2.pump.bluetooth.TandemBluetoothHandler
@@ -108,6 +109,7 @@ class CommService : Service() {
     private var pumpFinderCommHandler: PumpFinderCommHandler? = null
 
     private lateinit var messageBus: MessageBus
+    private var httpDebugApiService: HttpDebugApiService? = null
 
     private var serviceStatusAcknowledged = false
     private val serviceStatusTask = object : Runnable {
@@ -211,6 +213,7 @@ class CommService : Service() {
                     }
                 }
                 message?.let { updateNotificationWithPumpData(it) }
+                message?.let { httpDebugApiService?.onPumpMessageReceived(it) }
             }
 
             override fun onReceiveQualifyingEvent(
@@ -311,6 +314,13 @@ class CommService : Service() {
 
                 historyLogFetcher = HistoryLogFetcher(this@CommService, pump, peripheral!!, pumpSid!!)
                 Timber.i("HistoryLogFetcher initialized")
+
+                // Start Nightscout sync worker if enabled
+                NightscoutSyncWorker.startIfEnabled(
+                    applicationContext,
+                    applicationContext.getSharedPreferences("controlx2", Context.MODE_PRIVATE),
+                    pumpSid!!
+                )
 
                 var numResponses = -99999
                 while (PumpState.processedResponseMessages != numResponses) {
@@ -831,6 +841,13 @@ class CommService : Service() {
             }
         })
 
+        // Initialize and start HTTP Debug API service
+        httpDebugApiService = HttpDebugApiService(applicationContext)
+        httpDebugApiService?.getCurrentPumpDataCallback = { getCurrentPumpDataJson() }
+        httpDebugApiService?.sendPumpMessagesCallback = { data -> sendPumpCommMessages(data) }
+        httpDebugApiService?.sendMessagingCallback = { path, data -> sendWearCommMessage(path, data) }
+        httpDebugApiService?.start()
+
         if (Prefs(applicationContext).pumpFinderServiceEnabled()) {
             pumpFinderCommHandler = PumpFinderCommHandler(serviceLooper!!)
         } else {
@@ -851,6 +868,7 @@ class CommService : Service() {
 
     private fun handleMessageReceived(path: String, data: ByteArray, sourceNodeId: String) {
         Timber.i("service messageReceived: $path ${String(data)} from $sourceNodeId")
+        httpDebugApiService?.onMessagingReceived(path, data, sourceNodeId)
         when (path) {
             "/to-phone/force-reload" -> {
                 Timber.i("force-reload")
@@ -1027,6 +1045,11 @@ class CommService : Service() {
     )
 
     private val currentPumpData: DisplayablePumpData = DisplayablePumpData()
+
+    private fun getCurrentPumpDataJson(): String {
+        return """{"statusText":"${currentPumpData.statusText}","connectionTime":"${currentPumpData.connectionTime}","lastMessageTime":"${currentPumpData.lastMessageTime}","batteryPercent":${currentPumpData.batteryPercent},"iobUnits":${currentPumpData.iobUnits},"cartridgeRemainingUnits":${currentPumpData.cartridgeRemainingUnits}}"""
+    }
+
     fun updateNotificationWithPumpData(message: com.jwoglom.pumpx2.pump.messages.Message) {
         var changed = false
         when (message) {
@@ -1267,6 +1290,7 @@ class CommService : Service() {
         super.onDestroy()
         scope.cancel()
         messageBus.close()
+        httpDebugApiService?.stop()
         Toast.makeText(this, "ControlX2 service destroyed", Toast.LENGTH_SHORT).show()
     }
 

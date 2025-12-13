@@ -56,7 +56,8 @@ fun Settings(
     navController: NavHostController? = null,
     sendMessage: (String, ByteArray) -> Unit,
     sendPumpCommands: (SendType, List<Message>) -> Unit,
-    navigateToDebugOptions: () -> Unit = {}
+    navigateToDebugOptions: () -> Unit = {},
+    navigateToNightscoutSettings: () -> Unit = {}
 ) {
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
@@ -244,6 +245,23 @@ fun Settings(
                 Divider()
             }
             
+            item {
+                ListItem(
+                    headlineContent = { Text("Nightscout") },
+                    supportingContent = { Text("Configure Nightscout sync to upload pump data to the cloud.") },
+                    leadingContent = {
+                        Icon(
+                            Icons.Filled.Refresh,
+                            contentDescription = "Nightscout icon",
+                        )
+                    },
+                    modifier = Modifier.clickable {
+                        navigateToNightscoutSettings()
+                    }
+                )
+                Divider()
+            }
+
             item {
                 ListItem(
                     headlineContent = { Text("Debug options") },
