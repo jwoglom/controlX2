@@ -186,6 +186,9 @@ internal fun PumpStatusCardPreview() {
         ) {
             setUpPreviewState(LocalDataStore.current)
             PumpStatusCard()
+        }
+    }
+}
 
 @Preview(showBackground = true)
 @Composable

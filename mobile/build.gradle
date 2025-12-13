@@ -17,7 +17,7 @@ android {
         }
     }
     namespace 'com.jwoglom.controlx2'
-    compileSdk 35
+    compileSdk 36
 
     defaultConfig {
         applicationId "com.jwoglom.controlx2"
