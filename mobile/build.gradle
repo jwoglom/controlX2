@@ -48,6 +48,7 @@ android {
     }
     buildFeatures {
         compose true
+        buildConfig true
     }
     packaging {
         resources {
@@ -139,7 +140,7 @@ dependencies {
     debugImplementation "androidx.compose.ui:ui-test-manifest:$compose_version"
 
     // room
-    var room_version = "2.6.1"
+    var room_version = "2.7.0"
     implementation("androidx.room:room-runtime:$room_version")
     annotationProcessor("androidx.room:room-compiler:$room_version")
     ksp("androidx.room:room-compiler:$room_version")

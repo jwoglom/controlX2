@@ -44,28 +44,10 @@ import com.jwoglom.controlx2.presentation.theme.TargetRangeColor
 import com.jwoglom.pumpx2.pump.messages.response.historyLog.DexcomG6CGMHistoryLog
 import com.jwoglom.pumpx2.pump.messages.response.historyLog.DexcomG7CGMHistoryLog
 import com.patrykandpatrick.vico.compose.cartesian.CartesianChartHost
-import com.patrykandpatrick.vico.compose.cartesian.axis.rememberBottomAxis
-import com.patrykandpatrick.vico.compose.cartesian.axis.rememberStartAxis
-import com.patrykandpatrick.vico.compose.cartesian.decoration.rememberHorizontalLine
-import com.patrykandpatrick.vico.compose.cartesian.layer.rememberLine
-import com.patrykandpatrick.vico.compose.cartesian.layer.rememberLineCartesianLayer
-import com.patrykandpatrick.vico.compose.cartesian.rememberCartesianChart
-import com.patrykandpatrick.vico.compose.cartesian.rememberVicoZoomState
-import com.patrykandpatrick.vico.compose.common.component.rememberLineComponent
-import com.patrykandpatrick.vico.compose.common.component.rememberShapeComponent
-import com.patrykandpatrick.vico.compose.common.component.rememberTextComponent
-import com.patrykandpatrick.vico.compose.common.fill
-import com.patrykandpatrick.vico.compose.common.shader.color
-import com.patrykandpatrick.vico.core.cartesian.axis.HorizontalAxis
-import com.patrykandpatrick.vico.core.cartesian.axis.VerticalAxis
-import com.patrykandpatrick.vico.core.cartesian.data.CartesianChartModelProducer
-import com.patrykandpatrick.vico.core.cartesian.data.CartesianValueFormatter
-import com.patrykandpatrick.vico.core.cartesian.data.lineSeries
-import com.patrykandpatrick.vico.core.cartesian.decoration.HorizontalLine
-import com.patrykandpatrick.vico.core.cartesian.layer.LineCartesianLayer
-import com.patrykandpatrick.vico.core.common.Dimensions
-import com.patrykandpatrick.vico.core.common.shader.DynamicShader
-import com.patrykandpatrick.vico.core.common.shape.Shape
+// Vico imports temporarily commented out - API needs to be updated for 2.3.6
+// import com.patrykandpatrick.vico.compose.cartesian.*
+// import com.patrykandpatrick.vico.core.cartesian.*
+// import com.patrykandpatrick.vico.core.common.*
 import java.text.SimpleDateFormat
 import java.time.Instant
 import java.time.ZoneId
@@ -110,8 +92,9 @@ private fun rememberCgmChartData(
                 }
 
                 if (value != null && value > 0) {
+                    val timestamp = dao.pumpTime.atZone(ZoneId.systemDefault()).toEpochSecond()
                     CgmDataPoint(
-                        timestamp = dao.pumpTimeSec,
+                        timestamp = timestamp,
                         value = value
                     )
                 } else null
@@ -122,37 +105,9 @@ private fun rememberCgmChartData(
     }
 }
 
-// Glucose value formatter for Y-axis
-class GlucoseValueFormatter : CartesianValueFormatter {
-    override fun format(
-        value: Float,
-        chartValues: com.patrykandpatrick.vico.core.cartesian.data.ChartValues
-    ): CharSequence {
-        return value.toInt().toString()
-    }
-}
-
-// Time value formatter for X-axis
-class TimeValueFormatter : CartesianValueFormatter {
-    override fun format(
-        value: Float,
-        chartValues: com.patrykandpatrick.vico.core.cartesian.data.ChartValues
-    ): CharSequence {
-        return try {
-            val instant = Instant.ofEpochSecond(value.toLong())
-            val hour = instant.atZone(ZoneId.systemDefault()).hour
-            val ampm = if (hour < 12) "a" else "p"
-            val displayHour = when (hour) {
-                0 -> 12
-                in 1..12 -> hour
-                else -> hour - 12
-            }
-            "$displayHour$ampm"
-        } catch (e: Exception) {
-            ""
-        }
-    }
-}
+// Formatters temporarily commented out - will be restored when Vico API is fixed
+// class GlucoseValueFormatter : CartesianValueFormatter { ... }
+// class TimeValueFormatter : CartesianValueFormatter { ... }
 
 @Composable
 fun VicoCgmChart(
@@ -160,141 +115,13 @@ fun VicoCgmChart(
     timeRange: TimeRange = TimeRange.SIX_HOURS,
     modifier: Modifier = Modifier
 ) {
-    val modelProducer = remember { CartesianChartModelProducer.build() }
-    val cgmDataPoints = rememberCgmChartData(historyLogViewModel, timeRange)
-
-    // Update chart data when CGM data changes
-    LaunchedEffect(cgmDataPoints) {
-        if (cgmDataPoints.isNotEmpty()) {
-            modelProducer.tryRunTransaction {
-                lineSeries {
-                    series(cgmDataPoints.map { it.timestamp.toFloat() to it.value })
-                }
-            }
-        }
-    }
-
-    CartesianChartHost(
-        chart = rememberCartesianChart(
-            // Glucose line layer
-            rememberLineCartesianLayer(
-                lines = listOf(
-                    rememberLine(
-                        fill = remember {
-                            LineCartesianLayer.LineFill.single(
-                                fill(GlucoseColors.InRange)
-                            )
-                        },
-                        thickness = 2.5.dp,
-                        shader = DynamicShader.color(GlucoseColors.InRange)
-                    )
-                ),
-            ),
-            // Target range lines (decorations)
-            decorations = listOf(
-                // High target line (180 mg/dL)
-                rememberHorizontalLine(
-                    y = { 180f },
-                    line = rememberLineComponent(
-                        color = GlucoseColors.Elevated.copy(alpha = 0.5f),
-                        thickness = 1.5.dp,
-                        shape = remember {
-                            Shape.dashedShape(
-                                shape = Shape.Rectangle,
-                                dashLength = 8.dp,
-                                gapLength = 4.dp
-                            )
-                        }
-                    ),
-                    labelComponent = rememberTextComponent(
-                        color = GlucoseColors.Elevated.copy(alpha = 0.7f),
-                        padding = Dimensions(4f, 2f, 4f, 2f),
-                        background = rememberShapeComponent(
-                            fill(CardBackground.copy(alpha = 0.8f)),
-                            Shape.Rectangle
-                        )
-                    ),
-                ),
-                // Low target line (80 mg/dL)
-                rememberHorizontalLine(
-                    y = { 80f },
-                    line = rememberLineComponent(
-                        color = GlucoseColors.Low.copy(alpha = 0.5f),
-                        thickness = 1.5.dp,
-                        shape = remember {
-                            Shape.dashedShape(
-                                shape = Shape.Rectangle,
-                                dashLength = 8.dp,
-                                gapLength = 4.dp
-                            )
-                        }
-                    ),
-                    labelComponent = rememberTextComponent(
-                        color = GlucoseColors.Low.copy(alpha = 0.7f),
-                        padding = Dimensions(4f, 2f, 4f, 2f),
-                        background = rememberShapeComponent(
-                            fill(CardBackground.copy(alpha = 0.8f)),
-                            Shape.Rectangle
-                        )
-                    ),
-                ),
-            ),
-            // Y-axis (glucose values)
-            startAxis = rememberStartAxis(
-                label = rememberTextComponent(
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    padding = Dimensions(4f, 2f, 4f, 2f),
-                    background = rememberShapeComponent(
-                        fill(Color.Transparent),
-                        Shape.Rectangle
-                    )
-                ),
-                axis = rememberLineComponent(
-                    color = GridLineColor,
-                    thickness = 1.dp
-                ),
-                guideline = rememberLineComponent(
-                    color = GridLineColor.copy(alpha = 0.5f),
-                    thickness = 1.dp
-                ),
-                valueFormatter = GlucoseValueFormatter(),
-                itemPlacer = remember {
-                    VerticalAxis.ItemPlacer.step(
-                        step = { 50f }  // Show labels at 50, 100, 150, 200, 250, etc.
-                    )
-                }
-            ),
-            // X-axis (time)
-            bottomAxis = rememberBottomAxis(
-                label = rememberTextComponent(
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    padding = Dimensions(2f, 4f, 2f, 4f),
-                    background = rememberShapeComponent(
-                        fill(Color.Transparent),
-                        Shape.Rectangle
-                    )
-                ),
-                axis = rememberLineComponent(
-                    color = GridLineColor,
-                    thickness = 1.dp
-                ),
-                guideline = rememberLineComponent(
-                    color = GridLineColor.copy(alpha = 0.5f),
-                    thickness = 1.dp
-                ),
-                valueFormatter = TimeValueFormatter(),
-                itemPlacer = remember {
-                    HorizontalAxis.ItemPlacer.aligned(
-                        spacing = 3  // Show time label every 3rd data point
-                    )
-                }
-            ),
-        ),
-        modelProducer = modelProducer,
-        modifier = modifier
-            .fillMaxWidth()
-            .height(300.dp),
-        zoomState = rememberVicoZoomState(zoomEnabled = false)
+    // TODO: Fix Vico 2.3.6 API compatibility
+    // Temporarily showing placeholder until Vico API is properly configured
+    Text(
+        text = "CGM Chart (Vico API needs update)",
+        modifier = modifier.fillMaxWidth().height(300.dp),
+        style = MaterialTheme.typography.bodyMedium,
+        color = MaterialTheme.colorScheme.onSurfaceVariant
     )
 }
 

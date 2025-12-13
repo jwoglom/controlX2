@@ -46,6 +46,7 @@ android {
         viewBinding true
         // Enables Jetpack Compose for this module
         compose = true
+        buildConfig true
     }
 
 }

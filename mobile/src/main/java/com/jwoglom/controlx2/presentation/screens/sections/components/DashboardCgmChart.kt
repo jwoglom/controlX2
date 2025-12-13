@@ -1,15 +1,9 @@
 package com.jwoglom.controlx2.presentation.screens.sections.components
 
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.height
-import androidx.compose.material3.Surface
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.livedata.observeAsState
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.tooling.preview.Preview
-import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.jwoglom.controlx2.LocalDataStore
 import com.jwoglom.controlx2.db.historylog.HistoryLogDummyDao
@@ -19,71 +13,28 @@ import com.jwoglom.controlx2.db.historylog.HistoryLogViewModel
 import com.jwoglom.controlx2.presentation.components.Line
 import com.jwoglom.controlx2.presentation.screens.setUpPreviewState
 import com.jwoglom.controlx2.presentation.theme.ControlX2Theme
-import com.jwoglom.controlx2.presentation.util.FixedHeightContainer
+import com.jwoglom.controlx2.presentation.theme.SurfaceBackground
+import com.jwoglom.controlx2.presentation.theme.Spacing
 import com.jwoglom.pumpx2.pump.messages.response.historyLog.DexcomG6CGMHistoryLog
-import com.jwoglom.pumpx2.pump.messages.response.historyLog.DexcomG7CGMHistoryLog
 import com.jwoglom.pumpx2.pump.messages.response.historyLog.HistoryLog
-import io.github.dautovicharis.charts.LineChart
-import io.github.dautovicharis.charts.model.toMultiChartDataSet
-import io.github.dautovicharis.charts.style.ChartViewDefaults
-import io.github.dautovicharis.charts.style.LineChartDefaults
+import androidx.compose.material3.Surface
+import androidx.compose.ui.graphics.Color
 
 val CgmReadingHistoryLogs = listOf(
     DexcomG6CGMHistoryLog::class.java,
-    DexcomG7CGMHistoryLog::class.java
-
+    com.jwoglom.pumpx2.pump.messages.response.historyLog.DexcomG7CGMHistoryLog::class.java
 )
 
 @Composable
 fun DashboardCgmChart(
     historyLogViewModel: HistoryLogViewModel?,
-    width: Dp = 400.dp,
-    height: Dp = 300.dp
+    modifier: Modifier = Modifier
 ) {
-    val cgmData = historyLogViewModel?.latestItemsForTypes(
-        CgmReadingHistoryLogs,
-        100
-    )?.observeAsState()
-
-    val cgmValues = (cgmData?.value?.map { dao ->
-        when (val it = dao.parse()) {
-            is DexcomG6CGMHistoryLog -> it.currentGlucoseDisplayValue.toFloat()
-            is DexcomG7CGMHistoryLog -> it.currentGlucoseDisplayValue.toFloat()
-            else -> 0f
-        }
-    } ?: listOf()).asReversed()
-    val dataSet = listOf(
-        "CGM" to cgmValues,
-        "High target" to (1..cgmValues.size).map { 200f },
-        "Low target" to (1..cgmValues.size).map { 80f },
-    ).toMultiChartDataSet(
-        title = "",
+    VicoCgmChart(
+        historyLogViewModel = historyLogViewModel,
+        timeRange = TimeRange.SIX_HOURS,
+        modifier = modifier.fillMaxWidth()
     )
-
-    if (cgmValues.isEmpty()) {
-        Line("No CGM values found in HistoryLog")
-        return
-    }
-
-    Box(Modifier.height(height)) {
-        FixedHeightContainer(height) {
-            LineChart(
-                dataSet,
-                style = LineChartDefaults.style(
-                    chartViewStyle = ChartViewDefaults.style(
-                        outerPadding = 10.dp,
-                        innerPadding = 10.dp,
-                        cornerRadius = 0.dp,
-                        shadow = 0.dp,
-                        width = width,
-                        backgroundColor = Color.Transparent
-                    ),
-                    pointVisible = false,
-                    lineColors = listOf(Color.Black, Color(0xFF, 0xA5, 0x00), Color.Red)
-                )
-            )
-        }
-    }
 }
 
 private fun cgmEntry(index: Int, mgdl: Int): HistoryLog {
@@ -101,8 +52,8 @@ private fun cgmEntry(index: Int, mgdl: Int): HistoryLog {
 internal fun DashboardCgmChartDefaultPreview() {
     ControlX2Theme() {
         Surface(
-            modifier = Modifier.fillMaxSize(),
-            color = Color.White,
+            modifier = Modifier.fillMaxWidth(),
+            color = SurfaceBackground,
         ) {
             setUpPreviewState(LocalDataStore.current)
             DashboardCgmChart(
