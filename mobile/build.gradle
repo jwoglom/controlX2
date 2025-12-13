@@ -3,8 +3,8 @@ plugins {
     id 'org.jetbrains.kotlin.android'
     id 'org.jetbrains.kotlin.plugin.compose'
     id 'hu.supercluster.paperwork'
-    id 'com.google.devtools.ksp' version '2.0.0-1.0.24'
-    id 'app.cash.paparazzi'
+    id 'com.google.devtools.ksp'
+    id 'app.cash.paparazzi' version '1.3.4'
 }
 
 android {
@@ -49,7 +49,7 @@ android {
     buildFeatures {
         compose true
     }
-    packagingOptions {
+    packaging {
         resources {
             excludes += '/META-INF/{AL2.0,LGPL2.1}'
         }
@@ -154,6 +154,8 @@ dependencies {
 
     // HTTP server for debug API
     implementation 'org.nanohttpd:nanohttpd:2.3.1'
-
-    wearApp project(":wear")
+    
+    // Note: wearApp embedding was removed in AGP 9.0
+    // Wear OS apps must be distributed separately via Play Store
+    // See: https://developer.android.com/distribute/best-practices/launch/distribute-wear
 }
