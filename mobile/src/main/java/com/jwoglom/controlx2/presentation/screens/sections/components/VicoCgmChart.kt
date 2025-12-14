@@ -112,6 +112,24 @@ data class BasalDataPoint(
     val duration: Int?         // Duration in minutes (for temp basal)
 )
 
+data class CarbEvent(
+    val timestamp: Long,       // Pump time in seconds
+    val grams: Int,            // Carbohydrate grams
+    val note: String? = null   // Optional note (e.g., "meal", "snack")
+)
+
+data class ModeEvent(
+    val timestamp: Long,       // Pump time in seconds
+    val mode: TherapyMode,     // Sleep, Exercise, or Standard
+    val duration: Int?         // Duration in minutes (null = ongoing)
+)
+
+enum class TherapyMode {
+    SLEEP,
+    EXERCISE,
+    STANDARD
+}
+
 private class FixedYAxisRangeProvider(
     private val minYLimit: Double,
     private val maxYLimit: Double
@@ -126,6 +144,8 @@ data class ChartPreviewData(
     val cgmDataPoints: List<CgmDataPoint>,
     val bolusEvents: List<BolusEvent> = emptyList(),
     val basalDataPoints: List<BasalDataPoint> = emptyList(),
+    val carbEvents: List<CarbEvent> = emptyList(),
+    val modeEvents: List<ModeEvent> = emptyList(),
     val currentTimeSeconds: Long? = null
 )
 
@@ -137,12 +157,21 @@ private data class ChartBucket(
 private const val BOLUS_MARKER_DIAMETER_DP = 12f
 private const val BOLUS_MARKER_STROKE_DP = 2f
 private const val BOLUS_LABEL_TEXT_SIZE_SP = 12f
+private const val CARB_MARKER_SIZE_DP = 14f
+private const val CARB_MARKER_CORNER_RADIUS_DP = 3f
+private const val CARB_MARKER_STROKE_DP = 2f
+private const val CARB_LABEL_TEXT_SIZE_SP = 12f
 private const val BASAL_DISPLAY_RANGE = 60.0
 private const val MIN_BASAL_RATE_UNITS_PER_HOUR = 3f
 
 private data class BolusMarkerPoint(
     val position: Float,
     val event: BolusEvent
+)
+
+private data class CarbMarkerPoint(
+    val position: Float,
+    val event: CarbEvent
 )
 
 private data class BasalSeriesResult(
@@ -213,6 +242,10 @@ private fun formatBolusUnits(units: Float): String {
     return String.format(Locale.getDefault(), pattern, units)
 }
 
+private fun formatCarbGrams(grams: Int): String {
+    return "${grams}g"
+}
+
 private fun createBolusMarker(
     labelComponent: TextComponent,
     indicatorComponent: Component,
@@ -225,6 +258,22 @@ private fun createBolusMarker(
         labelPosition = DefaultCartesianMarker.LabelPosition.Top,
         indicator = { indicatorComponent },
         indicatorSizeDp = BOLUS_MARKER_DIAMETER_DP,
+        guideline = null
+    )
+}
+
+private fun createCarbMarker(
+    labelComponent: TextComponent,
+    indicatorComponent: Component,
+    labelText: String
+): DefaultCartesianMarker {
+    val formatter = DefaultCartesianMarker.ValueFormatter { _, _ -> labelText }
+    return DefaultCartesianMarker(
+        label = labelComponent,
+        valueFormatter = formatter,
+        labelPosition = DefaultCartesianMarker.LabelPosition.Top,
+        indicator = { indicatorComponent },
+        indicatorSizeDp = CARB_MARKER_SIZE_DP,
         guideline = null
     )
 }
@@ -390,6 +439,8 @@ fun VicoCgmChart(
     val cgmDataPoints = previewData?.cgmDataPoints ?: rememberCgmChartData(historyLogViewModel, timeRange)
     val bolusEvents = previewData?.bolusEvents ?: rememberBolusData(historyLogViewModel, timeRange)
     val basalDataPoints = previewData?.basalDataPoints ?: rememberBasalData(historyLogViewModel, timeRange)
+    val carbEvents = previewData?.carbEvents ?: emptyList() // TODO: Implement rememberCarbData when HistoryLog available
+    val modeEvents = previewData?.modeEvents ?: emptyList() // TODO: Implement rememberModeData when HistoryLog available
 
     val currentTimeSeconds = previewData?.currentTimeSeconds ?: Instant.now().epochSecond
     val fixedGlucoseRange = Pair(30f, 410f)
