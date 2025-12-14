@@ -1,8 +1,8 @@
 # Phase 3: Insulin Visualization - Implementation Status
 
-**Date:** December 13, 2025
-**Branch:** `dev`
-**Status:** Data Layer Complete, Visualization Pending Vico API
+**Date:** December 14, 2025
+**Branch:** `claude/phase-3-insulin-data-layer-01Xj4H5B8Y9q37xERVcNQzdK`
+**Status:** Chart Rendering Working, Insulin Overlays Pending
 
 ---
 
@@ -64,9 +64,20 @@
 
 ---
 
-## 🔄 Pending Vico API Fix
+### 6. Vico Chart Rendering (100%)
+- ✅ Fixed Vico 2.3.6 API imports
+- ✅ Implemented basic glucose line chart
+- ✅ Added CartesianChartModelProducer for data management
+- ✅ Configured axes (vertical start, horizontal bottom)
+- ✅ Styled glucose line (blue color, 2dp thickness)
+- ✅ Added empty state handling
+- ✅ Integrated with existing data fetching
 
-The following features are ready to implement once Vico 2.3.6 API is properly configured:
+---
+
+## 🔄 Pending Implementation
+
+The following features still need to be implemented:
 
 ### Bolus Markers Visualization
 - Circle markers at bolus timestamps (12.dp diameter)
@@ -90,53 +101,56 @@ The following features are ready to implement once Vico 2.3.6 API is properly co
 
 ---
 
-## 📋 Implementation Approach (When Vico API Ready)
+## 📋 Current Vico Implementation
 
-### Option A: Point Markers for Bolus
+### Working Glucose Line Chart
 ```kotlin
-rememberLineCartesianLayer(
-    lines = listOf(
-        rememberLine(...), // Glucose
-        rememberLine(      // Bolus markers
-            fill = LineCartesianLayer.LineFill.single(fill(Color.Transparent)),
-            thickness = 0.dp,
-            pointProvider = LineCartesianLayer.PointProvider.single(
-                rememberPoint(
-                    component = rememberShapeComponent(
-                        fill(InsulinColors.Bolus),
-                        Shape.Pill
-                    ),
-                    size = 12.dp
+CartesianChartHost(
+    chart = rememberCartesianChart(
+        rememberLineCartesianLayer(
+            lineProvider = LineCartesianLayer.LineProvider.series(
+                rememberLine(
+                    fill = remember { LineCartesianLayer.LineFill.single(fill(GlucoseColors.InRange)) },
+                    thickness = 2.dp
                 )
             )
-        )
-    )
+        ),
+        startAxis = VerticalAxis.rememberStart(),
+        bottomAxis = HorizontalAxis.rememberBottom(),
+    ),
+    modelProducer = modelProducer,
+    modifier = modifier.fillMaxWidth().height(300.dp)
 )
 ```
 
-### Option B: Custom Decoration for Bolus
+### Data Management
 ```kotlin
-class BolusMarkerDecoration(
-    private val bolusEvents: List<BolusEvent>
-) : Decoration {
-    override fun draw(context: CartesianDrawContext, bounds: RectF) {
-        // Draw circles and labels at bolus timestamps
-        // Different colors for automated vs manual
+val modelProducer = remember { CartesianChartModelProducer() }
+
+LaunchedEffect(cgmDataPoints) {
+    if (cgmDataPoints.isNotEmpty()) {
+        modelProducer.runTransaction {
+            lineSeries {
+                series(cgmDataPoints.map { it.value.toDouble() })
+            }
+        }
     }
 }
 ```
 
-### Basal Rate: Stepped Line Decoration
-```kotlin
-class BasalRateDecoration(
-    private val basalData: List<BasalDataPoint>
-) : Decoration {
-    override fun draw(context: CartesianDrawContext, bounds: RectF) {
-        // Draw stepped line in bottom 20% of chart
-        // Different colors for temp vs scheduled
-    }
-}
-```
+## 📋 Next: Insulin Visualizations Implementation
+
+### Approach for Bolus Markers
+Use additional line series with point markers or custom decorations:
+- Add second series for bolus events
+- Configure point markers with custom shapes and colors
+- Add text labels above markers showing units
+
+### Approach for Basal Rate
+Use separate line series or column layer:
+- Add column layer for basal rate at bottom of chart
+- Or use stepped line decoration
+- Configure Y-axis range for basal (0-3 U/hr)
 
 ---
 
@@ -166,15 +180,17 @@ class BasalRateDecoration(
 - ✅ Data models created
 - ✅ Data fetching functions implemented
 - ✅ Preview data generation working
-- ✅ Integration with VicoCgmChart prepared
-- ⏳ Bolus markers visible at correct timestamps (Pending Vico)
-- ⏳ Color distinction between manual and auto boluses (Pending Vico)
-- ⏳ Units displayed on bolus markers (Pending Vico)
-- ⏳ Basal rate shows as stepped line (Pending Vico)
-- ⏳ Temp basal distinguished from scheduled basal (Pending Vico)
-- ⏳ Chart performance remains smooth (Pending Vico)
-- ⏳ All previews render correctly (Pending Vico)
-- ✅ No crashes with empty/null data (Handled)
+- ✅ Integration with VicoCgmChart complete
+- ✅ Vico 2.3.6 API properly configured
+- ✅ Basic glucose chart rendering
+- ✅ Chart axes configured and styled
+- ✅ No crashes with empty/null data
+- ⏳ Bolus markers visible at correct timestamps (Next phase)
+- ⏳ Color distinction between manual and auto boluses (Next phase)
+- ⏳ Units displayed on bolus markers (Next phase)
+- ⏳ Basal rate shows as stepped line (Next phase)
+- ⏳ Temp basal distinguished from scheduled basal (Next phase)
+- ⏳ Chart performance remains smooth (To be tested with full features)
 
 ---
 
@@ -182,40 +198,58 @@ class BasalRateDecoration(
 
 - `mobile/src/main/java/com/jwoglom/controlx2/presentation/screens/sections/components/VicoCgmChart.kt`
   - Added BolusEvent and BasalDataPoint data models
-  - Added rememberBolusData() function
-  - Added rememberBasalData() function
+  - Added rememberBolusData() and rememberBasalData() functions
   - Added helper functions for reflection and class loading
+  - Fixed Vico 2.3.6 API imports
+  - Implemented working glucose line chart with CartesianChartHost
+  - Added CartesianChartModelProducer for data management
+  - Added styled line (blue, 2dp thickness)
+  - Added empty state handling
   - Added createBolusEntry() preview helper
   - Added "With Boluses" preview
-  - Updated VicoCgmChart to fetch insulin data
-  - Added comprehensive implementation comments
+
+- `docs/PHASE_3_IMPLEMENTATION_STATUS.md`
+  - Created comprehensive implementation status document
+  - Updated with working Vico implementation details
+
+- `local.properties`
+  - Created with minimal configuration for build
 
 ---
 
-## 🔜 Next Steps
+## 🔜 Next Steps (Phase 4)
 
-1. **Fix Vico 2.3.6 API compatibility issues**
-   - Update Vico imports
-   - Restore formatter classes
-   - Test basic chart rendering
-
-2. **Implement Bolus Markers**
-   - Choose decoration approach (custom or point markers)
-   - Implement drawing logic
-   - Add unit labels
+1. **Implement Bolus Markers Visualization**
+   - Add second line series for bolus data points
+   - Configure point markers with circles (12.dp diameter)
+   - Style markers: purple for manual, light purple for auto
+   - Add text labels showing units (e.g., "5.2U")
    - Handle overlapping markers
 
-3. **Implement Basal Rate Visualization**
-   - Implement stepped line decoration
-   - Add proper scaling
-   - Handle gaps in data
-   - Distinguish temp vs scheduled basal
+2. **Implement Basal Rate Visualization**
+   - Add column layer or second line series for basal
+   - Position at bottom 20% of chart
+   - Style: dark blue for scheduled, light blue for temp
+   - Implement stepped line style
+   - Configure proper Y-axis scale (0-3 U/hr)
 
-4. **Testing and Refinement**
+3. **Add Target Range Indicators**
+   - Add horizontal lines for high/low targets (180/70 mg/dL)
+   - Add background shading for target range
+   - Use TargetRangeColor for styling
+
+4. **Enhanced Styling and Polish**
+   - Add time-based X-axis labels
+   - Add glucose value labels on Y-axis
+   - Implement dynamic glucose line coloring based on ranges
+   - Add chart interactions (zoom, pan)
+   - Fine-tune spacing and padding
+
+5. **Testing and Validation**
    - Test with real pump data
-   - Verify performance
-   - Fine-tune visual appearance
-   - Handle all edge cases
+   - Verify performance with large datasets
+   - Test all time ranges (3h, 6h, 12h, 24h)
+   - Validate all edge cases
 
 ---
 
@@ -225,8 +259,10 @@ class BasalRateDecoration(
 - The implementation is robust against missing or malformed data
 - Preview data demonstrates realistic bolus timing and amounts
 - Code follows existing patterns in the codebase (similar to ProcessBolus and ProcessBasal)
-- Ready for immediate visualization implementation once Vico API is fixed
+- Vico 2.3.6 API is now fully working and configured
+- Basic chart rendering is complete and functional
 
 ---
 
-**Estimated Effort Remaining:** 2-3 hours for visualization implementation once Vico API is fixed
+**Current Status:** Phase 3 - Data layer and basic chart rendering complete (70% done)
+**Estimated Effort Remaining:** 2-3 hours for insulin overlays and polish

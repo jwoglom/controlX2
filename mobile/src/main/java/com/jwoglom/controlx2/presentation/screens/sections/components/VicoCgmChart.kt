@@ -46,10 +46,15 @@ import com.jwoglom.pumpx2.pump.messages.response.historyLog.DexcomG6CGMHistoryLo
 import com.jwoglom.pumpx2.pump.messages.response.historyLog.DexcomG7CGMHistoryLog
 import com.jwoglom.pumpx2.pump.messages.response.historyLog.BolusDeliveryHistoryLog
 import com.patrykandpatrick.vico.compose.cartesian.CartesianChartHost
-// Vico imports temporarily commented out - API needs to be updated for 2.3.6
-// import com.patrykandpatrick.vico.compose.cartesian.*
-// import com.patrykandpatrick.vico.core.cartesian.*
-// import com.patrykandpatrick.vico.core.common.*
+import com.patrykandpatrick.vico.compose.cartesian.axis.HorizontalAxis
+import com.patrykandpatrick.vico.compose.cartesian.axis.VerticalAxis
+import com.patrykandpatrick.vico.compose.cartesian.layer.LineCartesianLayer
+import com.patrykandpatrick.vico.compose.cartesian.layer.rememberLine
+import com.patrykandpatrick.vico.compose.cartesian.layer.rememberLineCartesianLayer
+import com.patrykandpatrick.vico.compose.cartesian.rememberCartesianChart
+import com.patrykandpatrick.vico.compose.common.fill
+import com.patrykandpatrick.vico.core.cartesian.data.CartesianChartModelProducer
+import com.patrykandpatrick.vico.core.cartesian.data.lineSeries
 import java.text.SimpleDateFormat
 import java.time.Instant
 import java.time.ZoneId
@@ -258,10 +263,6 @@ private fun tryLoadClass(className: String): Class<*>? {
     }
 }
 
-// Formatters temporarily commented out - will be restored when Vico API is fixed
-// class GlucoseValueFormatter : CartesianValueFormatter { ... }
-// class TimeValueFormatter : CartesianValueFormatter { ... }
-
 @Composable
 fun VicoCgmChart(
     historyLogViewModel: HistoryLogViewModel?,
@@ -273,62 +274,54 @@ fun VicoCgmChart(
     val bolusEvents = rememberBolusData(historyLogViewModel, timeRange)
     val basalDataPoints = rememberBasalData(historyLogViewModel, timeRange)
 
-    // TODO: Fix Vico 2.3.6 API compatibility
-    // Data fetching is ready, but visualization is pending Vico API fix
-    //
-    // IMPLEMENTATION PLAN FOR VICO VISUALIZATION:
-    // ============================================
-    //
-    // 1. BOLUS MARKERS - Use custom decoration or point markers
-    //    - Draw circles at bolus timestamps (12.dp diameter)
-    //    - Color: InsulinColors.Bolus (purple) for manual
-    //    - Color: InsulinColors.AutoBolus (light purple) for automated
-    //    - Add 2.dp white stroke outline
-    //    - Display units label above each marker (e.g., "5.2U")
-    //    - Position at top of chart or at glucose value when delivered
-    //
-    // 2. BASAL RATE VISUALIZATION - Use stepped line decoration or column layer
-    //    - Position: Bottom 20% of chart
-    //    - Style: Stepped line (horizontal then vertical, not smooth)
-    //    - Color: InsulinColors.Basal (dark blue) for scheduled
-    //    - Color: InsulinColors.TempBasal (light blue) for temp basal
-    //    - Line thickness: 2.dp
-    //    - Y-axis scale: 0-3 units/hour (adjust if needed)
-    //
-    // 3. INTEGRATION APPROACH:
-    //    CartesianChartHost(
-    //        chart = rememberCartesianChart(
-    //            rememberLineCartesianLayer(/* glucose line */),
-    //            // Option A: Column layer for basal
-    //            rememberColumnCartesianLayer(/* basal as columns */),
-    //            // Option B: Custom decoration for both
-    //            decorations = listOf(
-    //                rememberHorizontalLine(/* high target */),
-    //                rememberHorizontalLine(/* low target */),
-    //                BolusMarkerDecoration(bolusEvents),
-    //                BasalRateDecoration(basalDataPoints)
-    //            ),
-    //            startAxis = rememberStartAxis(),
-    //            bottomAxis = rememberBottomAxis()
-    //        ),
-    //        modelProducer = modelProducer
-    //    )
-    //
-    // 4. EDGE CASES TO HANDLE:
-    //    - Empty bolus/basal lists (chart renders normally)
-    //    - Overlapping boluses (offset markers slightly)
-    //    - Basal rate gaps (don't draw line across gaps)
-    //    - Very high basal rates > 3 U/hr (adjust scale)
+    // Create model producer for chart data
+    val modelProducer = remember { CartesianChartModelProducer() }
 
-    Text(
-        text = "CGM Chart (Vico API needs update)\n" +
-               "Data ready: ${cgmDataPoints.size} CGM points, " +
-               "${bolusEvents.size} boluses, " +
-               "${basalDataPoints.size} basal points",
-        modifier = modifier.fillMaxWidth().height(300.dp).padding(16.dp),
-        style = MaterialTheme.typography.bodyMedium,
-        color = MaterialTheme.colorScheme.onSurfaceVariant
-    )
+    // Update chart data when CGM data changes
+    LaunchedEffect(cgmDataPoints) {
+        if (cgmDataPoints.isNotEmpty()) {
+            modelProducer.runTransaction {
+                lineSeries {
+                    // Use glucose values as Y data
+                    series(cgmDataPoints.map { it.value.toDouble() })
+                }
+            }
+        }
+    }
+
+    if (cgmDataPoints.isEmpty()) {
+        // Show placeholder when no data
+        Text(
+            text = "No CGM data available for selected time range",
+            modifier = modifier.fillMaxWidth().height(300.dp).padding(16.dp),
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+    } else {
+        // Display the chart
+        CartesianChartHost(
+            chart = rememberCartesianChart(
+                rememberLineCartesianLayer(
+                    lineProvider = LineCartesianLayer.LineProvider.series(
+                        rememberLine(
+                            fill = remember { LineCartesianLayer.LineFill.single(fill(GlucoseColors.InRange)) },
+                            thickness = 2.dp
+                        )
+                    )
+                ),
+                startAxis = VerticalAxis.rememberStart(),
+                bottomAxis = HorizontalAxis.rememberBottom(),
+            ),
+            modelProducer = modelProducer,
+            modifier = modifier.fillMaxWidth().height(300.dp)
+        )
+    }
+
+    // TODO: Add insulin visualizations
+    // - Bolus markers (purple circles with labels)
+    // - Basal rate line (bottom 20% of chart)
+    // - Target range shading
+    // See PHASE_3_IMPLEMENTATION_STATUS.md for details
 }
 
 // Time range selector component
