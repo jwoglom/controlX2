@@ -407,13 +407,48 @@ fun VicoCgmChart(
         }
     }
 
-    // Replace NaN with a sentinel value outside visible range to prevent Vico crashes
-    // Vico's internal marker calculation crashes when trying to round NaN values
-    val SENTINEL_VALUE = -1000.0 // Outside visible glucose range (30-410)
-    val cgmSeries = remember(chartBuckets) {
-        chartBuckets.map { it.value ?: SENTINEL_VALUE }
+    // Split CGM data into segments to avoid drawing lines across gaps > 5 minutes
+    // Each segment is padded to full length with sentinel values, with valid data at correct x-positions
+    val SENTINEL_VALUE = -1000.0
+    val cgmSegments = remember(chartBuckets) {
+        val segments = mutableListOf<List<Double>>()
+        var currentSegmentStart: Int? = null
+        
+        chartBuckets.forEachIndexed { index, bucket ->
+            val hasValue = bucket.value != null
+            
+            if (hasValue) {
+                // Start a new segment if we don't have one, or continue current segment
+                if (currentSegmentStart == null) {
+                    currentSegmentStart = index
+                }
+            } else {
+                // Gap detected - close current segment if exists
+                if (currentSegmentStart != null) {
+                    // Create a full-length series with sentinel values everywhere except the segment range
+                    val fullSeries = MutableList(chartBuckets.size) { SENTINEL_VALUE }
+                    (currentSegmentStart until index).forEach { idx ->
+                        fullSeries[idx] = chartBuckets[idx].value ?: SENTINEL_VALUE
+                    }
+                    segments.add(fullSeries)
+                    currentSegmentStart = null
+                }
+            }
+        }
+        
+        // Close any remaining open segment
+        if (currentSegmentStart != null) {
+            val fullSeries = MutableList(chartBuckets.size) { SENTINEL_VALUE }
+            (currentSegmentStart until chartBuckets.size).forEach { idx ->
+                fullSeries[idx] = chartBuckets[idx].value ?: SENTINEL_VALUE
+            }
+            segments.add(fullSeries)
+        }
+        
+        segments
     }
-    val hasValidCgmData = cgmSeries.any { it != SENTINEL_VALUE }
+    
+    val hasValidCgmData = cgmSegments.isNotEmpty()
     val basalSeriesResult = remember(bucketTimes, basalDataPoints) {
         buildBasalSeries(bucketTimes, basalDataPoints)
     }
@@ -514,11 +549,17 @@ fun VicoCgmChart(
     val glucoseSpan = fixedGlucoseSpan
 
     // Update chart data when data changes
-    LaunchedEffect(cgmSeries, basalSeriesResult, hasValidCgmData) {
-        if (hasValidCgmData && cgmSeries.isNotEmpty()) {
+    // Use multiple series for CGM data to avoid drawing lines across gaps
+    LaunchedEffect(cgmSegments, basalSeriesResult, hasValidCgmData) {
+        if (hasValidCgmData && cgmSegments.isNotEmpty()) {
             modelProducer.runTransaction {
                 lineSeries {
-                    series(cgmSeries)
+                    // Add each CGM segment as a separate series
+                    // Each segment is a full-length series with sentinel values outside the segment range
+                    // This prevents Vico from drawing lines connecting across gaps
+                    cgmSegments.forEach { segment ->
+                        series(segment)
+                    }
                     if (hasScheduledBasalSeries) {
                         series(basalSeriesResult.scheduled)
                     }
@@ -546,9 +587,9 @@ fun VicoCgmChart(
         }
 
         // Create persistent markers for bolus events
-        // Map bolus events to their x-positions (indices in the CGM series buckets, not raw data points)
-        val SENTINEL_VALUE = -1000.0
-        val bolusMarkerPoints = remember(bolusEvents, bucketTimes, cgmSeries, hasValidCgmData) {
+        // Map bolus events to their x-positions (indices in the CGM series buckets)
+        // Note: With segmented series, markers are positioned by absolute bucket index
+        val bolusMarkerPoints = remember(bolusEvents, bucketTimes, chartBuckets, hasValidCgmData) {
             if (bolusEvents.isEmpty() || bucketTimes.isEmpty() || !hasValidCgmData) {
                 emptyList<BolusMarkerPoint>()
             } else {
@@ -558,18 +599,16 @@ fun VicoCgmChart(
                         it >= bolus.timestamp 
                     }.takeIf { it >= 0 } ?: bucketTimes.size - 1
                     
-                    // Ensure index is valid and corresponds to a valid (non-sentinel) data point in the series
-                    if (bucketIndex < 0 || bucketIndex >= cgmSeries.size) {
+                    // Ensure index is valid and corresponds to a valid data point
+                    if (bucketIndex < 0 || bucketIndex >= chartBuckets.size) {
                         null
-                    } else if (cgmSeries[bucketIndex] <= SENTINEL_VALUE) {
-                        // Skip markers at sentinel positions - find the nearest valid data point
-                        // Look for the nearest non-sentinel value in the series
-                        val nearestValidIndex = cgmSeries
-                            .mapIndexedNotNull { idx, value -> if (value > SENTINEL_VALUE) idx to value else null }
-                            .minByOrNull { kotlin.math.abs(it.first - bucketIndex) }
-                            ?.first
+                    } else if (chartBuckets[bucketIndex].value == null) {
+                        // Skip markers at gaps - find the nearest valid data point
+                        val nearestValidIndex = chartBuckets
+                            .mapIndexedNotNull { idx, bucket -> if (bucket.value != null) idx else null }
+                            .minByOrNull { kotlin.math.abs(it - bucketIndex) }
                         
-                        if (nearestValidIndex != null && nearestValidIndex >= 0 && nearestValidIndex < cgmSeries.size) {
+                        if (nearestValidIndex != null && nearestValidIndex >= 0 && nearestValidIndex < chartBuckets.size) {
                             BolusMarkerPoint(
                                 position = nearestValidIndex.toFloat(),
                                 event = bolus
