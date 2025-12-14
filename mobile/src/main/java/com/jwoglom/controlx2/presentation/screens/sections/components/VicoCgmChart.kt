@@ -44,6 +44,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color as ComposeColor
 import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -702,7 +703,52 @@ fun VicoCgmChart(
                     override fun getMaxY(minY: Double, maxY: Double, extraStore: ExtraStore): Double = fixedMaxGlucose.toDouble()
                 }
             }
-            val lineLayer = rememberLineCartesianLayer(rangeProvider = lineRangeProvider)
+
+            // Configure line styling for each series
+            val density = androidx.compose.ui.platform.LocalDensity.current
+            val lineLayer = rememberLineCartesianLayer(
+                rangeProvider = lineRangeProvider,
+                lineProvider = com.patrykandpatrick.vico.core.cartesian.layer.LineCartesianLayer.LineProvider.series(
+                    // CGM glucose segments - all styled in blue
+                    lines = buildList {
+                        // Add a line spec for each CGM segment
+                        repeat(cgmSegments.size) {
+                            add(
+                                com.patrykandpatrick.vico.core.cartesian.layer.LineCartesianLayer.Line(
+                                    fill = com.patrykandpatrick.vico.core.common.Fill.single(GlucoseColors.InRange.toArgb()),
+                                    thickness = with(density) { 2.5.dp.toPx() },
+                                    areaFill = null,
+                                    cap = android.graphics.Paint.Cap.ROUND
+                                )
+                            )
+                        }
+
+                        // Scheduled basal line (dark blue)
+                        if (hasScheduledBasalSeries) {
+                            add(
+                                com.patrykandpatrick.vico.core.cartesian.layer.LineCartesianLayer.Line(
+                                    fill = com.patrykandpatrick.vico.core.common.Fill.single(InsulinColors.Basal.toArgb()),
+                                    thickness = with(density) { 2.dp.toPx() },
+                                    areaFill = null,
+                                    cap = android.graphics.Paint.Cap.ROUND
+                                )
+                            )
+                        }
+
+                        // Temp basal line (light blue)
+                        if (hasTempBasalSeries) {
+                            add(
+                                com.patrykandpatrick.vico.core.cartesian.layer.LineCartesianLayer.Line(
+                                    fill = com.patrykandpatrick.vico.core.common.Fill.single(InsulinColors.TempBasal.toArgb()),
+                                    thickness = with(density) { 2.dp.toPx() },
+                                    areaFill = null,
+                                    cap = android.graphics.Paint.Cap.ROUND
+                                )
+                            )
+                        }
+                    }
+                )
+            )
             val scrollState = rememberVicoScrollState(
                 scrollEnabled = false,
                 initialScroll = Scroll.Absolute.End
@@ -988,7 +1034,7 @@ internal fun VicoCgmChartCardSteadyPreview() {
 }
 
 
-@Preview(showBackground = true, name = "With Boluses")
+@Preview(showBackground = true, name = "With Boluses and Basal")
 @Composable
 internal fun VicoCgmChartCardWithBolusPreview() {
 
@@ -1003,11 +1049,19 @@ internal fun VicoCgmChartCardWithBolusPreview() {
     val bolusEvents = createBolusPreviewData(
         baseTimestamp = baseTimestamp,
         entries = listOf(
-            Triple(5, 5.2f, false),
-            Triple(10, 1.5f, true),
-            Triple(15, 2.0f, true),
-            Triple(30, 4.0f, false)
+            Triple(5, 5.2f, false),   // Manual bolus at 25 minutes
+            Triple(10, 1.5f, true),   // Auto bolus at 50 minutes
+            Triple(15, 2.0f, true),   // Auto bolus at 75 minutes
+            Triple(30, 4.0f, false)   // Manual bolus at 150 minutes
         )
+    )
+
+    // Basal data - mix of scheduled and temp basals
+    val basalDataPoints = listOf(
+        BasalDataPoint(timestamp = baseTimestamp, rate = 1.0f, isTemp = false, duration = null),
+        BasalDataPoint(timestamp = baseTimestamp + (15 * 300L), rate = 0.5f, isTemp = true, duration = 30),  // Temp basal at 75 min
+        BasalDataPoint(timestamp = baseTimestamp + (21 * 300L), rate = 1.0f, isTemp = false, duration = null), // Back to scheduled at 105 min
+        BasalDataPoint(timestamp = baseTimestamp + (28 * 300L), rate = 1.5f, isTemp = false, duration = null)  // Scheduled increase at 140 min
     )
 
     ControlX2Theme {
@@ -1019,6 +1073,7 @@ internal fun VicoCgmChartCardWithBolusPreview() {
             val previewData = ChartPreviewData(
                 cgmDataPoints = cgmDataPoints,
                 bolusEvents = bolusEvents,
+                basalDataPoints = basalDataPoints,
                 currentTimeSeconds = cgmDataPoints.lastOrNull()?.timestamp
             )
             VicoCgmChartCard(
