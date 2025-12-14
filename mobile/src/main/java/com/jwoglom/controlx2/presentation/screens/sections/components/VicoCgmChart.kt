@@ -155,6 +155,11 @@ private data class ChartBucket(
     val value: Double?
 )
 
+private data class ChartSeries(
+    val xValues: List<Long>,  // Timestamps in seconds
+    val yValues: List<Double>  // Y-axis values (glucose or basal rate)
+)
+
 private const val BOLUS_MARKER_DIAMETER_DP = 12f
 private const val BOLUS_MARKER_STROKE_DP = 2f
 private const val BOLUS_LABEL_TEXT_SIZE_SP = 12f
@@ -166,18 +171,18 @@ private const val BASAL_DISPLAY_RANGE = 60.0
 private const val MIN_BASAL_RATE_UNITS_PER_HOUR = 3f
 
 private data class BolusMarkerPoint(
-    val position: Float,
+    val timestamp: Long,  // X position (timestamp in seconds)
     val event: BolusEvent
 )
 
 private data class CarbMarkerPoint(
-    val position: Float,
+    val timestamp: Long,  // X position (timestamp in seconds)
     val event: CarbEvent
 )
 
 private data class BasalSeriesResult(
-    val scheduled: List<Double>,
-    val temp: List<Double>
+    val scheduled: ChartSeries?,
+    val temp: ChartSeries?
 )
 
 enum class TimeRange(val label: String, val hours: Int) {
@@ -394,13 +399,16 @@ private fun buildBasalSeries(
     basalDataPoints: List<BasalDataPoint>
 ): BasalSeriesResult {
     if (bucketTimes.isEmpty() || basalDataPoints.isEmpty()) {
-        return BasalSeriesResult(emptyList(), emptyList())
+        return BasalSeriesResult(null, null)
     }
 
-    // Use NaN to represent gaps - should work with segmented series approach
+    // Build separate series for scheduled and temp basal with explicit X,Y coordinates
     val basalMaxRate = max(MIN_BASAL_RATE_UNITS_PER_HOUR, basalDataPoints.maxOfOrNull { it.rate } ?: MIN_BASAL_RATE_UNITS_PER_HOUR)
-    val scheduled = mutableListOf<Double>()
-    val temp = mutableListOf<Double>()
+
+    val scheduledX = mutableListOf<Long>()
+    val scheduledY = mutableListOf<Double>()
+    val tempX = mutableListOf<Long>()
+    val tempY = mutableListOf<Double>()
 
     bucketTimes.forEach { bucketTime ->
         val relevantBasal = basalDataPoints
@@ -410,21 +418,18 @@ private fun buildBasalSeries(
         if (relevantBasal != null) {
             val normalized = (relevantBasal.rate / basalMaxRate) * BASAL_DISPLAY_RANGE
             if (relevantBasal.isTemp) {
-                scheduled.add(Double.NaN)
-                temp.add(normalized)
+                tempX.add(bucketTime)
+                tempY.add(normalized)
             } else {
-                scheduled.add(normalized)
-                temp.add(Double.NaN)
+                scheduledX.add(bucketTime)
+                scheduledY.add(normalized)
             }
-        } else {
-            scheduled.add(Double.NaN)
-            temp.add(Double.NaN)
         }
     }
 
     return BasalSeriesResult(
-        scheduled = scheduled,
-        temp = temp
+        scheduled = if (scheduledX.isNotEmpty()) ChartSeries(scheduledX, scheduledY) else null,
+        temp = if (tempX.isNotEmpty()) ChartSeries(tempX, tempY) else null
     )
 }
 
@@ -469,15 +474,15 @@ fun VicoCgmChart(
     }
 
     // Split CGM data into segments to avoid drawing lines across gaps > 5 minutes
-    // Each segment is padded to full length with NaN values, with valid data at correct x-positions
-    // Using NaN should work better with segmented series approach
-    val cgmSegments = remember(chartBuckets) {
-        val segments = mutableListOf<List<Double>>()
+    // Each segment contains explicit X (timestamp) and Y (glucose) values
+    // Using separate X,Y lists allows proper positioning on time axis
+    val cgmSegments = remember(chartBuckets, bucketTimes) {
+        val segments = mutableListOf<ChartSeries>()
         var currentSegmentStart: Int? = null
-        
+
         chartBuckets.forEachIndexed { index, bucket ->
             val hasValue = bucket.value != null
-            
+
             if (hasValue) {
                 // Start a new segment if we don't have one, or continue current segment
                 if (currentSegmentStart == null) {
@@ -486,37 +491,49 @@ fun VicoCgmChart(
             } else {
                 // Gap detected - close current segment if exists
                 if (currentSegmentStart != null) {
-                    // Create a full-length series with NaN values everywhere except the segment range
-                    val fullSeries = MutableList(chartBuckets.size) { Double.NaN }
+                    // Create series with explicit X (timestamps) and Y (values) for this segment
+                    val xValues = mutableListOf<Long>()
+                    val yValues = mutableListOf<Double>()
+
                     (currentSegmentStart until index).forEach { idx ->
-                        fullSeries[idx] = chartBuckets[idx].value ?: Double.NaN
+                        xValues.add(bucketTimes[idx])
+                        yValues.add(chartBuckets[idx].value ?: Double.NaN)
                     }
-                    segments.add(fullSeries)
+
+                    if (xValues.isNotEmpty()) {
+                        segments.add(ChartSeries(xValues, yValues))
+                    }
                     currentSegmentStart = null
                 }
             }
         }
-        
+
         // Close any remaining open segment
         if (currentSegmentStart != null) {
-            val fullSeries = MutableList(chartBuckets.size) { Double.NaN }
+            val xValues = mutableListOf<Long>()
+            val yValues = mutableListOf<Double>()
+
             (currentSegmentStart until chartBuckets.size).forEach { idx ->
-                fullSeries[idx] = chartBuckets[idx].value ?: Double.NaN
+                xValues.add(bucketTimes[idx])
+                yValues.add(chartBuckets[idx].value ?: Double.NaN)
             }
-            segments.add(fullSeries)
+
+            if (xValues.isNotEmpty()) {
+                segments.add(ChartSeries(xValues, yValues))
+            }
         }
-        
+
         segments
     }
-    
+
     val hasValidCgmData = cgmSegments.isNotEmpty() && cgmSegments.any { segment ->
-        segment.any { !it.isNaN() }
+        segment.yValues.any { !it.isNaN() }
     }
     val basalSeriesResult = remember(bucketTimes, basalDataPoints) {
         buildBasalSeries(bucketTimes, basalDataPoints)
     }
-    val hasScheduledBasalSeries = basalSeriesResult.scheduled.any { !it.isNaN() }
-    val hasTempBasalSeries = basalSeriesResult.temp.any { !it.isNaN() }
+    val hasScheduledBasalSeries = basalSeriesResult.scheduled != null
+    val hasTempBasalSeries = basalSeriesResult.temp != null
 
     val circleShape = remember { CircleShape.toVicoShape() }
     val bolusLabelColor = MaterialTheme.colorScheme.onSurface
@@ -559,17 +576,17 @@ fun VicoCgmChart(
     val axisTimeFormatter = remember {
         SimpleDateFormat("h:mm a", Locale.getDefault())
     }
-    val markerValueFormatter = remember(cgmDataPoints) {
+    val markerValueFormatter = remember {
         DefaultCartesianMarker.ValueFormatter { _, targets ->
             val lineTarget = targets.filterIsInstance<LineCartesianLayerMarkerTarget>().firstOrNull()
             val entry = lineTarget?.points?.firstOrNull()?.entry ?: return@ValueFormatter ""
             // Handle NaN values and invalid data safely
-            if (entry.x.isNaN() || entry.y.isNaN() || cgmDataPoints.isEmpty()) {
+            if (entry.x.isNaN() || entry.y.isNaN()) {
                 return@ValueFormatter ""
             }
-            val index = entry.x.roundToInt().coerceIn(0, cgmDataPoints.lastIndex)
-            val point = cgmDataPoints.getOrNull(index) ?: return@ValueFormatter ""
-            val timeText = axisTimeFormatter.format(Date(point.timestamp * 1000))
+            // entry.x is now a timestamp in seconds
+            val timestamp = entry.x.toLong()
+            val timeText = axisTimeFormatter.format(Date(timestamp * 1000))
             val glucoseText = "${entry.y.roundToInt()} mg/dL"
             "$timeText\n$glucoseText"
         }
@@ -610,23 +627,26 @@ fun VicoCgmChart(
     val glucoseSpan = fixedGlucoseSpan
 
     // Update chart data when data changes
-    // Use multiple series for CGM data to avoid drawing lines across gaps
+    // Use explicit X,Y coordinates for all series
     LaunchedEffect(cgmSegments, basalSeriesResult, hasValidCgmData) {
         if (hasValidCgmData && cgmSegments.isNotEmpty()) {
             modelProducer.runTransaction {
                 lineSeries {
-                    // Add each CGM segment as a separate series
-                    // Each segment is a full-length series with NaN values outside the segment range
-                    // This prevents Vico from drawing lines connecting across gaps
-                    // Using segmented series should help Vico handle NaN values correctly
+                    // Add each CGM segment with explicit timestamps (X) and glucose values (Y)
+                    // This allows proper positioning on the time axis
                     cgmSegments.forEach { segment ->
-                        series(segment)
+                        series(segment.xValues, segment.yValues)
                     }
+                    // Add basal series with explicit timestamps and normalized rates
                     if (hasScheduledBasalSeries) {
-                        series(basalSeriesResult.scheduled)
+                        basalSeriesResult.scheduled?.let { scheduled ->
+                            series(scheduled.xValues, scheduled.yValues)
+                        }
                     }
                     if (hasTempBasalSeries) {
-                        series(basalSeriesResult.temp)
+                        basalSeriesResult.temp?.let { temp ->
+                            series(temp.xValues, temp.yValues)
+                        }
                     }
                 }
             }
@@ -649,41 +669,20 @@ fun VicoCgmChart(
         }
 
         // Create persistent markers for bolus events
-        // Map bolus events to their x-positions (indices in the CGM series buckets)
-        // Note: With segmented series, markers are positioned by absolute bucket index
-        val bolusMarkerPoints = remember(bolusEvents, bucketTimes, chartBuckets, hasValidCgmData) {
-            if (bolusEvents.isEmpty() || bucketTimes.isEmpty() || !hasValidCgmData) {
+        // Use actual timestamps as X positions for markers
+        val bolusMarkerPoints = remember(bolusEvents, startTimeSeconds, currentTimeSeconds, hasValidCgmData) {
+            if (bolusEvents.isEmpty() || !hasValidCgmData) {
                 emptyList<BolusMarkerPoint>()
             } else {
                 bolusEvents.mapNotNull { bolus ->
-                    // Find the bucket index that this bolus timestamp falls into
-                    val bucketIndex = bucketTimes.indexOfFirst { 
-                        it >= bolus.timestamp 
-                    }.takeIf { it >= 0 } ?: bucketTimes.size - 1
-                    
-                    // Ensure index is valid and corresponds to a valid (non-NaN) data point
-                    if (bucketIndex < 0 || bucketIndex >= chartBuckets.size) {
-                        null
-                    } else if (chartBuckets[bucketIndex].value == null) {
-                        // Skip markers at gaps - find the nearest valid data point
-                        val nearestValidIndex = chartBuckets
-                            .mapIndexedNotNull { idx, bucket -> if (bucket.value != null) idx else null }
-                            .minByOrNull { kotlin.math.abs(it - bucketIndex) }
-                        
-                        if (nearestValidIndex != null && nearestValidIndex >= 0 && nearestValidIndex < chartBuckets.size) {
-                            BolusMarkerPoint(
-                                position = nearestValidIndex.toFloat(),
-                                event = bolus
-                            )
-                        } else {
-                            null
-                        }
-                    } else {
-                        // Valid position - use the bucket index
+                    // Only include boluses within the time range
+                    if (bolus.timestamp in startTimeSeconds..currentTimeSeconds) {
                         BolusMarkerPoint(
-                            position = bucketIndex.toFloat(),
+                            timestamp = bolus.timestamp,
                             event = bolus
                         )
+                    } else {
+                        null
                     }
                 }
             }
@@ -706,7 +705,7 @@ fun VicoCgmChart(
                     indicatorComponent = indicator,
                     labelText = formatBolusUnits(markerPoint.event.units)
                 )
-                markerPoint.position to marker
+                markerPoint.timestamp.toFloat() to marker
             }
         }
 
