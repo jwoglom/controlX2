@@ -61,6 +61,7 @@ import com.patrykandpatrick.vico.compose.cartesian.rememberVicoScrollState
 import com.patrykandpatrick.vico.compose.common.component.rememberShapeComponent
 import com.patrykandpatrick.vico.compose.common.fill
 import com.patrykandpatrick.vico.compose.common.shape.toVicoShape
+import com.patrykandpatrick.vico.core.cartesian.Scroll
 import com.patrykandpatrick.vico.core.cartesian.data.CartesianChartModelProducer
 import com.patrykandpatrick.vico.core.cartesian.data.CartesianLayerRangeProvider
 import com.patrykandpatrick.vico.core.cartesian.data.lineSeries
@@ -114,7 +115,13 @@ private class FixedYAxisRangeProvider(
 data class ChartPreviewData(
     val cgmDataPoints: List<CgmDataPoint>,
     val bolusEvents: List<BolusEvent> = emptyList(),
-    val basalDataPoints: List<BasalDataPoint> = emptyList()
+    val basalDataPoints: List<BasalDataPoint> = emptyList(),
+    val currentTimeSeconds: Long? = null
+)
+
+private data class ChartBucket(
+    val timestamp: Long,
+    val value: Double?
 )
 
 private const val BOLUS_MARKER_DIAMETER_DP = 12f
@@ -323,34 +330,36 @@ private fun rememberBasalData(
 }
 
 private fun buildBasalSeries(
-    cgmDataPoints: List<CgmDataPoint>,
+    bucketTimes: List<Long>,
     basalDataPoints: List<BasalDataPoint>
 ): BasalSeriesResult {
-    if (cgmDataPoints.isEmpty() || basalDataPoints.isEmpty()) {
+    if (bucketTimes.isEmpty() || basalDataPoints.isEmpty()) {
         return BasalSeriesResult(emptyList(), emptyList())
     }
 
+    // Use sentinel value instead of NaN to prevent Vico crashes
+    val BASAL_SENTINEL = -1000.0 // Outside visible range
     val basalMaxRate = max(MIN_BASAL_RATE_UNITS_PER_HOUR, basalDataPoints.maxOfOrNull { it.rate } ?: MIN_BASAL_RATE_UNITS_PER_HOUR)
     val scheduled = mutableListOf<Double>()
     val temp = mutableListOf<Double>()
 
-    cgmDataPoints.forEach { cgmPoint ->
+    bucketTimes.forEach { bucketTime ->
         val relevantBasal = basalDataPoints
-            .filter { it.timestamp <= cgmPoint.timestamp }
+            .filter { it.timestamp <= bucketTime }
             .maxByOrNull { it.timestamp }
 
         if (relevantBasal != null) {
             val normalized = (relevantBasal.rate / basalMaxRate) * BASAL_DISPLAY_RANGE
             if (relevantBasal.isTemp) {
-                scheduled.add(Double.NaN)
+                scheduled.add(BASAL_SENTINEL)
                 temp.add(normalized)
             } else {
                 scheduled.add(normalized)
-                temp.add(Double.NaN)
+                temp.add(BASAL_SENTINEL)
             }
         } else {
-            scheduled.add(Double.NaN)
-            temp.add(Double.NaN)
+            scheduled.add(BASAL_SENTINEL)
+            temp.add(BASAL_SENTINEL)
         }
     }
 
@@ -373,19 +382,44 @@ fun VicoCgmChart(
     val bolusEvents = previewData?.bolusEvents ?: rememberBolusData(historyLogViewModel, timeRange)
     val basalDataPoints = previewData?.basalDataPoints ?: rememberBasalData(historyLogViewModel, timeRange)
 
+    val currentTimeSeconds = previewData?.currentTimeSeconds ?: Instant.now().epochSecond
     val fixedGlucoseRange = Pair(30f, 410f)
     val fixedMaxGlucose = fixedGlucoseRange.second
     val fixedMinGlucose = fixedGlucoseRange.first
     val fixedGlucoseSpan = fixedMaxGlucose - fixedMinGlucose
 
-    val cgmSeries = remember(cgmDataPoints) {
-        cgmDataPoints.map { it.value.toDouble() }
+    val rangeSeconds = timeRange.hours * 3600L
+    val bucketSeconds = 5L * 60L
+    val bucketCount = max(1, (rangeSeconds / bucketSeconds).toInt() + 1)
+    val startTimeSeconds = currentTimeSeconds - rangeSeconds
+    val bucketTimes = List(bucketCount) { startTimeSeconds + it * bucketSeconds }
+
+    val chartBuckets = remember(cgmDataPoints, currentTimeSeconds, timeRange) {
+        val values = MutableList(bucketCount) { Double.NaN }
+        cgmDataPoints.forEach { point ->
+            if (point.timestamp in startTimeSeconds..currentTimeSeconds) {
+                val index = ((point.timestamp - startTimeSeconds) / bucketSeconds).toInt().coerceIn(0, bucketCount - 1)
+                values[index] = point.value.toDouble()
+            }
+        }
+        bucketTimes.mapIndexed { index, ts ->
+            ChartBucket(ts, values[index].takeUnless { it.isNaN() })
+        }
     }
-    val basalSeriesResult = remember(cgmDataPoints, basalDataPoints) {
-        buildBasalSeries(cgmDataPoints, basalDataPoints)
+
+    // Replace NaN with a sentinel value outside visible range to prevent Vico crashes
+    // Vico's internal marker calculation crashes when trying to round NaN values
+    val SENTINEL_VALUE = -1000.0 // Outside visible glucose range (30-410)
+    val cgmSeries = remember(chartBuckets) {
+        chartBuckets.map { it.value ?: SENTINEL_VALUE }
     }
-    val hasScheduledBasalSeries = basalSeriesResult.scheduled.any { !it.isNaN() }
-    val hasTempBasalSeries = basalSeriesResult.temp.any { !it.isNaN() }
+    val hasValidCgmData = cgmSeries.any { it != SENTINEL_VALUE }
+    val basalSeriesResult = remember(bucketTimes, basalDataPoints) {
+        buildBasalSeries(bucketTimes, basalDataPoints)
+    }
+    val BASAL_SENTINEL = -1000.0
+    val hasScheduledBasalSeries = basalSeriesResult.scheduled.any { it != BASAL_SENTINEL }
+    val hasTempBasalSeries = basalSeriesResult.temp.any { it != BASAL_SENTINEL }
 
     val circleShape = remember { CircleShape.toVicoShape() }
     val bolusLabelColor = MaterialTheme.colorScheme.onSurface
@@ -432,6 +466,11 @@ fun VicoCgmChart(
         DefaultCartesianMarker.ValueFormatter { _, targets ->
             val lineTarget = targets.filterIsInstance<LineCartesianLayerMarkerTarget>().firstOrNull()
             val entry = lineTarget?.points?.firstOrNull()?.entry ?: return@ValueFormatter ""
+            // Handle sentinel values and invalid data safely
+            val SENTINEL_VALUE = -1000.0
+            if (entry.x.isNaN() || entry.y.isNaN() || entry.y <= SENTINEL_VALUE || cgmDataPoints.isEmpty()) {
+                return@ValueFormatter ""
+            }
             val index = entry.x.roundToInt().coerceIn(0, cgmDataPoints.lastIndex)
             val point = cgmDataPoints.getOrNull(index) ?: return@ValueFormatter ""
             val timeText = axisTimeFormatter.format(Date(point.timestamp * 1000))
@@ -455,23 +494,16 @@ fun VicoCgmChart(
             minWidth = TextComponent.MinWidth.Companion.fixed(0f)
         )
     }
-    val dragMarker = rememberDefaultCartesianMarker(
-        label = dragMarkerLabel,
-        valueFormatter = markerValueFormatter
-    )
-    val axisLabels = remember(cgmDataPoints) {
-        if (cgmDataPoints.isEmpty()) {
-            emptyList<String>()
-        } else {
-            val positions = when {
-                cgmDataPoints.size >= 3 -> listOf(0, cgmDataPoints.size / 2, cgmDataPoints.lastIndex)
-                cgmDataPoints.size == 2 -> listOf(0, 1)
-                else -> listOf(0)
-            }
-            positions.distinct().map { index ->
-                val timestampMillis = cgmDataPoints[index].timestamp * 1000
-                axisTimeFormatter.format(Date(timestampMillis))
-            }
+            // Create the drag marker - no longer need to disable it since we're using sentinel values instead of NaN
+            val dragMarker = rememberDefaultCartesianMarker(
+                label = dragMarkerLabel,
+                valueFormatter = markerValueFormatter
+            )
+    val axisLabels = remember(startTimeSeconds, currentTimeSeconds) {
+        val offsets = listOf(0L, rangeSeconds / 2, rangeSeconds)
+        offsets.map { offset ->
+            val ts = startTimeSeconds + offset
+            axisTimeFormatter.format(Date(ts * 1000))
         }
     }
 
@@ -482,8 +514,8 @@ fun VicoCgmChart(
     val glucoseSpan = fixedGlucoseSpan
 
     // Update chart data when data changes
-    LaunchedEffect(cgmSeries, basalSeriesResult) {
-        if (cgmSeries.isNotEmpty()) {
+    LaunchedEffect(cgmSeries, basalSeriesResult, hasValidCgmData) {
+        if (hasValidCgmData && cgmSeries.isNotEmpty()) {
             modelProducer.runTransaction {
                 lineSeries {
                     series(cgmSeries)
@@ -498,7 +530,7 @@ fun VicoCgmChart(
         }
     }
 
-    if (cgmDataPoints.isEmpty()) {
+    if (cgmDataPoints.isEmpty() || !hasValidCgmData) {
         // Show placeholder when no data
         Text(
             text = "No CGM data available for selected time range",
@@ -514,22 +546,44 @@ fun VicoCgmChart(
         }
 
         // Create persistent markers for bolus events
-        // Map bolus events to their x-positions (indices in the CGM data series) along with bolus data
-        val bolusMarkerPoints = remember(bolusEvents, cgmDataPoints) {
-            if (bolusEvents.isEmpty() || cgmDataPoints.isEmpty()) {
+        // Map bolus events to their x-positions (indices in the CGM series buckets, not raw data points)
+        val SENTINEL_VALUE = -1000.0
+        val bolusMarkerPoints = remember(bolusEvents, bucketTimes, cgmSeries, hasValidCgmData) {
+            if (bolusEvents.isEmpty() || bucketTimes.isEmpty() || !hasValidCgmData) {
                 emptyList<BolusMarkerPoint>()
             } else {
                 bolusEvents.mapNotNull { bolus ->
-                    // Find the closest CGM data point index for this bolus timestamp
-                    val closestIndex = cgmDataPoints.indexOfFirst { 
-                        it.timestamp >= bolus.timestamp 
-                    }.takeIf { it >= 0 } ?: cgmDataPoints.size - 1
+                    // Find the bucket index that this bolus timestamp falls into
+                    val bucketIndex = bucketTimes.indexOfFirst { 
+                        it >= bolus.timestamp 
+                    }.takeIf { it >= 0 } ?: bucketTimes.size - 1
                     
-                    // Convert index to x-value (float position in the series)
-                    BolusMarkerPoint(
-                        position = closestIndex.toFloat(),
-                        event = bolus
-                    )
+                    // Ensure index is valid and corresponds to a valid (non-sentinel) data point in the series
+                    if (bucketIndex < 0 || bucketIndex >= cgmSeries.size) {
+                        null
+                    } else if (cgmSeries[bucketIndex] <= SENTINEL_VALUE) {
+                        // Skip markers at sentinel positions - find the nearest valid data point
+                        // Look for the nearest non-sentinel value in the series
+                        val nearestValidIndex = cgmSeries
+                            .mapIndexedNotNull { idx, value -> if (value > SENTINEL_VALUE) idx to value else null }
+                            .minByOrNull { kotlin.math.abs(it.first - bucketIndex) }
+                            ?.first
+                        
+                        if (nearestValidIndex != null && nearestValidIndex >= 0 && nearestValidIndex < cgmSeries.size) {
+                            BolusMarkerPoint(
+                                position = nearestValidIndex.toFloat(),
+                                event = bolus
+                            )
+                        } else {
+                            null
+                        }
+                    } else {
+                        // Valid position - use the bucket index
+                        BolusMarkerPoint(
+                            position = bucketIndex.toFloat(),
+                            event = bolus
+                        )
+                    }
                 }
             }
         }
@@ -600,11 +654,18 @@ fun VicoCgmChart(
                 }
             }
             val lineLayer = rememberLineCartesianLayer(rangeProvider = lineRangeProvider)
-            val scrollState = rememberVicoScrollState(scrollEnabled = false)
+            val scrollState = rememberVicoScrollState(
+                scrollEnabled = false,
+                initialScroll = Scroll.Absolute.End
+            )
+
+            LaunchedEffect(timeRange, currentTimeSeconds) {
+                scrollState.scroll(Scroll.Absolute.End)
+            }
             CartesianChartHost(
                 chart = rememberCartesianChart(
                     lineLayer,
-                    marker = dragMarker,
+                    marker = dragMarker, // May be null if series contains NaN
                     persistentMarkers = persistentMarkers
                 ),
                 scrollState = scrollState,
@@ -759,8 +820,10 @@ internal fun VicoCgmChartCardNormalPreview() {
                 120, 125, 130, 128, 125, 122, 118, 115, 120, 125, 130, 135, 140, 145, 142, 138, 135, 130, 125, 120,
                 118, 115, 112, 110, 115, 120, 125, 130, 135, 138, 140, 142, 145, 148, 150, 152, 155, 158, 160, 162
             )
+            val cgmDataPoints = createCgmPreviewData(sampleValues)
             val previewData = ChartPreviewData(
-                cgmDataPoints = createCgmPreviewData(sampleValues)
+                cgmDataPoints = cgmDataPoints,
+                currentTimeSeconds = cgmDataPoints.lastOrNull()?.timestamp
             )
 
             VicoCgmChartCard(
@@ -783,8 +846,10 @@ internal fun VicoCgmChartCardHighPreview() {
                 140, 145, 150, 160, 175, 190, 205, 220, 235, 250, 265, 280, 290, 295, 290, 280, 270, 255, 240, 225,
                 210, 195, 180, 170, 160, 155, 150, 145, 140, 135, 130, 125, 120, 118, 115, 120, 125, 130, 128, 125
             )
+            val cgmDataPoints = createCgmPreviewData(sampleValues)
             val previewData = ChartPreviewData(
-                cgmDataPoints = createCgmPreviewData(sampleValues)
+                cgmDataPoints = cgmDataPoints,
+                currentTimeSeconds = cgmDataPoints.lastOrNull()?.timestamp
             )
 
             VicoCgmChartCard(
@@ -808,8 +873,10 @@ internal fun VicoCgmChartCardLowPreview() {
             modifier = Modifier.fillMaxSize(),
             color = SurfaceBackground
         ) {
+            val cgmDataPoints = createCgmPreviewData(sampleValues)
             val previewData = ChartPreviewData(
-                cgmDataPoints = createCgmPreviewData(sampleValues)
+                cgmDataPoints = cgmDataPoints,
+                currentTimeSeconds = cgmDataPoints.lastOrNull()?.timestamp
             )
             VicoCgmChartCard(
                 historyLogViewModel = null,
@@ -832,8 +899,10 @@ internal fun VicoCgmChartCardVolatilePreview() {
             modifier = Modifier.fillMaxSize(),
             color = SurfaceBackground
         ) {
+            val cgmDataPoints = createCgmPreviewData(sampleValues)
             val previewData = ChartPreviewData(
-                cgmDataPoints = createCgmPreviewData(sampleValues)
+                cgmDataPoints = cgmDataPoints,
+                currentTimeSeconds = cgmDataPoints.lastOrNull()?.timestamp
             )
             VicoCgmChartCard(
                 historyLogViewModel = null,
@@ -856,8 +925,10 @@ internal fun VicoCgmChartCardSteadyPreview() {
             modifier = Modifier.fillMaxSize(),
             color = SurfaceBackground
         ) {
+            val cgmDataPoints = createCgmPreviewData(sampleValues)
             val previewData = ChartPreviewData(
-                cgmDataPoints = createCgmPreviewData(sampleValues)
+                cgmDataPoints = cgmDataPoints,
+                currentTimeSeconds = cgmDataPoints.lastOrNull()?.timestamp
             )
             VicoCgmChartCard(
                 historyLogViewModel = null,
@@ -895,9 +966,11 @@ internal fun VicoCgmChartCardWithBolusPreview() {
             modifier = Modifier.fillMaxSize(),
             color = SurfaceBackground
         ) {
+            val cgmDataPoints = createCgmPreviewData(cgmValues, baseTimestamp)
             val previewData = ChartPreviewData(
-                cgmDataPoints = createCgmPreviewData(cgmValues, baseTimestamp),
-                bolusEvents = bolusEvents
+                cgmDataPoints = cgmDataPoints,
+                bolusEvents = bolusEvents,
+                currentTimeSeconds = cgmDataPoints.lastOrNull()?.timestamp
             )
             VicoCgmChartCard(
                 historyLogViewModel = null,

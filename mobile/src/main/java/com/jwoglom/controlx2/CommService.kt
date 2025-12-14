@@ -40,6 +40,7 @@ import com.jwoglom.controlx2.shared.util.twoDecimalPlaces
 import com.jwoglom.controlx2.util.AppVersionCheck
 import com.jwoglom.controlx2.util.DataClientState
 import com.jwoglom.controlx2.util.HistoryLogFetcher
+import com.jwoglom.controlx2.util.HistoryLogSyncWorker
 import com.jwoglom.controlx2.util.extractPumpSid
 import com.jwoglom.controlx2.sync.nightscout.NightscoutSyncWorker
 import com.jwoglom.pumpx2.pump.PumpState
@@ -136,6 +137,7 @@ class CommService : Service() {
     val historyLogDb by lazy { HistoryLogDatabase.getDatabase(this) }
     val historyLogRepo by lazy { HistoryLogRepo(historyLogDb.historyLogDao()) }
     private var historyLogFetcher: HistoryLogFetcher? = null
+    private var historyLogSyncWorker: HistoryLogSyncWorker? = null
 
     // Handler that receives messages from the thread
     private inner class PumpCommHandler(looper: Looper) : Handler(looper) {
@@ -317,6 +319,12 @@ class CommService : Service() {
                 historyLogFetcher = HistoryLogFetcher(this@CommService, pump, peripheral!!, pumpSid!!)
                 Timber.i("HistoryLogFetcher initialized")
 
+                historyLogSyncWorker = HistoryLogSyncWorker(requestSync = { requestHistoryLogStatusUpdate() })
+                if (Prefs(applicationContext).autoFetchHistoryLogs()) {
+                    historyLogSyncWorker?.start()
+                    historyLogSyncWorker?.triggerImmediateSync()
+                }
+
                 // Start Nightscout sync worker if enabled
                 NightscoutSyncWorker.startIfEnabled(
                     applicationContext,
@@ -367,6 +375,8 @@ class CommService : Service() {
                 lastPeripheral = null
                 lastResponseMessage.clear()
                 historyLogFetcher = null
+                historyLogSyncWorker?.stop()
+                historyLogSyncWorker = null
                 lastTimeSinceReset = null
                 isConnected = false
                 sendWearCommMessage("/from-pump/pump-disconnected",
@@ -822,6 +832,17 @@ class CommService : Service() {
                 HistoryLogStatusRequest()
             )))
         }
+    }
+
+    private fun requestHistoryLogStatusUpdate() {
+        if (!Prefs(applicationContext).autoFetchHistoryLogs()) {
+            return
+        }
+        sendPumpCommMessages(
+            PumpMessageSerializer.toBulkBytes(
+                listOf(HistoryLogStatusRequest())
+            )
+        )
     }
 
     private val checkForUpdatesDelayMs: Long = 1000 * 30 // 30 seconds
@@ -1322,6 +1343,8 @@ class CommService : Service() {
 
     override fun onDestroy() {
         super.onDestroy()
+        historyLogSyncWorker?.stop()
+        historyLogSyncWorker = null
         scope.cancel()
         messageBus.close()
         httpDebugApiService?.stop()
