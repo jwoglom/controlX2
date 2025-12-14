@@ -7,14 +7,13 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.SharedPreferences
+import android.os.Handler
+import android.os.Looper
 import androidx.core.app.NotificationCompat
-import com.google.android.gms.wearable.MessageClient
-import com.google.android.gms.wearable.MessageEvent
-import com.google.android.gms.wearable.Node
-import com.google.android.gms.wearable.NodeClient
-import com.google.android.gms.wearable.Wearable
-import com.google.android.gms.wearable.WearableListenerService
+import com.jwoglom.controlx2.messaging.MessageBusFactory
 import com.jwoglom.controlx2.shared.InitiateConfirmedBolusSerializer
+import com.jwoglom.controlx2.shared.messaging.MessageBus
+import com.jwoglom.controlx2.shared.messaging.MessageBusSender
 import com.jwoglom.controlx2.shared.PumpMessageSerializer
 import com.jwoglom.controlx2.shared.util.shortTimeAgo
 import com.jwoglom.controlx2.shared.util.twoDecimalPlaces
@@ -28,18 +27,11 @@ import timber.log.Timber
 import java.time.Instant
 
 
-class BolusNotificationBroadcastReceiver : BroadcastReceiver(), MessageClient.OnMessageReceivedListener {
-    private lateinit var messageClient: MessageClient
-    private lateinit var nodeClient: NodeClient
-
-
+class BolusNotificationBroadcastReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context?, intent: Intent?) {
         Timber.i("BolusNotificationBroadcastReceiver $context $intent")
 
-        messageClient = Wearable.getMessageClient(context!!)
-        messageClient.addListener(this)
-
-        nodeClient = Wearable.getNodeClient(context)
+        val messageBus = MessageBusFactory.createMessageBus(context!!)
 
         val action = intent?.getStringExtra("action")
         val notifId = getCurrentNotificationId(context)
@@ -62,12 +54,11 @@ class BolusNotificationBroadcastReceiver : BroadcastReceiver(), MessageClient.On
                         }"
                     )
 
-                    waitForApiClient()
                     val bolusSource = prefs(context)?.getString("initiateBolusSource", "") ?: ""
                     if (bolusSource == "wear") {
-                        sendMessage("/to-wear/initiate-confirmed-bolus", rawBytes)
+                        sendMessageWhenReady(messageBus, "/to-wear/initiate-confirmed-bolus", rawBytes, context)
                     } else if (bolusSource == "phone") {
-                        sendMessage("/to-phone/initiate-confirmed-bolus", rawBytes)
+                        sendMessageWhenReady(messageBus, "/to-phone/initiate-confirmed-bolus", rawBytes, context)
                     }
                     if (!PumpState.actionsAffectingInsulinDeliveryEnabled()) {
                         // The same message will appear on the wearable
@@ -167,20 +158,22 @@ class BolusNotificationBroadcastReceiver : BroadcastReceiver(), MessageClient.On
                     )
                 )
                 resetBolusPrefs(context)
-                waitForApiClient()
-                sendMessage("/to-wear/bolus-rejected", "from_phone".toByteArray())
+                sendMessageWhenReady(messageBus, "/to-wear/bolus-rejected", "from_phone".toByteArray(), context)
             }
             "CANCEL" -> {
                 val bolusId = intent.getIntExtra("bolusId", 0)
 
-                repeat (5) {
-                    // fall-open on allowing cancellation, and retry several times
-                    sendMessage(
+                // Send cancellation command - retry logic with delays to ensure MessageBus is ready
+                // Note: Multiple sends are intentional to increase delivery probability
+                val cancelBytes = PumpMessageSerializer.toBytes(CancelBolusRequest(bolusId))
+                repeat (5) { attempt ->
+                    sendMessageWhenReady(
+                        messageBus,
                         "/to-pump/command",
-                        PumpMessageSerializer.toBytes(CancelBolusRequest(bolusId))
+                        cancelBytes,
+                        context,
+                        delayMs = attempt * 100L // Stagger retries: 0ms, 100ms, 200ms, 300ms, 400ms
                     )
-                    Thread.sleep(500)
-                    waitForApiClient()
                 }
             }
             else -> {
@@ -340,48 +333,35 @@ class BolusNotificationBroadcastReceiver : BroadcastReceiver(), MessageClient.On
     }
 
     private fun prefs(context: Context?): SharedPreferences? {
-        return context?.getSharedPreferences("WearX2", WearableListenerService.MODE_PRIVATE)
+        return context?.getSharedPreferences("WearX2", Context.MODE_PRIVATE)
     }
 
-    fun sendMessage(path: String, message: ByteArray) {
-        Timber.i("bolusNotificationBroadcastReceiver sendMessage: $path ${String(message)}")
-
-        fun inner(node: Node) {
-            messageClient.sendMessage(node.id, path, message)
-                .addOnSuccessListener {
-                    Timber.d("bolusNotificationBroadcastReceiver message sent: $path ${String(message)} to: $node")
-                }
-                .addOnFailureListener {
-                    Timber.w("bolusNotificationBroadcastReceiver sendMessage callback: ${it} for: $path ${String(message)}")
-                }
-        }
-        if (!path.startsWith("/to-wear")) {
-            nodeClient.localNode.addOnSuccessListener { localNode ->
-                inner(localNode)
-            }
-        }
-        nodeClient.connectedNodes
-            .addOnSuccessListener { nodes ->
-                Timber.d("bolusNotificationBroadcastReceiver sendMessage nodes: ${nodes}")
-                nodes.forEach { node ->
-                    inner(node)
-                }
-            }
-    }
-
-    private fun waitForApiClient() {
-        var connected = false
-        while (!connected) {
-            Timber.d("BolusNotificationBroadcastReceiver is waiting on mApiClient connection")
-            nodeClient.localNode.addOnSuccessListener {
-                connected = true
-            }
-            Thread.sleep(100)
-        }
-    }
-
-    override fun onMessageReceived(messageEvent: MessageEvent) {
-        // does not currently listen for anything
+    /**
+     * Send a message through the MessageBus, ensuring the bus is ready first.
+     * Uses a Handler-based approach with a small delay to allow MessageBus initialization,
+     * similar to the original waitForApiClient() but non-blocking.
+     * 
+     * @param messageBus The MessageBus instance to use
+     * @param path The message path
+     * @param data The message data
+     * @param context Android context
+     * @param delayMs Optional delay before sending (for staggered retries)
+     */
+    private fun sendMessageWhenReady(
+        messageBus: MessageBus,
+        path: String,
+        data: ByteArray,
+        context: Context,
+        delayMs: Long = 0
+    ) {
+        val handler = Handler(Looper.getMainLooper())
+        val totalDelay = delayMs + 100L // Add 100ms base delay to ensure MessageBus is initialized
+        
+        handler.postDelayed({
+            Timber.d("BolusNotificationBroadcastReceiver sending message: $path")
+            messageBus.sendMessage(path, data, MessageBusSender.MOBILE_UI)
+            Timber.d("BolusNotificationBroadcastReceiver message queued: $path")
+        }, totalDelay)
     }
 
 }
