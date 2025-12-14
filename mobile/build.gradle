@@ -164,5 +164,3 @@ dependencies {
     // See: https://developer.android.com/distribute/best-practices/launch/distribute-wear
 }
 
-// Apply Vico NaN fix patch
-apply from: 'vico-patch.gradle'

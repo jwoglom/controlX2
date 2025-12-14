@@ -2,13 +2,7 @@ package com.jwoglom.controlx2.presentation.screens.sections.components
 
 /**
  * CGM Chart using Vico charting library.
- * 
- * NOTE: This uses a fork of Vico (https://github.com/jwoglom/vico) which includes a fix
- * for NaN handling in LineCartesianLayer.updateMarkerTargets. The upstream Vico library
- * crashes when trying to round NaN values during marker position calculations.
- * 
- * The fork adds null-safety checks before rounding y-values in updateMarkerTargets.
- */
+ **/
 
 import android.graphics.Typeface
 import android.text.Layout
@@ -46,24 +40,27 @@ import androidx.compose.ui.graphics.Color as ComposeColor
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
+import com.jwoglom.controlx2.db.historylog.HistoryLogItem
 import com.jwoglom.controlx2.db.historylog.HistoryLogViewModel
 import com.jwoglom.controlx2.presentation.theme.CardBackground
 import com.jwoglom.controlx2.presentation.theme.ControlX2Theme
 import com.jwoglom.controlx2.presentation.theme.Elevation
 import com.jwoglom.controlx2.presentation.theme.GlucoseColors
-import com.jwoglom.controlx2.presentation.theme.GridLineColor
 import com.jwoglom.controlx2.presentation.theme.Spacing
 import com.jwoglom.controlx2.presentation.theme.SurfaceBackground
-import com.jwoglom.controlx2.presentation.theme.TargetRangeColor
 import com.jwoglom.controlx2.presentation.theme.InsulinColors
 import com.jwoglom.pumpx2.pump.messages.models.InsulinUnit
-import com.jwoglom.pumpx2.pump.messages.response.currentStatus.LastBolusStatusAbstractResponse
+import com.jwoglom.pumpx2.pump.messages.response.historyLog.BasalRateChangeHistoryLog
 import com.jwoglom.pumpx2.pump.messages.response.historyLog.BolusDeliveryHistoryLog
+import com.jwoglom.pumpx2.pump.messages.response.historyLog.BolusDeliveryHistoryLog.BolusSource
 import com.jwoglom.pumpx2.pump.messages.response.historyLog.DexcomG6CGMHistoryLog
 import com.jwoglom.pumpx2.pump.messages.response.historyLog.DexcomG7CGMHistoryLog
 import com.jwoglom.pumpx2.pump.messages.response.historyLog.CgmDataGxHistoryLog
+import com.jwoglom.pumpx2.pump.messages.response.historyLog.TempRateActivatedHistoryLog
 import com.patrykandpatrick.vico.compose.cartesian.CartesianChartHost
+import com.patrykandpatrick.vico.compose.cartesian.axis.rememberAxisLabelComponent
+import com.patrykandpatrick.vico.compose.cartesian.axis.rememberBottom
+import com.patrykandpatrick.vico.compose.cartesian.axis.rememberStart
 import com.patrykandpatrick.vico.compose.cartesian.layer.rememberLineCartesianLayer
 import com.patrykandpatrick.vico.compose.cartesian.marker.rememberDefaultCartesianMarker
 import com.patrykandpatrick.vico.compose.cartesian.rememberCartesianChart
@@ -77,8 +74,9 @@ import com.patrykandpatrick.vico.core.cartesian.data.CartesianLayerRangeProvider
 import com.patrykandpatrick.vico.core.cartesian.data.lineSeries
 import com.patrykandpatrick.vico.core.cartesian.marker.DefaultCartesianMarker
 import com.patrykandpatrick.vico.core.cartesian.marker.LineCartesianLayerMarkerTarget
-import com.patrykandpatrick.vico.core.cartesian.CartesianChart
 import com.patrykandpatrick.vico.core.cartesian.CartesianChart.PersistentMarkerScope
+import com.patrykandpatrick.vico.core.cartesian.axis.HorizontalAxis
+import com.patrykandpatrick.vico.core.cartesian.axis.VerticalAxis
 import com.patrykandpatrick.vico.core.common.Insets
 import com.patrykandpatrick.vico.core.common.component.Component
 import com.patrykandpatrick.vico.core.common.component.TextComponent
@@ -89,18 +87,38 @@ import java.time.ZoneId
 import java.util.Date
 import java.util.Locale
 import kotlin.math.max
-import kotlin.math.min
 import kotlin.math.roundToInt
 
 // Data models
+enum class CgmTarget(val pointColor: ComposeColor) {
+    SEVERE_LOW(GlucoseColors.SevereLow),
+    LOW(GlucoseColors.Low),
+    IN_RANGE(GlucoseColors.InRange),
+    HIGH(GlucoseColors.High),
+    SEVERE_HIGH(GlucoseColors.SevereHigh)
+}
+
+private fun targetForGlucoseValue(value: Float): CgmTarget {
+    // TODO(jwoglom): configurable
+    return when (value) {
+        in 0f..59f -> CgmTarget.SEVERE_LOW
+        in 60f..79f -> CgmTarget.LOW
+        in 80f..159f -> CgmTarget.IN_RANGE
+        in 160f..219f -> CgmTarget.HIGH
+        in 220f..400f -> CgmTarget.SEVERE_HIGH
+        else -> CgmTarget.IN_RANGE
+    }
+}
+
 data class CgmDataPoint(
     val timestamp: Long,
-    val value: Float
+    val value: Float,
+    val target: CgmTarget
 )
 
 data class BolusEvent(
     val timestamp: Long,       // Pump time in seconds
-    val units: Float,          // Insulin units delivered
+    val units: Float,         // Insulin units delivered
     val isAutomated: Boolean,  // True if Control-IQ auto-bolus
     val bolusType: String      // Type identifier
 )
@@ -113,13 +131,15 @@ data class BasalDataPoint(
 )
 
 private class FixedYAxisRangeProvider(
-    private val minYLimit: Double,
-    private val maxYLimit: Double
+    private val fixedMinX: Double,
+    private val fixedMaxX: Double,
+    private val fixedMinY: Double,
+    private val fixedMaxY: Double
 ) : CartesianLayerRangeProvider {
-    override fun getMinX(minX: Double, maxX: Double, extraStore: ExtraStore): Double = minX
-    override fun getMaxX(minX: Double, maxX: Double, extraStore: ExtraStore): Double = maxX
-    override fun getMinY(minY: Double, maxY: Double, extraStore: ExtraStore): Double = minYLimit
-    override fun getMaxY(minY: Double, maxY: Double, extraStore: ExtraStore): Double = maxYLimit
+    override fun getMinX(minX: Double, maxX: Double, extraStore: ExtraStore): Double = fixedMinX
+    override fun getMaxX(minX: Double, maxX: Double, extraStore: ExtraStore): Double = fixedMaxX
+    override fun getMinY(minY: Double, maxY: Double, extraStore: ExtraStore): Double = fixedMinY
+    override fun getMaxY(minY: Double, maxY: Double, extraStore: ExtraStore): Double = fixedMaxY
 }
 
 data class ChartPreviewData(
@@ -184,27 +204,14 @@ private fun rememberCgmChartData(
                     val timestamp = dao.pumpTime.atZone(ZoneId.systemDefault()).toEpochSecond()
                     CgmDataPoint(
                         timestamp = timestamp,
-                        value = value
+                        value = value,
+                        target = targetForGlucoseValue(value)
                     )
                 } else null
             } catch (e: Exception) {
                 null
             }
         }?.reversed() ?: emptyList()  // Reverse to get chronological order
-    }
-}
-
-// Helper function to safely extract field values using reflection
-private inline fun <reified T> tryGetField(clazz: Class<*>, obj: Any, fieldName: String): T? {
-    return try {
-        val field = clazz.getDeclaredField(fieldName)
-        field.isAccessible = true
-        val value = field.get(obj)
-        if (value is T) value else null
-    } catch (e: NoSuchFieldException) {
-        null
-    } catch (e: Exception) {
-        null
     }
 }
 
@@ -243,37 +250,33 @@ private fun rememberBolusData(
 
     return remember(bolusHistoryLogs?.value, timeRange) {
         bolusHistoryLogs?.value?.mapNotNull { dao ->
-            try {
-                val parsed = dao.parse()
-                if (parsed is BolusDeliveryHistoryLog) {
-                    val bolusClass = parsed.javaClass
+            val parsed = dao.parse()
+            if (parsed is BolusDeliveryHistoryLog) {
+                val units = InsulinUnit.from1000To1(parsed.deliveredTotal.toLong())
 
-                    // Extract insulin units
-                    val units = tryGetField<Int>(bolusClass, parsed, "totalVolumeDelivered")
-                        ?.let { it / 100f }  // Convert to units (0.01U precision)
-                        ?: 0f
+                // Determine if automated bolus
+                val bolusSource = parsed.bolusSource
+                val isAutomated = when (bolusSource) {
+                    BolusSource.GUI -> false
+                    BolusSource.BLUETOOTH_REMOTE_BOLUS -> false
+                    BolusSource.QUICK_BOLUS -> false
+                    else -> true
+                }
 
-                    // Determine if automated bolus
-                    val bolusSource = tryGetField<Any>(bolusClass, parsed, "bolusSource")?.toString() ?: ""
-                    val isAutomated = bolusSource.contains("CLOSED_LOOP_AUTO_BOLUS", ignoreCase = true)
+                // Get bolus type
+                val bolusType = parsed.bolusTypes.map { it.name }.joinToString(", ")
 
-                    // Get bolus type
-                    val bolusType = tryGetField<Any>(bolusClass, parsed, "bolusType")?.toString() ?: "UNKNOWN"
+                val timestamp = dao.pumpTime.atZone(ZoneId.systemDefault()).toEpochSecond()
 
-                    val timestamp = dao.pumpTime.atZone(ZoneId.systemDefault()).toEpochSecond()
-
-                    if (units > 0) {
-                        BolusEvent(
-                            timestamp = timestamp,
-                            units = units,
-                            isAutomated = isAutomated,
-                            bolusType = bolusType
-                        )
-                    } else null
+                if (units > 0) {
+                    BolusEvent(
+                        timestamp = timestamp,
+                        units = units.toFloat(),
+                        isAutomated = isAutomated,
+                        bolusType = bolusType
+                    )
                 } else null
-            } catch (e: Exception) {
-                null
-            }
+            } else null
         }?.reversed() ?: emptyList()  // Reverse to get chronological order
     }
 }
@@ -284,57 +287,35 @@ private fun rememberBasalData(
     historyLogViewModel: HistoryLogViewModel?,
     timeRange: TimeRange
 ): List<BasalDataPoint> {
-    // Try to find basal-related HistoryLog types
-    val basalClasses = listOfNotNull(
-            com.jwoglom.pumpx2.pump.messages.response.historyLog.BasalRateChangeHistoryLog::class.java,
-            com.jwoglom.pumpx2.pump.messages.response.historyLog.TempRateActivatedHistoryLog::class.java,
-            com.jwoglom.pumpx2.pump.messages.response.historyLog.BasalRateChangeHistoryLog::class.java
-        )
 
-    val basalHistoryLogs = if (basalClasses.isNotEmpty()) {
-        historyLogViewModel?.latestItemsForTypes(
-            basalClasses,
-            // Basal changes: ~1-4 per hour for temp basals
-            (timeRange.hours * 4) + 10
-        )?.observeAsState()
-    } else null
+    val basalHistoryLogs = historyLogViewModel?.latestItemsForTypes(
+        listOf(
+            BasalRateChangeHistoryLog::class.java
+        ),
+        (timeRange.hours * 60)
+    )?.observeAsState()
 
     return remember(basalHistoryLogs?.value, timeRange) {
-        basalHistoryLogs?.value?.mapNotNull { dao: com.jwoglom.controlx2.db.historylog.HistoryLogItem ->
-            try {
-                val parsed = dao.parse()
-                val basalClass = parsed.javaClass
+        basalHistoryLogs?.value?.mapNotNull { dao: HistoryLogItem ->
+            val parsed = dao.parse()
 
-                // Extract basal rate
-                val rate = tryGetField<Int>(basalClass, parsed, "basalRate")
-                    ?.let { it / 1000f }  // Convert from milli-units/hr to units/hr
-                    ?: tryGetField<Int>(basalClass, parsed, "rate")
-                        ?.let { it / 1000f }
-                    ?: 0f
-
-                // Determine if temp basal
-                val isTemp = tryGetField<Boolean>(basalClass, parsed, "isTemp")
-                    ?: tryGetField<String>(basalClass, parsed, "basalType")?.contains("TEMP", ignoreCase = true)
-                    ?: false
-
-                // Get duration
-                val durationSeconds = tryGetField<Int>(basalClass, parsed, "duration")
-                    ?: tryGetField<Long>(basalClass, parsed, "duration")?.toInt()
-                val duration = durationSeconds?.let { it / 60 } // Convert to minutes
-
-                val timestamp = dao.pumpTime.atZone(ZoneId.systemDefault()).toEpochSecond()
-
-                if (rate > 0) {
-                    BasalDataPoint(
-                        timestamp = timestamp,
-                        rate = rate,
-                        isTemp = isTemp,
-                        duration = duration
-                    )
-                } else null
-            } catch (e: Exception) {
-                null
+            val rate = when (parsed) {
+                is BasalRateChangeHistoryLog -> parsed.commandBasalRate
+                else -> null
             }
+
+            val isTemp = false
+            val durationMins = 5
+            val timestamp = dao.pumpTime.atZone(ZoneId.systemDefault()).toEpochSecond()
+
+            if (rate != null && rate > 0) {
+                BasalDataPoint(
+                    timestamp = timestamp,
+                    rate = rate,
+                    isTemp = isTemp,
+                    duration = durationMins
+                )
+            } else null
         }?.reversed() ?: emptyList()  // Reverse to get chronological order
     }
 }
@@ -695,12 +676,12 @@ fun VicoCgmChart(
             }
 
             val lineRangeProvider = remember {
-                object : CartesianLayerRangeProvider {
-                    override fun getMinX(minX: Double, maxX: Double, extraStore: ExtraStore): Double = minX
-                    override fun getMaxX(minX: Double, maxX: Double, extraStore: ExtraStore): Double = maxX
-                    override fun getMinY(minY: Double, maxY: Double, extraStore: ExtraStore): Double = fixedMinGlucose.toDouble()
-                    override fun getMaxY(minY: Double, maxY: Double, extraStore: ExtraStore): Double = fixedMaxGlucose.toDouble()
-                }
+                FixedYAxisRangeProvider(
+                    fixedMinX = (currentTimeSeconds - rangeSeconds).toDouble(),
+                    fixedMaxX = currentTimeSeconds.toDouble(),
+                    fixedMinY = 39.0,
+                    fixedMaxY = 401.0
+                )
             }
             val lineLayer = rememberLineCartesianLayer(rangeProvider = lineRangeProvider)
             val scrollState = rememberVicoScrollState(
@@ -714,6 +695,12 @@ fun VicoCgmChart(
             CartesianChartHost(
                 chart = rememberCartesianChart(
                     lineLayer,
+                    startAxis = VerticalAxis.rememberStart(
+                        label = rememberAxisLabelComponent(),
+                    ),
+                    bottomAxis = HorizontalAxis.rememberBottom(
+                        label = rememberAxisLabelComponent(),
+                    ),
                     marker = dragMarker, // May be null if series contains NaN
                     persistentMarkers = persistentMarkers
                 ),
@@ -834,25 +821,27 @@ fun VicoCgmChartCard(
     }
 }
 
-private fun createCgmPreviewData(values: List<Int>, baseTimestamp: Long = 1700000000L): List<CgmDataPoint> {
-    return values.mapIndexed { index, mgdl ->
-        CgmDataPoint(
+private fun createCgmPreviewData(values: List<Int?>, baseTimestamp: Long = 1700000000L): List<CgmDataPoint> {
+    return values.mapIndexedNotNull { index, mgdl ->
+        if (mgdl == null) null
+        else CgmDataPoint(
             timestamp = baseTimestamp + (index * 300L),
-            value = mgdl.toFloat()
+            value = mgdl.toFloat(),
+            target = targetForGlucoseValue(mgdl.toFloat())
         )
     }
 }
 
 private fun createBolusPreviewData(
     baseTimestamp: Long,
-    entries: List<Triple<Int, Float, Boolean>>
+    entries: List<Triple<Int, Double, Boolean>>
 ): List<BolusEvent> {
     return entries.mapIndexed { idx, (fiveMinuteIndex, units, automated) ->
         BolusEvent(
             timestamp = baseTimestamp + (fiveMinuteIndex * 300L),
-            units = units,
+            units = units.toFloat(),
             isAutomated = automated,
-            bolusType = if (automated) "AUTO" else "MANUAL-${'$'}idx"
+            bolusType = ""
         )
     }
 }
@@ -1003,10 +992,10 @@ internal fun VicoCgmChartCardWithBolusPreview() {
     val bolusEvents = createBolusPreviewData(
         baseTimestamp = baseTimestamp,
         entries = listOf(
-            Triple(5, 5.2f, false),
-            Triple(10, 1.5f, true),
-            Triple(15, 2.0f, true),
-            Triple(30, 4.0f, false)
+            Triple(5, 5.2, false),
+            Triple(10, 1.5, true),
+            Triple(15, 2.0, true),
+            Triple(30, 4.0, false)
         )
     )
 
@@ -1020,6 +1009,78 @@ internal fun VicoCgmChartCardWithBolusPreview() {
                 cgmDataPoints = cgmDataPoints,
                 bolusEvents = bolusEvents,
                 currentTimeSeconds = cgmDataPoints.lastOrNull()?.timestamp
+            )
+            VicoCgmChartCard(
+                historyLogViewModel = null,
+                previewData = previewData
+            )
+        }
+    }
+}
+
+@Preview(showBackground = true, name = "Test Data With Gaps")
+@Composable
+internal fun TestVicoCgmChart() {
+    val baseTimestamp = 1700000000L
+
+    // Create CGM data with intentional gaps
+    // Segment 1: indices 0-9 (normal readings)
+    // Gap: indices 10-15 (no data - simulates sensor loss/signal issues)
+    // Segment 2: indices 16-24 (readings resume)
+    // Gap: indices 25-29 (another gap)
+    // Segment 3: indices 30-39 (final segment)
+    val allDataPoints = mutableListOf<CgmDataPoint>()
+
+    // Segment 1: Normal range (120-140 mg/dL)
+    val segment1Values = listOf(120, 122, 125, 128, 130, 132, 135, 137, 138, 140)
+    segment1Values.forEachIndexed { index, value ->
+        allDataPoints.add(
+            CgmDataPoint(
+                timestamp = baseTimestamp + (index * 300L),
+                value = value.toFloat(),
+                target = targetForGlucoseValue(value.toFloat())
+            )
+        )
+    }
+
+    // Gap 1: indices 10-15 (30 minutes gap = 6 readings missing)
+    // No data points added here
+
+    // Segment 2: Rising glucose (145-195 mg/dL)
+    val segment2Values = listOf(145, 150, 155, 165, 175, 180, 185, 190, 195)
+    segment2Values.forEachIndexed { index, value ->
+        allDataPoints.add(
+            CgmDataPoint(
+                timestamp = baseTimestamp + ((16 + index) * 300L),
+                value = value.toFloat(),
+                target = targetForGlucoseValue(value.toFloat())
+            )
+        )
+    }
+
+    // Gap 2: indices 25-29 (25 minutes gap = 5 readings missing)
+    // No data points added here
+
+    // Segment 3: Declining glucose (190-120 mg/dL)
+    val segment3Values = listOf(190, 180, 170, 160, 150, 145, 140, 135, 130, 120)
+    segment3Values.forEachIndexed { index, value ->
+        allDataPoints.add(
+            CgmDataPoint(
+                timestamp = baseTimestamp + ((30 + index) * 300L),
+                value = value.toFloat(),
+                target = targetForGlucoseValue(value.toFloat())
+            )
+        )
+    }
+
+    ControlX2Theme {
+        Surface(
+            modifier = Modifier.fillMaxSize(),
+            color = SurfaceBackground
+        ) {
+            val previewData = ChartPreviewData(
+                cgmDataPoints = allDataPoints,
+                currentTimeSeconds = allDataPoints.lastOrNull()?.timestamp
             )
             VicoCgmChartCard(
                 historyLogViewModel = null,

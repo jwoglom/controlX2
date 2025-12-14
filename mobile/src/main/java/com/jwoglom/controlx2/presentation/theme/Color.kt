@@ -26,11 +26,11 @@ val Colors = lightColorScheme(
 
 // Glucose Status Colors
 object GlucoseColors {
-    val Severe = Color(0xFFC62828)        // Deep Red (< 70 mg/dL)
+    val SevereLow = Color(0xFFC62828)        // Deep Red (< 70 mg/dL)
     val Low = Color(0xFFFF5252)           // Red Accent (70-79 mg/dL)
     val InRange = Color(0xFF1976D2)       // Blue (80-180 mg/dL)
-    val Elevated = Color(0xFFFF9800)      // Orange (181-250 mg/dL)
-    val High = Color(0xFFE65100)          // Deep Orange (> 250 mg/dL)
+    val High = Color(0xFFFF9800)      // Orange (181-250 mg/dL)
+    val SevereHigh = Color(0xFFE65100)          // Deep Orange (> 250 mg/dL)
 }
 
 // Insulin Colors

@@ -21,7 +21,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
-import androidx.compose.ui.unit.dp
 import com.jwoglom.controlx2.presentation.theme.CardBackground
 import com.jwoglom.controlx2.presentation.theme.ControlX2Theme
 import com.jwoglom.controlx2.presentation.theme.Elevation
@@ -98,11 +97,11 @@ fun GlucoseHeroCard(
 private fun getGlucoseColor(glucose: Int?): Color {
     return when (glucose) {
         null -> MaterialTheme.colorScheme.onSurfaceVariant
-        in 0..69 -> GlucoseColors.Severe
+        in 0..69 -> GlucoseColors.SevereLow
         in 70..79 -> GlucoseColors.Low
         in 80..180 -> GlucoseColors.InRange
-        in 181..250 -> GlucoseColors.Elevated
-        else -> GlucoseColors.High
+        in 181..250 -> GlucoseColors.High
+        else -> GlucoseColors.SevereHigh
     }
 }
 
