@@ -1,6 +1,9 @@
 package com.jwoglom.controlx2.presentation.screens.sections.components
 
+import android.graphics.Typeface
+import android.text.Layout
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -32,6 +35,7 @@ import androidx.compose.ui.graphics.Color as ComposeColor
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.jwoglom.controlx2.db.historylog.HistoryLogViewModel
 import com.jwoglom.controlx2.presentation.theme.CardBackground
 import com.jwoglom.controlx2.presentation.theme.ControlX2Theme
@@ -42,17 +46,27 @@ import com.jwoglom.controlx2.presentation.theme.Spacing
 import com.jwoglom.controlx2.presentation.theme.SurfaceBackground
 import com.jwoglom.controlx2.presentation.theme.TargetRangeColor
 import com.jwoglom.controlx2.presentation.theme.InsulinColors
+import com.jwoglom.pumpx2.pump.messages.models.InsulinUnit
+import com.jwoglom.pumpx2.pump.messages.response.currentStatus.LastBolusStatusAbstractResponse
 import com.jwoglom.pumpx2.pump.messages.response.historyLog.DexcomG6CGMHistoryLog
 import com.jwoglom.pumpx2.pump.messages.response.historyLog.DexcomG7CGMHistoryLog
 import com.jwoglom.pumpx2.pump.messages.response.historyLog.BolusDeliveryHistoryLog
+import com.jwoglom.pumpx2.pump.messages.response.historyLog.CgmDataGxHistoryLog
 import com.patrykandpatrick.vico.compose.cartesian.CartesianChartHost
 import com.patrykandpatrick.vico.compose.cartesian.layer.rememberLineCartesianLayer
 import com.patrykandpatrick.vico.compose.cartesian.rememberCartesianChart
-import com.patrykandpatrick.vico.compose.cartesian.marker.rememberDefaultCartesianMarker
+import com.patrykandpatrick.vico.compose.common.component.rememberShapeComponent
+import com.patrykandpatrick.vico.compose.common.fill
+import com.patrykandpatrick.vico.compose.common.shape.toVicoShape
 import com.patrykandpatrick.vico.core.cartesian.data.CartesianChartModelProducer
 import com.patrykandpatrick.vico.core.cartesian.data.lineSeries
 import com.patrykandpatrick.vico.core.cartesian.marker.DefaultCartesianMarker
-import androidx.compose.ui.unit.dp
+import com.patrykandpatrick.vico.core.cartesian.CartesianChart
+import com.patrykandpatrick.vico.core.cartesian.CartesianChart.PersistentMarkerScope
+import com.patrykandpatrick.vico.core.common.Insets
+import com.patrykandpatrick.vico.core.common.component.Component
+import com.patrykandpatrick.vico.core.common.component.TextComponent
+import com.patrykandpatrick.vico.core.common.data.ExtraStore
 import java.text.SimpleDateFormat
 import java.time.Instant
 import java.time.ZoneId
@@ -81,6 +95,22 @@ data class BasalDataPoint(
     val duration: Int?         // Duration in minutes (for temp basal)
 )
 
+private const val BOLUS_MARKER_DIAMETER_DP = 12f
+private const val BOLUS_MARKER_STROKE_DP = 2f
+private const val BOLUS_LABEL_TEXT_SIZE_SP = 12f
+private const val BASAL_DISPLAY_RANGE = 60.0
+private const val MIN_BASAL_RATE_UNITS_PER_HOUR = 3f
+
+private data class BolusMarkerPoint(
+    val position: Float,
+    val event: BolusEvent
+)
+
+private data class BasalSeriesResult(
+    val scheduled: List<Double>,
+    val temp: List<Double>
+)
+
 enum class TimeRange(val label: String, val hours: Int) {
     THREE_HOURS("3h", 3),
     SIX_HOURS("6h", 6),
@@ -107,6 +137,7 @@ private fun rememberCgmChartData(
                 val value = when (parsed) {
                     is DexcomG6CGMHistoryLog -> parsed.currentGlucoseDisplayValue.toFloat()
                     is DexcomG7CGMHistoryLog -> parsed.currentGlucoseDisplayValue.toFloat()
+                    is CgmDataGxHistoryLog -> parsed.value.toFloat()
                     else -> null
                 }
 
@@ -136,6 +167,27 @@ private inline fun <reified T> tryGetField(clazz: Class<*>, obj: Any, fieldName:
     } catch (e: Exception) {
         null
     }
+}
+
+private fun formatBolusUnits(units: Float): String {
+    val pattern = if (units >= 1f) "%.1fU" else "%.2fU"
+    return String.format(Locale.getDefault(), pattern, units)
+}
+
+private fun createBolusMarker(
+    labelComponent: TextComponent,
+    indicatorComponent: Component,
+    labelText: String
+): DefaultCartesianMarker {
+    val formatter = DefaultCartesianMarker.ValueFormatter { _, _ -> labelText }
+    return DefaultCartesianMarker(
+        label = labelComponent,
+        valueFormatter = formatter,
+        labelPosition = DefaultCartesianMarker.LabelPosition.Top,
+        indicator = { indicatorComponent },
+        indicatorSizeDp = BOLUS_MARKER_DIAMETER_DP,
+        guideline = null
+    )
 }
 
 // Helper function to fetch and convert Bolus data
@@ -194,19 +246,15 @@ private fun rememberBasalData(
     timeRange: TimeRange
 ): List<BasalDataPoint> {
     // Try to find basal-related HistoryLog types
-    val basalClasses = try {
-        listOfNotNull(
-            tryLoadClass("com.jwoglom.pumpx2.pump.messages.response.historyLog.BasalRateChangeHistoryLog"),
-            tryLoadClass("com.jwoglom.pumpx2.pump.messages.response.historyLog.TempRateStartedHistoryLog"),
-            tryLoadClass("com.jwoglom.pumpx2.pump.messages.response.historyLog.BasalActivatedHistoryLog")
+    val basalClasses = listOfNotNull(
+            com.jwoglom.pumpx2.pump.messages.response.historyLog.BasalRateChangeHistoryLog::class.java,
+            com.jwoglom.pumpx2.pump.messages.response.historyLog.TempRateActivatedHistoryLog::class.java,
+            com.jwoglom.pumpx2.pump.messages.response.historyLog.BasalRateChangeHistoryLog::class.java
         )
-    } catch (e: Exception) {
-        emptyList()
-    }
 
     val basalHistoryLogs = if (basalClasses.isNotEmpty()) {
         historyLogViewModel?.latestItemsForTypes(
-            basalClasses as List<Class<out com.jwoglom.pumpx2.pump.messages.response.historyLog.HistoryLog>>,
+            basalClasses,
             // Basal changes: ~1-4 per hour for temp basals
             (timeRange.hours * 4) + 10
         )?.observeAsState()
@@ -252,25 +300,99 @@ private fun rememberBasalData(
     }
 }
 
-// Helper to load class by name
-private fun tryLoadClass(className: String): Class<*>? {
-    return try {
-        Class.forName(className)
-    } catch (e: ClassNotFoundException) {
-        null
+private fun buildBasalSeries(
+    cgmDataPoints: List<CgmDataPoint>,
+    basalDataPoints: List<BasalDataPoint>
+): BasalSeriesResult {
+    if (cgmDataPoints.isEmpty() || basalDataPoints.isEmpty()) {
+        return BasalSeriesResult(emptyList(), emptyList())
     }
+
+    val basalMaxRate = max(MIN_BASAL_RATE_UNITS_PER_HOUR, basalDataPoints.maxOfOrNull { it.rate } ?: MIN_BASAL_RATE_UNITS_PER_HOUR)
+    val scheduled = mutableListOf<Double>()
+    val temp = mutableListOf<Double>()
+
+    cgmDataPoints.forEach { cgmPoint ->
+        val relevantBasal = basalDataPoints
+            .filter { it.timestamp <= cgmPoint.timestamp }
+            .maxByOrNull { it.timestamp }
+
+        if (relevantBasal != null) {
+            val normalized = (relevantBasal.rate / basalMaxRate) * BASAL_DISPLAY_RANGE
+            if (relevantBasal.isTemp) {
+                scheduled.add(Double.NaN)
+                temp.add(normalized)
+            } else {
+                scheduled.add(normalized)
+                temp.add(Double.NaN)
+            }
+        } else {
+            scheduled.add(Double.NaN)
+            temp.add(Double.NaN)
+        }
+    }
+
+    return BasalSeriesResult(
+        scheduled = scheduled,
+        temp = temp
+    )
 }
+
 
 @Composable
 fun VicoCgmChart(
     historyLogViewModel: HistoryLogViewModel?,
-    timeRange: TimeRange = TimeRange.SIX_HOURS,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    timeRange: TimeRange = TimeRange.SIX_HOURS
 ) {
     // Fetch all chart data
     val cgmDataPoints = rememberCgmChartData(historyLogViewModel, timeRange)
     val bolusEvents = rememberBolusData(historyLogViewModel, timeRange)
     val basalDataPoints = rememberBasalData(historyLogViewModel, timeRange)
+
+    val cgmSeries = remember(cgmDataPoints) {
+        cgmDataPoints.map { it.value.toDouble() }
+    }
+    val basalSeriesResult = remember(cgmDataPoints, basalDataPoints) {
+        buildBasalSeries(cgmDataPoints, basalDataPoints)
+    }
+    val hasScheduledBasalSeries = basalSeriesResult.scheduled.any { !it.isNaN() }
+    val hasTempBasalSeries = basalSeriesResult.temp.any { !it.isNaN() }
+
+    val circleShape = remember { CircleShape.toVicoShape() }
+    val bolusLabelColor = MaterialTheme.colorScheme.onSurface
+    val bolusLabelComponent = remember(bolusLabelColor) {
+        TextComponent(
+            color = bolusLabelColor.toArgb(),
+            typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD),
+            textSizeSp = BOLUS_LABEL_TEXT_SIZE_SP,
+            textAlignment = Layout.Alignment.ALIGN_CENTER,
+            lineHeightSp = null,
+            lineCount = 1,
+            truncateAt = null,
+            margins = Insets(0f, 0f, 0f, 4f),
+            padding = Insets(6f, 2f, 6f, 2f),
+            background = null,
+            minWidth = TextComponent.MinWidth.Companion.fixed(0f)
+        )
+    }
+
+    val manualIndicatorComponent = rememberShapeComponent(
+        fill(InsulinColors.Bolus),
+        circleShape,
+        Insets(),
+        fill(ComposeColor.White),
+        BOLUS_MARKER_STROKE_DP.dp,
+        null
+    )
+    val autoIndicatorComponent = rememberShapeComponent(
+        fill(InsulinColors.AutoBolus),
+        circleShape,
+        Insets(),
+        fill(ComposeColor.White),
+        BOLUS_MARKER_STROKE_DP.dp,
+        null
+    )
 
     // Create model producer for chart data
     val modelProducer = remember { CartesianChartModelProducer() }
@@ -291,48 +413,16 @@ fun VicoCgmChart(
     val glucoseSpan = maxGlucose - minGlucose
 
     // Update chart data when data changes
-    LaunchedEffect(cgmDataPoints, bolusEvents, basalDataPoints) {
-        if (cgmDataPoints.isNotEmpty()) {
+    LaunchedEffect(cgmSeries, basalSeriesResult) {
+        if (cgmSeries.isNotEmpty()) {
             modelProducer.runTransaction {
                 lineSeries {
-                    // Series 0: Glucose line (main data series)
-                    series(cgmDataPoints.map { it.value.toDouble() })
-                    
-                    // Series 1: Bolus markers (positioned at top of chart, 5% above max glucose)
-                    // Map bolus events to chart positions aligned with glucose timeline
-                    if (bolusEvents.isNotEmpty()) {
-                        val bolusMarkerY = maxGlucose * 1.05 // Position 5% above max glucose
-                        val bolusSeries = cgmDataPoints.mapIndexed { index, cgm ->
-                            // Check if there's a bolus event near this CGM reading (within 5 minutes)
-                            val hasBolus = bolusEvents.any { bolus ->
-                            val timeDiff = kotlin.math.abs(cgm.timestamp - bolus.timestamp)
-                            timeDiff <= 300 // 5 minutes tolerance
-                        }
-                        if (hasBolus) bolusMarkerY else Double.NaN // NaN means no point at this position
-                        }
-                        series(bolusSeries)
+                    series(cgmSeries)
+                    if (hasScheduledBasalSeries) {
+                        series(basalSeriesResult.scheduled)
                     }
-                    
-                    // Series 2: Basal rate (scaled to bottom 20% of chart: 0-60 mg/dL range)
-                    // Scale: 0-3 U/hr mapped to 0-60 mg/dL (bottom 20% of typical 0-300 range)
-                    if (basalDataPoints.isNotEmpty()) {
-                        val basalMaxRate = maxOf(3f, basalDataPoints.maxOfOrNull { it.rate } ?: 3f)
-                        // Create basal series aligned with CGM timeline
-                        val basalSeries = cgmDataPoints.mapIndexed { index, cgm ->
-                            // Find the most recent basal rate at or before this CGM reading
-                            val relevantBasal = basalDataPoints
-                                .filter { it.timestamp <= cgm.timestamp }
-                                .maxByOrNull { it.timestamp }
-                            
-                            if (relevantBasal != null) {
-                                // Scale to bottom 20%: 0-60 mg/dL range
-                                val normalizedRate = (relevantBasal.rate / basalMaxRate) * 60.0
-                                normalizedRate
-                            } else {
-                                Double.NaN
-                            }
-                        }
-                        series(basalSeries)
+                    if (hasTempBasalSeries) {
+                        series(basalSeriesResult.temp)
                     }
                 }
             }
@@ -349,10 +439,10 @@ fun VicoCgmChart(
         )
     } else {
         // Create persistent markers for bolus events
-        // Map bolus events to their x-positions (indices in the CGM data series)
-        val bolusMarkerPositions = remember(bolusEvents, cgmDataPoints) {
+        // Map bolus events to their x-positions (indices in the CGM data series) along with bolus data
+        val bolusMarkerPoints = remember(bolusEvents, cgmDataPoints) {
             if (bolusEvents.isEmpty() || cgmDataPoints.isEmpty()) {
-                emptyList<Float>()
+                emptyList<BolusMarkerPoint>()
             } else {
                 bolusEvents.mapNotNull { bolus ->
                     // Find the closest CGM data point index for this bolus timestamp
@@ -361,33 +451,64 @@ fun VicoCgmChart(
                     }.takeIf { it >= 0 } ?: cgmDataPoints.size - 1
                     
                     // Convert index to x-value (float position in the series)
-                    closestIndex.toFloat()
+                    BolusMarkerPoint(
+                        position = closestIndex.toFloat(),
+                        event = bolus
+                    )
+                }
+            }
+        }
+        
+        val bolusMarkers = remember(
+            bolusMarkerPoints,
+            bolusLabelComponent,
+            manualIndicatorComponent,
+            autoIndicatorComponent
+        ) {
+            bolusMarkerPoints.map { markerPoint ->
+                val indicator = if (markerPoint.event.isAutomated) {
+                    autoIndicatorComponent
+                } else {
+                    manualIndicatorComponent
+                }
+                val marker = createBolusMarker(
+                    labelComponent = bolusLabelComponent,
+                    indicatorComponent = indicator,
+                    labelText = formatBolusUnits(markerPoint.event.units)
+                )
+                markerPoint.position to marker
+            }
+        }
+
+        val persistentMarkers = remember(bolusMarkers) {
+            if (bolusMarkers.isEmpty()) {
+                null
+            } else {
+                { scope: PersistentMarkerScope, _: ExtraStore ->
+                    bolusMarkers.forEach { (xValue, marker) ->
+                        with(scope) {
+                            marker.at(xValue)
+                        }
+                    }
                 }
             }
         }
         
         // Display the chart with Vico
-        // Note: Persistent markers for bolus events will be implemented in next iteration
-        // The bolusMarkerPositions are calculated and ready for marker visualization
         CartesianChartHost(
             chart = rememberCartesianChart(
-                rememberLineCartesianLayer()
+                rememberLineCartesianLayer(),
+                persistentMarkers = persistentMarkers
             ),
             modelProducer = modelProducer,
             modifier = modifier.fillMaxWidth().height(300.dp)
         )
         
         // TODO Phase 4: Enhance marker styling
-        // - Add custom indicator colors (purple for manual, light purple for auto)
-        // - Add white stroke outline (2dp)
-        // - Add vertical guideline (dashed line)
-        // - Handle overlapping markers
+        // - Handle overlapping markers and optional guideline styling
         
         // TODO Phase 4: Enhance basal rate visualization
-        // - Use column layer or stepped line
-        // - Position at bottom 20% of chart
-        // - Color: dark blue for scheduled, light blue for temp
-        // - Handle gaps in basal data
+        // - Consider stepped columns/area fill for clearer temp vs scheduled states
     }
 }
 
@@ -488,30 +609,32 @@ private fun createCgmEntry(index: Int, mgdl: Int, baseTimestamp: Long = 17000000
 }
 
 // Preview helper function to create Bolus entries
-// TODO: Fix constructor - BolusDeliveryHistoryLog API has changed
-// Constructor signature and enums need to be verified
-/*
+
 private fun createBolusEntry(
     index: Int,
     timestamp: Long,
     units: Float,
-    isAutomated: Boolean = false,
-    baseTimestamp: Long = 1700000000L
+    isAutomated: Boolean = false
 ): BolusDeliveryHistoryLog {
     val actualTimestamp = timestamp
     return BolusDeliveryHistoryLog(
         actualTimestamp,
         (index + 1000).toLong(),  // Unique sequence ID
-        (units * 100).toInt(),  // Total volume in 0.01U
-        0,  // Extended volume
-        BolusDeliveryHistoryLog.BolusType.FOOD,
+        (index + 1000),  // Bolus ID
+        LastBolusStatusAbstractResponse.BolusStatus.COMPLETE.id(),
+        setOf(BolusDeliveryHistoryLog.BolusType.FOOD1),
         if (isAutomated)
-            BolusDeliveryHistoryLog.BolusSource.CLOSED_LOOP_AUTO_BOLUS
+            BolusDeliveryHistoryLog.BolusSource.CONTROL_IQ_AUTO_BOLUS
         else
-            BolusDeliveryHistoryLog.BolusSource.MANUAL
+            BolusDeliveryHistoryLog.BolusSource.GUI,
+        0,
+        0,
+        0,
+        0,
+        0,
+        InsulinUnit.from1To1000(units).toInt()
     )
 }
-*/
 
 @Preview(showBackground = true, name = "Normal Range")
 @Composable
@@ -568,24 +691,25 @@ internal fun VicoCgmChartCardHighPreview() {
 @Preview(showBackground = true, name = "Low Glucose")
 @Composable
 internal fun VicoCgmChartCardLowPreview() {
+    val sampleData = listOf(
+        120, 115, 110, 105, 100, 95, 90, 85, 80, 75, 70, 65, 60, 58, 55, 58, 62, 68, 75, 82,
+        90, 98, 105, 112, 118, 125, 130, 135, 138, 140, 142, 140, 138, 135, 132, 130, 128, 125, 122, 120
+    ).mapIndexed { index, mgdl ->
+        createCgmEntry(index, mgdl)
+    }.map { com.jwoglom.controlx2.db.historylog.HistoryLogItem(it) }
+
+    val historyLogViewModel = HistoryLogViewModel(
+        com.jwoglom.controlx2.db.historylog.HistoryLogRepo(
+            com.jwoglom.controlx2.db.historylog.HistoryLogDummyDao(sampleData.toMutableList())
+        ), 0
+    )
     ControlX2Theme {
         Surface(
             modifier = Modifier.fillMaxSize(),
             color = SurfaceBackground
         ) {
-            val sampleData = listOf(
-                120, 115, 110, 105, 100, 95, 90, 85, 80, 75, 70, 65, 60, 58, 55, 58, 62, 68, 75, 82,
-                90, 98, 105, 112, 118, 125, 130, 135, 138, 140, 142, 140, 138, 135, 132, 130, 128, 125, 122, 120
-            ).mapIndexed { index, mgdl ->
-                createCgmEntry(index, mgdl)
-            }.map { com.jwoglom.controlx2.db.historylog.HistoryLogItem(it) }
-
             VicoCgmChartCard(
-                historyLogViewModel = com.jwoglom.controlx2.db.historylog.HistoryLogViewModel(
-                    com.jwoglom.controlx2.db.historylog.HistoryLogRepo(
-                        com.jwoglom.controlx2.db.historylog.HistoryLogDummyDao(sampleData.toMutableList())
-                    ), 0
-                )
+                historyLogViewModel = historyLogViewModel,
             )
         }
     }
@@ -594,24 +718,26 @@ internal fun VicoCgmChartCardLowPreview() {
 @Preview(showBackground = true, name = "Volatile Glucose")
 @Composable
 internal fun VicoCgmChartCardVolatilePreview() {
+    val sampleData = listOf(
+        150, 165, 145, 170, 140, 180, 135, 190, 130, 200, 125, 210, 120, 205, 125, 195, 135, 180, 145, 165,
+        155, 150, 160, 145, 170, 140, 175, 138, 180, 135, 185, 132, 180, 135, 170, 140, 160, 145, 150, 148
+    ).mapIndexed { index, mgdl ->
+        createCgmEntry(index, mgdl)
+    }.map { com.jwoglom.controlx2.db.historylog.HistoryLogItem(it) }
+
+    val historyLogViewModel = HistoryLogViewModel(
+        com.jwoglom.controlx2.db.historylog.HistoryLogRepo(
+            com.jwoglom.controlx2.db.historylog.HistoryLogDummyDao(sampleData.toMutableList())
+        ), 0
+    )
+
     ControlX2Theme {
         Surface(
             modifier = Modifier.fillMaxSize(),
             color = SurfaceBackground
         ) {
-            val sampleData = listOf(
-                150, 165, 145, 170, 140, 180, 135, 190, 130, 200, 125, 210, 120, 205, 125, 195, 135, 180, 145, 165,
-                155, 150, 160, 145, 170, 140, 175, 138, 180, 135, 185, 132, 180, 135, 170, 140, 160, 145, 150, 148
-            ).mapIndexed { index, mgdl ->
-                createCgmEntry(index, mgdl)
-            }.map { com.jwoglom.controlx2.db.historylog.HistoryLogItem(it) }
-
             VicoCgmChartCard(
-                historyLogViewModel = com.jwoglom.controlx2.db.historylog.HistoryLogViewModel(
-                    com.jwoglom.controlx2.db.historylog.HistoryLogRepo(
-                        com.jwoglom.controlx2.db.historylog.HistoryLogDummyDao(sampleData.toMutableList())
-                    ), 0
-                )
+                historyLogViewModel = historyLogViewModel,
             )
         }
     }
@@ -620,71 +746,74 @@ internal fun VicoCgmChartCardVolatilePreview() {
 @Preview(showBackground = true, name = "Steady Trend")
 @Composable
 internal fun VicoCgmChartCardSteadyPreview() {
+    val sampleData = listOf(
+        110, 110, 111, 111, 112, 112, 113, 113, 114, 114, 115, 115, 116, 116, 117, 117, 118, 118, 119, 119,
+        120, 120, 121, 121, 122, 122, 123, 123, 124, 124, 125, 125, 126, 126, 127, 127, 128, 128, 129, 129
+    ).mapIndexed { index, mgdl ->
+        createCgmEntry(index, mgdl)
+    }.map { com.jwoglom.controlx2.db.historylog.HistoryLogItem(it) }
+
+    val historyLogViewModel = HistoryLogViewModel(
+        com.jwoglom.controlx2.db.historylog.HistoryLogRepo(
+            com.jwoglom.controlx2.db.historylog.HistoryLogDummyDao(sampleData.toMutableList())
+        ), 0
+    )
+
     ControlX2Theme {
         Surface(
             modifier = Modifier.fillMaxSize(),
             color = SurfaceBackground
         ) {
-            val sampleData = listOf(
-                110, 110, 111, 111, 112, 112, 113, 113, 114, 114, 115, 115, 116, 116, 117, 117, 118, 118, 119, 119,
-                120, 120, 121, 121, 122, 122, 123, 123, 124, 124, 125, 125, 126, 126, 127, 127, 128, 128, 129, 129
-            ).mapIndexed { index, mgdl ->
-                createCgmEntry(index, mgdl)
-            }.map { com.jwoglom.controlx2.db.historylog.HistoryLogItem(it) }
-
             VicoCgmChartCard(
-                historyLogViewModel = com.jwoglom.controlx2.db.historylog.HistoryLogViewModel(
-                    com.jwoglom.controlx2.db.historylog.HistoryLogRepo(
-                        com.jwoglom.controlx2.db.historylog.HistoryLogDummyDao(sampleData.toMutableList())
-                    ), 0
-                )
+                historyLogViewModel = historyLogViewModel,
             )
         }
     }
 }
 
-// TODO: Re-enable once createBolusEntry is fixed
-/*
+
 @Preview(showBackground = true, name = "With Boluses")
 @Composable
 internal fun VicoCgmChartCardWithBolusPreview() {
+
+    val baseTimestamp = 1700000000L
+
+    // CGM data
+    val cgmData = listOf(
+        120, 125, 130, 135, 140, 150, 160, 170, 180, 190, 200, 210, 220, 225, 220, 210, 200, 190, 180, 170,
+        160, 155, 150, 145, 140, 135, 130, 125, 120, 118, 115, 120, 125, 130, 128, 125, 122, 120, 118, 115
+    ).mapIndexed { index, mgdl ->
+        createCgmEntry(index, mgdl, baseTimestamp)
+    }.map { com.jwoglom.controlx2.db.historylog.HistoryLogItem(it) }
+
+    // Bolus data - add some manual and auto boluses
+    val bolusData = listOf(
+        // Manual bolus at index 5 (before meal spike)
+        createBolusEntry(0, baseTimestamp + (5 * 300L), 5.2f, false),
+        // Auto bolus at index 10 (during spike)
+        createBolusEntry(1, baseTimestamp + (10 * 300L), 1.5f, true),
+        // Auto bolus at index 15 (peak)
+        createBolusEntry(2, baseTimestamp + (15 * 300L), 2.0f, true),
+        // Manual bolus at index 30 (separate meal)
+        createBolusEntry(3, baseTimestamp + (30 * 300L), 4.0f, false)
+    ).map { com.jwoglom.controlx2.db.historylog.HistoryLogItem(it) }
+
+    val allData = (cgmData + bolusData).toMutableList()
+
+    val historyLogViewModel = HistoryLogViewModel(
+        com.jwoglom.controlx2.db.historylog.HistoryLogRepo(
+            com.jwoglom.controlx2.db.historylog.HistoryLogDummyDao(allData)
+        ), 0
+    )
+
     ControlX2Theme {
         Surface(
             modifier = Modifier.fillMaxSize(),
             color = SurfaceBackground
         ) {
-            val baseTimestamp = 1700000000L
-
-            // CGM data
-            val cgmData = listOf(
-                120, 125, 130, 135, 140, 150, 160, 170, 180, 190, 200, 210, 220, 225, 220, 210, 200, 190, 180, 170,
-                160, 155, 150, 145, 140, 135, 130, 125, 120, 118, 115, 120, 125, 130, 128, 125, 122, 120, 118, 115
-            ).mapIndexed { index, mgdl ->
-                createCgmEntry(index, mgdl, baseTimestamp)
-            }.map { com.jwoglom.controlx2.db.historylog.HistoryLogItem(it) }
-
-            // Bolus data - add some manual and auto boluses
-            val bolusData = listOf(
-                // Manual bolus at index 5 (before meal spike)
-                createBolusEntry(0, baseTimestamp + (5 * 300L), 5.2f, false, baseTimestamp),
-                // Auto bolus at index 10 (during spike)
-                createBolusEntry(1, baseTimestamp + (10 * 300L), 1.5f, true, baseTimestamp),
-                // Auto bolus at index 15 (peak)
-                createBolusEntry(2, baseTimestamp + (15 * 300L), 2.0f, true, baseTimestamp),
-                // Manual bolus at index 30 (separate meal)
-                createBolusEntry(3, baseTimestamp + (30 * 300L), 4.0f, false, baseTimestamp)
-            ).map { com.jwoglom.controlx2.db.historylog.HistoryLogItem(it) }
-
-            val allData = (cgmData + bolusData).toMutableList()
-
             VicoCgmChartCard(
-                historyLogViewModel = com.jwoglom.controlx2.db.historylog.HistoryLogViewModel(
-                    com.jwoglom.controlx2.db.historylog.HistoryLogRepo(
-                        com.jwoglom.controlx2.db.historylog.HistoryLogDummyDao(allData)
-                    ), 0
-                )
+                historyLogViewModel = historyLogViewModel,
             )
         }
     }
 }
-*/
