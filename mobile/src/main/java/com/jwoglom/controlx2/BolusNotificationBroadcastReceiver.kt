@@ -21,7 +21,9 @@ import com.jwoglom.pumpx2.pump.PumpState
 import com.jwoglom.pumpx2.pump.messages.models.InsulinUnit
 import com.jwoglom.pumpx2.pump.messages.request.control.CancelBolusRequest
 import com.jwoglom.pumpx2.pump.messages.request.control.InitiateBolusRequest
+import com.jwoglom.pumpx2.pump.messages.request.currentStatus.CurrentBolusStatusRequest
 import com.jwoglom.pumpx2.pump.messages.response.control.InitiateBolusResponse
+import com.jwoglom.pumpx2.pump.messages.response.currentStatus.CurrentBolusStatusResponse
 import com.jwoglom.pumpx2.shared.Hex
 import timber.log.Timber
 import java.time.Instant
@@ -143,13 +145,101 @@ class BolusNotificationBroadcastReceiver : BroadcastReceiver() {
                             context, notifId, confirmBolusRequestBaseNotification(
                                 context,
                                 "Bolus Requested",
-                                "The ${bolusSummaryText(initiateRequest)} is being delivered"
+                                "The ${bolusSummaryText(initiateRequest)} is being prepared."
                             ).addAction(R.drawable.decline, "Cancel", cancelPendingIntent)
                         )
+                        
+                        // Save initial status and bolusId
+                        prefs(context)?.edit()
+                            ?.putString("lastBolusStatus", CurrentBolusStatusResponse.CurrentBolusStatus.REQUESTING.name)
+                            ?.putInt("lastBolusId", initiateResponse.bolusId)
+                            ?.apply()
+                        
+                        // Start periodic status updates
+                        startBolusStatusUpdates(context, messageBus, initiateResponse.bolusId, initiateRequest)
+                    }
+                }
+            }
+            "STATUS_UPDATE" -> {
+                getCurrentBolusToConfirm(context)?.let { initiateRequest ->
+                    getCurrentBolusStatusResponse(intent)?.let { statusResponse ->
+                        // Only update notification if status has changed
+                        val previousStatus = prefs(context)?.getString("lastBolusStatus", null)
+                        val currentStatus = statusResponse.status.name
+                        val previousBolusId = prefs(context)?.getInt("lastBolusId", -1) ?: -1
+                        val currentBolusId = statusResponse.bolusId
+                        
+                        // Update if status changed OR if bolusId changed (especially when it becomes 0 for completion)
+                        val statusChanged = previousStatus != currentStatus
+                        val bolusIdChanged = previousBolusId != currentBolusId
+                        val bolusCompleted = currentBolusId == 0 && previousBolusId != 0
+                        
+                        if (statusChanged || bolusIdChanged) {
+                            Timber.d("BolusNotificationBroadcastReceiver status changed: $previousStatus -> $currentStatus, bolusId: $previousBolusId -> $currentBolusId")
+                            
+                            // Save the new status and bolusId
+                            prefs(context)?.edit()
+                                ?.putString("lastBolusStatus", currentStatus)
+                                ?.putInt("lastBolusId", currentBolusId)
+                                ?.apply()
+                            
+                            val notifId = getCurrentNotificationId(context)
+                            
+                            // Determine status text - prioritize completion detection
+                            val statusText = when {
+                                bolusCompleted -> "was completed."
+                                currentBolusId == 0 -> "was completed."
+                                statusResponse.status == CurrentBolusStatusResponse.CurrentBolusStatus.REQUESTING -> "is being prepared."
+                                statusResponse.status == CurrentBolusStatusResponse.CurrentBolusStatus.DELIVERING -> "is being delivered."
+                                else -> "was completed."
+                            }
+                            
+                            // Only show cancel button if bolus is still active
+                            val notificationBuilder = confirmBolusRequestBaseNotification(
+                                context,
+                                "Bolus Initiated",
+                                "The ${bolusSummaryText(initiateRequest)} $statusText"
+                            )
+                            
+                            if (currentBolusId != 0) {
+                                val cancelIntent =
+                                    Intent(context, BolusNotificationBroadcastReceiver::class.java).apply {
+                                        putExtra("action", "CANCEL")
+                                        putExtra("bolusId", currentBolusId)
+                                    }
+                                val cancelPendingIntent = PendingIntent.getBroadcast(
+                                    context,
+                                    2003,
+                                    cancelIntent,
+                                    PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_ONE_SHOT
+                                )
+                                notificationBuilder.addAction(R.drawable.decline, "Cancel", cancelPendingIntent)
+                            }
+                            
+                            reply(context, notifId, notificationBuilder)
+                        } else {
+                            Timber.d("BolusNotificationBroadcastReceiver status unchanged: $currentStatus, bolusId: $currentBolusId, skipping notification update")
+                        }
+                        
+                        // Stop updates if bolus is complete (bolusId becomes 0 or status is complete)
+                        if (bolusCompleted || (currentBolusId == 0 && previousBolusId != 0) || 
+                            (statusResponse.status != CurrentBolusStatusResponse.CurrentBolusStatus.REQUESTING && 
+                             statusResponse.status != CurrentBolusStatusResponse.CurrentBolusStatus.DELIVERING && 
+                             currentBolusId == 0)) {
+                            stopBolusStatusUpdates(context)
+                            // Clear the saved status after a delay to allow the completion notification to be shown
+                            Handler(Looper.getMainLooper()).postDelayed({
+                                prefs(context)?.edit()
+                                    ?.remove("lastBolusStatus")
+                                    ?.remove("lastBolusId")
+                                    ?.apply()
+                            }, 1000)
+                        }
                     }
                 }
             }
             "REJECT" -> {
+                stopBolusStatusUpdates(context)
                 reply(
                     context, notifId, confirmBolusRequestBaseNotification(
                         context,
@@ -161,6 +251,7 @@ class BolusNotificationBroadcastReceiver : BroadcastReceiver() {
                 sendMessageWhenReady(messageBus, "/to-wear/bolus-rejected", "from_phone".toByteArray(), context)
             }
             "CANCEL" -> {
+                stopBolusStatusUpdates(context)
                 val bolusId = intent.getIntExtra("bolusId", 0)
 
                 // Send cancellation command - retry logic with delays to ensure MessageBus is ready
@@ -300,10 +391,22 @@ class BolusNotificationBroadcastReceiver : BroadcastReceiver() {
         return PumpMessageSerializer.fromBytes(intentResponseBytes) as InitiateBolusResponse
     }
 
+    private fun getCurrentBolusStatusResponse(intent: Intent?): CurrentBolusStatusResponse? {
+        val intentStatusBytes = intent?.getByteArrayExtra("status")
+        if (intentStatusBytes == null) {
+            Timber.w("BolusNotificationBroadcastReceiver invalid status intent")
+            return null
+        }
+
+        return PumpMessageSerializer.fromBytes(intentStatusBytes) as CurrentBolusStatusResponse
+    }
+
     private fun resetBolusPrefs(context: Context?) {
         prefs(context)?.edit()
             ?.remove("initiateBolusRequest")
             ?.remove("initiateBolusTime")
+            ?.remove("lastBolusStatus")
+            ?.remove("lastBolusId")
             ?.apply()
     }
 
@@ -334,6 +437,63 @@ class BolusNotificationBroadcastReceiver : BroadcastReceiver() {
 
     private fun prefs(context: Context?): SharedPreferences? {
         return context?.getSharedPreferences("WearX2", Context.MODE_PRIVATE)
+    }
+
+    private var statusUpdateHandler: Handler? = null
+    private var statusUpdateRunnable: Runnable? = null
+
+    /**
+     * Start periodic status updates for an active bolus
+     */
+    private fun startBolusStatusUpdates(
+        context: Context,
+        messageBus: MessageBus,
+        bolusId: Int,
+        initiateRequest: InitiateBolusRequest
+    ) {
+        stopBolusStatusUpdates(context) // Stop any existing updates
+        
+        val handler = Handler(Looper.getMainLooper())
+        statusUpdateHandler = handler
+        
+        var requestCount = 0
+        val maxRequests = 60 // Request for up to 60 seconds (60 requests at 1 second intervals)
+        
+        val runnable = object : Runnable {
+            override fun run() {
+                if (requestCount < maxRequests) {
+                    Timber.d("BolusNotificationBroadcastReceiver requesting bolus status update (request $requestCount)")
+                    sendMessageWhenReady(
+                        messageBus,
+                        "/to-pump/commands-bust-cache",
+                        PumpMessageSerializer.toBulkBytes(listOf(CurrentBolusStatusRequest())),
+                        context,
+                        delayMs = 0
+                    )
+                    requestCount++
+                    handler.postDelayed(this, 1000) // Request every second
+                } else {
+                    Timber.d("BolusNotificationBroadcastReceiver stopping status updates after $maxRequests requests")
+                    stopBolusStatusUpdates(context)
+                }
+            }
+        }
+        
+        statusUpdateRunnable = runnable
+        // Start first request after a short delay
+        handler.postDelayed(runnable, 500)
+    }
+
+    /**
+     * Stop periodic status updates
+     */
+    private fun stopBolusStatusUpdates(context: Context) {
+        statusUpdateRunnable?.let { runnable ->
+            statusUpdateHandler?.removeCallbacks(runnable)
+            statusUpdateRunnable = null
+            statusUpdateHandler = null
+            Timber.d("BolusNotificationBroadcastReceiver stopped status updates")
+        }
     }
 
     /**

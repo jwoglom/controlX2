@@ -88,6 +88,7 @@ import com.jwoglom.controlx2.shared.util.twoDecimalPlaces
 import com.jwoglom.controlx2.shared.util.twoDecimalPlaces1000Unit
 import com.jwoglom.pumpx2.pump.messages.bluetooth.PumpStateSupplier
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import timber.log.Timber
@@ -712,20 +713,45 @@ fun BolusWindow(
             text = {
                 LaunchedEffect(Unit) {
                     sendPumpCommands(SendType.BUST_CACHE, listOf(CurrentBolusStatusRequest()))
-                }
-
-                // When bolusCurrentResponse is updated, re-request it
-                LaunchedEffect(bolusCurrentResponse.value) {
-                    Timber.i("bolusCurrentResponse: ${bolusCurrentResponse.value}")
-                    // when a bolusId=0 is returned, the current bolus session has ended so the message
-                    // no longer contains any useful data.
-                    if (bolusCurrentResponse.value?.bolusId != 0) {
-                        mainHandler.postDelayed({
+                    // Start continuous polling
+                    refreshScope.launch {
+                        var requestCount = 0
+                        while (requestCount < 60) { // Poll for up to 60 seconds
+                            delay(1000)
+                            // Check if bolus is still active before requesting
+                            val currentResponse = dataStore.bolusCurrentResponse.value
+                            if (currentResponse?.bolusId == 0) {
+                                Timber.d("BolusWindow: bolusId is 0, stopping status polling")
+                                break
+                            }
                             sendPumpCommands(
                                 SendType.BUST_CACHE,
                                 listOf(CurrentBolusStatusRequest())
                             )
-                        }, 1000)
+                            requestCount++
+                        }
+                    }
+                }
+
+                // When bolusCurrentResponse is updated, continue polling if bolus is still active
+                LaunchedEffect(bolusCurrentResponse.value) {
+                    Timber.i("bolusCurrentResponse: ${bolusCurrentResponse.value}")
+                    // when a bolusId=0 is returned, the current bolus session has ended
+                    if (bolusCurrentResponse.value?.bolusId != 0) {
+                        refreshScope.launch {
+                            repeat(5) { // Request 5 more times (5 seconds)
+                                delay(1000)
+                                val currentResponse = dataStore.bolusCurrentResponse.value
+                                if (currentResponse?.bolusId == 0) {
+                                    Timber.d("BolusWindow: bolusId is 0, stopping status polling")
+                                    return@launch
+                                }
+                                sendPumpCommands(
+                                    SendType.BUST_CACHE,
+                                    listOf(CurrentBolusStatusRequest())
+                                )
+                            }
+                        }
                     }
                 }
 

@@ -71,6 +71,7 @@ import com.jwoglom.pumpx2.pump.messages.response.control.BolusPermissionReleaseR
 import com.jwoglom.pumpx2.pump.messages.response.control.BolusPermissionResponse
 import com.jwoglom.pumpx2.pump.messages.response.control.InitiateBolusResponse
 import com.jwoglom.pumpx2.pump.messages.response.currentStatus.BolusCalcDataSnapshotResponse
+import com.jwoglom.pumpx2.pump.messages.response.currentStatus.CurrentBolusStatusResponse
 import com.jwoglom.pumpx2.pump.messages.response.currentStatus.ControlIQIOBResponse
 import com.jwoglom.pumpx2.pump.messages.response.currentStatus.CurrentBasalStatusResponse
 import com.jwoglom.pumpx2.pump.messages.response.currentStatus.CurrentBatteryAbstractResponse
@@ -187,6 +188,7 @@ class CommService : Service() {
                 when (message) {
                     is TimeSinceResetResponse -> onReceiveTimeSinceResetResponse(message)
                     is InitiateBolusResponse -> onReceiveInitiateBolusResponse(message)
+                    is CurrentBolusStatusResponse -> onReceiveCurrentBolusStatusResponse(message)
                     is BolusPermissionResponse -> {
                         PumpStateSupplier.inProgressBolusId = Supplier { message.bolusId }
                     }
@@ -413,7 +415,39 @@ class CommService : Service() {
                 putExtra("action", "INITIATE_RESPONSE")
                 putExtra("response", PumpMessageSerializer.toBytes(response))
             }
-            applicationContext.startService(intent)
+            applicationContext.sendBroadcast(intent)
+        }
+
+        private var lastBolusStatusId: Int? = null
+        
+        private fun onReceiveCurrentBolusStatusResponse(response: CurrentBolusStatusResponse?) {
+            if (response != null) {
+                // Broadcast status updates for active boluses (bolusId != 0)
+                // Also broadcast when bolus completes (bolusId becomes 0 after being non-zero)
+                val shouldBroadcast = response.bolusId != 0 || 
+                    (response.bolusId == 0 && lastBolusStatusId != null && lastBolusStatusId != 0)
+                
+                if (shouldBroadcast) {
+                    val intent: Intent? = Intent(applicationContext, BolusNotificationBroadcastReceiver::class.java).apply {
+                        putExtra("action", "STATUS_UPDATE")
+                        putExtra("status", PumpMessageSerializer.toBytes(response))
+                    }
+                    applicationContext.sendBroadcast(intent)
+                }
+                
+                // Track the last bolusId to detect completion (transition from non-zero to zero)
+                lastBolusStatusId = response.bolusId
+                
+                // Clear tracking when bolusId has been 0 for a while (to avoid stale broadcasts)
+                if (response.bolusId == 0) {
+                    // Clear after a delay to allow the completion notification to be sent
+                    pumpCommHandler?.postDelayed({
+                        if (lastBolusStatusId == 0) {
+                            lastBolusStatusId = null
+                        }
+                    }, 2000)
+                }
+            }
         }
 
         private fun onReceiveTimeSinceResetResponse(response: TimeSinceResetResponse?) {
