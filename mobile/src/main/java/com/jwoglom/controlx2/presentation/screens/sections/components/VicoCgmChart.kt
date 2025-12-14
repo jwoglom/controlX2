@@ -55,15 +55,17 @@ import com.jwoglom.pumpx2.pump.messages.response.historyLog.DexcomG7CGMHistoryLo
 import com.jwoglom.pumpx2.pump.messages.response.historyLog.CgmDataGxHistoryLog
 import com.patrykandpatrick.vico.compose.cartesian.CartesianChartHost
 import com.patrykandpatrick.vico.compose.cartesian.layer.rememberLineCartesianLayer
+import com.patrykandpatrick.vico.compose.cartesian.marker.rememberDefaultCartesianMarker
 import com.patrykandpatrick.vico.compose.cartesian.rememberCartesianChart
-import com.patrykandpatrick.vico.core.cartesian.data.CartesianLayerRangeProvider
 import com.patrykandpatrick.vico.compose.cartesian.rememberVicoScrollState
 import com.patrykandpatrick.vico.compose.common.component.rememberShapeComponent
 import com.patrykandpatrick.vico.compose.common.fill
 import com.patrykandpatrick.vico.compose.common.shape.toVicoShape
 import com.patrykandpatrick.vico.core.cartesian.data.CartesianChartModelProducer
+import com.patrykandpatrick.vico.core.cartesian.data.CartesianLayerRangeProvider
 import com.patrykandpatrick.vico.core.cartesian.data.lineSeries
 import com.patrykandpatrick.vico.core.cartesian.marker.DefaultCartesianMarker
+import com.patrykandpatrick.vico.core.cartesian.marker.LineCartesianLayerMarkerTarget
 import com.patrykandpatrick.vico.core.cartesian.CartesianChart
 import com.patrykandpatrick.vico.core.cartesian.CartesianChart.PersistentMarkerScope
 import com.patrykandpatrick.vico.core.common.Insets
@@ -98,6 +100,16 @@ data class BasalDataPoint(
     val isTemp: Boolean,       // True if temporary basal
     val duration: Int?         // Duration in minutes (for temp basal)
 )
+
+private class FixedYAxisRangeProvider(
+    private val minYLimit: Double,
+    private val maxYLimit: Double
+) : CartesianLayerRangeProvider {
+    override fun getMinX(minX: Double, maxX: Double, extraStore: ExtraStore): Double = minX
+    override fun getMaxX(minX: Double, maxX: Double, extraStore: ExtraStore): Double = maxX
+    override fun getMinY(minY: Double, maxY: Double, extraStore: ExtraStore): Double = minYLimit
+    override fun getMaxY(minY: Double, maxY: Double, extraStore: ExtraStore): Double = maxYLimit
+}
 
 data class ChartPreviewData(
     val cgmDataPoints: List<CgmDataPoint>,
@@ -416,6 +428,37 @@ fun VicoCgmChart(
     val axisTimeFormatter = remember {
         SimpleDateFormat("h:mm a", Locale.getDefault())
     }
+    val markerValueFormatter = remember(cgmDataPoints) {
+        DefaultCartesianMarker.ValueFormatter { _, targets ->
+            val lineTarget = targets.filterIsInstance<LineCartesianLayerMarkerTarget>().firstOrNull()
+            val entry = lineTarget?.points?.firstOrNull()?.entry ?: return@ValueFormatter ""
+            val index = entry.x.roundToInt().coerceIn(0, cgmDataPoints.lastIndex)
+            val point = cgmDataPoints.getOrNull(index) ?: return@ValueFormatter ""
+            val timeText = axisTimeFormatter.format(Date(point.timestamp * 1000))
+            val glucoseText = "${entry.y.roundToInt()} mg/dL"
+            "$timeText\n$glucoseText"
+        }
+    }
+    val dragMarkerLabelColor = MaterialTheme.colorScheme.onSurface
+    val dragMarkerLabel = remember(dragMarkerLabelColor) {
+        TextComponent(
+            color = dragMarkerLabelColor.toArgb(),
+            typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD),
+            textSizeSp = 12f,
+            textAlignment = Layout.Alignment.ALIGN_CENTER,
+            lineHeightSp = null,
+            lineCount = 2,
+            truncateAt = null,
+            margins = Insets(4f, 4f, 4f, 4f),
+            padding = Insets(6f, 4f, 6f, 4f),
+            background = null,
+            minWidth = TextComponent.MinWidth.Companion.fixed(0f)
+        )
+    }
+    val dragMarker = rememberDefaultCartesianMarker(
+        label = dragMarkerLabel,
+        valueFormatter = markerValueFormatter
+    )
     val axisLabels = remember(cgmDataPoints) {
         if (cgmDataPoints.isEmpty()) {
             emptyList<String>()
@@ -561,10 +604,11 @@ fun VicoCgmChart(
             CartesianChartHost(
                 chart = rememberCartesianChart(
                     lineLayer,
+                    marker = dragMarker,
                     persistentMarkers = persistentMarkers
                 ),
                 scrollState = scrollState,
-                consumeMoveEvents = false,
+                consumeMoveEvents = true,
                 modelProducer = modelProducer,
                 modifier = Modifier.fillMaxHeight().weight(1f)
             )
