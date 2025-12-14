@@ -44,10 +44,9 @@ fun DashboardCgmChart(
     historyLogViewModel: HistoryLogViewModel?,
     modifier: Modifier = Modifier
 ) {
-    VicoCgmChart(
+    VicoCgmChartCard(
         historyLogViewModel = historyLogViewModel,
-        timeRange = TimeRange.SIX_HOURS,
-        modifier = modifier.fillMaxWidth().height(400.dp)
+        modifier = modifier
     )
 }
 
