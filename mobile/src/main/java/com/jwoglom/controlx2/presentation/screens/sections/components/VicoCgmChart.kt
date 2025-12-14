@@ -5,6 +5,7 @@ import android.text.Layout
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -55,6 +56,7 @@ import com.jwoglom.pumpx2.pump.messages.response.historyLog.CgmDataGxHistoryLog
 import com.patrykandpatrick.vico.compose.cartesian.CartesianChartHost
 import com.patrykandpatrick.vico.compose.cartesian.layer.rememberLineCartesianLayer
 import com.patrykandpatrick.vico.compose.cartesian.rememberCartesianChart
+import com.patrykandpatrick.vico.core.cartesian.data.CartesianLayerRangeProvider
 import com.patrykandpatrick.vico.compose.cartesian.rememberVicoScrollState
 import com.patrykandpatrick.vico.compose.common.component.rememberShapeComponent
 import com.patrykandpatrick.vico.compose.common.fill
@@ -75,6 +77,7 @@ import java.util.Date
 import java.util.Locale
 import kotlin.math.max
 import kotlin.math.min
+import kotlin.math.roundToInt
 
 // Data models
 data class CgmDataPoint(
@@ -358,6 +361,11 @@ fun VicoCgmChart(
     val bolusEvents = previewData?.bolusEvents ?: rememberBolusData(historyLogViewModel, timeRange)
     val basalDataPoints = previewData?.basalDataPoints ?: rememberBasalData(historyLogViewModel, timeRange)
 
+    val fixedGlucoseRange = Pair(30f, 410f)
+    val fixedMaxGlucose = fixedGlucoseRange.second
+    val fixedMinGlucose = fixedGlucoseRange.first
+    val fixedGlucoseSpan = fixedMaxGlucose - fixedMinGlucose
+
     val cgmSeries = remember(cgmDataPoints) {
         cgmDataPoints.map { it.value.toDouble() }
     }
@@ -425,19 +433,10 @@ fun VicoCgmChart(
     }
 
     // Calculate glucose range for positioning markers
-    val glucoseRange = remember(cgmDataPoints) {
-        if (cgmDataPoints.isNotEmpty()) {
-            val values = cgmDataPoints.map { it.value }
-            val min = values.minOrNull() ?: 0f
-            val max = values.maxOrNull() ?: 300f
-            Pair(min, max)
-        } else {
-            Pair(0f, 300f)
-        }
-    }
-    val maxGlucose = glucoseRange.second
-    val minGlucose = glucoseRange.first
-    val glucoseSpan = maxGlucose - minGlucose
+    val glucoseRange = fixedGlucoseRange
+    val maxGlucose = fixedMaxGlucose
+    val minGlucose = fixedMinGlucose
+    val glucoseSpan = fixedGlucoseSpan
 
     // Update chart data when data changes
     LaunchedEffect(cgmSeries, basalSeriesResult) {
@@ -465,6 +464,12 @@ fun VicoCgmChart(
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
     } else {
+        val yAxisLabels = remember(fixedGlucoseRange) {
+            val tickCount = 6
+            val step = fixedGlucoseSpan / (tickCount - 1)
+            (0 until tickCount).map { (fixedMaxGlucose - step * it).toInt() }
+        }
+
         // Create persistent markers for bolus events
         // Map bolus events to their x-positions (indices in the CGM data series) along with bolus data
         val bolusMarkerPoints = remember(bolusEvents, cgmDataPoints) {
@@ -522,17 +527,48 @@ fun VicoCgmChart(
         }
         
         // Display the chart with Vico
-        val scrollState = rememberVicoScrollState(scrollEnabled = false)
-        CartesianChartHost(
-            chart = rememberCartesianChart(
-                rememberLineCartesianLayer(),
-                persistentMarkers = persistentMarkers
-            ),
-            scrollState = scrollState,
-            consumeMoveEvents = false,
-            modelProducer = modelProducer,
-            modifier = modifier.fillMaxWidth().height(300.dp)
-        )
+        Row(
+            modifier = modifier
+                .fillMaxWidth()
+                .height(300.dp)
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxHeight()
+                    .padding(horizontal = Spacing.Small),
+                verticalArrangement = Arrangement.SpaceBetween,
+                horizontalAlignment = Alignment.End
+            ) {
+                yAxisLabels.forEach { label ->
+                    Text(
+                        text = label.toString(),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+
+            val lineRangeProvider = remember {
+                object : CartesianLayerRangeProvider {
+                    override fun getMinX(minX: Double, maxX: Double, extraStore: ExtraStore): Double = minX
+                    override fun getMaxX(minX: Double, maxX: Double, extraStore: ExtraStore): Double = maxX
+                    override fun getMinY(minY: Double, maxY: Double, extraStore: ExtraStore): Double = fixedMinGlucose.toDouble()
+                    override fun getMaxY(minY: Double, maxY: Double, extraStore: ExtraStore): Double = fixedMaxGlucose.toDouble()
+                }
+            }
+            val lineLayer = rememberLineCartesianLayer(rangeProvider = lineRangeProvider)
+            val scrollState = rememberVicoScrollState(scrollEnabled = false)
+            CartesianChartHost(
+                chart = rememberCartesianChart(
+                    lineLayer,
+                    persistentMarkers = persistentMarkers
+                ),
+                scrollState = scrollState,
+                consumeMoveEvents = false,
+                modelProducer = modelProducer,
+                modifier = Modifier.fillMaxHeight().weight(1f)
+            )
+        }
 
         if (axisLabels.isNotEmpty()) {
             Spacer(Modifier.height(Spacing.Small))
