@@ -46,13 +46,10 @@ import com.jwoglom.pumpx2.pump.messages.response.historyLog.DexcomG6CGMHistoryLo
 import com.jwoglom.pumpx2.pump.messages.response.historyLog.DexcomG7CGMHistoryLog
 import com.jwoglom.pumpx2.pump.messages.response.historyLog.BolusDeliveryHistoryLog
 import com.patrykandpatrick.vico.compose.cartesian.CartesianChartHost
-import com.patrykandpatrick.vico.compose.cartesian.axis.HorizontalAxis
-import com.patrykandpatrick.vico.compose.cartesian.axis.VerticalAxis
-import com.patrykandpatrick.vico.compose.cartesian.layer.LineCartesianLayer
-import com.patrykandpatrick.vico.compose.cartesian.layer.rememberLine
+import com.patrykandpatrick.vico.compose.cartesian.axis.rememberBottomAxis
+import com.patrykandpatrick.vico.compose.cartesian.axis.rememberStartAxis
 import com.patrykandpatrick.vico.compose.cartesian.layer.rememberLineCartesianLayer
 import com.patrykandpatrick.vico.compose.cartesian.rememberCartesianChart
-import com.patrykandpatrick.vico.compose.common.fill
 import com.patrykandpatrick.vico.core.cartesian.data.CartesianChartModelProducer
 import com.patrykandpatrick.vico.core.cartesian.data.lineSeries
 import java.text.SimpleDateFormat
@@ -208,14 +205,14 @@ private fun rememberBasalData(
 
     val basalHistoryLogs = if (basalClasses.isNotEmpty()) {
         historyLogViewModel?.latestItemsForTypes(
-            basalClasses,
+            basalClasses as List<Class<out com.jwoglom.pumpx2.pump.messages.response.historyLog.HistoryLog>>,
             // Basal changes: ~1-4 per hour for temp basals
             (timeRange.hours * 4) + 10
         )?.observeAsState()
     } else null
 
     return remember(basalHistoryLogs?.value, timeRange) {
-        basalHistoryLogs?.value?.mapNotNull { dao ->
+        basalHistoryLogs?.value?.mapNotNull { dao: com.jwoglom.controlx2.db.historylog.HistoryLogItem ->
             try {
                 val parsed = dao.parse()
                 val basalClass = parsed.javaClass
@@ -298,30 +295,24 @@ fun VicoCgmChart(
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
     } else {
-        // Display the chart
+        // Display the chart with Vico
         CartesianChartHost(
             chart = rememberCartesianChart(
-                rememberLineCartesianLayer(
-                    lineProvider = LineCartesianLayer.LineProvider.series(
-                        rememberLine(
-                            fill = remember { LineCartesianLayer.LineFill.single(fill(GlucoseColors.InRange)) },
-                            thickness = 2.dp
-                        )
-                    )
-                ),
-                startAxis = VerticalAxis.rememberStart(),
-                bottomAxis = HorizontalAxis.rememberBottom(),
+                rememberLineCartesianLayer(),
+                startAxis = rememberStartAxis(),
+                bottomAxis = rememberBottomAxis(),
             ),
             modelProducer = modelProducer,
             modifier = modifier.fillMaxWidth().height(300.dp)
         )
     }
 
-    // TODO: Add insulin visualizations
+    // TODO: Add insulin visualizations (Phase 4)
     // - Bolus markers (purple circles with labels)
     // - Basal rate line (bottom 20% of chart)
     // - Target range shading
-    // See PHASE_3_IMPLEMENTATION_STATUS.md for details
+    // - Glucose line color coding based on ranges
+    // Data is ready: ${bolusEvents.size} boluses, ${basalDataPoints.size} basal points
 }
 
 // Time range selector component
@@ -421,6 +412,9 @@ private fun createCgmEntry(index: Int, mgdl: Int, baseTimestamp: Long = 17000000
 }
 
 // Preview helper function to create Bolus entries
+// TODO: Fix constructor - BolusDeliveryHistoryLog API has changed
+// Constructor signature and enums need to be verified
+/*
 private fun createBolusEntry(
     index: Int,
     timestamp: Long,
@@ -441,6 +435,7 @@ private fun createBolusEntry(
             BolusDeliveryHistoryLog.BolusSource.MANUAL
     )
 }
+*/
 
 @Preview(showBackground = true, name = "Normal Range")
 @Composable
@@ -572,6 +567,8 @@ internal fun VicoCgmChartCardSteadyPreview() {
     }
 }
 
+// TODO: Re-enable once createBolusEntry is fixed
+/*
 @Preview(showBackground = true, name = "With Boluses")
 @Composable
 internal fun VicoCgmChartCardWithBolusPreview() {
@@ -614,3 +611,4 @@ internal fun VicoCgmChartCardWithBolusPreview() {
         }
     }
 }
+*/
