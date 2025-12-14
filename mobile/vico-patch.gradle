@@ -1,120 +1,163 @@
 /**
- * Gradle script to patch the Vico library with NaN handling fixes
+ * Gradle script to patch the Vico library with NaN handling fixes using bytecode manipulation
  *
- * This script documents the NaN fix patch for the Vico library.
- * The patch file is available in patches/vico-core-nan-fix.patch for upstream submission.
- *
- * If you want to apply the patch at build time, you can:
- * 1. Use a forked version from JitPack (see mobile/build.gradle comments)
- * 2. Wait for upstream to merge the fix
- * 3. Manually apply the patch to a local Vico checkout
- *
- * The patch adds NaN validation in LineCartesianLayer.updateMarkerTargets()
- * to prevent crashes when chart data contains NaN values.
+ * This script uses ASM to modify the compiled bytecode of LineCartesianLayer.class
+ * to add NaN checks before roundToInt() calls, preventing the crash.
  */
 
+buildscript {
+    repositories {
+        mavenCentral()
+    }
+    dependencies {
+        classpath 'org.ow2.asm:asm:9.6'
+        classpath 'org.ow2.asm:asm-commons:9.6'
+        classpath 'org.ow2.asm:asm-util:9.6'
+    }
+}
+
+import org.objectweb.asm.*
+import org.objectweb.asm.commons.*
+import static org.objectweb.asm.Opcodes.*
+
 configurations {
-    vicoCoreSources
+    vicoCoreOriginal
 }
 
 dependencies {
-    vicoCoreSources "com.patrykandpatrick.vico:core:${vico_version}:sources"
+    vicoCoreOriginal "com.patrykandpatrick.vico:core:${vico_version}"
 }
 
 ext {
-    vicoSourcesDir = file("${buildDir}/vico-sources")
-    vicoPatchedSourceDir = file("${buildDir}/vico-patched-source")
-    vicoLayerPath = 'com/patrykandpatrick/vico/core/cartesian/layer/LineCartesianLayer.kt'
+    vicoExtractedDir = file("${buildDir}/vico-extracted")
+    vicoPatchedJar = file("${buildDir}/libs/vico-core-${vico_version}-patched.jar")
+    targetClass = 'com/patrykandpatrick/vico/core/cartesian/layer/LineCartesianLayer.class'
 }
 
-task extractVicoSources {
-    description = 'Extract Vico core sources JAR for patching'
-    inputs.files(configurations.vicoCoreSources)
-    outputs.dir(vicoSourcesDir)
+task extractVicoJar {
+    description = 'Extract Vico core JAR'
+    inputs.files(configurations.vicoCoreOriginal)
+    outputs.dir(vicoExtractedDir)
 
     doLast {
-        vicoSourcesDir.mkdirs()
-        configurations.vicoCoreSources.each { file ->
+        delete vicoExtractedDir
+        vicoExtractedDir.mkdirs()
+
+        configurations.vicoCoreOriginal.each { file ->
             copy {
                 from zipTree(file)
-                into vicoSourcesDir
-                include vicoLayerPath
+                into vicoExtractedDir
             }
         }
-        logger.lifecycle("✓ Extracted Vico sources to ${vicoSourcesDir}")
+        logger.lifecycle("✓ Extracted Vico JAR to ${vicoExtractedDir}")
     }
 }
 
-task applyVicoPatch {
-    description = 'Apply NaN fix patch to Vico LineCartesianLayer (for documentation)'
-    dependsOn extractVicoSources
-    inputs.file("${projectDir.parent}/patches/vico-core-nan-fix.patch")
-    inputs.dir(vicoSourcesDir)
-    outputs.dir(vicoPatchedSourceDir)
+task patchVicoClass {
+    description = 'Patch LineCartesianLayer bytecode to add NaN checks'
+    dependsOn extractVicoJar
+    inputs.dir(vicoExtractedDir)
+    outputs.dir(vicoExtractedDir)
 
     doLast {
-        delete vicoPatchedSourceDir
-        vicoPatchedSourceDir.mkdirs()
-
-        // Copy the source file
-        def sourceFile = file("${vicoSourcesDir}/${vicoLayerPath}")
-        if (!sourceFile.exists()) {
-            logger.warn("⚠ Source file not found: ${sourceFile}")
-            return
+        def classFile = file("${vicoExtractedDir}/${targetClass}")
+        if (!classFile.exists()) {
+            logger.error("Class file not found: ${classFile}")
+            throw new GradleException("Cannot find LineCartesianLayer.class")
         }
 
-        def destFile = file("${vicoPatchedSourceDir}/${vicoLayerPath}")
-        destFile.parentFile.mkdirs()
+        logger.lifecycle("Patching ${classFile}...")
 
-        // Read and apply patch manually
-        def patchedContent = sourceFile.text
+        // Read the original class
+        def classBytes = classFile.bytes
 
-        // Apply the NaN check after the bounds check
-        def searchPattern = '    if (canvasX <= layerBounds.left - 1 || canvasX >= layerBounds.right + 1) return'
-        def replacement = '''    if (canvasX <= layerBounds.left - 1 || canvasX >= layerBounds.right + 1) return
-    // Guard against NaN values which would cause roundToInt() to throw IllegalArgumentException
-    if (canvasX.isNaN() || canvasY.isNaN()) return'''
+        // Create a ClassReader and ClassWriter
+        def reader = new ClassReader(classBytes)
+        def writer = new ClassWriter(reader, ClassWriter.COMPUTE_MAXS | ClassWriter.COMPUTE_FRAMES)
 
-        if (!patchedContent.contains('canvasX.isNaN() || canvasY.isNaN()')) {
-            patchedContent = patchedContent.replace(searchPattern, replacement)
-            destFile.text = patchedContent
-            logger.lifecycle("✓ Applied NaN fix patch to LineCartesianLayer.kt")
-            logger.lifecycle("  Patched source available at: ${destFile}")
-            logger.lifecycle("  Submit this patch upstream: https://github.com/patrykandpatrick/vico")
-        } else {
-            destFile.text = patchedContent
-            logger.lifecycle("✓ Patch already applied to LineCartesianLayer.kt")
+        // Create a visitor that will add NaN checks
+        def visitor = new ClassVisitor(ASM9, writer) {
+            @Override
+            MethodVisitor visitMethod(int access, String name, String descriptor, String signature, String[] exceptions) {
+                def mv = super.visitMethod(access, name, descriptor, signature, exceptions)
+
+                // Only patch the updateMarkerTargets method
+                if (name == 'updateMarkerTargets' &&
+                    descriptor == '(Lcom/patrykandpatrick/vico/core/cartesian/layer/LineCartesianLayerModel$Entry;FFLandroid/graphics/Bitmap;)V') {
+
+                    logger.lifecycle("✓ Found updateMarkerTargets method, injecting NaN checks...")
+
+                    return new AdviceAdapter(ASM9, mv, access, name, descriptor) {
+                        Label boundaryCheckLabel
+                        int instructionCount = 0
+
+                        @Override
+                        void visitInsn(int opcode) {
+                            instructionCount++
+
+                            // After the first RETURN (bounds check), inject NaN checks
+                            if (opcode == RETURN && instructionCount < 20) {
+                                // This is the bounds check return, keep it
+                                super.visitInsn(opcode)
+
+                                // Now inject NaN checks right after
+                                // Check canvasX.isNaN()
+                                super.visitVarInsn(FLOAD, 2) // Load canvasX parameter
+                                super.visitMethodInsn(INVOKESTATIC, "java/lang/Float", "isNaN", "(F)Z", false)
+                                Label notNaNX = new Label()
+                                super.visitJumpInsn(IFEQ, notNaNX) // If false (not NaN), jump
+                                super.visitInsn(RETURN) // If true (is NaN), return
+                                super.visitLabel(notNaNX)
+
+                                // Check canvasY.isNaN()
+                                super.visitVarInsn(FLOAD, 3) // Load canvasY parameter
+                                super.visitMethodInsn(INVOKESTATIC, "java/lang/Float", "isNaN", "(F)Z", false)
+                                Label notNaNY = new Label()
+                                super.visitJumpInsn(IFEQ, notNaNY) // If false (not NaN), jump
+                                super.visitInsn(RETURN) // If true (is NaN), return
+                                super.visitLabel(notNaNY)
+
+                                // Don't call super.visitInsn again since we already did
+                                return
+                            }
+
+                            super.visitInsn(opcode)
+                        }
+                    }
+                }
+
+                return mv
+            }
         }
+
+        // Apply the transformation
+        reader.accept(visitor, 0)
+
+        // Write the patched class back
+        classFile.bytes = writer.toByteArray()
+        logger.lifecycle("✓ Successfully patched LineCartesianLayer.class with NaN checks")
     }
 }
 
-task verifyVicoPatch {
-    description = 'Verify that Vico NaN fix patch is documented'
-    group = 'verification'
+task createPatchedVicoJar(type: Jar) {
+    description = 'Create patched Vico JAR with NaN fix'
+    dependsOn patchVicoClass
+    archiveBaseName = 'vico-core'
+    archiveVersion = "${vico_version}-patched"
+    destinationDirectory = file("${buildDir}/libs")
+    from vicoExtractedDir
 
     doLast {
-        def patchFile = file("${projectDir.parent}/patches/vico-core-nan-fix.patch")
-        def readmeFile = file("${projectDir.parent}/patches/README.md")
-
-        if (patchFile.exists() && readmeFile.exists()) {
-            logger.lifecycle("✓ Vico NaN fix patch is documented")
-            logger.lifecycle("  Patch file: ${patchFile}")
-            logger.lifecycle("  Documentation: ${readmeFile}")
-            logger.lifecycle("")
-            logger.lifecycle("  NOTE: This build uses the original Vico library.")
-            logger.lifecycle("  The patch is documented for upstream submission to:")
-            logger.lifecycle("  https://github.com/patrykandpatrick/vico")
-            logger.lifecycle("")
-            logger.lifecycle("  To apply the fix, either:")
-            logger.lifecycle("  1. Wait for upstream to merge the patch")
-            logger.lifecycle("  2. Use a forked version (see mobile/build.gradle)")
-        } else {
-            logger.warn("⚠ Vico patch files not found")
-        }
+        logger.lifecycle("✓ Created patched Vico JAR: ${archiveFile.get().asFile.name}")
     }
 }
 
-// Run patch verification during build
-tasks.matching { it.name == 'preBuild' }.configureEach {
-    dependsOn verifyVicoPatch
+// Use the patched JAR instead of the original
+configurations.all {
+    resolutionStrategy.dependencySubstitution {
+        substitute module('com.patrykandpatrick.vico:core') using files(vicoPatchedJar) because 'Using patched version with NaN fix'
+    }
 }
+
+// Ensure the patched JAR is built before compilation
+preBuild.dependsOn createPatchedVicoJar
