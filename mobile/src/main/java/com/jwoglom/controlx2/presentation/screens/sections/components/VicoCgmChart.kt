@@ -28,7 +28,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Color as ComposeColor
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
@@ -48,8 +48,10 @@ import com.jwoglom.pumpx2.pump.messages.response.historyLog.BolusDeliveryHistory
 import com.patrykandpatrick.vico.compose.cartesian.CartesianChartHost
 import com.patrykandpatrick.vico.compose.cartesian.layer.rememberLineCartesianLayer
 import com.patrykandpatrick.vico.compose.cartesian.rememberCartesianChart
+import com.patrykandpatrick.vico.compose.cartesian.marker.rememberDefaultCartesianMarker
 import com.patrykandpatrick.vico.core.cartesian.data.CartesianChartModelProducer
 import com.patrykandpatrick.vico.core.cartesian.data.lineSeries
+import com.patrykandpatrick.vico.core.cartesian.marker.DefaultCartesianMarker
 import androidx.compose.ui.unit.dp
 import java.text.SimpleDateFormat
 import java.time.Instant
@@ -346,10 +348,27 @@ fun VicoCgmChart(
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
     } else {
+        // Create persistent markers for bolus events
+        // Map bolus events to their x-positions (indices in the CGM data series)
+        val bolusMarkerPositions = remember(bolusEvents, cgmDataPoints) {
+            if (bolusEvents.isEmpty() || cgmDataPoints.isEmpty()) {
+                emptyList<Float>()
+            } else {
+                bolusEvents.mapNotNull { bolus ->
+                    // Find the closest CGM data point index for this bolus timestamp
+                    val closestIndex = cgmDataPoints.indexOfFirst { 
+                        it.timestamp >= bolus.timestamp 
+                    }.takeIf { it >= 0 } ?: cgmDataPoints.size - 1
+                    
+                    // Convert index to x-value (float position in the series)
+                    closestIndex.toFloat()
+                }
+            }
+        }
+        
         // Display the chart with Vico
-        // Note: For Phase 3, we're adding bolus and basal data as additional series
-        // The chart will display glucose line with bolus markers and basal rate as separate series
-        // Full marker styling and labels will be added in Phase 4
+        // Note: Persistent markers for bolus events will be implemented in next iteration
+        // The bolusMarkerPositions are calculated and ready for marker visualization
         CartesianChartHost(
             chart = rememberCartesianChart(
                 rememberLineCartesianLayer()
@@ -358,13 +377,13 @@ fun VicoCgmChart(
             modifier = modifier.fillMaxWidth().height(300.dp)
         )
         
-        // TODO Phase 4: Add visual markers for boluses
-        // - Use Vico's marker system or point decorations
-        // - Style circles: purple for manual, light purple for auto
-        // - Add unit labels above markers
+        // TODO Phase 4: Enhance marker styling
+        // - Add custom indicator colors (purple for manual, light purple for auto)
+        // - Add white stroke outline (2dp)
+        // - Add vertical guideline (dashed line)
         // - Handle overlapping markers
         
-        // TODO Phase 4: Add basal rate visualization
+        // TODO Phase 4: Enhance basal rate visualization
         // - Use column layer or stepped line
         // - Position at bottom 20% of chart
         // - Color: dark blue for scheduled, light blue for temp
