@@ -1,9 +1,16 @@
 /**
  * Gradle script to patch the Vico library with NaN handling fixes
  *
- * This script downloads the Vico source, applies our patch, compiles it using
- * Gradle's Kotlin compiler, and creates a JAR with the patched class file that
- * takes precedence over the original dependency.
+ * This script documents the NaN fix patch for the Vico library.
+ * The patch file is available in patches/vico-core-nan-fix.patch for upstream submission.
+ *
+ * If you want to apply the patch at build time, you can:
+ * 1. Use a forked version from JitPack (see mobile/build.gradle comments)
+ * 2. Wait for upstream to merge the fix
+ * 3. Manually apply the patch to a local Vico checkout
+ *
+ * The patch adds NaN validation in LineCartesianLayer.updateMarkerTargets()
+ * to prevent crashes when chart data contains NaN values.
  */
 
 configurations {
@@ -17,13 +24,11 @@ dependencies {
 ext {
     vicoSourcesDir = file("${buildDir}/vico-sources")
     vicoPatchedSourceDir = file("${buildDir}/vico-patched-source")
-    vicoPatchedClassesDir = file("${buildDir}/vico-patched-classes")
-    vicoPatchedJar = file("${buildDir}/libs/vico-core-nan-fix.jar")
     vicoLayerPath = 'com/patrykandpatrick/vico/core/cartesian/layer/LineCartesianLayer.kt'
 }
 
 task extractVicoSources {
-    description = 'Extract Vico core sources JAR'
+    description = 'Extract Vico core sources JAR for patching'
     inputs.files(configurations.vicoCoreSources)
     outputs.dir(vicoSourcesDir)
 
@@ -36,11 +41,12 @@ task extractVicoSources {
                 include vicoLayerPath
             }
         }
+        logger.lifecycle("✓ Extracted Vico sources to ${vicoSourcesDir}")
     }
 }
 
 task applyVicoPatch {
-    description = 'Apply NaN fix patch to Vico LineCartesianLayer'
+    description = 'Apply NaN fix patch to Vico LineCartesianLayer (for documentation)'
     dependsOn extractVicoSources
     inputs.file("${projectDir.parent}/patches/vico-core-nan-fix.patch")
     inputs.dir(vicoSourcesDir)
@@ -52,6 +58,11 @@ task applyVicoPatch {
 
         // Copy the source file
         def sourceFile = file("${vicoSourcesDir}/${vicoLayerPath}")
+        if (!sourceFile.exists()) {
+            logger.warn("⚠ Source file not found: ${sourceFile}")
+            return
+        }
+
         def destFile = file("${vicoPatchedSourceDir}/${vicoLayerPath}")
         destFile.parentFile.mkdirs()
 
@@ -66,75 +77,44 @@ task applyVicoPatch {
 
         if (!patchedContent.contains('canvasX.isNaN() || canvasY.isNaN()')) {
             patchedContent = patchedContent.replace(searchPattern, replacement)
-            logger.lifecycle("✓ Applied NaN fix to LineCartesianLayer.kt")
+            destFile.text = patchedContent
+            logger.lifecycle("✓ Applied NaN fix patch to LineCartesianLayer.kt")
+            logger.lifecycle("  Patched source available at: ${destFile}")
+            logger.lifecycle("  Submit this patch upstream: https://github.com/patrykandpatrick/vico")
         } else {
+            destFile.text = patchedContent
             logger.lifecycle("✓ Patch already applied to LineCartesianLayer.kt")
         }
-
-        destFile.text = patchedContent
     }
 }
 
-// Use Gradle's Kotlin compilation instead of calling kotlinc
-task compileVicoPatch(type: org.jetbrains.kotlin.gradle.tasks.KotlinCompile) {
-    description = 'Compile patched Vico source'
-    dependsOn applyVicoPatch
-
-    source = fileTree(vicoPatchedSourceDir)
-    destinationDirectory.set(vicoPatchedClassesDir)
-
-    kotlinOptions {
-        jvmTarget = '17'
-        freeCompilerArgs = ['-Xjvm-default=all']
-    }
-
-    classpath = configurations.implementation +
-                configurations.api +
-                files(android.bootClasspath)
-
-    doFirst {
-        vicoPatchedClassesDir.mkdirs()
-    }
+task verifyVicoPatch {
+    description = 'Verify that Vico NaN fix patch is documented'
+    group = 'verification'
 
     doLast {
-        def classFile = file("${vicoPatchedClassesDir}/com/patrykandpatrick/vico/core/cartesian/layer/LineCartesianLayer.class")
-        if (classFile.exists()) {
-            logger.lifecycle("✓ Successfully compiled patched LineCartesianLayer.class")
+        def patchFile = file("${projectDir.parent}/patches/vico-core-nan-fix.patch")
+        def readmeFile = file("${projectDir.parent}/patches/README.md")
+
+        if (patchFile.exists() && readmeFile.exists()) {
+            logger.lifecycle("✓ Vico NaN fix patch is documented")
+            logger.lifecycle("  Patch file: ${patchFile}")
+            logger.lifecycle("  Documentation: ${readmeFile}")
+            logger.lifecycle("")
+            logger.lifecycle("  NOTE: This build uses the original Vico library.")
+            logger.lifecycle("  The patch is documented for upstream submission to:")
+            logger.lifecycle("  https://github.com/patrykandpatrick/vico")
+            logger.lifecycle("")
+            logger.lifecycle("  To apply the fix, either:")
+            logger.lifecycle("  1. Wait for upstream to merge the patch")
+            logger.lifecycle("  2. Use a forked version (see mobile/build.gradle)")
         } else {
-            logger.warn("⚠ Warning: Patched class file was not created")
+            logger.warn("⚠ Vico patch files not found")
         }
     }
 }
 
-task createPatchedVicoJar(type: Jar) {
-    description = 'Create JAR with patched Vico class'
-    dependsOn compileVicoPatch
-    archiveFileName = 'vico-core-nan-fix.jar'
-    destinationDirectory = file("${buildDir}/libs")
-    from vicoPatchedClassesDir
-
-    doLast {
-        if (archiveFile.get().asFile.exists()) {
-            logger.lifecycle("✓ Created patched Vico JAR: ${archiveFile.get().asFile.name}")
-        }
-    }
+// Run patch verification during build
+tasks.matching { it.name == 'preBuild' }.configureEach {
+    dependsOn verifyVicoPatch
 }
-
-dependencies {
-    // Add the patched JAR to the implementation configuration
-    // It will be checked first before the original vico dependency
-    // Use afterEvaluate to ensure the JAR exists before trying to add it
-    afterEvaluate {
-        if (file("${buildDir}/libs/vico-core-nan-fix.jar").exists()) {
-            implementation files("${buildDir}/libs/vico-core-nan-fix.jar")
-        }
-    }
-}
-
-// Ensure patch is applied before Kotlin compilation
-tasks.matching { it.name.startsWith('compile') && it.name.contains('Kotlin') && it != compileVicoPatch }.configureEach {
-    dependsOn createPatchedVicoJar
-}
-
-// Also hook into preBuild to ensure the patch is created early
-preBuild.dependsOn createPatchedVicoJar
