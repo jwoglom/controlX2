@@ -1895,7 +1895,304 @@ This design plan provides a comprehensive roadmap for transforming the ControlX2
 
 ---
 
-**Document Version:** 1.0
-**Last Updated:** December 13, 2025
+## Implementation Status
+
+**Last Updated:** December 14, 2025
+**Branch:** `dev` (consolidated from multiple feature branches)
+**Overall Progress:** Phase 3 Complete (95%), Phases 1-2 Complete (100%)
+
+### ✅ Completed Implementation (Phases 1-3)
+
+#### Phase 1: Foundation (100% Complete)
+**Branch:** `claude/redesign-cgm-graph-01BfK4mapfPsxsvgN6GLXDd4`
+**Commit:** `f36c193`
+
+- ✅ Vico 2.3.6 dependency added to build.gradle
+- ✅ Complete color palette in `Color.kt` (GlucoseColors, InsulinColors, UI colors)
+- ✅ Spacing system in `Spacing.kt` (4dp to 32dp scale)
+- ✅ Elevation system in `Elevation.kt` (Material Design 3 levels)
+- ✅ GlucoseHeroCard component with 5 preview states
+- ✅ Enhanced PumpStatusCard with card-based layout
+- ✅ VicoCgmChart foundation with CartesianChartHost
+
+#### Phase 2: Chart Core Features (100% Complete)
+**Branch:** `claude/redesign-cgm-graph-01BfK4mapfPsxsvgN6GLXDd4`
+**Commit:** `b5761e5`
+
+- ✅ `rememberCgmChartData()` composable data fetching
+- ✅ CgmDataPoint data model (timestamp, value)
+- ✅ TimeRange enum (3h, 6h, 12h, 24h)
+- ✅ GlucoseValueFormatter for Y-axis
+- ✅ TimeValueFormatter for X-axis (12-hour format)
+- ✅ Target range decorations (80-180 mg/dL with dashed lines)
+- ✅ Glucose line styling (2.5dp thickness, blue color)
+- ✅ Grid lines with proper transparency
+- ✅ ChartTimeRangeSelector with Material 3 FilterChips
+- ✅ VicoCgmChartCard wrapper component
+- ✅ Zoom disabled for medical safety
+
+#### Phase 3: Insulin Visualization (95% Complete)
+**Branch:** `claude/phase-3-insulin-data-layer-01Xj4H5B8Y9q37xERVcNQzdK` → merged to `dev`
+
+**Data Layer (100%):**
+- ✅ BolusEvent data model (timestamp, units, isAutomated, bolusType)
+- ✅ BasalDataPoint data model (timestamp, rate, isTemp, duration)
+- ✅ `rememberBolusData()` with reflection-based field extraction
+- ✅ `rememberBasalData()` with dynamic class loading
+- ✅ Support for multiple basal log types (BasalRateChange, TempRateActivated)
+- ✅ Automated bolus detection via bolusSource field
+- ✅ Unit conversion (milli-units to units)
+
+**Visualization (95%):**
+- ✅ Bolus markers implemented as persistent markers
+- ✅ Purple circles for manual bolus (#5E35B1)
+- ✅ Light purple circles for auto bolus (#7E57C2)
+- ✅ 12dp diameter with 2dp white stroke
+- ✅ Unit labels above markers (e.g., "5.2U", "1.5U")
+- ✅ Smart positioning to nearest valid data point
+- ✅ Basal rate dual series (scheduled vs temp)
+- ✅ Normalized basal display (bottom 20% of chart = 60 mg/dL range)
+- ✅ Color distinction (dark blue #1565C0 for scheduled, light blue #42A5F5 for temp)
+- ✅ NaN-based gap handling for discontinuous basal periods
+
+**Chart Infrastructure (100%):**
+- ✅ Data bucketing (5-minute intervals)
+- ✅ Segmented CGM series to prevent lines across gaps
+- ✅ NaN-safe data handling throughout
+- ✅ Custom CartesianLayerRangeProvider for fixed Y-axis (30-410 mg/dL)
+- ✅ Drag marker with custom value formatter
+- ✅ Time-based X-axis labels (3 labels: start, middle, end)
+- ✅ Comprehensive preview data generators
+
+**Remaining (5%):**
+- ⏳ Overlapping marker handling refinement
+- ⏳ Performance testing with large datasets (24h+ data)
+- ⏳ Accessibility testing for bolus markers
+- ⏳ Optional: Marker guideline styling
+
+### 🔧 Critical Technical Implementation Details
+
+#### Vico Fork for NaN Handling
+
+**Important:** This implementation uses a **forked version of Vico** (`https://github.com/jwoglom/vico`) to fix a critical NaN handling bug in the upstream library.
+
+**Issue:** Upstream Vico 2.3.6 crashes when `LineCartesianLayer.updateMarkerTargets` attempts to round NaN values during marker position calculations. This occurs when CGM data has gaps (missing readings).
+
+**Fix:** The fork adds null-safety checks before rounding y-values in `updateMarkerTargets`:
+```kotlin
+// Before (crashes on NaN):
+val roundedY = y.roundToInt()
+
+// After (safe):
+if (!y.isNaN()) {
+    val roundedY = y.roundToInt()
+    // ... continue
+}
+```
+
+**Impact:** Enables robust handling of real-world CGM data with gaps, common in medical devices due to sensor signal loss, compression lows, calibration periods, etc.
+
+#### Data Fetching with Reflection
+
+Due to pumpx2 library version variations, all insulin data fetching uses **reflection-based field extraction**:
+
+```kotlin
+private inline fun <reified T> tryGetField(clazz: Class<*>, obj: Any, fieldName: String): T? {
+    return try {
+        val field = clazz.getDeclaredField(fieldName)
+        field.isAccessible = true
+        val value = field.get(obj)
+        if (value is T) value else null
+    } catch (e: Exception) {
+        null
+    }
+}
+```
+
+**Benefits:**
+- Gracefully handles missing fields across pumpx2 versions
+- No runtime crashes from schema changes
+- Returns null for missing data (handled safely downstream)
+
+**Usage:**
+- `totalVolumeDelivered` → insulin units (÷100 for precision)
+- `bolusSource` → automated detection ("CLOSED_LOOP_AUTO_BOLUS")
+- `basalRate` / `rate` → units per hour (÷1000 from milli-units)
+- `isTemp` / `basalType` → temporary basal detection
+
+#### Segmented Series for Gap Handling
+
+CGM data is split into **segments** to prevent Vico from drawing lines across data gaps > 5 minutes:
+
+```kotlin
+val cgmSegments = remember(chartBuckets) {
+    val segments = mutableListOf<List<Double>>()
+    var currentSegmentStart: Int? = null
+
+    chartBuckets.forEachIndexed { index, bucket ->
+        if (bucket.value != null) {
+            if (currentSegmentStart == null) {
+                currentSegmentStart = index
+            }
+        } else {
+            // Gap detected - close current segment
+            if (currentSegmentStart != null) {
+                val fullSeries = MutableList(chartBuckets.size) { Double.NaN }
+                (currentSegmentStart until index).forEach { idx ->
+                    fullSeries[idx] = chartBuckets[idx].value ?: Double.NaN
+                }
+                segments.add(fullSeries)
+                currentSegmentStart = null
+            }
+        }
+    }
+    segments
+}
+```
+
+**Why:** Each segment is a full-length series with `NaN` values outside the segment range. This prevents visual artifacts from interpolation across sensor dropouts.
+
+#### Basal Rate Visualization Strategy
+
+Basal rates use **dual series** approach for scheduled vs temporary basals:
+
+```kotlin
+private data class BasalSeriesResult(
+    val scheduled: List<Double>,  // NaN when temp is active
+    val temp: List<Double>         // NaN when scheduled is active
+)
+
+bucketTimes.forEach { bucketTime ->
+    val relevantBasal = basalDataPoints
+        .filter { it.timestamp <= bucketTime }
+        .maxByOrNull { it.timestamp }
+
+    if (relevantBasal != null) {
+        val normalized = (relevantBasal.rate / basalMaxRate) * BASAL_DISPLAY_RANGE
+        if (relevantBasal.isTemp) {
+            scheduled.add(Double.NaN)
+            temp.add(normalized)
+        } else {
+            scheduled.add(normalized)
+            temp.add(Double.NaN)
+        }
+    }
+}
+```
+
+**Normalization:** Basal rates scaled to bottom 60 mg/dL of chart (e.g., 30-90 mg/dL range) to avoid obscuring glucose data.
+
+**Color Distinction:** Dark blue (#1565C0) for scheduled, light blue (#42A5F5) for temp basals.
+
+#### Bolus Marker Positioning
+
+Bolus markers use **bucket-based positioning** with fallback to nearest valid data:
+
+```kotlin
+val bolusMarkerPoints = remember(bolusEvents, bucketTimes, chartBuckets) {
+    bolusEvents.mapNotNull { bolus ->
+        // Find bucket index for bolus timestamp
+        val bucketIndex = bucketTimes.indexOfFirst { it >= bolus.timestamp }
+            .takeIf { it >= 0 } ?: bucketTimes.size - 1
+
+        if (chartBuckets[bucketIndex].value == null) {
+            // Skip markers at gaps - find nearest valid point
+            val nearestValidIndex = chartBuckets
+                .mapIndexedNotNull { idx, bucket -> if (bucket.value != null) idx else null }
+                .minByOrNull { kotlin.math.abs(it - bucketIndex) }
+
+            if (nearestValidIndex != null) {
+                BolusMarkerPoint(nearestValidIndex.toFloat(), bolus)
+            } else null
+        } else {
+            BolusMarkerPoint(bucketIndex.toFloat(), bolus)
+        }
+    }
+}
+```
+
+**Rationale:** Ensures markers always appear at valid chart positions, even if bolus occurred during CGM gap.
+
+### 📋 Updated Implementation Roadmap
+
+#### ✅ Phase 1: Foundation (COMPLETE)
+- All tasks completed
+- Design system fully established
+- Base components created and tested
+
+#### ✅ Phase 2: Chart Core Features (COMPLETE)
+- All tasks completed
+- Glucose visualization working
+- Target ranges implemented
+- Time range selection functional
+
+#### ✅ Phase 3: Insulin Visualization (95% COMPLETE)
+- All core tasks completed
+- Bolus markers rendered and styled
+- Basal rates visualized with dual series
+- Data fetching robust with reflection
+- **Remaining:** Fine-tuning for overlapping markers, performance testing
+
+#### ⏳ Phase 4: Carbs and Therapy Modes (NOT STARTED)
+**Estimated Effort:** 8-10 hours
+
+**Tasks:**
+1. Create CarbEvent data model
+2. Implement `rememberCarbData()` composable
+3. Add carb markers (orange rounded squares)
+4. Calculate COB (Carbs on Board) algorithm
+5. Query Sleep/Exercise mode changes
+6. Implement mode indicator decoration (colored bands)
+7. Create TherapyMetricsCard component
+8. Update Dashboard layout to include new card
+
+#### ⏳ Phase 5: Polish and Optimization (NOT STARTED)
+**Estimated Effort:** 6-8 hours
+
+**Tasks:**
+1. Add toggleable chart legend
+2. Enhance tap interactions and tooltips
+3. Profile and optimize recomposition
+4. Implement data caching for frequently accessed ranges
+5. Add accessibility improvements (content descriptions, high contrast)
+6. Responsive design testing (landscape, tablets, foldables)
+7. Create comprehensive snapshot tests
+
+#### ⏳ Phase 6: Additional Dashboard Cards (NOT STARTED)
+**Estimated Effort:** 8-10 hours
+
+**Tasks:**
+1. Create ActiveTherapyCard (basal, last bolus, Control-IQ mode)
+2. Create SensorInfoCard (sensor expiration, transmitter battery)
+3. Calculate Time-in-Range (TIR) from CGM data
+4. Implement refresh animations and loading states
+5. Add skeleton loading for cards
+6. Comprehensive error handling
+7. Final polish and edge case fixes
+
+### 🎯 Next Steps
+
+**Immediate (Complete Phase 3):**
+1. Test with real pump data across all time ranges
+2. Validate marker positioning with overlapping boluses
+3. Performance test with 24-hour datasets
+4. Document any edge cases discovered
+
+**Short-term (Phase 4):**
+1. Research COB calculation algorithm
+2. Identify carb entry HistoryLog types
+3. Design therapy mode indicator visuals
+4. Implement TherapyMetricsCard
+
+**Long-term (Phases 5-6):**
+1. Accessibility audit
+2. Performance optimization
+3. Complete dashboard reorganization
+4. Production release preparation
+
+---
+
+**Document Version:** 2.0
+**Last Updated:** December 14, 2025
 **Author:** Claude (Anthropic AI)
-**Status:** Ready for Review
+**Status:** Implementation In Progress (Phase 3: 95% Complete)
