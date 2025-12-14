@@ -1,0 +1,11 @@
+--- a/LineCartesianLayer.kt	2025-12-14 00:00:00.000000000 +0000
++++ b/LineCartesianLayer.kt	2025-12-14 00:00:00.000000000 +0000
+@@ -456,6 +456,8 @@
+     lineFillBitmap: Bitmap,
+   ) {
+     if (canvasX <= layerBounds.left - 1 || canvasX >= layerBounds.right + 1) return
++    // Guard against NaN values which would cause roundToInt() to throw IllegalArgumentException
++    if (canvasX.isNaN() || canvasY.isNaN()) return
+     val limitedCanvasY = canvasY.coerceIn(layerBounds.top, layerBounds.bottom)
+     _markerTargets
+       .getOrPut(entry.x) { listOf(MutableLineCartesianLayerMarkerTarget(entry.x, canvasX)) }

@@ -163,3 +163,6 @@ dependencies {
     // Wear OS apps must be distributed separately via Play Store
     // See: https://developer.android.com/distribute/best-practices/launch/distribute-wear
 }
+
+// Apply Vico NaN fix patch
+apply from: 'vico-patch.gradle'

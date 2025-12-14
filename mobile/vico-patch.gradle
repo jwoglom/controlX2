@@ -1,0 +1,120 @@
+/**
+ * Gradle script to patch the Vico library with NaN handling fixes
+ *
+ * This script documents the NaN fix patch for the Vico library.
+ * The patch file is available in patches/vico-core-nan-fix.patch for upstream submission.
+ *
+ * If you want to apply the patch at build time, you can:
+ * 1. Use a forked version from JitPack (see mobile/build.gradle comments)
+ * 2. Wait for upstream to merge the fix
+ * 3. Manually apply the patch to a local Vico checkout
+ *
+ * The patch adds NaN validation in LineCartesianLayer.updateMarkerTargets()
+ * to prevent crashes when chart data contains NaN values.
+ */
+
+configurations {
+    vicoCoreSources
+}
+
+dependencies {
+    vicoCoreSources "com.patrykandpatrick.vico:core:${vico_version}:sources"
+}
+
+ext {
+    vicoSourcesDir = file("${buildDir}/vico-sources")
+    vicoPatchedSourceDir = file("${buildDir}/vico-patched-source")
+    vicoLayerPath = 'com/patrykandpatrick/vico/core/cartesian/layer/LineCartesianLayer.kt'
+}
+
+task extractVicoSources {
+    description = 'Extract Vico core sources JAR for patching'
+    inputs.files(configurations.vicoCoreSources)
+    outputs.dir(vicoSourcesDir)
+
+    doLast {
+        vicoSourcesDir.mkdirs()
+        configurations.vicoCoreSources.each { file ->
+            copy {
+                from zipTree(file)
+                into vicoSourcesDir
+                include vicoLayerPath
+            }
+        }
+        logger.lifecycle("✓ Extracted Vico sources to ${vicoSourcesDir}")
+    }
+}
+
+task applyVicoPatch {
+    description = 'Apply NaN fix patch to Vico LineCartesianLayer (for documentation)'
+    dependsOn extractVicoSources
+    inputs.file("${projectDir.parent}/patches/vico-core-nan-fix.patch")
+    inputs.dir(vicoSourcesDir)
+    outputs.dir(vicoPatchedSourceDir)
+
+    doLast {
+        delete vicoPatchedSourceDir
+        vicoPatchedSourceDir.mkdirs()
+
+        // Copy the source file
+        def sourceFile = file("${vicoSourcesDir}/${vicoLayerPath}")
+        if (!sourceFile.exists()) {
+            logger.warn("⚠ Source file not found: ${sourceFile}")
+            return
+        }
+
+        def destFile = file("${vicoPatchedSourceDir}/${vicoLayerPath}")
+        destFile.parentFile.mkdirs()
+
+        // Read and apply patch manually
+        def patchedContent = sourceFile.text
+
+        // Apply the NaN check after the bounds check
+        def searchPattern = '    if (canvasX <= layerBounds.left - 1 || canvasX >= layerBounds.right + 1) return'
+        def replacement = '''    if (canvasX <= layerBounds.left - 1 || canvasX >= layerBounds.right + 1) return
+    // Guard against NaN values which would cause roundToInt() to throw IllegalArgumentException
+    if (canvasX.isNaN() || canvasY.isNaN()) return'''
+
+        if (!patchedContent.contains('canvasX.isNaN() || canvasY.isNaN()')) {
+            patchedContent = patchedContent.replace(searchPattern, replacement)
+            destFile.text = patchedContent
+            logger.lifecycle("✓ Applied NaN fix patch to LineCartesianLayer.kt")
+            logger.lifecycle("  Patched source available at: ${destFile}")
+            logger.lifecycle("  Submit this patch upstream: https://github.com/patrykandpatrick/vico")
+        } else {
+            destFile.text = patchedContent
+            logger.lifecycle("✓ Patch already applied to LineCartesianLayer.kt")
+        }
+    }
+}
+
+task verifyVicoPatch {
+    description = 'Verify that Vico NaN fix patch is documented'
+    group = 'verification'
+
+    doLast {
+        def patchFile = file("${projectDir.parent}/patches/vico-core-nan-fix.patch")
+        def readmeFile = file("${projectDir.parent}/patches/README.md")
+
+        if (patchFile.exists() && readmeFile.exists()) {
+            logger.lifecycle("✓ Vico NaN fix patch is documented")
+            logger.lifecycle("  Patch file: ${patchFile}")
+            logger.lifecycle("  Documentation: ${readmeFile}")
+            logger.lifecycle("")
+            logger.lifecycle("  NOTE: This build uses the original Vico library.")
+            logger.lifecycle("  The patch is documented for upstream submission to:")
+            logger.lifecycle("  https://github.com/patrykandpatrick/vico")
+            logger.lifecycle("")
+            logger.lifecycle("  To apply the fix, either:")
+            logger.lifecycle("  1. Wait for upstream to merge the patch")
+            logger.lifecycle("  2. Use a forked version (see mobile/build.gradle)")
+        } else {
+            logger.warn("⚠ Vico patch files not found")
+        }
+    }
+}
+
+// Run patch verification during build
+tasks.matching { it.name == 'preBuild' }.configureEach {
+    dependsOn verifyVicoPatch
+}
