@@ -75,6 +75,46 @@
 
 ---
 
+### 7. Chart Data Architecture Refactoring (100%) - **MAJOR IMPROVEMENT**
+- ✅ **ChartSeries data class**: Explicit X,Y coordinate pairs
+  - `xValues: List<Long>` - Timestamps in seconds
+  - `yValues: List<Double>` - Glucose/basal values
+
+- ✅ **CGM Data Refactoring**:
+  - Changed from `List<List<Double>>` (implicit X axis) to `List<ChartSeries>`
+  - Each segment now contains explicit timestamps and values
+  - Simplified gap handling logic
+
+- ✅ **Basal Data Refactoring**:
+  - Changed `BasalSeriesResult` from `List<Double>` to `ChartSeries?`
+  - Scheduled and temp basal now use separate X,Y coordinate lists
+  - Cleaner null handling for missing data
+
+- ✅ **Series API Update**:
+  - Updated from: `series(yValues)` (implicit 0, 1, 2... X axis)
+  - To: `series(xValues, yValues)` (explicit timestamp-based X axis)
+  - Example: `series(listOf(1234567890, 1234567950), listOf(120.0, 125.0))`
+
+- ✅ **Marker Positioning Refactoring**:
+  - BolusMarkerPoint now uses `timestamp: Long` instead of `position: Float`
+  - CarbMarkerPoint updated similarly
+  - Simplified positioning logic (removed bucket index calculation)
+  - Markers positioned using actual timestamps
+
+- ✅ **Drag Marker Value Formatter**:
+  - Updated to interpret entry.x as timestamp (not index)
+  - Direct timestamp-to-time conversion
+  - Removed dependency on cgmDataPoints lookup
+
+**Benefits of Refactoring**:
+- 📈 More explicit and maintainable code structure
+- 🎯 Accurate time-based positioning for all markers
+- 🧹 Simplified logic (removed index-based conversions)
+- 🔧 Easier debugging and testing
+- 🚀 Better foundation for future features
+
+---
+
 ## ✅ Completed Visual Styling (100%)
 
 ### Bolus Markers Visualization - COMPLETE
@@ -220,10 +260,17 @@ Use separate line series or column layer:
   - Added empty state handling
   - Added createBolusEntry() preview helper
   - Added "With Boluses" preview
+  - **[LATEST]** Added ChartSeries data class for explicit X,Y coordinates
+  - **[LATEST]** Refactored cgmSegments to use ChartSeries with timestamps
+  - **[LATEST]** Updated buildBasalSeries to return ChartSeries with timestamps
+  - **[LATEST]** Modified series() calls to use explicit xValues, yValues
+  - **[LATEST]** Simplified marker positioning using actual timestamps
+  - **[LATEST]** Updated drag marker formatter for timestamp-based X axis
 
 - `docs/PHASE_3_IMPLEMENTATION_STATUS.md`
   - Created comprehensive implementation status document
   - Updated with working Vico implementation details
+  - **[LATEST]** Added section documenting chart data architecture refactoring
 
 - `local.properties`
   - Created with minimal configuration for build
@@ -274,17 +321,29 @@ Use separate line series or column layer:
 - Code follows existing patterns in the codebase (similar to ProcessBolus and ProcessBasal)
 - Vico 2.3.6 API is now fully working and configured
 - Basic chart rendering is complete and functional
+- **NEW:** Chart data architecture refactored to use explicit X,Y coordinates
+- **NEW:** Timestamp-based positioning provides accurate time axis mapping
+- **NEW:** Simplified marker positioning logic improves maintainability
 
 ---
 
 ## 🎉 Phase 3 Complete!
 
-**Current Status:** ✅ Phase 3 - 100% COMPLETE
+**Current Status:** ✅ Phase 3 - 100% COMPLETE + Architecture Refactored
 **Build Status:** ✅ Code compiles with Vico fork (NaN-safe)
-**Branch:** `dev`
-**Commit:** `857b700` - feat(chart): Complete Phase 3 visual styling
+**Branch:** `claude/dashboard-ui-design-plan-Gcw23`
+**Latest Commit:** `ccb2388` - Refactor chart data to use explicit X,Y coordinates with timestamps
+**Previous Commit:** `857b700` - feat(chart): Complete Phase 3 visual styling
 
-**Completed in This Session:**
+**Completed in Latest Session:**
+- ✅ Added ChartSeries data class for explicit X,Y coordinate pairs
+- ✅ Refactored cgmSegments from List<Double> to List<ChartSeries>
+- ✅ Updated buildBasalSeries to return ChartSeries with timestamps
+- ✅ Modified all series() calls to use series(xValues, yValues) format
+- ✅ Simplified bolus/carb marker positioning using actual timestamps
+- ✅ Updated drag marker formatter to interpret X as timestamp
+
+**Previous Session:**
 - ✅ LineProvider configuration with proper colors for all series
 - ✅ CGM glucose segments styled in blue (#1976D2, 2.5dp)
 - ✅ Scheduled basal styled in dark blue (#1565C0, 2dp)
