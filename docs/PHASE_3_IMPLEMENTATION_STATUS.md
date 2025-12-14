@@ -264,6 +264,12 @@ Use separate line series or column layer:
 
 ---
 
-**Current Status:** Phase 3 - Data layer and basic chart rendering complete (70% done)
-**Build Status:** Code is correct and uses proper Vico 2.3.6 API. Build environment has network connectivity issues.
-**Estimated Effort Remaining:** 2-3 hours for insulin overlays and polish
+**Current Status:** Phase 3 - Data layer complete, chart rendering working, insulin data series added (85% done)
+**Build Status:** ✅ Code compiles successfully with Vico 2.3.6 API
+**Latest Updates:**
+- ✅ Bolus and basal data added as additional chart series
+- ✅ Data alignment with glucose timeline implemented
+- ✅ Bolus markers positioned at top of chart (5% above max glucose)
+- ✅ Basal rate scaled to bottom 20% of chart (0-60 mg/dL range)
+- ⏳ Visual styling (colors, markers, labels) pending - requires Vico marker API investigation
+**Estimated Effort Remaining:** 1-2 hours for visual marker styling and polish

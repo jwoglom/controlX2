@@ -46,12 +46,11 @@ import com.jwoglom.pumpx2.pump.messages.response.historyLog.DexcomG6CGMHistoryLo
 import com.jwoglom.pumpx2.pump.messages.response.historyLog.DexcomG7CGMHistoryLog
 import com.jwoglom.pumpx2.pump.messages.response.historyLog.BolusDeliveryHistoryLog
 import com.patrykandpatrick.vico.compose.cartesian.CartesianChartHost
-import com.patrykandpatrick.vico.compose.cartesian.axis.rememberBottomAxis
-import com.patrykandpatrick.vico.compose.cartesian.axis.rememberStartAxis
 import com.patrykandpatrick.vico.compose.cartesian.layer.rememberLineCartesianLayer
 import com.patrykandpatrick.vico.compose.cartesian.rememberCartesianChart
 import com.patrykandpatrick.vico.core.cartesian.data.CartesianChartModelProducer
 import com.patrykandpatrick.vico.core.cartesian.data.lineSeries
+import androidx.compose.ui.unit.dp
 import java.text.SimpleDateFormat
 import java.time.Instant
 import java.time.ZoneId
@@ -274,13 +273,65 @@ fun VicoCgmChart(
     // Create model producer for chart data
     val modelProducer = remember { CartesianChartModelProducer() }
 
-    // Update chart data when CGM data changes
-    LaunchedEffect(cgmDataPoints) {
+    // Calculate glucose range for positioning markers
+    val glucoseRange = remember(cgmDataPoints) {
+        if (cgmDataPoints.isNotEmpty()) {
+            val values = cgmDataPoints.map { it.value }
+            val min = values.minOrNull() ?: 0f
+            val max = values.maxOrNull() ?: 300f
+            Pair(min, max)
+        } else {
+            Pair(0f, 300f)
+        }
+    }
+    val maxGlucose = glucoseRange.second
+    val minGlucose = glucoseRange.first
+    val glucoseSpan = maxGlucose - minGlucose
+
+    // Update chart data when data changes
+    LaunchedEffect(cgmDataPoints, bolusEvents, basalDataPoints) {
         if (cgmDataPoints.isNotEmpty()) {
             modelProducer.runTransaction {
                 lineSeries {
-                    // Use glucose values as Y data
+                    // Series 0: Glucose line (main data series)
                     series(cgmDataPoints.map { it.value.toDouble() })
+                    
+                    // Series 1: Bolus markers (positioned at top of chart, 5% above max glucose)
+                    // Map bolus events to chart positions aligned with glucose timeline
+                    if (bolusEvents.isNotEmpty()) {
+                        val bolusMarkerY = maxGlucose * 1.05 // Position 5% above max glucose
+                        val bolusSeries = cgmDataPoints.mapIndexed { index, cgm ->
+                            // Check if there's a bolus event near this CGM reading (within 5 minutes)
+                            val hasBolus = bolusEvents.any { bolus ->
+                            val timeDiff = kotlin.math.abs(cgm.timestamp - bolus.timestamp)
+                            timeDiff <= 300 // 5 minutes tolerance
+                        }
+                        if (hasBolus) bolusMarkerY else Double.NaN // NaN means no point at this position
+                        }
+                        series(bolusSeries)
+                    }
+                    
+                    // Series 2: Basal rate (scaled to bottom 20% of chart: 0-60 mg/dL range)
+                    // Scale: 0-3 U/hr mapped to 0-60 mg/dL (bottom 20% of typical 0-300 range)
+                    if (basalDataPoints.isNotEmpty()) {
+                        val basalMaxRate = maxOf(3f, basalDataPoints.maxOfOrNull { it.rate } ?: 3f)
+                        // Create basal series aligned with CGM timeline
+                        val basalSeries = cgmDataPoints.mapIndexed { index, cgm ->
+                            // Find the most recent basal rate at or before this CGM reading
+                            val relevantBasal = basalDataPoints
+                                .filter { it.timestamp <= cgm.timestamp }
+                                .maxByOrNull { it.timestamp }
+                            
+                            if (relevantBasal != null) {
+                                // Scale to bottom 20%: 0-60 mg/dL range
+                                val normalizedRate = (relevantBasal.rate / basalMaxRate) * 60.0
+                                normalizedRate
+                            } else {
+                                Double.NaN
+                            }
+                        }
+                        series(basalSeries)
+                    }
                 }
             }
         }
@@ -296,23 +347,29 @@ fun VicoCgmChart(
         )
     } else {
         // Display the chart with Vico
+        // Note: For Phase 3, we're adding bolus and basal data as additional series
+        // The chart will display glucose line with bolus markers and basal rate as separate series
+        // Full marker styling and labels will be added in Phase 4
         CartesianChartHost(
             chart = rememberCartesianChart(
-                rememberLineCartesianLayer(),
-                startAxis = rememberStartAxis(),
-                bottomAxis = rememberBottomAxis(),
+                rememberLineCartesianLayer()
             ),
             modelProducer = modelProducer,
             modifier = modifier.fillMaxWidth().height(300.dp)
         )
+        
+        // TODO Phase 4: Add visual markers for boluses
+        // - Use Vico's marker system or point decorations
+        // - Style circles: purple for manual, light purple for auto
+        // - Add unit labels above markers
+        // - Handle overlapping markers
+        
+        // TODO Phase 4: Add basal rate visualization
+        // - Use column layer or stepped line
+        // - Position at bottom 20% of chart
+        // - Color: dark blue for scheduled, light blue for temp
+        // - Handle gaps in basal data
     }
-
-    // TODO: Add insulin visualizations (Phase 4)
-    // - Bolus markers (purple circles with labels)
-    // - Basal rate line (bottom 20% of chart)
-    // - Target range shading
-    // - Glucose line color coding based on ranges
-    // Data is ready: ${bolusEvents.size} boluses, ${basalDataPoints.size} basal points
 }
 
 // Time range selector component
