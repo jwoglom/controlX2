@@ -36,6 +36,9 @@ import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.jwoglom.controlx2.db.historylog.HistoryLogDummyDao
+import com.jwoglom.controlx2.db.historylog.HistoryLogItem
+import com.jwoglom.controlx2.db.historylog.HistoryLogRepo
 import com.jwoglom.controlx2.db.historylog.HistoryLogViewModel
 import com.jwoglom.controlx2.presentation.theme.CardBackground
 import com.jwoglom.controlx2.presentation.theme.ControlX2Theme
@@ -128,7 +131,7 @@ private fun rememberCgmChartData(
         CgmReadingHistoryLogs,
         // Calculate how many data points we need (CGM reading every 5 min)
         (timeRange.hours * 60 / 5) + 20  // Extra buffer
-    )?.observeAsState()
+    )?.observeAsState(emptyList())
 
     return remember(cgmData?.value, timeRange) {
         cgmData?.value?.mapNotNull { dao ->
@@ -567,17 +570,17 @@ fun VicoCgmChartCard(
                 .fillMaxWidth()
                 .padding(Spacing.CardPadding)
         ) {
-            // Header with title and time range selector
+            // Header with time range selector
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Text(
-                    "Glucose History",
-                    style = MaterialTheme.typography.titleLarge,
-                    color = MaterialTheme.colorScheme.onSurface
-                )
+//                Text(
+//                    "Glucose History",
+//                    style = MaterialTheme.typography.titleLarge,
+//                    color = MaterialTheme.colorScheme.onSurface
+//                )
 
                 ChartTimeRangeSelector(
                     selectedRange = selectedTimeRange,
@@ -605,6 +608,14 @@ private fun createCgmEntry(index: Int, mgdl: Int, baseTimestamp: Long = 17000000
         mgdl,
         baseTimestamp + (index * 300L),
         481, 0
+    )
+}
+
+private fun createPreviewHistoryLogViewModel(items: List<HistoryLogItem>): HistoryLogViewModel {
+    return HistoryLogViewModel(
+        HistoryLogRepo(
+            HistoryLogDummyDao(items.toMutableList())
+        ), 0
     )
 }
 
@@ -650,13 +661,10 @@ internal fun VicoCgmChartCardNormalPreview() {
             ).mapIndexed { index, mgdl ->
                 createCgmEntry(index, mgdl)
             }.map { com.jwoglom.controlx2.db.historylog.HistoryLogItem(it) }
+            val previewViewModel = remember { createPreviewHistoryLogViewModel(sampleData) }
 
             VicoCgmChartCard(
-                historyLogViewModel = com.jwoglom.controlx2.db.historylog.HistoryLogViewModel(
-                    com.jwoglom.controlx2.db.historylog.HistoryLogRepo(
-                        com.jwoglom.controlx2.db.historylog.HistoryLogDummyDao(sampleData.toMutableList())
-                    ), 0
-                )
+                historyLogViewModel = previewViewModel
             )
         }
     }
@@ -676,13 +684,10 @@ internal fun VicoCgmChartCardHighPreview() {
             ).mapIndexed { index, mgdl ->
                 createCgmEntry(index, mgdl)
             }.map { com.jwoglom.controlx2.db.historylog.HistoryLogItem(it) }
+            val previewViewModel = remember { createPreviewHistoryLogViewModel(sampleData) }
 
             VicoCgmChartCard(
-                historyLogViewModel = com.jwoglom.controlx2.db.historylog.HistoryLogViewModel(
-                    com.jwoglom.controlx2.db.historylog.HistoryLogRepo(
-                        com.jwoglom.controlx2.db.historylog.HistoryLogDummyDao(sampleData.toMutableList())
-                    ), 0
-                )
+                historyLogViewModel = previewViewModel
             )
         }
     }
@@ -698,18 +703,14 @@ internal fun VicoCgmChartCardLowPreview() {
         createCgmEntry(index, mgdl)
     }.map { com.jwoglom.controlx2.db.historylog.HistoryLogItem(it) }
 
-    val historyLogViewModel = HistoryLogViewModel(
-        com.jwoglom.controlx2.db.historylog.HistoryLogRepo(
-            com.jwoglom.controlx2.db.historylog.HistoryLogDummyDao(sampleData.toMutableList())
-        ), 0
-    )
     ControlX2Theme {
         Surface(
             modifier = Modifier.fillMaxSize(),
             color = SurfaceBackground
         ) {
+            val previewViewModel = remember { createPreviewHistoryLogViewModel(sampleData) }
             VicoCgmChartCard(
-                historyLogViewModel = historyLogViewModel,
+                historyLogViewModel = previewViewModel,
             )
         }
     }
@@ -725,19 +726,14 @@ internal fun VicoCgmChartCardVolatilePreview() {
         createCgmEntry(index, mgdl)
     }.map { com.jwoglom.controlx2.db.historylog.HistoryLogItem(it) }
 
-    val historyLogViewModel = HistoryLogViewModel(
-        com.jwoglom.controlx2.db.historylog.HistoryLogRepo(
-            com.jwoglom.controlx2.db.historylog.HistoryLogDummyDao(sampleData.toMutableList())
-        ), 0
-    )
-
     ControlX2Theme {
         Surface(
             modifier = Modifier.fillMaxSize(),
             color = SurfaceBackground
         ) {
+            val previewViewModel = remember { createPreviewHistoryLogViewModel(sampleData) }
             VicoCgmChartCard(
-                historyLogViewModel = historyLogViewModel,
+                historyLogViewModel = previewViewModel,
             )
         }
     }
@@ -753,19 +749,14 @@ internal fun VicoCgmChartCardSteadyPreview() {
         createCgmEntry(index, mgdl)
     }.map { com.jwoglom.controlx2.db.historylog.HistoryLogItem(it) }
 
-    val historyLogViewModel = HistoryLogViewModel(
-        com.jwoglom.controlx2.db.historylog.HistoryLogRepo(
-            com.jwoglom.controlx2.db.historylog.HistoryLogDummyDao(sampleData.toMutableList())
-        ), 0
-    )
-
     ControlX2Theme {
         Surface(
             modifier = Modifier.fillMaxSize(),
             color = SurfaceBackground
         ) {
+            val previewViewModel = remember { createPreviewHistoryLogViewModel(sampleData) }
             VicoCgmChartCard(
-                historyLogViewModel = historyLogViewModel,
+                historyLogViewModel = previewViewModel,
             )
         }
     }
@@ -800,19 +791,14 @@ internal fun VicoCgmChartCardWithBolusPreview() {
 
     val allData = (cgmData + bolusData).toMutableList()
 
-    val historyLogViewModel = HistoryLogViewModel(
-        com.jwoglom.controlx2.db.historylog.HistoryLogRepo(
-            com.jwoglom.controlx2.db.historylog.HistoryLogDummyDao(allData)
-        ), 0
-    )
-
     ControlX2Theme {
         Surface(
             modifier = Modifier.fillMaxSize(),
             color = SurfaceBackground
         ) {
+            val previewViewModel = remember { createPreviewHistoryLogViewModel(allData) }
             VicoCgmChartCard(
-                historyLogViewModel = historyLogViewModel,
+                historyLogViewModel = previewViewModel,
             )
         }
     }
