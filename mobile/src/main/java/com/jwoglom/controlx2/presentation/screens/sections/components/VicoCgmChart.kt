@@ -46,14 +46,10 @@ import com.jwoglom.pumpx2.pump.messages.response.historyLog.DexcomG6CGMHistoryLo
 import com.jwoglom.pumpx2.pump.messages.response.historyLog.DexcomG7CGMHistoryLog
 import com.jwoglom.pumpx2.pump.messages.response.historyLog.BolusDeliveryHistoryLog
 import com.patrykandpatrick.vico.compose.cartesian.CartesianChartHost
-// Vico 2.3.6 API imports - may need adjustment based on actual library version
-// import com.patrykandpatrick.vico.compose.cartesian.axis.HorizontalAxis
-// import com.patrykandpatrick.vico.compose.cartesian.axis.VerticalAxis
-// import com.patrykandpatrick.vico.compose.cartesian.layer.LineCartesianLayer
-// import com.patrykandpatrick.vico.compose.cartesian.layer.rememberLine
-// import com.patrykandpatrick.vico.compose.cartesian.layer.rememberLineCartesianLayer
-// import com.patrykandpatrick.vico.compose.cartesian.rememberCartesianChart
-// import com.patrykandpatrick.vico.compose.common.fill
+import com.patrykandpatrick.vico.compose.cartesian.axis.rememberBottomAxis
+import com.patrykandpatrick.vico.compose.cartesian.axis.rememberStartAxis
+import com.patrykandpatrick.vico.compose.cartesian.layer.rememberLineCartesianLayer
+import com.patrykandpatrick.vico.compose.cartesian.rememberCartesianChart
 import com.patrykandpatrick.vico.core.cartesian.data.CartesianChartModelProducer
 import com.patrykandpatrick.vico.core.cartesian.data.lineSeries
 import java.text.SimpleDateFormat
@@ -290,25 +286,33 @@ fun VicoCgmChart(
         }
     }
 
-    // TODO: Implement Vico chart rendering once correct API is determined
-    // The Vico 2.3.6 API structure needs to be verified
-    // Data is fetched and ready: ${cgmDataPoints.size} CGM points, ${bolusEvents.size} boluses, ${basalDataPoints.size} basal points
-    Text(
-        text = if (cgmDataPoints.isEmpty()) {
-            "No CGM data available for selected time range"
-        } else {
-            "CGM Chart\nData loaded: ${cgmDataPoints.size} CGM points\n${bolusEvents.size} boluses, ${basalDataPoints.size} basal points\n\n(Vico API needs configuration)"
-        },
-        modifier = modifier.fillMaxWidth().height(300.dp).padding(16.dp),
-        style = MaterialTheme.typography.bodyMedium,
-        color = MaterialTheme.colorScheme.onSurfaceVariant
-    )
+    if (cgmDataPoints.isEmpty()) {
+        // Show placeholder when no data
+        Text(
+            text = "No CGM data available for selected time range",
+            modifier = modifier.fillMaxWidth().height(300.dp).padding(16.dp),
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+    } else {
+        // Display the chart with Vico
+        CartesianChartHost(
+            chart = rememberCartesianChart(
+                rememberLineCartesianLayer(),
+                startAxis = rememberStartAxis(),
+                bottomAxis = rememberBottomAxis(),
+            ),
+            modelProducer = modelProducer,
+            modifier = modifier.fillMaxWidth().height(300.dp)
+        )
+    }
 
-    // TODO: Add insulin visualizations
+    // TODO: Add insulin visualizations (Phase 4)
     // - Bolus markers (purple circles with labels)
     // - Basal rate line (bottom 20% of chart)
     // - Target range shading
-    // See PHASE_3_IMPLEMENTATION_STATUS.md for details
+    // - Glucose line color coding based on ranges
+    // Data is ready: ${bolusEvents.size} boluses, ${basalDataPoints.size} basal points
 }
 
 // Time range selector component
