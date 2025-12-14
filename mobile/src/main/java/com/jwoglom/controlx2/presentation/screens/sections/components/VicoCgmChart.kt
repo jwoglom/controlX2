@@ -55,6 +55,7 @@ import com.jwoglom.pumpx2.pump.messages.response.historyLog.CgmDataGxHistoryLog
 import com.patrykandpatrick.vico.compose.cartesian.CartesianChartHost
 import com.patrykandpatrick.vico.compose.cartesian.layer.rememberLineCartesianLayer
 import com.patrykandpatrick.vico.compose.cartesian.rememberCartesianChart
+import com.patrykandpatrick.vico.compose.cartesian.rememberVicoScrollState
 import com.patrykandpatrick.vico.compose.common.component.rememberShapeComponent
 import com.patrykandpatrick.vico.compose.common.fill
 import com.patrykandpatrick.vico.compose.common.shape.toVicoShape
@@ -521,11 +522,14 @@ fun VicoCgmChart(
         }
         
         // Display the chart with Vico
+        val scrollState = rememberVicoScrollState(scrollEnabled = false)
         CartesianChartHost(
             chart = rememberCartesianChart(
                 rememberLineCartesianLayer(),
                 persistentMarkers = persistentMarkers
             ),
+            scrollState = scrollState,
+            consumeMoveEvents = false,
             modelProducer = modelProducer,
             modifier = modifier.fillMaxWidth().height(300.dp)
         )
