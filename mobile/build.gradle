@@ -121,11 +121,14 @@ dependencies {
     implementation 'androidx.compose.material:material:1.7.8'
     implementation 'androidx.compose.runtime:runtime-livedata:1.7.8'
 
-
-    // charts - Vico for advanced charting
+    // charts
     implementation("com.patrykandpatrick.vico:compose:2.3.6")
     implementation("com.patrykandpatrick.vico:compose-m3:2.3.6")
     implementation("com.patrykandpatrick.vico:core:2.3.6")
+    // in the future, if using fork from https://github.com/jwoglom/vico
+    // implementation("com.github.jwoglom.vico:compose:$vico_version")
+    // implementation("com.github.jwoglom.vico:compose-m3:$vico_version")
+    // implementation("com.github.jwoglom.vico:core:$vico_version")
 
 
     // https://issuetracker.google.com/issues/227767363

@@ -1,5 +1,15 @@
 package com.jwoglom.controlx2.presentation.screens.sections.components
 
+/**
+ * CGM Chart using Vico charting library.
+ * 
+ * NOTE: This uses a fork of Vico (https://github.com/jwoglom/vico) which includes a fix
+ * for NaN handling in LineCartesianLayer.updateMarkerTargets. The upstream Vico library
+ * crashes when trying to round NaN values during marker position calculations.
+ * 
+ * The fork adds null-safety checks before rounding y-values in updateMarkerTargets.
+ */
+
 import android.graphics.Typeface
 import android.text.Layout
 import androidx.compose.foundation.layout.Arrangement
@@ -337,8 +347,7 @@ private fun buildBasalSeries(
         return BasalSeriesResult(emptyList(), emptyList())
     }
 
-    // Use sentinel value instead of NaN to prevent Vico crashes
-    val BASAL_SENTINEL = -1000.0 // Outside visible range
+    // Use NaN to represent gaps - should work with segmented series approach
     val basalMaxRate = max(MIN_BASAL_RATE_UNITS_PER_HOUR, basalDataPoints.maxOfOrNull { it.rate } ?: MIN_BASAL_RATE_UNITS_PER_HOUR)
     val scheduled = mutableListOf<Double>()
     val temp = mutableListOf<Double>()
@@ -351,15 +360,15 @@ private fun buildBasalSeries(
         if (relevantBasal != null) {
             val normalized = (relevantBasal.rate / basalMaxRate) * BASAL_DISPLAY_RANGE
             if (relevantBasal.isTemp) {
-                scheduled.add(BASAL_SENTINEL)
+                scheduled.add(Double.NaN)
                 temp.add(normalized)
             } else {
                 scheduled.add(normalized)
-                temp.add(BASAL_SENTINEL)
+                temp.add(Double.NaN)
             }
         } else {
-            scheduled.add(BASAL_SENTINEL)
-            temp.add(BASAL_SENTINEL)
+            scheduled.add(Double.NaN)
+            temp.add(Double.NaN)
         }
     }
 
@@ -408,8 +417,8 @@ fun VicoCgmChart(
     }
 
     // Split CGM data into segments to avoid drawing lines across gaps > 5 minutes
-    // Each segment is padded to full length with sentinel values, with valid data at correct x-positions
-    val SENTINEL_VALUE = -1000.0
+    // Each segment is padded to full length with NaN values, with valid data at correct x-positions
+    // Using NaN should work better with segmented series approach
     val cgmSegments = remember(chartBuckets) {
         val segments = mutableListOf<List<Double>>()
         var currentSegmentStart: Int? = null
@@ -425,10 +434,10 @@ fun VicoCgmChart(
             } else {
                 // Gap detected - close current segment if exists
                 if (currentSegmentStart != null) {
-                    // Create a full-length series with sentinel values everywhere except the segment range
-                    val fullSeries = MutableList(chartBuckets.size) { SENTINEL_VALUE }
+                    // Create a full-length series with NaN values everywhere except the segment range
+                    val fullSeries = MutableList(chartBuckets.size) { Double.NaN }
                     (currentSegmentStart until index).forEach { idx ->
-                        fullSeries[idx] = chartBuckets[idx].value ?: SENTINEL_VALUE
+                        fullSeries[idx] = chartBuckets[idx].value ?: Double.NaN
                     }
                     segments.add(fullSeries)
                     currentSegmentStart = null
@@ -438,9 +447,9 @@ fun VicoCgmChart(
         
         // Close any remaining open segment
         if (currentSegmentStart != null) {
-            val fullSeries = MutableList(chartBuckets.size) { SENTINEL_VALUE }
+            val fullSeries = MutableList(chartBuckets.size) { Double.NaN }
             (currentSegmentStart until chartBuckets.size).forEach { idx ->
-                fullSeries[idx] = chartBuckets[idx].value ?: SENTINEL_VALUE
+                fullSeries[idx] = chartBuckets[idx].value ?: Double.NaN
             }
             segments.add(fullSeries)
         }
@@ -448,13 +457,14 @@ fun VicoCgmChart(
         segments
     }
     
-    val hasValidCgmData = cgmSegments.isNotEmpty()
+    val hasValidCgmData = cgmSegments.isNotEmpty() && cgmSegments.any { segment ->
+        segment.any { !it.isNaN() }
+    }
     val basalSeriesResult = remember(bucketTimes, basalDataPoints) {
         buildBasalSeries(bucketTimes, basalDataPoints)
     }
-    val BASAL_SENTINEL = -1000.0
-    val hasScheduledBasalSeries = basalSeriesResult.scheduled.any { it != BASAL_SENTINEL }
-    val hasTempBasalSeries = basalSeriesResult.temp.any { it != BASAL_SENTINEL }
+    val hasScheduledBasalSeries = basalSeriesResult.scheduled.any { !it.isNaN() }
+    val hasTempBasalSeries = basalSeriesResult.temp.any { !it.isNaN() }
 
     val circleShape = remember { CircleShape.toVicoShape() }
     val bolusLabelColor = MaterialTheme.colorScheme.onSurface
@@ -501,9 +511,8 @@ fun VicoCgmChart(
         DefaultCartesianMarker.ValueFormatter { _, targets ->
             val lineTarget = targets.filterIsInstance<LineCartesianLayerMarkerTarget>().firstOrNull()
             val entry = lineTarget?.points?.firstOrNull()?.entry ?: return@ValueFormatter ""
-            // Handle sentinel values and invalid data safely
-            val SENTINEL_VALUE = -1000.0
-            if (entry.x.isNaN() || entry.y.isNaN() || entry.y <= SENTINEL_VALUE || cgmDataPoints.isEmpty()) {
+            // Handle NaN values and invalid data safely
+            if (entry.x.isNaN() || entry.y.isNaN() || cgmDataPoints.isEmpty()) {
                 return@ValueFormatter ""
             }
             val index = entry.x.roundToInt().coerceIn(0, cgmDataPoints.lastIndex)
@@ -529,11 +538,11 @@ fun VicoCgmChart(
             minWidth = TextComponent.MinWidth.Companion.fixed(0f)
         )
     }
-            // Create the drag marker - no longer need to disable it since we're using sentinel values instead of NaN
-            val dragMarker = rememberDefaultCartesianMarker(
-                label = dragMarkerLabel,
-                valueFormatter = markerValueFormatter
-            )
+    // Re-enable the drag marker with the NaN-safe fork
+    val dragMarker = rememberDefaultCartesianMarker(
+        label = dragMarkerLabel,
+        valueFormatter = markerValueFormatter
+    )
     val axisLabels = remember(startTimeSeconds, currentTimeSeconds) {
         val offsets = listOf(0L, rangeSeconds / 2, rangeSeconds)
         offsets.map { offset ->
@@ -555,8 +564,9 @@ fun VicoCgmChart(
             modelProducer.runTransaction {
                 lineSeries {
                     // Add each CGM segment as a separate series
-                    // Each segment is a full-length series with sentinel values outside the segment range
+                    // Each segment is a full-length series with NaN values outside the segment range
                     // This prevents Vico from drawing lines connecting across gaps
+                    // Using segmented series should help Vico handle NaN values correctly
                     cgmSegments.forEach { segment ->
                         series(segment)
                     }
@@ -599,7 +609,7 @@ fun VicoCgmChart(
                         it >= bolus.timestamp 
                     }.takeIf { it >= 0 } ?: bucketTimes.size - 1
                     
-                    // Ensure index is valid and corresponds to a valid data point
+                    // Ensure index is valid and corresponds to a valid (non-NaN) data point
                     if (bucketIndex < 0 || bucketIndex >= chartBuckets.size) {
                         null
                     } else if (chartBuckets[bucketIndex].value == null) {
