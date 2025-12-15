@@ -755,49 +755,8 @@ fun VicoCgmChart(
             }
 
             // Configure line styling for each series
-            val density = androidx.compose.ui.platform.LocalDensity.current
             val lineLayer = rememberLineCartesianLayer(
-                rangeProvider = lineRangeProvider,
-                lineProvider = com.patrykandpatrick.vico.core.cartesian.layer.LineCartesianLayer.LineProvider.series(
-                    // CGM glucose segments - all styled in blue
-                    lines = buildList {
-                        // Add a line spec for each CGM segment
-                        repeat(cgmSegments.size) {
-                            add(
-                                com.patrykandpatrick.vico.core.cartesian.layer.LineCartesianLayer.Line(
-                                    fill = com.patrykandpatrick.vico.core.common.Fill.single(GlucoseColors.InRange.toArgb()),
-                                    thickness = with(density) { 2.5.dp.toPx() },
-                                    areaFill = null,
-                                    cap = android.graphics.Paint.Cap.ROUND
-                                )
-                            )
-                        }
-
-                        // Scheduled basal line (dark blue)
-                        if (hasScheduledBasalSeries) {
-                            add(
-                                com.patrykandpatrick.vico.core.cartesian.layer.LineCartesianLayer.Line(
-                                    fill = com.patrykandpatrick.vico.core.common.Fill.single(InsulinColors.Basal.toArgb()),
-                                    thickness = with(density) { 2.dp.toPx() },
-                                    areaFill = null,
-                                    cap = android.graphics.Paint.Cap.ROUND
-                                )
-                            )
-                        }
-
-                        // Temp basal line (light blue)
-                        if (hasTempBasalSeries) {
-                            add(
-                                com.patrykandpatrick.vico.core.cartesian.layer.LineCartesianLayer.Line(
-                                    fill = com.patrykandpatrick.vico.core.common.Fill.single(InsulinColors.TempBasal.toArgb()),
-                                    thickness = with(density) { 2.dp.toPx() },
-                                    areaFill = null,
-                                    cap = android.graphics.Paint.Cap.ROUND
-                                )
-                            )
-                        }
-                    }
-                )
+                rangeProvider = lineRangeProvider
             )
             val scrollState = rememberVicoScrollState(
                 scrollEnabled = false,
