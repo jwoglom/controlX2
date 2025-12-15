@@ -1157,10 +1157,12 @@ fun triggerHistoryLogRangePrompt(
     endLog: Long
 ) {
     if (endLog - startLog in 0..255) {
+        // HistoryLogRequest returns items backward from the start ID,
+        // so we request from the END of the range to get all items in [startLog, endLog]
         sendPumpCommands(
             SendType.STANDARD,
             listOf(
-                HistoryLogRequest(startLog, (endLog - startLog).toInt())
+                HistoryLogRequest(endLog, (endLog - startLog).toInt())
             )
         )
         return
@@ -1190,15 +1192,18 @@ fun triggerHistoryLogRange(
     for (i in startLog..endLog step 256) {
         val localNum = num
         val count = if (i+255 > endLog) (endLog - i).toInt() else 255
+        val endI = i + count - 1
         Handler(Looper.getMainLooper()).postDelayed({
-            Timber.i("HistoryLogRequest ${localNum+1} from $i to ${i+count} count=$count")
+            Timber.i("HistoryLogRequest ${localNum+1} from $i to $endI count=$count")
+            // HistoryLogRequest returns items backward from the start ID,
+            // so we request from the END of the range to get all items in [i, endI]
             sendPumpCommands(
                 SendType.STANDARD,
                 listOf(
-                    HistoryLogRequest(i, count)
+                    HistoryLogRequest(endI, count)
                 )
             )
-            Toast.makeText(context, "${localNum+1}/${totalNums}: Requesting $i to ${i+count}", Toast.LENGTH_SHORT).show()
+            Toast.makeText(context, "${localNum+1}/${totalNums}: Requesting $i to $endI", Toast.LENGTH_SHORT).show()
         }, localNum.toLong() * 7000)
         num++
         totalNums++
