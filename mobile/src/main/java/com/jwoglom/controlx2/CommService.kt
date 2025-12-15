@@ -230,6 +230,7 @@ class CommService : Service() {
                     event.suggestedHandlers.forEach { handler ->
                         Timber.i("onReceiveQualifyingEvent: running handler for $event message: ${handler.get()}")
                         handler.get()?.let { command(it) }
+                        Thread.sleep(50) // prevent message flood
                     }
                 }
                 sendWearCommMessage("/from-pump/receive-qualifying-event", PumpQualifyingEventsSerializer.toBytes(events))
@@ -410,6 +411,7 @@ class CommService : Service() {
 
                 Timber.i("Pump send command: $message")
                 sendCommand(lastPeripheral, message)
+                Thread.sleep(25) // prevent message flood
             }
 
             override fun toString(): String {
