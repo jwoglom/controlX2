@@ -213,7 +213,7 @@ fun Dashboard(
 
                 // Therapy Metrics Card - IOB, COB, TIR
                 item {
-                    TherapyMetricsCardFromDataStore()
+                    TherapyMetricsCardFromDataStore(historyLogViewModel = historyLogViewModel)
                 }
 
                 // Active Therapy Card - Basal, Last Bolus, Mode

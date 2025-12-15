@@ -12,7 +12,11 @@ package com.jwoglom.controlx2.presentation.screens.sections.components
 
 import android.graphics.Typeface
 import android.text.Layout
+import java.text.SimpleDateFormat
+import java.util.Date
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxHeight
@@ -59,6 +63,7 @@ import com.jwoglom.controlx2.presentation.theme.SurfaceBackground
 import com.jwoglom.controlx2.presentation.theme.TargetRangeColor
 import com.jwoglom.controlx2.presentation.theme.InsulinColors
 import com.jwoglom.controlx2.presentation.theme.CarbColor
+import com.jwoglom.controlx2.presentation.theme.ModeColors
 import com.jwoglom.pumpx2.pump.messages.helpers.Dates
 import com.jwoglom.pumpx2.pump.messages.models.InsulinUnit
 import com.jwoglom.pumpx2.pump.messages.response.currentStatus.LastBolusStatusAbstractResponse
@@ -66,6 +71,7 @@ import com.jwoglom.pumpx2.pump.messages.response.historyLog.BolusDeliveryHistory
 import com.jwoglom.pumpx2.pump.messages.response.historyLog.DexcomG6CGMHistoryLog
 import com.jwoglom.pumpx2.pump.messages.response.historyLog.DexcomG7CGMHistoryLog
 import com.jwoglom.pumpx2.pump.messages.response.historyLog.CgmDataGxHistoryLog
+import com.jwoglom.pumpx2.pump.messages.response.historyLog.HistoryLogParser
 import com.patrykandpatrick.vico.compose.cartesian.CartesianChartHost
 import com.patrykandpatrick.vico.compose.cartesian.layer.rememberLineCartesianLayer
 import com.patrykandpatrick.vico.compose.cartesian.marker.rememberDefaultCartesianMarker
@@ -259,6 +265,21 @@ private fun formatCarbGrams(grams: Int): String {
     return "${grams}g"
 }
 
+private fun formatBolusTooltip(units: Float, isAutomated: Boolean, timestamp: Long): String {
+    val timeFormat = SimpleDateFormat("h:mm a", Locale.getDefault())
+    val timeStr = timeFormat.format(Date(timestamp * 1000))
+    val typeStr = if (isAutomated) "Auto" else "Bolus"
+    val pattern = if (units >= 1f) "%.1fU" else "%.2fU"
+    val unitsStr = String.format(Locale.getDefault(), pattern, units)
+    return "$unitsStr\n$typeStr @ $timeStr"
+}
+
+private fun formatCarbTooltip(grams: Int, timestamp: Long): String {
+    val timeFormat = SimpleDateFormat("h:mm a", Locale.getDefault())
+    val timeStr = timeFormat.format(Date(timestamp * 1000))
+    return "${grams}g\n@ $timeStr"
+}
+
 private fun createBolusMarker(
     labelComponent: TextComponent,
     indicatorComponent: Component,
@@ -401,6 +422,167 @@ private fun rememberBasalData(
     }
 }
 
+// Helper function to fetch and convert Carb data from bolus history
+@Composable
+private fun rememberCarbData(
+    historyLogViewModel: HistoryLogViewModel?,
+    timeRange: TimeRange
+): List<CarbEvent> {
+    // Carbs are recorded in BolusDeliveryHistoryLog along with bolus delivery
+    val bolusHistoryLogs = historyLogViewModel?.latestItemsForTypes(
+        listOf(BolusDeliveryHistoryLog::class.java),
+        (timeRange.hours * 2) + 10
+    )?.observeAsState()
+
+    return remember(bolusHistoryLogs?.value, timeRange) {
+        bolusHistoryLogs?.value?.mapNotNull { dao ->
+            try {
+                val parsed = dao.parse()
+                if (parsed is BolusDeliveryHistoryLog) {
+                    val bolusClass = parsed.javaClass
+
+                    // Extract carbs from bolus record
+                    val carbs = tryGetField<Int>(bolusClass, parsed, "bolusCarbs")
+                        ?: tryGetField<Int>(bolusClass, parsed, "carbsGrams")
+                        ?: 0
+
+                    if (carbs > 0) {
+                        val timestamp = dao.pumpTime.atZone(ZoneId.systemDefault()).toEpochSecond()
+                        CarbEvent(
+                            timestamp = timestamp,
+                            grams = carbs,
+                            note = null
+                        )
+                    } else null
+                } else null
+            } catch (e: Exception) {
+                null
+            }
+        }?.reversed() ?: emptyList()
+    }
+}
+
+// Helper function to fetch and convert Mode data (Sleep/Exercise)
+@Composable
+private fun rememberModeData(
+    historyLogViewModel: HistoryLogViewModel?,
+    timeRange: TimeRange
+): List<ModeEvent> {
+    // Try to find mode-related HistoryLog type IDs
+    val modeClasses = listOfNotNull(
+        tryLoadClass("com.jwoglom.pumpx2.pump.messages.response.historyLog.SleepModeActivatedHistoryLog"),
+        tryLoadClass("com.jwoglom.pumpx2.pump.messages.response.historyLog.SleepModeDeactivatedHistoryLog"),
+        tryLoadClass("com.jwoglom.pumpx2.pump.messages.response.historyLog.ExerciseModeActivatedHistoryLog"),
+        tryLoadClass("com.jwoglom.pumpx2.pump.messages.response.historyLog.ExerciseModeDeactivatedHistoryLog"),
+        tryLoadClass("com.jwoglom.pumpx2.pump.messages.response.historyLog.UserModeChangeHistoryLog"),
+        tryLoadClass("com.jwoglom.pumpx2.pump.messages.response.historyLog.ControlIQModeChangeHistoryLog")
+    )
+
+    val modeHistoryLogs = if (modeClasses.isNotEmpty()) {
+        historyLogViewModel?.latestItemsForTypes(
+            modeClasses,
+            (timeRange.hours * 2) + 10
+        )?.observeAsState()
+    } else null
+
+    return remember(modeHistoryLogs?.value, timeRange) {
+        modeHistoryLogs?.value?.mapNotNull { dao ->
+            try {
+                val parsed = dao.parse()
+                val modeClass = parsed.javaClass
+                val className = modeClass.simpleName
+
+                // Determine mode from class name
+                val mode = when {
+                    className.contains("Sleep", ignoreCase = true) -> TherapyMode.SLEEP
+                    className.contains("Exercise", ignoreCase = true) -> TherapyMode.EXERCISE
+                    else -> {
+                        // Try to extract mode from fields
+                        val modeValue = tryGetField<Any>(modeClass, parsed, "newMode")
+                            ?: tryGetField<Any>(modeClass, parsed, "mode")
+                            ?: tryGetField<Any>(modeClass, parsed, "userMode")
+                        when {
+                            modeValue?.toString()?.contains("SLEEP", ignoreCase = true) == true -> TherapyMode.SLEEP
+                            modeValue?.toString()?.contains("EXERCISE", ignoreCase = true) == true -> TherapyMode.EXERCISE
+                            else -> TherapyMode.STANDARD
+                        }
+                    }
+                }
+
+                // Check if activated or deactivated
+                val isActivated = className.contains("Activated", ignoreCase = true) ||
+                        className.contains("Started", ignoreCase = true)
+
+                // Get duration if available
+                val durationSeconds = tryGetField<Int>(modeClass, parsed, "duration")
+                    ?: tryGetField<Long>(modeClass, parsed, "duration")?.toInt()
+                val duration = durationSeconds?.let { it / 60 }
+
+                val timestamp = dao.pumpTime.atZone(ZoneId.systemDefault()).toEpochSecond()
+
+                // Only return mode events for Sleep/Exercise activations
+                if ((mode == TherapyMode.SLEEP || mode == TherapyMode.EXERCISE) && isActivated) {
+                    ModeEvent(
+                        timestamp = timestamp,
+                        mode = mode,
+                        duration = duration
+                    )
+                } else null
+            } catch (e: Exception) {
+                null
+            }
+        }?.reversed() ?: emptyList()
+    }
+}
+
+private fun tryLoadClass(className: String): Class<*>? {
+    return try {
+        Class.forName(className)
+    } catch (e: ClassNotFoundException) {
+        null
+    }
+}
+
+// Calculate Time-in-Range percentage from CGM data
+fun calculateTimeInRange(
+    cgmDataPoints: List<CgmDataPoint>,
+    lowTarget: Float = 70f,
+    highTarget: Float = 180f
+): Float? {
+    if (cgmDataPoints.isEmpty()) return null
+
+    val validReadings = cgmDataPoints.filter { it.value > 0 }
+    if (validReadings.isEmpty()) return null
+
+    val inRange = validReadings.count { it.value >= lowTarget && it.value <= highTarget }
+    return (inRange.toFloat() / validReadings.size.toFloat()) * 100f
+}
+
+// Calculate Carbs-on-Board using exponential decay model
+// Default absorption time is 3 hours (180 minutes)
+fun calculateCarbsOnBoard(
+    carbEvents: List<CarbEvent>,
+    currentTimeSeconds: Long,
+    absorptionTimeMinutes: Int = 180
+): Float? {
+    if (carbEvents.isEmpty()) return null
+
+    val absorptionTimeSeconds = absorptionTimeMinutes * 60L
+    val tau = absorptionTimeSeconds / 3.0 // Time constant for exponential decay
+
+    var totalCob = 0f
+    carbEvents.forEach { carb ->
+        val elapsedSeconds = currentTimeSeconds - carb.timestamp
+        if (elapsedSeconds >= 0 && elapsedSeconds < absorptionTimeSeconds * 2) {
+            // Exponential decay: COB = carbs * e^(-t/tau)
+            val remaining = carb.grams * kotlin.math.exp(-elapsedSeconds / tau)
+            totalCob += remaining.toFloat()
+        }
+    }
+
+    return if (totalCob > 0.5f) totalCob else null
+}
+
 private fun buildBasalSeries(
     bucketTimes: List<Long>,
     basalDataPoints: List<BasalDataPoint>
@@ -452,8 +634,8 @@ fun VicoCgmChart(
     val cgmDataPoints = previewData?.cgmDataPoints ?: rememberCgmChartData(historyLogViewModel, timeRange)
     val bolusEvents = previewData?.bolusEvents ?: rememberBolusData(historyLogViewModel, timeRange)
     val basalDataPoints = previewData?.basalDataPoints ?: rememberBasalData(historyLogViewModel, timeRange)
-    val carbEvents = previewData?.carbEvents ?: emptyList() // TODO: Implement rememberCarbData when HistoryLog available
-    val modeEvents = previewData?.modeEvents ?: emptyList() // TODO: Implement rememberModeData when HistoryLog available
+    val carbEvents = previewData?.carbEvents ?: rememberCarbData(historyLogViewModel, timeRange)
+    val modeEvents = previewData?.modeEvents ?: rememberModeData(historyLogViewModel, timeRange)
 
     val currentTimeSeconds = remember(timeRange) {
         previewData?.currentTimeSeconds ?: Instant.now().epochSecond
@@ -722,9 +904,42 @@ fun VicoCgmChart(
             }
         }
         
+        // Enhanced label component for detailed tooltips (multi-line)
+        val detailedBolusLabelComponent = remember(bolusLabelColor) {
+            TextComponent(
+                color = bolusLabelColor.toArgb(),
+                typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD),
+                textSizeSp = 10f,  // Slightly smaller for multi-line
+                textAlignment = Layout.Alignment.ALIGN_CENTER,
+                lineHeightSp = null,
+                lineCount = 2,  // Allow 2 lines
+                truncateAt = null,
+                margins = Insets(0f, 0f, 0f, 4f),
+                padding = Insets(6f, 2f, 6f, 2f),
+                background = null,
+                minWidth = TextComponent.MinWidth.Companion.fixed(0f)
+            )
+        }
+
+        val detailedCarbLabelComponent = remember(bolusLabelColor) {
+            TextComponent(
+                color = bolusLabelColor.toArgb(),
+                typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD),
+                textSizeSp = 10f,
+                textAlignment = Layout.Alignment.ALIGN_CENTER,
+                lineHeightSp = null,
+                lineCount = 2,
+                truncateAt = null,
+                margins = Insets(0f, 0f, 0f, 4f),
+                padding = Insets(6f, 2f, 6f, 2f),
+                background = null,
+                minWidth = TextComponent.MinWidth.Companion.fixed(0f)
+            )
+        }
+
         val bolusMarkers = remember(
             bolusMarkerPoints,
-            bolusLabelComponent,
+            detailedBolusLabelComponent,
             manualIndicatorComponent,
             autoIndicatorComponent
         ) {
@@ -735,9 +950,13 @@ fun VicoCgmChart(
                     manualIndicatorComponent
                 }
                 val marker = createBolusMarker(
-                    labelComponent = bolusLabelComponent,
+                    labelComponent = detailedBolusLabelComponent,
                     indicatorComponent = indicator,
-                    labelText = formatBolusUnits(markerPoint.event.units)
+                    labelText = formatBolusTooltip(
+                        markerPoint.event.units,
+                        markerPoint.event.isAutomated,
+                        markerPoint.event.timestamp
+                    )
                 )
                 markerPoint.timestamp.toFloat() to marker
             }
@@ -763,14 +982,14 @@ fun VicoCgmChart(
 
         val carbMarkers = remember(
             carbMarkerPoints,
-            carbLabelComponent,
+            detailedCarbLabelComponent,
             carbIndicatorComponent
         ) {
             carbMarkerPoints.map { markerPoint ->
                 val marker = createCarbMarker(
-                    labelComponent = carbLabelComponent,
+                    labelComponent = detailedCarbLabelComponent,
                     indicatorComponent = carbIndicatorComponent,
-                    labelText = formatCarbGrams(markerPoint.event.grams)
+                    labelText = formatCarbTooltip(markerPoint.event.grams, markerPoint.event.timestamp)
                 )
                 markerPoint.timestamp.toFloat() to marker
             }
@@ -795,60 +1014,107 @@ fun VicoCgmChart(
             }
         }
         
-        // Display the chart with Vico
-        Row(
+        // Display the chart with Vico and mode bands overlay
+        Box(
             modifier = modifier
                 .fillMaxWidth()
                 .height(300.dp)
         ) {
-            Column(
-                modifier = Modifier
-                    .fillMaxHeight()
-                    .padding(horizontal = Spacing.Small),
-                verticalArrangement = Arrangement.SpaceBetween,
-                horizontalAlignment = Alignment.End
+            // Mode bands overlay at top of chart
+            if (modeEvents.isNotEmpty()) {
+                Canvas(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(16.dp)
+                        .align(Alignment.TopCenter)
+                ) {
+                    val chartWidth = size.width
+                    val bandHeight = size.height
+
+                    modeEvents.forEach { modeEvent ->
+                        // Calculate X position based on timestamp
+                        val modeStartRatio = ((modeEvent.timestamp - startTimeSeconds).toFloat() / rangeSeconds).coerceIn(0f, 1f)
+                        val startX = modeStartRatio * chartWidth
+
+                        // Calculate end position (use duration or extend to current time)
+                        val durationSeconds = (modeEvent.duration ?: 120) * 60L  // Default 2 hours if no duration
+                        val modeEndTime = modeEvent.timestamp + durationSeconds
+                        val modeEndRatio = ((modeEndTime - startTimeSeconds).toFloat() / rangeSeconds).coerceIn(0f, 1f)
+                        val endX = modeEndRatio * chartWidth
+
+                        // Only draw if within visible range
+                        if (endX > 0 && startX < chartWidth) {
+                            val bandColor = when (modeEvent.mode) {
+                                TherapyMode.SLEEP -> ModeColors.SleepBand
+                                TherapyMode.EXERCISE -> ModeColors.ExerciseBand
+                                else -> ComposeColor.Transparent
+                            }
+
+                            drawRect(
+                                color = bandColor,
+                                topLeft = androidx.compose.ui.geometry.Offset(startX.coerceAtLeast(0f), 0f),
+                                size = androidx.compose.ui.geometry.Size(
+                                    width = (endX - startX).coerceAtLeast(8f),
+                                    height = bandHeight
+                                )
+                            )
+                        }
+                    }
+                }
+            }
+
+            Row(
+                modifier = Modifier.fillMaxSize()
             ) {
-                yAxisLabels.forEach { label ->
-                    Text(
-                        text = label,
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
+                Column(
+                    modifier = Modifier
+                        .fillMaxHeight()
+                        .padding(horizontal = Spacing.Small),
+                    verticalArrangement = Arrangement.SpaceBetween,
+                    horizontalAlignment = Alignment.End
+                ) {
+                    yAxisLabels.forEach { label ->
+                        Text(
+                            text = label,
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
                 }
-            }
 
-            val lineRangeProvider = remember {
-                object : CartesianLayerRangeProvider {
-                    override fun getMinX(minX: Double, maxX: Double, extraStore: ExtraStore): Double = minX
-                    override fun getMaxX(minX: Double, maxX: Double, extraStore: ExtraStore): Double = maxX
-                    override fun getMinY(minY: Double, maxY: Double, extraStore: ExtraStore): Double = fixedMinGlucose.toDouble()
-                    override fun getMaxY(minY: Double, maxY: Double, extraStore: ExtraStore): Double = fixedMaxGlucose.toDouble()
+                val lineRangeProvider = remember {
+                    object : CartesianLayerRangeProvider {
+                        override fun getMinX(minX: Double, maxX: Double, extraStore: ExtraStore): Double = minX
+                        override fun getMaxX(minX: Double, maxX: Double, extraStore: ExtraStore): Double = maxX
+                        override fun getMinY(minY: Double, maxY: Double, extraStore: ExtraStore): Double = fixedMinGlucose.toDouble()
+                        override fun getMaxY(minY: Double, maxY: Double, extraStore: ExtraStore): Double = fixedMaxGlucose.toDouble()
+                    }
                 }
-            }
 
-            // Configure line styling for each series
-            val lineLayer = rememberLineCartesianLayer(
-                rangeProvider = lineRangeProvider
-            )
-            val scrollState = rememberVicoScrollState(
-                scrollEnabled = false,
-                initialScroll = Scroll.Absolute.End
-            )
+                // Configure line styling for each series
+                val lineLayer = rememberLineCartesianLayer(
+                    rangeProvider = lineRangeProvider
+                )
+                val scrollState = rememberVicoScrollState(
+                    scrollEnabled = false,
+                    initialScroll = Scroll.Absolute.End
+                )
 
-            LaunchedEffect(timeRange, currentTimeSeconds) {
-                scrollState.scroll(Scroll.Absolute.End)
+                LaunchedEffect(timeRange, currentTimeSeconds) {
+                    scrollState.scroll(Scroll.Absolute.End)
+                }
+                CartesianChartHost(
+                    chart = rememberCartesianChart(
+                        lineLayer,
+                        marker = dragMarker, // May be null if series contains NaN
+                        persistentMarkers = persistentMarkers
+                    ),
+                    scrollState = scrollState,
+                    consumeMoveEvents = true,
+                    modelProducer = modelProducer,
+                    modifier = Modifier.fillMaxHeight().weight(1f)
+                )
             }
-            CartesianChartHost(
-                chart = rememberCartesianChart(
-                    lineLayer,
-                    marker = dragMarker, // May be null if series contains NaN
-                    persistentMarkers = persistentMarkers
-                ),
-                scrollState = scrollState,
-                consumeMoveEvents = true,
-                modelProducer = modelProducer,
-                modifier = Modifier.fillMaxHeight().weight(1f)
-            )
         }
 
         if (axisLabels.isNotEmpty()) {
@@ -866,12 +1132,49 @@ fun VicoCgmChart(
                 }
             }
         }
-        
-        // TODO Phase 4: Enhance marker styling
-        // - Handle overlapping markers and optional guideline styling
-        
-        // TODO Phase 4: Enhance basal rate visualization
-        // - Consider stepped columns/area fill for clearer temp vs scheduled states
+
+        // Mode legend if modes are present
+        if (modeEvents.isNotEmpty()) {
+            Spacer(Modifier.height(Spacing.ExtraSmall))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.Center,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                val hasSleep = modeEvents.any { it.mode == TherapyMode.SLEEP }
+                val hasExercise = modeEvents.any { it.mode == TherapyMode.EXERCISE }
+
+                if (hasSleep) {
+                    Surface(
+                        modifier = Modifier.width(16.dp).height(8.dp),
+                        color = ModeColors.SleepBand,
+                        shape = RoundedCornerShape(2.dp)
+                    ) {}
+                    Spacer(Modifier.width(Spacing.ExtraSmall))
+                    Text(
+                        "Sleep",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                if (hasSleep && hasExercise) {
+                    Spacer(Modifier.width(Spacing.Medium))
+                }
+                if (hasExercise) {
+                    Surface(
+                        modifier = Modifier.width(16.dp).height(8.dp),
+                        color = ModeColors.ExerciseBand,
+                        shape = RoundedCornerShape(2.dp)
+                    ) {}
+                    Spacer(Modifier.width(Spacing.ExtraSmall))
+                    Text(
+                        "Exercise",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+        }
     }
 }
 
@@ -1091,6 +1394,19 @@ private fun createCarbPreviewData(
     }
 }
 
+private fun createModePreviewData(
+    baseTimestamp: Long,
+    entries: List<Triple<Int, TherapyMode, Int?>>  // Triple of (fiveMinuteIndex, mode, durationMinutes)
+): List<ModeEvent> {
+    return entries.map { (fiveMinuteIndex, mode, duration) ->
+        ModeEvent(
+            timestamp = baseTimestamp + (fiveMinuteIndex * 300L),
+            mode = mode,
+            duration = duration
+        )
+    }
+}
+
 @Preview(showBackground = true, name = "Normal Range")
 @Composable
 internal fun VicoCgmChartCardNormalPreview() {
@@ -1262,6 +1578,15 @@ internal fun VicoCgmChartCardWithBolusPreview() {
         )
     )
 
+    // Mode events - Sleep and Exercise modes
+    val modeEvents = createModePreviewData(
+        baseTimestamp = baseTimestamp,
+        entries = listOf(
+            Triple(0, TherapyMode.SLEEP, 60),      // Sleep mode at start for 60 min
+            Triple(20, TherapyMode.EXERCISE, 45)  // Exercise mode at 100 min for 45 min
+        )
+    )
+
     ControlX2Theme {
         Surface(
             modifier = Modifier.fillMaxSize(),
@@ -1273,6 +1598,7 @@ internal fun VicoCgmChartCardWithBolusPreview() {
                 bolusEvents = bolusEvents,
                 basalDataPoints = basalDataPoints,
                 carbEvents = carbEvents,
+                modeEvents = modeEvents,
                 currentTimeSeconds = cgmDataPoints.lastOrNull()?.timestamp
             )
             VicoCgmChartCard(

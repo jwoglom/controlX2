@@ -336,12 +336,17 @@ The Dashboard UI redesign is now complete with all planned features:
 5. ✅ **Polish** - Chart legend with conditional display
 6. ✅ **Dashboard Cards** - TherapyMetrics, ActiveTherapy, SensorInfo
 
-**Next Steps (Optional Enhancements):**
+**Recent Enhancements (December 2025):**
+- ✅ COB calculation from carb history (exponential decay model)
+- ✅ TIR calculation from CGM history (24-hour window)
+- ✅ Therapy mode background bands on chart (Sleep/Exercise modes)
+- ✅ Enhanced marker tooltips with time and type info
+- ✅ Mode legend with conditional display
+
+**Optional Future Enhancements:**
 - Test with real pump data across all time ranges
 - Performance optimization with large datasets
 - Accessibility improvements (screen reader support)
-- COB/TIR calculation from history data
-- Therapy mode background bands on chart
 
 ---
 

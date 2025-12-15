@@ -47,3 +47,11 @@ val TargetRangeColor = Color(0xFFE0F2F1) // Background (Teal)
 val GridLineColor = Color(0xFFEEEEEE)     // Light Gray
 val SurfaceBackground = Color(0xFFFAFAFA) // Background (Off-white)
 val CardBackground = Color(0xFFFFFFFF)    // Card Background (White)
+
+// Therapy Mode Colors
+object ModeColors {
+    val Sleep = Color(0xFF3F51B5)          // Indigo for Sleep mode
+    val SleepBand = Color(0x4D3F51B5)      // 30% alpha Sleep band
+    val Exercise = Color(0xFFFF9800)        // Orange for Exercise mode
+    val ExerciseBand = Color(0x4DFF9800)   // 30% alpha Exercise band
+}

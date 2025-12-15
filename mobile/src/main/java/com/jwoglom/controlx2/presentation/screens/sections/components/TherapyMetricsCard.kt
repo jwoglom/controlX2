@@ -16,6 +16,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.livedata.observeAsState
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -23,6 +24,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import com.jwoglom.controlx2.LocalDataStore
+import com.jwoglom.controlx2.db.historylog.HistoryLogViewModel
 import com.jwoglom.controlx2.presentation.theme.CardBackground
 import com.jwoglom.controlx2.presentation.theme.ControlX2Theme
 import com.jwoglom.controlx2.presentation.theme.Elevation
@@ -31,6 +33,13 @@ import com.jwoglom.controlx2.presentation.theme.InsulinColors
 import com.jwoglom.controlx2.presentation.theme.CarbColor
 import com.jwoglom.controlx2.presentation.theme.Spacing
 import com.jwoglom.controlx2.presentation.theme.SurfaceBackground
+import com.jwoglom.pumpx2.pump.messages.helpers.Dates
+import com.jwoglom.pumpx2.pump.messages.response.historyLog.BolusDeliveryHistoryLog
+import com.jwoglom.pumpx2.pump.messages.response.historyLog.DexcomG6CGMHistoryLog
+import com.jwoglom.pumpx2.pump.messages.response.historyLog.DexcomG7CGMHistoryLog
+import com.jwoglom.pumpx2.pump.messages.response.historyLog.CgmDataGxHistoryLog
+import java.time.Instant
+import java.time.ZoneId
 
 /**
  * Therapy Metrics Card displaying IOB, COB, and Time in Range.
@@ -111,11 +120,24 @@ private fun MetricDisplay(
     }
 }
 
+// Helper to safely get field value using reflection
+private inline fun <reified T> tryGetField(clazz: Class<*>, obj: Any, fieldName: String): T? {
+    return try {
+        val field = clazz.getDeclaredField(fieldName)
+        field.isAccessible = true
+        val value = field.get(obj)
+        if (value is T) value else null
+    } catch (e: Exception) {
+        null
+    }
+}
+
 /**
- * TherapyMetricsCard that automatically reads from the DataStore.
+ * TherapyMetricsCard that automatically reads from the DataStore and calculates COB/TIR.
  */
 @Composable
 fun TherapyMetricsCardFromDataStore(
+    historyLogViewModel: HistoryLogViewModel? = null,
     modifier: Modifier = Modifier
 ) {
     val ds = LocalDataStore.current
@@ -130,12 +152,70 @@ fun TherapyMetricsCardFromDataStore(
         }
     }
 
-    // COB and TIR would need to be added to DataStore or calculated from history
-    // For now, we'll show -- for these values
+    // Calculate TIR from CGM history (last 24 hours)
+    val cgmHistoryLogs = historyLogViewModel?.latestItemsForTypes(
+        listOf(
+            DexcomG6CGMHistoryLog::class.java,
+            DexcomG7CGMHistoryLog::class.java
+        ),
+        288 // ~24 hours of 5-min readings
+    )?.observeAsState()
+
+    val timeInRange = remember(cgmHistoryLogs?.value) {
+        cgmHistoryLogs?.value?.let { logs ->
+            val validReadings = logs.mapNotNull { dao ->
+                val parsed = dao.parse()
+                when (parsed) {
+                    is DexcomG6CGMHistoryLog -> parsed.currentGlucoseDisplayValue
+                    is DexcomG7CGMHistoryLog -> parsed.currentGlucoseDisplayValue
+                    is CgmDataGxHistoryLog -> parsed.value
+                    else -> null
+                }?.takeIf { it > 0 }
+            }
+            if (validReadings.isNotEmpty()) {
+                val inRange = validReadings.count { it in 70..180 }
+                (inRange.toFloat() / validReadings.size.toFloat()) * 100f
+            } else null
+        }
+    }
+
+    // Calculate COB from bolus history (carbs with exponential decay)
+    val bolusHistoryLogs = historyLogViewModel?.latestItemsForTypes(
+        listOf(BolusDeliveryHistoryLog::class.java),
+        50 // Last ~50 boluses
+    )?.observeAsState()
+
+    val currentTimeSeconds = remember { Instant.now().epochSecond }
+    val absorptionTimeSeconds = 180 * 60L // 3 hours
+    val tau = absorptionTimeSeconds / 3.0
+
+    val cob = remember(bolusHistoryLogs?.value, currentTimeSeconds) {
+        bolusHistoryLogs?.value?.let { logs ->
+            var totalCob = 0f
+            logs.forEach { dao ->
+                val parsed = dao.parse()
+                if (parsed is BolusDeliveryHistoryLog) {
+                    val carbs = tryGetField<Int>(parsed.javaClass, parsed, "bolusCarbs")
+                        ?: tryGetField<Int>(parsed.javaClass, parsed, "carbsGrams")
+                        ?: 0
+                    if (carbs > 0) {
+                        val timestamp = dao.pumpTime.atZone(ZoneId.systemDefault()).toEpochSecond()
+                        val elapsedSeconds = currentTimeSeconds - timestamp
+                        if (elapsedSeconds >= 0 && elapsedSeconds < absorptionTimeSeconds * 2) {
+                            val remaining = carbs * kotlin.math.exp(-elapsedSeconds / tau)
+                            totalCob += remaining.toFloat()
+                        }
+                    }
+                }
+            }
+            if (totalCob > 0.5f) totalCob else null
+        }
+    }
+
     TherapyMetricsCard(
         iob = iob,
-        cob = null,  // TODO: Implement COB calculation from carb history
-        timeInRange = null,  // TODO: Implement TIR calculation from CGM history
+        cob = cob,
+        timeInRange = timeInRange,
         modifier = modifier
     )
 }
