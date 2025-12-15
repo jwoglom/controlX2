@@ -1405,6 +1405,7 @@ class CommService : Service() {
             .setContentTitle(title)
             .setContentText(contentText)
             .setContentIntent(pendingIntent)
+            .setFullScreenIntent(pendingIntent, false)
             .setSmallIcon(IconCompat.createWithResource(this, R.drawable.pump_notif_1d))
             .setTicker(currentPumpData.statusText)
             .setPriority(NotificationCompat.PRIORITY_MAX) // for under android 26 compatibility
