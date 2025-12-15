@@ -594,7 +594,7 @@ fun VicoCgmChart(
             }
             // entry.x is now a timestamp in seconds
             val timestamp = entry.x.toLong()
-            val timeText = axisTimeFormatter.format(Date(timestamp * 1000))
+            val timeText = axisTimeFormatter.format(Dates.fromJan12008EpochSecondsToDate(timestamp))
             val glucoseText = "${entry.y.roundToInt()} mg/dL"
             "$timeText\n$glucoseText"
         }
@@ -671,9 +671,8 @@ fun VicoCgmChart(
         )
     } else {
         val yAxisLabels = remember(fixedGlucoseRange) {
-            val tickCount = 6
-            val step = fixedGlucoseSpan / (tickCount - 1)
-            (0 until tickCount).map { (fixedMaxGlucose - step * it).toInt() }
+            //listOf("400", "360", "320", "280", "240", "200", "160", "120", "80", "40")
+            listOf("400", " ", " ", "280", " ", "200", "160", "120", "80", "40")
         }
 
         // Create persistent markers for bolus events
@@ -746,7 +745,7 @@ fun VicoCgmChart(
             ) {
                 yAxisLabels.forEach { label ->
                     Text(
-                        text = label.toString(),
+                        text = label,
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
