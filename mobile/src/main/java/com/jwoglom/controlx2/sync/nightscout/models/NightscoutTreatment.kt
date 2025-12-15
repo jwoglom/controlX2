@@ -25,13 +25,19 @@ data class NightscoutTreatment(
     val carbs: Double? = null,  // Carbs in grams
 
     @SerializedName("duration")
-    val duration: Int? = null,  // Duration in minutes (for temp basal)
+    val duration: Double? = null,  // Duration in minutes (for temp basal)
 
     @SerializedName("rate")
     val rate: Double? = null,  // Basal rate in U/hr
 
     @SerializedName("absolute")
     val absolute: Double? = null,  // Absolute basal rate in U/hr
+
+    @SerializedName("enteredinsulin")
+    val enteredInsulin: Double? = null,
+
+    @SerializedName("relative")
+    val relative: Double? = null, // Extended amount
 
     @SerializedName("reason")
     val reason: String? = null,  // Reason for treatment
@@ -58,9 +64,11 @@ data class NightscoutTreatment(
             seqId: Long,
             insulin: Double? = null,
             carbs: Double? = null,
-            duration: Int? = null,
+            duration: Double? = null,
             rate: Double? = null,
             absolute: Double? = null,
+            enteredInsulin: Double? = null,
+            relative: Double? = null,
             reason: String? = null,
             notes: String? = null
         ): NightscoutTreatment {
@@ -74,6 +82,8 @@ data class NightscoutTreatment(
                 duration = duration,
                 rate = rate,
                 absolute = absolute,
+                enteredInsulin = enteredInsulin,
+                relative = relative,
                 reason = reason,
                 notes = notes,
                 pumpId = seqId.toString()

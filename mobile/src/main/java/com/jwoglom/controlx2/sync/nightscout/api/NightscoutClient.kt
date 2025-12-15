@@ -72,6 +72,23 @@ class NightscoutClient(
         }
     }
 
+    override suspend fun uploadProfile(profile: Any): Result<Boolean> {
+        return withContext(Dispatchers.IO) {
+            try {
+                // Nightscout profile API expects { "_id": "...", "defaultProfile": "...", "store": { ... } }
+                // or just the profile object?
+                // Actually it's often a PUT to /api/v1/profile (single profile) or POST (add profile)
+                // Let's assume standard POST /api/v1/profile
+                val response = post("/api/v1/profile", profile)
+                Timber.d("Uploaded profile to Nightscout")
+                Result.success(true)
+            } catch (e: Exception) {
+                Timber.e(e, "Failed to upload profile to Nightscout")
+                Result.failure(e)
+            }
+        }
+    }
+
     override suspend fun getLastEntries(count: Int): Result<List<NightscoutEntry>> {
         return withContext(Dispatchers.IO) {
             try {

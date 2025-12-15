@@ -7,6 +7,7 @@ import com.jwoglom.controlx2.sync.nightscout.ProcessorType
 import com.jwoglom.controlx2.sync.nightscout.api.NightscoutApi
 import com.jwoglom.controlx2.sync.nightscout.models.NightscoutTreatment
 import com.jwoglom.pumpx2.pump.messages.response.historyLog.BolusDeliveryHistoryLog
+import com.jwoglom.pumpx2.pump.messages.response.historyLog.ExtendedBolusHistoryLog
 import com.jwoglom.pumpx2.pump.messages.response.historyLog.HistoryLogParser
 import timber.log.Timber
 
@@ -14,6 +15,7 @@ import timber.log.Timber
  * Process bolus deliveries for Nightscout upload
  *
  * Converts insulin bolus records to Nightscout treatments
+ * Handles standard and extended boluses.
  */
 class ProcessBolus(
     nightscoutApi: NightscoutApi,
@@ -24,7 +26,8 @@ class ProcessBolus(
 
     override fun supportedTypeIds(): Set<Int> {
         return setOfNotNull(
-            HistoryLogParser.LOG_MESSAGE_CLASS_TO_ID[BolusDeliveryHistoryLog::class.java]
+            HistoryLogParser.LOG_MESSAGE_CLASS_TO_ID[BolusDeliveryHistoryLog::class.java],
+            HistoryLogParser.LOG_MESSAGE_CLASS_TO_ID[ExtendedBolusHistoryLog::class.java]
         )
     }
 
@@ -61,24 +64,48 @@ class ProcessBolus(
 
     private fun bolusToNightscoutTreatment(item: HistoryLogItem): NightscoutTreatment? {
         val parsed = item.parse()
+        val pumpTime = item.pumpTime
 
-        if (parsed !is BolusDeliveryHistoryLog) {
-            Timber.w("Unexpected bolus type: ${parsed.javaClass.simpleName}")
-            return null
+        return when (parsed) {
+            is BolusDeliveryHistoryLog -> {
+                val bolusData = extractBolusData(parsed)
+                NightscoutTreatment.fromTimestamp(
+                    eventType = "Bolus",
+                    timestamp = pumpTime,
+                    seqId = item.seqId,
+                    insulin = bolusData.insulin,
+                    carbs = bolusData.carbs,
+                    notes = bolusData.notes
+                )
+            }
+            is ExtendedBolusHistoryLog -> {
+                // Extended bolus (Combo Bolus part 2)
+                // "extendedAmount" is the amount delivered over time
+                // "duration" is in minutes
+                val extendedAmount = tryGetField<Int>(parsed.javaClass, parsed, "extendedAmount")?.div(1000.0)
+                    ?: tryGetField<Double>(parsed.javaClass, parsed, "extendedAmount")
+                    ?: 0.0
+                
+                val duration = tryGetField<Int>(parsed.javaClass, parsed, "duration") // minutes
+                    ?: 0
+
+                val requestId = tryGetField<Long>(parsed.javaClass, parsed, "bolusRequestId")
+
+                NightscoutTreatment.fromTimestamp(
+                    eventType = "Bolus", // Or "Combo Bolus"? Nightscout usually uses "Bolus" with extended fields
+                    timestamp = pumpTime,
+                    seqId = item.seqId,
+                    enteredInsulin = extendedAmount, // Total valid for extended part?
+                    relative = extendedAmount,       // The extended portion
+                    duration = duration.toDouble(),
+                    notes = "Extended Bolus (ID: $requestId)"
+                )
+            }
+            else -> {
+                Timber.w("Unexpected bolus type: ${parsed.javaClass.simpleName}")
+                null
+            }
         }
-
-        // Extract bolus data using reflection since we don't have direct access to pumpx2 internals
-        // The bolus object should have these fields based on the pump protocol
-        val bolusData = extractBolusData(parsed)
-
-        return NightscoutTreatment.fromTimestamp(
-            eventType = "Bolus",
-            timestamp = item.pumpTime,
-            seqId = item.seqId,
-            insulin = bolusData.insulin,
-            carbs = bolusData.carbs,
-            notes = bolusData.notes
-        )
     }
 
     private data class BolusData(

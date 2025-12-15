@@ -118,15 +118,18 @@ class NightscoutSyncWorker(
                 config.getSanitizedUrl(),
                 config.apiSecret
             )
-            val syncStateDao = NightscoutSyncStateDatabase.getDatabase(context)
-                .nightscoutSyncStateDao()
+            val syncStateDb = NightscoutSyncStateDatabase.getDatabase(context)
+            val syncStateDao = syncStateDb.nightscoutSyncStateDao()
+            val processorStateDao = syncStateDb.nightscoutProcessorStateDao()
 
             val coordinator = NightscoutSyncCoordinator(
                 historyLogRepo,
                 nightscoutClient,
                 syncStateDao,
+                processorStateDao,
                 config,
-                pumpSid
+                pumpSid,
+                context
             )
 
             // Perform sync

@@ -78,6 +78,21 @@ class ProcessBasal(
         val parsed = item.parse()
         val basalClass = parsed.javaClass
 
+        // Special handling for TempRateCompletedHistoryLog - indicates end of temp basal
+        if (basalClass.simpleName.contains("TempRateCompleted", ignoreCase = true)) {
+            return NightscoutTreatment.fromTimestamp(
+                eventType = "Temp Basal",
+                timestamp = item.pumpTime,
+                seqId = item.seqId,
+                rate = 0.0, // Should reset to scheduled? 0 usually means cancel/none active? 
+                            // Or does it mean "back to pattern"?
+                            // Nightscout: duration=0 cancels temp basal.
+                absolute = null, // don't set absolute if we are cancelling
+                duration = 0.0, // Duration 0 means cancel/end
+                notes = "Temp rate completed"
+            )
+        }
+
         // Extract basal data using reflection
         val basalData = extractBasalData(basalClass, parsed)
 
@@ -93,7 +108,7 @@ class ProcessBasal(
             seqId = item.seqId,
             rate = basalData.rate,
             absolute = basalData.rate, // Nightscout uses absolute for the actual rate
-            duration = basalData.duration,
+            duration = basalData.duration?.toDouble(),
             notes = basalData.notes
         )
     }

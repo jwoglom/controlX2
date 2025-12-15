@@ -66,8 +66,10 @@ class NightscoutSyncCoordinatorTest {
             historyLogRepo,
             mockApi,
             syncStateDb.nightscoutSyncStateDao(),
+            syncStateDb.nightscoutProcessorStateDao(),
             config,
-            pumpSid = 123
+            pumpSid = 123,
+            context = context
         )
 
         val result = coordinator.syncAll()
@@ -86,8 +88,10 @@ class NightscoutSyncCoordinatorTest {
             historyLogRepo,
             mockApi,
             syncStateDb.nightscoutSyncStateDao(),
+            syncStateDb.nightscoutProcessorStateDao(),
             config,
-            pumpSid = 123
+            pumpSid = 123,
+            context = context
         )
 
         val result = coordinator.syncAll()
@@ -106,8 +110,10 @@ class NightscoutSyncCoordinatorTest {
             historyLogRepo,
             mockApi,
             syncStateDb.nightscoutSyncStateDao(),
+            syncStateDb.nightscoutProcessorStateDao(),
             config,
-            pumpSid = 123
+            pumpSid = 123,
+            context = context
         )
 
         val result = coordinator.syncAll()
@@ -138,8 +144,10 @@ class NightscoutSyncCoordinatorTest {
             historyLogRepo,
             mockApi,
             syncStateDb.nightscoutSyncStateDao(),
+            syncStateDb.nightscoutProcessorStateDao(),
             config,
-            pumpSid = 123
+            pumpSid = 123,
+            context = context
         )
 
         val result = coordinator.syncAll()
@@ -173,8 +181,10 @@ class NightscoutSyncCoordinatorTest {
             historyLogRepo,
             mockApi,
             syncStateDb.nightscoutSyncStateDao(),
+            syncStateDb.nightscoutProcessorStateDao(),
             config,
-            pumpSid = 123
+            pumpSid = 123,
+            context = context
         )
 
         // First sync
@@ -216,8 +226,10 @@ class NightscoutSyncCoordinatorTest {
             historyLogRepo,
             mockApi,
             syncStateDb.nightscoutSyncStateDao(),
+            syncStateDb.nightscoutProcessorStateDao(),
             config,
-            pumpSid = 123
+            pumpSid = 123,
+            context = context
         )
 
         // Retroactive sync for specific range

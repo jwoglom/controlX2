@@ -86,7 +86,7 @@ class ProcessBasalSuspension(
             seqId = item.seqId,
             rate = 0.0, // Suspension means 0 basal rate
             absolute = 0.0,
-            duration = suspensionData.duration,
+            duration = suspensionData.duration?.toDouble(),
             reason = suspensionData.reason,
             notes = suspensionData.notes
         )
