@@ -12,7 +12,6 @@ import androidx.compose.material.ExperimentalMaterialApi
 import androidx.compose.material.pullrefresh.PullRefreshIndicator
 import androidx.compose.material.pullrefresh.pullRefresh
 import androidx.compose.material.pullrefresh.rememberPullRefreshState
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -51,24 +50,22 @@ import com.jwoglom.controlx2.dataStore
 import com.jwoglom.controlx2.db.historylog.HistoryLogViewModel
 import com.jwoglom.controlx2.presentation.components.HistoryLogSyncProgressBar
 import com.jwoglom.controlx2.presentation.components.LastConnectionUpdatedTimestamp
-import com.jwoglom.controlx2.presentation.components.Line
 import com.jwoglom.controlx2.presentation.components.PumpSetupStageDescription
 import com.jwoglom.controlx2.presentation.components.PumpSetupStageProgress
 import com.jwoglom.controlx2.presentation.components.ServiceDisabledMessage
-import com.jwoglom.controlx2.presentation.screens.sections.components.DashboardCgmChart
+import com.jwoglom.controlx2.presentation.screens.sections.components.ActiveTherapyCardFromDataStore
+import com.jwoglom.controlx2.presentation.screens.sections.components.GlucoseHeroCard
 import com.jwoglom.controlx2.presentation.screens.sections.components.PumpStatusBar
+import com.jwoglom.controlx2.presentation.screens.sections.components.SensorInfoCardFromDataStore
+import com.jwoglom.controlx2.presentation.screens.sections.components.TherapyMetricsCardFromDataStore
+import com.jwoglom.controlx2.presentation.screens.sections.components.VicoCgmChartCard
 import com.jwoglom.controlx2.presentation.screens.setUpPreviewState
 import com.jwoglom.controlx2.presentation.theme.ControlX2Theme
 import com.jwoglom.controlx2.presentation.util.LifecycleStateObserver
-import com.jwoglom.controlx2.shared.enums.BasalStatus
-import com.jwoglom.controlx2.shared.enums.UserMode
 import com.jwoglom.controlx2.shared.presentation.intervalOf
 import com.jwoglom.controlx2.shared.util.SendType
 import com.jwoglom.pumpx2.pump.messages.models.NotificationBundle
 import com.jwoglom.pumpx2.pump.messages.request.currentStatus.HistoryLogStatusRequest
-import com.jwoglom.pumpx2.pump.messages.response.historyLog.DexcomG6CGMHistoryLog
-import com.jwoglom.pumpx2.pump.messages.response.historyLog.DexcomG7CGMHistoryLog
-import com.jwoglom.pumpx2.pump.messages.response.historyLog.HistoryLogParser.LOG_MESSAGE_IDS
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
@@ -179,29 +176,29 @@ fun Dashboard(
                     }
                 }
 
+                // Pump Status Bar with battery, connection, and cartridge
                 item {
                     PumpStatusBar(middleContent = {
                         LastConnectionUpdatedTimestamp()
                     })
                 }
 
+                // Hero card showing current glucose reading
                 item {
                     val cgmReading = ds.cgmReading.observeAsState()
                     val cgmDeltaArrow = ds.cgmDeltaArrow.observeAsState()
-                    Line(
-                        "${
-                            when (cgmReading.value) {
-                                0 -> "CGM Value Unknown"
-                                null -> ""
-                                else -> cgmReading.value
-                            }
-                        } ${cgmDeltaArrow.value ?: ""}",
-                        style = MaterialTheme.typography.displayMedium,
+                    GlucoseHeroCard(
+                        glucoseValue = cgmReading.value,
+                        deltaArrow = cgmDeltaArrow.value
                     )
                 }
-                
+
+                // CGM Chart with Vico - shows glucose, boluses, basal, carbs
                 item {
-                    DashboardCgmChart(historyLogViewModel)
+                    VicoCgmChartCard(
+                        historyLogViewModel = historyLogViewModel,
+                        showLegend = true
+                    )
                 }
 
                 // History Log Sync Progress
@@ -214,132 +211,19 @@ fun Dashboard(
                     }
                 }
 
+                // Therapy Metrics Card - IOB, COB, TIR
                 item {
-                    val batteryPercent = ds.batteryPercent.observeAsState()
-                    Line(batteryPercent.value?.let {
-                        "Battery: ${batteryPercent.value}%"
-                    } ?: "")
+                    TherapyMetricsCardFromDataStore()
                 }
 
+                // Active Therapy Card - Basal, Last Bolus, Mode
                 item {
-                    val iobUnits = ds.iobUnits.observeAsState()
-                    Line(iobUnits.value?.let {
-                        "IOB: ${iobUnits.value}"
-                    } ?: "")
+                    ActiveTherapyCardFromDataStore()
                 }
 
+                // Sensor Info Card - Sensor expiration, Transmitter status
                 item {
-                    val cartridgeRemainingUnits =
-                        ds.cartridgeRemainingUnits.observeAsState()
-                    Line(cartridgeRemainingUnits.value?.let {
-                        "Cartridge: ${cartridgeRemainingUnits.value}"
-                    } ?: "")
-                }
-
-                item {
-                    val lastBolusStatus = ds.lastBolusStatus.observeAsState()
-                    Line(lastBolusStatus.value?.let {
-                        "Last Bolus: ${lastBolusStatus.value}"
-                    } ?: "")
-                }
-
-                item {
-                    val basalRate = dataStore.basalRate.observeAsState()
-                    val basalStatus = dataStore.basalStatus.observeAsState()
-                    val landingBasalDisplayedText =
-                        dataStore.landingBasalDisplayedText.observeAsState()
-
-                    LaunchedEffect(basalRate.value, basalStatus.value) {
-                        dataStore.landingBasalDisplayedText.value = when (basalStatus.value) {
-                            BasalStatus.ON, BasalStatus.ZERO, BasalStatus.CONTROLIQ_INCREASED, BasalStatus.CONTROLIQ_REDUCED, BasalStatus.UNKNOWN, null -> when (basalRate.value) {
-                                null -> null
-                                else -> "${basalRate.value}"
-                            }
-                            else -> when (basalRate.value) {
-                                null -> "${basalStatus.value}"
-                                else -> "${basalStatus.value} (${basalRate.value})"
-                            }
-                        }
-                    }
-                    Line(landingBasalDisplayedText.value?.let {
-                        "Basal: ${landingBasalDisplayedText.value}"
-                    } ?: "")
-                }
-
-                item {
-
-                    val controlIQStatus = LocalDataStore.current.controlIQStatus.observeAsState()
-                    val controlIQMode = LocalDataStore.current.controlIQMode.observeAsState()
-                    val landingControlIQDisplayedText =
-                        dataStore.landingControlIQDisplayedText.observeAsState()
-
-                    LaunchedEffect(controlIQStatus.value, controlIQMode.value) {
-                        dataStore.landingControlIQDisplayedText.value = when (controlIQMode.value) {
-                            UserMode.SLEEP, UserMode.EXERCISE -> "${controlIQMode.value}"
-                            else -> when (controlIQStatus.value) {
-                                null -> null
-                                else -> "${controlIQStatus.value}"
-                            }
-                        }
-                    }
-
-                    Line(landingControlIQDisplayedText.value?.let {
-                        "Control-IQ: ${landingControlIQDisplayedText.value}"
-                    } ?: "")
-                }
-
-                item {
-                    val cgmSessionExpireRelative =
-                        ds.cgmSessionExpireRelative.observeAsState()
-                    val cgmSessionExpireExact =
-                        ds.cgmSessionExpireExact.observeAsState()
-                    Line(cgmSessionExpireRelative.value?.let {
-                        "CGM Sensor: ${cgmSessionExpireRelative.value} (${cgmSessionExpireExact.value})"
-                    } ?: "")
-                }
-
-                item {
-                    val cgmTransmitterStatus = ds.cgmTransmitterStatus.observeAsState()
-                    Line(cgmTransmitterStatus.value?.let {
-                        "CGM Transmitter Battery: ${cgmTransmitterStatus.value}"
-                    } ?: "")
-                }
-
-                item {
-                    Line("")
-                }
-
-                item {
-                    val historyLogCount = historyLogViewModel?.count?.observeAsState()
-                    Line(historyLogCount?.value?.let {
-                        "History log count: $it"
-                    } ?: "")
-                }
-
-                item {
-                    val latestHistoryLog = historyLogViewModel?.latest?.observeAsState()
-                    Line(latestHistoryLog?.value?.let {
-                        "Latest history log reading: ${it.seqId} at ${it.pumpTime} added ${it.addedTime}"
-                    } ?: "")
-                }
-
-                item {
-                    val latestHistoryLog = historyLogViewModel?.oldest?.observeAsState()
-                    Line(latestHistoryLog?.value?.let {
-                        "Oldest history log reading: ${it.seqId} at ${it.pumpTime} added ${it.addedTime}"
-                    } ?: "")
-                }
-
-                item {
-                    val latestG6Reading = historyLogViewModel?.latestForType(DexcomG6CGMHistoryLog().typeId())?.observeAsState()
-                    Line(latestG6Reading?.value?.let {
-                        "Latest G6 history log reading: ${it.seqId}: ${LOG_MESSAGE_IDS[it.typeId]?.let { m -> shortPumpMessageTitle(m)}} (${it.typeId}) at ${it.addedTime}: ${(it.parse() as DexcomG6CGMHistoryLog).currentGlucoseDisplayValue}mgdl"
-                    } ?: "")
-
-                    val latestG7Reading = historyLogViewModel?.latestForType(DexcomG7CGMHistoryLog().typeId())?.observeAsState()
-                    Line(latestG7Reading?.value?.let {
-                        "Latest G7 history log reading: ${it.seqId}: ${LOG_MESSAGE_IDS[it.typeId]?.let { m -> shortPumpMessageTitle(m)}} (${it.typeId}) at ${it.addedTime}: ${(it.parse() as DexcomG7CGMHistoryLog).currentGlucoseDisplayValue}mgdl"
-                    } ?: "")
+                    SensorInfoCardFromDataStore()
                 }
             }
         )

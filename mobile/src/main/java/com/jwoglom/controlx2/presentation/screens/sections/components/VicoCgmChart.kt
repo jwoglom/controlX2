@@ -58,6 +58,7 @@ import com.jwoglom.controlx2.presentation.theme.Spacing
 import com.jwoglom.controlx2.presentation.theme.SurfaceBackground
 import com.jwoglom.controlx2.presentation.theme.TargetRangeColor
 import com.jwoglom.controlx2.presentation.theme.InsulinColors
+import com.jwoglom.controlx2.presentation.theme.CarbColor
 import com.jwoglom.pumpx2.pump.messages.helpers.Dates
 import com.jwoglom.pumpx2.pump.messages.models.InsulinUnit
 import com.jwoglom.pumpx2.pump.messages.response.currentStatus.LastBolusStatusAbstractResponse
@@ -578,6 +579,32 @@ fun VicoCgmChart(
         null
     )
 
+    // Carb marker components (orange rounded square)
+    val carbRoundedSquareShape = remember { RoundedCornerShape(CARB_MARKER_CORNER_RADIUS_DP.dp).toVicoShape() }
+    val carbLabelComponent = remember(bolusLabelColor) {
+        TextComponent(
+            color = bolusLabelColor.toArgb(),
+            typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD),
+            textSizeSp = CARB_LABEL_TEXT_SIZE_SP,
+            textAlignment = Layout.Alignment.ALIGN_CENTER,
+            lineHeightSp = null,
+            lineCount = 1,
+            truncateAt = null,
+            margins = Insets(0f, 0f, 0f, 4f),
+            padding = Insets(6f, 2f, 6f, 2f),
+            background = null,
+            minWidth = TextComponent.MinWidth.Companion.fixed(0f)
+        )
+    }
+    val carbIndicatorComponent = rememberShapeComponent(
+        fill(CarbColor),
+        carbRoundedSquareShape,
+        Insets(),
+        fill(ComposeColor.White),
+        CARB_MARKER_STROKE_DP.dp,
+        null
+    )
+
     // Create model producer for chart data
     val modelProducer = remember { CartesianChartModelProducer() }
 
@@ -716,12 +743,50 @@ fun VicoCgmChart(
             }
         }
 
-        val persistentMarkers = remember(bolusMarkers) {
-            if (bolusMarkers.isEmpty()) {
+        // Create carb marker points
+        val carbMarkerPoints = remember(carbEvents, startTimeSeconds, currentTimeSeconds, hasValidCgmData) {
+            if (carbEvents.isEmpty() || !hasValidCgmData) {
+                emptyList<CarbMarkerPoint>()
+            } else {
+                carbEvents.mapNotNull { carb ->
+                    if (carb.timestamp in startTimeSeconds..currentTimeSeconds) {
+                        CarbMarkerPoint(
+                            timestamp = carb.timestamp,
+                            event = carb
+                        )
+                    } else {
+                        null
+                    }
+                }
+            }
+        }
+
+        val carbMarkers = remember(
+            carbMarkerPoints,
+            carbLabelComponent,
+            carbIndicatorComponent
+        ) {
+            carbMarkerPoints.map { markerPoint ->
+                val marker = createCarbMarker(
+                    labelComponent = carbLabelComponent,
+                    indicatorComponent = carbIndicatorComponent,
+                    labelText = formatCarbGrams(markerPoint.event.grams)
+                )
+                markerPoint.timestamp.toFloat() to marker
+            }
+        }
+
+        val persistentMarkers = remember(bolusMarkers, carbMarkers) {
+            if (bolusMarkers.isEmpty() && carbMarkers.isEmpty()) {
                 null
             } else {
                 { scope: PersistentMarkerScope, _: ExtraStore ->
                     bolusMarkers.forEach { (xValue, marker) ->
+                        with(scope) {
+                            marker.at(xValue)
+                        }
+                    }
+                    carbMarkers.forEach { (xValue, marker) ->
                         with(scope) {
                             marker.at(xValue)
                         }
@@ -810,6 +875,96 @@ fun VicoCgmChart(
     }
 }
 
+// Chart Legend Component
+@Composable
+fun ChartLegend(
+    showCarbs: Boolean = true,
+    showBasal: Boolean = true,
+    modifier: Modifier = Modifier
+) {
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(horizontal = Spacing.Medium, vertical = Spacing.Small),
+        horizontalArrangement = Arrangement.SpaceEvenly,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        LegendItem(
+            color = GlucoseColors.InRange,
+            label = "Glucose",
+            shape = LegendShape.LINE
+        )
+        LegendItem(
+            color = InsulinColors.Bolus,
+            label = "Bolus",
+            shape = LegendShape.CIRCLE
+        )
+        if (showCarbs) {
+            LegendItem(
+                color = CarbColor,
+                label = "Carbs",
+                shape = LegendShape.SQUARE
+            )
+        }
+        if (showBasal) {
+            LegendItem(
+                color = InsulinColors.Basal,
+                label = "Basal",
+                shape = LegendShape.LINE
+            )
+        }
+    }
+}
+
+enum class LegendShape {
+    LINE, CIRCLE, SQUARE
+}
+
+@Composable
+private fun LegendItem(
+    color: ComposeColor,
+    label: String,
+    shape: LegendShape,
+    modifier: Modifier = Modifier
+) {
+    Row(
+        modifier = modifier,
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(Spacing.ExtraSmall)
+    ) {
+        when (shape) {
+            LegendShape.LINE -> {
+                Surface(
+                    modifier = Modifier
+                        .width(16.dp)
+                        .height(3.dp),
+                    color = color,
+                    shape = RoundedCornerShape(1.dp)
+                ) {}
+            }
+            LegendShape.CIRCLE -> {
+                Surface(
+                    modifier = Modifier.width(10.dp).height(10.dp),
+                    color = color,
+                    shape = CircleShape
+                ) {}
+            }
+            LegendShape.SQUARE -> {
+                Surface(
+                    modifier = Modifier.width(10.dp).height(10.dp),
+                    color = color,
+                    shape = RoundedCornerShape(2.dp)
+                ) {}
+            }
+        }
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+    }
+}
+
 // Time range selector component
 @Composable
 fun ChartTimeRangeSelector(
@@ -849,7 +1004,8 @@ fun ChartTimeRangeSelector(
 fun VicoCgmChartCard(
     historyLogViewModel: HistoryLogViewModel?,
     modifier: Modifier = Modifier,
-    previewData: ChartPreviewData? = null
+    previewData: ChartPreviewData? = null,
+    showLegend: Boolean = true
 ) {
     var selectedTimeRange by remember { mutableStateOf(TimeRange.SIX_HOURS) }
 
@@ -872,12 +1028,6 @@ fun VicoCgmChartCard(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-//                Text(
-//                    "Glucose History",
-//                    style = MaterialTheme.typography.titleLarge,
-//                    color = MaterialTheme.colorScheme.onSurface
-//                )
-
                 ChartTimeRangeSelector(
                     selectedRange = selectedTimeRange,
                     onRangeSelected = { selectedTimeRange = it }
@@ -892,6 +1042,15 @@ fun VicoCgmChartCard(
                 timeRange = selectedTimeRange,
                 previewData = previewData
             )
+
+            // Chart legend
+            if (showLegend) {
+                Spacer(Modifier.height(Spacing.Small))
+                ChartLegend(
+                    showCarbs = previewData?.carbEvents?.isNotEmpty() == true,
+                    showBasal = previewData?.basalDataPoints?.isNotEmpty() == true
+                )
+            }
         }
     }
 }
@@ -914,7 +1073,20 @@ private fun createBolusPreviewData(
             timestamp = baseTimestamp + (fiveMinuteIndex * 300L),
             units = units,
             isAutomated = automated,
-            bolusType = if (automated) "AUTO" else "MANUAL-${'$'}idx"
+            bolusType = if (automated) "AUTO" else "MANUAL-$idx"
+        )
+    }
+}
+
+private fun createCarbPreviewData(
+    baseTimestamp: Long,
+    entries: List<Pair<Int, Int>>  // Pair of (fiveMinuteIndex, grams)
+): List<CarbEvent> {
+    return entries.map { (fiveMinuteIndex, grams) ->
+        CarbEvent(
+            timestamp = baseTimestamp + (fiveMinuteIndex * 300L),
+            grams = grams,
+            note = null
         )
     }
 }
@@ -1050,7 +1222,7 @@ internal fun VicoCgmChartCardSteadyPreview() {
 }
 
 
-@Preview(showBackground = true, name = "With Boluses and Basal")
+@Preview(showBackground = true, name = "With Boluses, Basal, and Carbs")
 @Composable
 internal fun VicoCgmChartCardWithBolusPreview() {
 
@@ -1080,6 +1252,16 @@ internal fun VicoCgmChartCardWithBolusPreview() {
         BasalDataPoint(timestamp = baseTimestamp + (28 * 300L), rate = 1.5f, isTemp = false, duration = null)  // Scheduled increase at 140 min
     )
 
+    // Carb data - meals and snacks
+    val carbEvents = createCarbPreviewData(
+        baseTimestamp = baseTimestamp,
+        entries = listOf(
+            Pair(4, 45),    // 45g carbs at 20 minutes (breakfast)
+            Pair(25, 30),   // 30g carbs at 125 minutes (snack)
+            Pair(35, 60)    // 60g carbs at 175 minutes (lunch)
+        )
+    )
+
     ControlX2Theme {
         Surface(
             modifier = Modifier.fillMaxSize(),
@@ -1090,6 +1272,7 @@ internal fun VicoCgmChartCardWithBolusPreview() {
                 cgmDataPoints = cgmDataPoints,
                 bolusEvents = bolusEvents,
                 basalDataPoints = basalDataPoints,
+                carbEvents = carbEvents,
                 currentTimeSeconds = cgmDataPoints.lastOrNull()?.timestamp
             )
             VicoCgmChartCard(
