@@ -324,7 +324,6 @@ class CommService : Service() {
                     historyLogSyncWorker?.start()
                     historyLogSyncWorker?.triggerImmediateSync()
                 }
-
                 // Start Nightscout sync worker if enabled
                 NightscoutSyncWorker.startIfEnabled(
                     applicationContext,

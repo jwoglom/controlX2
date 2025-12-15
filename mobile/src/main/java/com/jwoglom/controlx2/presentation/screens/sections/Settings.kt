@@ -205,6 +205,9 @@ fun Settings(
                     },
                     modifier = Modifier.clickable {
                         Prefs(context).setPumpSetupComplete(false)
+                        Prefs(context).setPumpFinderPumpMac("")
+                        Prefs(context).setPumpFinderPairingCodeType("")
+                        Prefs(context).setPumpFinderServiceEnabled(false)
                         PumpState.setPairingCode(context, "")
                         PumpState.setJpakeDerivedSecret(context, "")
                         PumpState.setJpakeServerNonce(context, "")

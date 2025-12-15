@@ -339,6 +339,7 @@ fun Landing(
                                 navController = navController,
                                 sendMessage = sendMessage,
                                 sendPumpCommands = sendPumpCommands,
+                                historyLogViewModel = historyLogViewModel,
                             )
                         }
                         LandingSection.SETTINGS -> {

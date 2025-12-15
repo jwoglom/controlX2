@@ -21,7 +21,7 @@ import java.lang.Long.max
 import java.lang.Long.min
 
 const val InitialHistoryLogCount = 5000
-const val FetchGroupTimeoutMs = 7000
+const val FetchGroupTimeoutMs = 2500
 
 val triggerRangeMutex = Mutex()
 val statusResponseLock = Mutex()
@@ -50,17 +50,24 @@ class HistoryLogFetcher(val context: Context, val pump: TandemPump, val peripher
         endLog: Long
     )  {
         Timber.i("HistoryLogFetcher.triggerRange($startLog, $endLog)")
+        val chunkSize = 32
         var num = 1
         var totalNums = 1
-        for (i in startLog..endLog step 256) {
+        for (i in startLog..endLog step chunkSize.toLong()) {
             totalNums++
         }
-        for (i in startLog..endLog step 256) {
-            val count = if (i+255 > endLog) (endLog - i + 1).toInt() else 255
+        for (i in startLog..endLog step chunkSize.toLong()) {
+            val count = if (i+chunkSize >= endLog) (endLog - i + 1).toInt() else chunkSize
             val endI = i+count-1
             Timber.i("HistoryLogFetcher.triggerRangeStart $i - $endI ($count)")
 
-            request(i, count)
+            // HistoryLogRequest returns items backward from the start ID,
+            // so we request from the END of the range to get all items in [i, endI]
+            request(endI, count)
+
+            withContext(Dispatchers.IO) {
+                Thread.sleep(500)
+            }
 
             var waitTimeMs = 0
             while (true) {

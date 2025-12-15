@@ -16,6 +16,10 @@ class HistoryLogViewModel(private val repo: HistoryLogRepo, private val pumpSid:
     val latest: LiveData<HistoryLogItem?> = repo.getLatest(pumpSid).asLiveData()
     val oldest: LiveData<HistoryLogItem?> = repo.getOldest(pumpSid).asLiveData()
 
+    fun getCountAboveSeqId(minSeqId: Long): LiveData<Long?> {
+        return repo.getCountAboveSeqId(pumpSid, minSeqId).asLiveData()
+    }
+
     fun latestForType(typeId: Int): LiveData<HistoryLogItem?> {
         return repo.getLatestForType(pumpSid, typeId).asLiveData()
     }

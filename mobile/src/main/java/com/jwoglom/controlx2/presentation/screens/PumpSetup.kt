@@ -7,6 +7,7 @@ import android.content.Intent
 import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
@@ -105,6 +106,30 @@ fun PumpSetup(
     var showAdvancedPairingSettings by remember { mutableStateOf(false) }
     var pumpStateStatus by remember { mutableStateOf<String?>(null) }
     var pumpStateJson by remember { mutableStateOf(PumpState.exportState(context)) }
+
+    fun resetPumpFinder(context: Context) {
+        Prefs(context).setPumpSetupComplete(false)
+        Prefs(context).setPumpFinderPumpMac("")
+        Prefs(context).setPumpFinderPairingCodeType("")
+        Prefs(context).setPumpFinderServiceEnabled(true)
+        PumpState.setPairingCode(context, "")
+        PumpState.setJpakeDerivedSecret(context, "")
+        PumpState.setJpakeServerNonce(context, "")
+        PumpState.setSavedBluetoothMAC(context, "")
+        coroutineScope.launch {
+            withContext(Dispatchers.IO) {
+                Thread.sleep(500)
+            }
+            sendMessage(
+                "/to-phone/app-reload",
+                "".toByteArray()
+            )
+            withContext(Dispatchers.IO) {
+                Thread.sleep(500)
+            }
+            navController?.navigate(Screen.PumpSetup.route)
+        }
+    }
     DialogScreen(
         "Pump Setup",
         actionContent = {
@@ -129,6 +154,9 @@ fun PumpSetup(
                     }
                 }
                 else -> {
+                    val resettableStages = setOf(
+                        PumpSetupStage.PUMP_FINDER_SEARCHING_FOR_PUMPS, PumpSetupStage.WAITING_PUMPX2_INIT, PumpSetupStage.PUMPX2_SEARCHING_FOR_PUMP, PumpSetupStage.PUMPX2_PUMP_DISCOVERED, PumpSetupStage.PUMPX2_INITIAL_PUMP_CONNECTION, PumpSetupStage.PUMPX2_INVALID_PAIRING_CODE, PumpSetupStage.PUMPX2_PUMP_MODEL_METADATA, PumpSetupStage.PUMPX2_SENDING_PAIRING_CODE, PumpSetupStage.WAITING_PUMP_FINDER_CLEANUP
+                    )
                     Button(
                         onClick = {
                             when (ds.pumpSetupStage.value) {
@@ -139,13 +167,21 @@ fun PumpSetup(
                                     Prefs(context).setPumpSetupComplete(false)
                                 }
                                 else -> {
-                                    ds.pumpSetupStage.value =
-                                        PumpSetupStage.values()[setupStage.value!!.ordinal - 1]
+                                    if (ds.pumpSetupStage.value in resettableStages) {
+                                        resetPumpFinder(context)
+                                    } else {
+                                        ds.pumpSetupStage.value =
+                                            PumpSetupStage.values()[setupStage.value!!.ordinal - 1]
+                                    }
                                 }
                             }
                         }
                     ) {
-                        Text("Back")
+                        if (ds.pumpSetupStage.value in resettableStages) {
+                            Text("Reset")
+                        } else {
+                            Text("Back")
+                        }
                     }
                 }
             }
@@ -256,6 +292,7 @@ fun PumpSetup(
                                 context.startActivity(mainIntent)
                                 Runtime.getRuntime().exit(0)
                             }
+
 
                             item {
                                 LazyRow {

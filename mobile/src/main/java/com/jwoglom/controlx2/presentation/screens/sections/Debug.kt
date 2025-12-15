@@ -129,7 +129,9 @@ import com.jwoglom.controlx2.Prefs
 import com.jwoglom.controlx2.dataStore
 import com.jwoglom.controlx2.db.historylog.HistoryLogDatabase
 import com.jwoglom.controlx2.db.historylog.HistoryLogRepo
+import com.jwoglom.controlx2.db.historylog.HistoryLogViewModel
 import com.jwoglom.controlx2.presentation.components.HeaderLine
+import com.jwoglom.controlx2.presentation.components.HistoryLogSyncProgressBar
 import com.jwoglom.controlx2.presentation.theme.ControlX2Theme
 import com.jwoglom.controlx2.shared.util.SendType
 import com.jwoglom.controlx2.shared.util.shortTimeAgo
@@ -156,6 +158,7 @@ fun Debug(
     navController: NavHostController? = null,
     sendMessage: (String, ByteArray) -> Unit,
     sendPumpCommands: (SendType, List<Message>) -> Unit,
+    historyLogViewModel: HistoryLogViewModel? = null,
 ) {
     val coroutineScope = rememberCoroutineScope()
     val clipboardManager: ClipboardManager = LocalClipboardManager.current
@@ -511,6 +514,18 @@ fun Debug(
 
             item {
                 Divider()
+            }
+
+            // History Log Sync Progress Bar
+            historyLogViewModel?.let {
+                item {
+                    HistoryLogSyncProgressBar(
+                        historyLogViewModel = it
+                    )
+                }
+                item {
+                    Divider()
+                }
             }
 
             item {

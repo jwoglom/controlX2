@@ -49,6 +49,7 @@ import com.jwoglom.controlx2.LocalDataStore
 import com.jwoglom.controlx2.Prefs
 import com.jwoglom.controlx2.dataStore
 import com.jwoglom.controlx2.db.historylog.HistoryLogViewModel
+import com.jwoglom.controlx2.presentation.components.HistoryLogSyncProgressBar
 import com.jwoglom.controlx2.presentation.components.LastConnectionUpdatedTimestamp
 import com.jwoglom.controlx2.presentation.components.Line
 import com.jwoglom.controlx2.presentation.components.PumpSetupStageDescription
@@ -201,6 +202,16 @@ fun Dashboard(
                 
                 item {
                     DashboardCgmChart(historyLogViewModel)
+                }
+
+                // History Log Sync Progress
+                historyLogViewModel?.let {
+                    item {
+                        HistoryLogSyncProgressBar(
+                            historyLogViewModel = it,
+                            hideWhenComplete = true
+                        )
+                    }
                 }
 
                 item {

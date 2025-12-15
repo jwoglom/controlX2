@@ -10,6 +10,7 @@ import java.time.ZoneId
 class HistoryLogRepo(private val historyLogDao: HistoryLogDao) {
     fun getCount(pumpSid: Int): Flow<Long?> = historyLogDao.getCount(pumpSid)
     fun getCount(pumpSid: Int, min: Long, max: Long): Flow<Long?> = historyLogDao.getCount(pumpSid, min, max)
+    fun getCountAboveSeqId(pumpSid: Int, minSeqId: Long): Flow<Long?> = historyLogDao.getCountAboveSeqId(pumpSid, minSeqId)
     fun getAllIds(pumpSid: Int, min: Long, max: Long): List<Long> = historyLogDao.getAllIds(pumpSid, min, max)
     fun getAll(pumpSid: Int): Flow<List<HistoryLogItem>> = historyLogDao.getAll(pumpSid)
 

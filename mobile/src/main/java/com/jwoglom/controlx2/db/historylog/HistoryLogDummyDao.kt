@@ -13,6 +13,10 @@ class HistoryLogDummyDao(val data: MutableList<HistoryLogItem>) : HistoryLogDao 
         data.count { it.pumpSid == pumpSid && it.seqId in min..max }.toLong()
     )
 
+    override fun getCountAboveSeqId(pumpSid: Int, minSeqId: Long): Flow<Long?> = flowOf(
+        data.count { it.pumpSid == pumpSid && it.seqId >= minSeqId }.toLong()
+    )
+
     override fun getAllIds(pumpSid: Int, min: Long, max: Long): List<Long> =
         data.filter { it.pumpSid == pumpSid && it.seqId in min..max }
             .sortedBy { it.seqId }

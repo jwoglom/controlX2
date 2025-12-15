@@ -23,6 +23,13 @@ interface HistoryLogDao {
     fun getCount(pumpSid: Int, min: Long, max: Long): Flow<Long?>
 
     @Query("""
+        SELECT COUNT(seqId) FROM $HistoryLogTable
+        WHERE pumpSid = :pumpSid
+        AND seqId >= :minSeqId
+    """)
+    fun getCountAboveSeqId(pumpSid: Int, minSeqId: Long): Flow<Long?>
+
+    @Query("""
         SELECT DISTINCT seqId
         FROM $HistoryLogTable
         WHERE pumpSid = :pumpSid

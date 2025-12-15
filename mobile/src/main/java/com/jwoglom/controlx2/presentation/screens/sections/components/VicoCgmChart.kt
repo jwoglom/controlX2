@@ -58,6 +58,7 @@ import com.jwoglom.controlx2.presentation.theme.Spacing
 import com.jwoglom.controlx2.presentation.theme.SurfaceBackground
 import com.jwoglom.controlx2.presentation.theme.TargetRangeColor
 import com.jwoglom.controlx2.presentation.theme.InsulinColors
+import com.jwoglom.pumpx2.pump.messages.helpers.Dates
 import com.jwoglom.pumpx2.pump.messages.models.InsulinUnit
 import com.jwoglom.pumpx2.pump.messages.response.currentStatus.LastBolusStatusAbstractResponse
 import com.jwoglom.pumpx2.pump.messages.response.historyLog.BolusDeliveryHistoryLog
@@ -87,6 +88,7 @@ import com.patrykandpatrick.vico.core.common.data.ExtraStore
 import java.text.SimpleDateFormat
 import java.time.Instant
 import java.time.ZoneId
+import java.time.ZoneOffset
 import java.util.Date
 import java.util.Locale
 import kotlin.math.max
@@ -206,25 +208,29 @@ private fun rememberCgmChartData(
 
     return remember(cgmData?.value, timeRange) {
         cgmData?.value?.mapNotNull { dao ->
-            try {
-                val parsed = dao.parse()
-                val value = when (parsed) {
-                    is DexcomG6CGMHistoryLog -> parsed.currentGlucoseDisplayValue.toFloat()
-                    is DexcomG7CGMHistoryLog -> parsed.currentGlucoseDisplayValue.toFloat()
-                    is CgmDataGxHistoryLog -> parsed.value.toFloat()
-                    else -> null
-                }
-
-                if (value != null && value > 0) {
-                    val timestamp = dao.pumpTime.atZone(ZoneId.systemDefault()).toEpochSecond()
-                    CgmDataPoint(
-                        timestamp = timestamp,
-                        value = value
-                    )
-                } else null
-            } catch (e: Exception) {
-                null
+            val parsed = dao.parse()
+            val value = when (parsed) {
+                is DexcomG6CGMHistoryLog -> parsed.currentGlucoseDisplayValue.toFloat()
+                is DexcomG7CGMHistoryLog -> parsed.currentGlucoseDisplayValue.toFloat()
+                is CgmDataGxHistoryLog -> parsed.value.toFloat()
+                else -> null
             }
+
+            val pumpTimestamp = when (parsed) {
+                is DexcomG6CGMHistoryLog -> parsed.timeStampSeconds
+                is DexcomG7CGMHistoryLog -> parsed.egvTimestamp
+                is CgmDataGxHistoryLog -> parsed.transmitterTimestamp
+                else -> parsed.pumpTimeSec
+
+            }
+
+            if (value != null && value > 0) {
+                val timestamp = Dates.fromJan12008EpochSecondsToDate(pumpTimestamp)
+                CgmDataPoint(
+                    timestamp = timestamp.epochSecond,
+                    value = value
+                )
+            } else null
         }?.reversed() ?: emptyList()  // Reverse to get chronological order
     }
 }
@@ -448,7 +454,9 @@ fun VicoCgmChart(
     val carbEvents = previewData?.carbEvents ?: emptyList() // TODO: Implement rememberCarbData when HistoryLog available
     val modeEvents = previewData?.modeEvents ?: emptyList() // TODO: Implement rememberModeData when HistoryLog available
 
-    val currentTimeSeconds = previewData?.currentTimeSeconds ?: Instant.now().epochSecond
+    val currentTimeSeconds = remember(timeRange) {
+        previewData?.currentTimeSeconds ?: Instant.now().epochSecond
+    }
     val fixedGlucoseRange = Pair(30f, 410f)
     val fixedMaxGlucose = fixedGlucoseRange.second
     val fixedMinGlucose = fixedGlucoseRange.first
