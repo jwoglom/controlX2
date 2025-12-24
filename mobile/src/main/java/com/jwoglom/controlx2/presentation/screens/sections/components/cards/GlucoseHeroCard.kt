@@ -21,6 +21,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.unit.dp
 import com.jwoglom.controlx2.presentation.theme.CardBackground
 import com.jwoglom.controlx2.presentation.theme.ControlX2Theme
 import com.jwoglom.controlx2.presentation.theme.Elevation
@@ -84,6 +85,11 @@ fun GlucoseHeroCard(
                         ),
                         color = getGlucoseColor(glucoseValue)
                     )
+                }
+
+                // ensures we line up with ActiveTherapyCard
+                if (noCgmConnected) {
+                    Spacer(Modifier.height(8.dp))
                 }
             }
 

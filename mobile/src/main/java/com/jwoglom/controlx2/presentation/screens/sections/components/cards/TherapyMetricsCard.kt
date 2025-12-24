@@ -64,7 +64,7 @@ fun TherapyMetricsCard(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(Spacing.CardPadding + 14.dp)
+                .padding(Spacing.CardPadding + 18.dp)
         ) {
             Row(
                 modifier = Modifier.fillMaxWidth(),

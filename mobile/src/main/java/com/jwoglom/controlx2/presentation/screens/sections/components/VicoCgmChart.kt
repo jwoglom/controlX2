@@ -803,7 +803,7 @@ fun VicoCgmChart(
             }
             // entry.x is now a timestamp in seconds
             val timestamp = entry.x.toLong()
-            val timeText = axisTimeFormatter.format(Dates.fromJan12008EpochSecondsToDate(timestamp))
+            val timeText = axisTimeFormatter.format(Date.from(Dates.fromJan12008EpochSecondsToDate(timestamp)))
             val glucoseText = "${entry.y.roundToInt()} mg/dL"
             "$timeText\n$glucoseText"
         }
