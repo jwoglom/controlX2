@@ -1316,7 +1316,7 @@ fun VicoCgmChartCard(
     Card(
         modifier = modifier
             .fillMaxWidth()
-            .padding(horizontal = Spacing.Medium, vertical = Spacing.Small),
+            .padding(horizontal = Spacing.Small, vertical = Spacing.Small),
         colors = CardDefaults.cardColors(containerColor = CardBackground),
         elevation = CardDefaults.cardElevation(defaultElevation = Elevation.Card),
         shape = RoundedCornerShape(Spacing.CardCornerRadius)

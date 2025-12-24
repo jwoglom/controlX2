@@ -23,6 +23,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.unit.dp
 import com.jwoglom.controlx2.LocalDataStore
 import com.jwoglom.controlx2.db.historylog.HistoryLogViewModel
 import com.jwoglom.controlx2.presentation.theme.CardBackground
@@ -42,7 +43,7 @@ import java.time.ZoneId
 import kotlin.math.exp
 
 /**
- * Therapy Metrics Card displaying IOB, COB, and Time in Range.
+ * Therapy Metrics Card displaying IOB
  * Provides a quick overview of current therapy status.
  */
 @Composable
@@ -55,7 +56,7 @@ fun TherapyMetricsCard(
     Card(
         modifier = modifier
             .fillMaxWidth()
-            .padding(horizontal = Spacing.Medium, vertical = Spacing.Small),
+            .padding(horizontal = Spacing.Small, vertical = Spacing.Small),
         colors = CardDefaults.cardColors(containerColor = CardBackground),
         elevation = CardDefaults.cardElevation(defaultElevation = Elevation.Card),
         shape = RoundedCornerShape(Spacing.CardCornerRadius)
@@ -63,7 +64,7 @@ fun TherapyMetricsCard(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(Spacing.CardPadding)
+                .padding(Spacing.CardPadding + 14.dp)
         ) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -75,17 +76,21 @@ fun TherapyMetricsCard(
                     color = InsulinColors.Bolus
                 )
 
-                MetricDisplay(
-                    label = "COB",
-                    value = cob?.let { "%.0f g".format(it) } ?: "--",
-                    color = CarbColor
-                )
+                if (cob != null) {
+                    MetricDisplay(
+                        label = "COB",
+                        value = cob?.let { "%.0f g".format(it) } ?: "--",
+                        color = CarbColor
+                    )
+                }
 
-                MetricDisplay(
-                    label = "TIR",
-                    value = timeInRange?.let { "${it.toInt()}%" } ?: "--",
-                    color = GlucoseColors.InRange
-                )
+                if (timeInRange != null) {
+                    MetricDisplay(
+                        label = "TIR",
+                        value = timeInRange?.let { "${it.toInt()}%" } ?: "--",
+                        color = GlucoseColors.InRange
+                    )
+                }
             }
         }
     }
@@ -138,6 +143,8 @@ private inline fun <reified T> tryGetField(clazz: Class<*>, obj: Any, fieldName:
 @Composable
 fun TherapyMetricsCardFromDataStore(
     historyLogViewModel: HistoryLogViewModel? = null,
+    showCOB: Boolean = false,
+    showTIR: Boolean = false,
     modifier: Modifier = Modifier
 ) {
     val ds = LocalDataStore.current
@@ -145,70 +152,71 @@ fun TherapyMetricsCardFromDataStore(
 
     val iob = iobUnits.value
 
-    // Calculate TIR from CGM history (last 24 hours)
-    val cgmHistoryLogs = historyLogViewModel?.latestItemsForTypes(
-        listOf(
-            DexcomG6CGMHistoryLog::class.java,
-            DexcomG7CGMHistoryLog::class.java
-        ),
-        288 // ~24 hours of 5-min readings
-    )?.observeAsState()
-
-    val timeInRange = remember(cgmHistoryLogs?.value) {
-        cgmHistoryLogs?.value?.let { logs ->
-            val validReadings = logs.mapNotNull { dao ->
-                val parsed = dao.parse()
-                when (parsed) {
-                    is DexcomG6CGMHistoryLog -> parsed.currentGlucoseDisplayValue
-                    is DexcomG7CGMHistoryLog -> parsed.currentGlucoseDisplayValue
-                    is CgmDataGxHistoryLog -> parsed.value
-                    else -> null
-                }?.takeIf { it > 0 }
-            }
-            if (validReadings.isNotEmpty()) {
-                val inRange = validReadings.count { it in 70..180 }
-                (inRange.toFloat() / validReadings.size.toFloat()) * 100f
-            } else null
-        }
-    }
-
-    // Calculate COB from bolus history (carbs with exponential decay)
-    val bolusHistoryLogs = historyLogViewModel?.latestItemsForTypes(
-        listOf(BolusDeliveryHistoryLog::class.java),
-        50 // Last ~50 boluses
-    )?.observeAsState()
-
-    val currentTimeSeconds = remember { Instant.now().epochSecond }
-    val absorptionTimeSeconds = 180 * 60L // 3 hours
-    val tau = absorptionTimeSeconds / 3.0
-
-    val cob = remember(bolusHistoryLogs?.value, currentTimeSeconds) {
-        bolusHistoryLogs?.value?.let { logs ->
-            var totalCob = 0f
-            logs.forEach { dao ->
-                val parsed = dao.parse()
-                if (parsed is BolusDeliveryHistoryLog) {
-                    val carbs = tryGetField<Int>(parsed.javaClass, parsed, "bolusCarbs")
-                        ?: tryGetField<Int>(parsed.javaClass, parsed, "carbsGrams")
-                        ?: 0
-                    if (carbs > 0) {
-                        val timestamp = dao.pumpTime.atZone(ZoneId.systemDefault()).toEpochSecond()
-                        val elapsedSeconds = currentTimeSeconds - timestamp
-                        if (elapsedSeconds >= 0 && elapsedSeconds < absorptionTimeSeconds * 2) {
-                            val remaining = carbs * exp(-elapsedSeconds / tau)
-                            totalCob += remaining.toFloat()
-                        }
-                    }
-                }
-            }
-            if (totalCob > 0.5f) totalCob else null
-        }
-    }
+//    // Calculate TIR from CGM history (last 24 hours)
+//    val cgmHistoryLogs = historyLogViewModel?.latestItemsForTypes(
+//        listOf(
+//            DexcomG6CGMHistoryLog::class.java,
+//            DexcomG7CGMHistoryLog::class.java
+//        ),
+//        288 // ~24 hours of 5-min readings
+//    )?.observeAsState()
+//
+//    val timeInRange = remember(cgmHistoryLogs?.value) {
+//        cgmHistoryLogs?.value?.let { logs ->
+//            val validReadings = logs.mapNotNull { dao ->
+//                val parsed = dao.parse()
+//                when (parsed) {
+//                    is DexcomG6CGMHistoryLog -> parsed.currentGlucoseDisplayValue
+//                    is DexcomG7CGMHistoryLog -> parsed.currentGlucoseDisplayValue
+//                    is CgmDataGxHistoryLog -> parsed.value
+//                    else -> null
+//                }?.takeIf { it > 0 }
+//            }
+//            if (validReadings.isNotEmpty()) {
+//                val inRange = validReadings.count { it in 70..180 }
+//                (inRange.toFloat() / validReadings.size.toFloat()) * 100f
+//            } else null
+//        }
+//    }
+//
+//    // Calculate COB from bolus history (carbs with exponential decay)
+//    val bolusHistoryLogs = historyLogViewModel?.latestItemsForTypes(
+//        listOf(BolusDeliveryHistoryLog::class.java),
+//        50 // Last ~50 boluses
+//    )?.observeAsState()
+//
+//    // TODO(jwoglom): THIS IS NOT READY YET
+//    val currentTimeSeconds = remember { Instant.now().epochSecond }
+//    val absorptionTimeSeconds = 180 * 60L // 3 hours
+//    val tau = absorptionTimeSeconds / 3.0
+//
+//    val cob = remember(bolusHistoryLogs?.value, currentTimeSeconds) {
+//        bolusHistoryLogs?.value?.let { logs ->
+//            var totalCob = 0f
+//            logs.forEach { dao ->
+//                val parsed = dao.parse()
+//                if (parsed is BolusDeliveryHistoryLog) {
+//                    val carbs = tryGetField<Int>(parsed.javaClass, parsed, "bolusCarbs")
+//                        ?: tryGetField<Int>(parsed.javaClass, parsed, "carbsGrams")
+//                        ?: 0
+//                    if (carbs > 0) {
+//                        val timestamp = dao.pumpTime.atZone(ZoneId.systemDefault()).toEpochSecond()
+//                        val elapsedSeconds = currentTimeSeconds - timestamp
+//                        if (elapsedSeconds >= 0 && elapsedSeconds < absorptionTimeSeconds * 2) {
+//                            val remaining = carbs * exp(-elapsedSeconds / tau)
+//                            totalCob += remaining.toFloat()
+//                        }
+//                    }
+//                }
+//            }
+//            if (totalCob > 0.5f) totalCob else null
+//        }
+//    }
 
     TherapyMetricsCard(
         iob = iob?.toFloat(),
-        cob = cob,
-        timeInRange = timeInRange,
+        cob = null,
+        timeInRange = null,
         modifier = modifier
     )
 }

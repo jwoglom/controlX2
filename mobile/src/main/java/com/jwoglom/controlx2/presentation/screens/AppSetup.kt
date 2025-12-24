@@ -325,10 +325,11 @@ fun AppSetup(
                     onCheckedChange = null // null recommended for accessibility with screenreaders
                 )
                 Line(
-                    "Automatically fetch history logs (ALPHA)",
+                    "Automatically fetch history logs",
                     bold = true,
                     modifier = Modifier.padding(start = checkboxPadding))
             }
+            Line("Fetching history logs allows for rendering a CGM graph on the dashboard screen.")
             Spacer(Modifier.height(checkboxPadding))
             Divider()
         }

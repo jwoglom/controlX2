@@ -39,7 +39,7 @@ fun GlucoseHeroCard(
     Card(
         modifier = modifier
             .fillMaxWidth()
-            .padding(horizontal = Spacing.Medium, vertical = Spacing.Small),
+            .padding(horizontal = Spacing.Small, vertical = Spacing.Small),
         colors = CardDefaults.cardColors(containerColor = CardBackground),
         elevation = CardDefaults.cardElevation(defaultElevation = Elevation.Card),
         shape = RoundedCornerShape(Spacing.CardCornerRadius)
@@ -51,53 +51,48 @@ fun GlucoseHeroCard(
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             // Label
-            Text(
-                if (noCgmConnected)
-                    "No CGM Connected"
-                else
-                    "Current Glucose",
-                style = MaterialTheme.typography.titleMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
+//            Text(
+//                if (noCgmConnected)
+//                    "No CGM Connected"
+//                else
+//                    "Current Glucose",
+//                style = MaterialTheme.typography.titleMedium,
+//                color = MaterialTheme.colorScheme.onSurfaceVariant
+//            )
+            // Hero number with color coding and trend arrow
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.Center
+            ) {
+                Text(
+                    text = if (!noCgmConnected)
+                        glucoseValue?.toString() ?: "--"
+                    else
+                        "n/a",
+                    style = MaterialTheme.typography.displayLarge.copy(
+                        fontWeight = FontWeight.Bold
+                    ),
+                    color = getGlucoseColor(glucoseValue)
+                )
 
-            if (!noCgmConnected) {
-
-                Spacer(Modifier.height(Spacing.Small))
-
-                // Hero number with color coding and trend arrow
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.Center
-                ) {
+                if (!deltaArrow.isNullOrEmpty()) {
+                    // Trend arrow
                     Text(
-                        text = glucoseValue?.toString() ?: "--",
+                        text = deltaArrow,
                         style = MaterialTheme.typography.displayLarge.copy(
                             fontWeight = FontWeight.Bold
                         ),
                         color = getGlucoseColor(glucoseValue)
                     )
-
-                    if (!deltaArrow.isNullOrEmpty()) {
-                        Spacer(Modifier.width(Spacing.Medium))
-
-                        // Trend arrow
-                        Text(
-                            text = deltaArrow,
-                            style = MaterialTheme.typography.displayLarge.copy(
-                                fontWeight = FontWeight.Bold
-                            ),
-                            color = getGlucoseColor(glucoseValue)
-                        )
-                    }
                 }
-
-                // Unit label
-                Text(
-                    "mg/dL",
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
             }
+
+            // Unit label
+            Text(
+                "mg/dL",
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
         }
     }
 }

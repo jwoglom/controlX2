@@ -5,9 +5,13 @@ package com.jwoglom.controlx2.presentation.screens.sections
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.material.ExperimentalMaterialApi
 import androidx.compose.material.pullrefresh.PullRefreshIndicator
 import androidx.compose.material.pullrefresh.pullRefresh
@@ -163,7 +167,7 @@ fun Dashboard(
             verticalArrangement = Arrangement.spacedBy(0.dp),
             modifier = Modifier
                 .fillMaxSize()
-                .padding(horizontal = 16.dp),
+                .padding(horizontal = 8.dp),
             content = {
                 item {
                     ServiceDisabledMessage(sendMessage = sendMessage)
@@ -183,15 +187,36 @@ fun Dashboard(
                     })
                 }
 
-                // Hero card showing current glucose reading
                 item {
-                    val cgmReading = ds.cgmReading.observeAsState()
-                    val cgmDeltaArrow = ds.cgmDeltaArrow.observeAsState()
-                    GlucoseHeroCard(
-                        glucoseValue = cgmReading.value,
-                        deltaArrow = cgmDeltaArrow.value
+                    LazyRow(
+                        horizontalArrangement = Arrangement.spacedBy(4.dp),
+                        userScrollEnabled = false,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .fillMaxHeight(),
+                        content = {
+                            // Hero card showing current glucose reading
+                            item {
+                                val cgmReading = ds.cgmReading.observeAsState()
+                                val cgmDeltaArrow = ds.cgmDeltaArrow.observeAsState()
+                                GlucoseHeroCard(
+                                    glucoseValue = cgmReading.value,
+                                    deltaArrow = cgmDeltaArrow.value,
+                                    modifier = Modifier.fillParentMaxWidth(0.5f)
+                                )
+                            }
+
+                            // Therapy Metrics Card - IOB, COB
+                            item {
+                                TherapyMetricsCardFromDataStore(
+                                    historyLogViewModel = historyLogViewModel,
+                                    modifier = Modifier.fillParentMaxWidth(0.5f)
+                                )
+                            }
+                        }
                     )
                 }
+
 
                 // CGM Chart with Vico - shows glucose, boluses, basal, carbs
                 item {
@@ -199,11 +224,6 @@ fun Dashboard(
                         historyLogViewModel = historyLogViewModel,
                         showLegend = true
                     )
-                }
-
-                // Therapy Metrics Card - IOB, COB, TIR
-                item {
-                    TherapyMetricsCardFromDataStore(historyLogViewModel = historyLogViewModel)
                 }
 
                 // Active Therapy Card - Basal, Last Bolus, Mode

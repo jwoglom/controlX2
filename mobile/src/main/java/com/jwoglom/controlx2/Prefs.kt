@@ -136,7 +136,7 @@ class Prefs(val context: Context) {
      * Whether to run history log fetching in background
      */
     fun autoFetchHistoryLogs(): Boolean {
-        return prefs().getBoolean("auto-fetch-history-logs", false)
+        return prefs().getBoolean("auto-fetch-history-logs", true)
     }
 
     fun setAutoFetchHistoryLogs(b: Boolean) {
