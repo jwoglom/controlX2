@@ -1,4 +1,4 @@
-package com.jwoglom.controlx2.presentation.screens.sections.components
+package com.jwoglom.controlx2.presentation.components.input
 
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -7,7 +7,6 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -16,7 +15,7 @@ import androidx.compose.ui.text.input.KeyboardType
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun DexcomG6SensorCode(
+fun DexcomG6TransmitterCode(
     title: String,
     value: String?,
     onValueChange: (String) -> Unit,
@@ -30,14 +29,14 @@ fun DexcomG6SensorCode(
             else -> value
         },
         onValueChange = { it ->
-            val filtered = it.filter { c -> (c in '0'..'9') }
-            error = filtered.length < it.length || filtered.length != 4
+            val filtered = it.filter { c -> (c in '0'..'9' || c in 'A' .. 'Z') }
+            error = filtered.length < it.length || filtered.length != 6
             onValueChange(filtered)
         },
         keyboardOptions = KeyboardOptions(
             autoCorrect = false,
-            capitalization = KeyboardCapitalization.None,
-            keyboardType = KeyboardType.Number,
+            capitalization = KeyboardCapitalization.Characters,
+            keyboardType = KeyboardType.Text,
         ),
         label = {
             Text(title)

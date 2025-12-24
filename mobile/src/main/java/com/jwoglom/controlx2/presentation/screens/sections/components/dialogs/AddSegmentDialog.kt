@@ -1,6 +1,6 @@
 @file:OptIn(ExperimentalMaterial3Api::class)
 
-package com.jwoglom.controlx2.presentation.screens.sections.components
+package com.jwoglom.controlx2.presentation.screens.sections.components.dialogs
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -28,37 +28,31 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.jwoglom.controlx2.presentation.theme.ControlX2Theme
 import com.jwoglom.pumpx2.pump.messages.builders.IDPManager
-import com.jwoglom.pumpx2.pump.messages.models.InsulinUnit
 import com.jwoglom.pumpx2.pump.messages.models.MinsTime
-import com.jwoglom.pumpx2.pump.messages.response.currentStatus.IDPSegmentResponse
+import com.jwoglom.pumpx2.pump.messages.response.currentStatus.IDPSettingsResponse
 import timber.log.Timber
 
 @Composable
-fun EditSegmentDialog(
+fun AddSegmentDialog(
     profile: IDPManager.Profile,
-    segment: IDPSegmentResponse,
-    segmentIndex: Int,
     onDismiss: () -> Unit,
     onConfirm: (MinsTime, Float, Long, Int, Int) -> Unit
 ) {
-    val totalMinutes = segment.profileStartTime
-    val initialHour = totalMinutes / 60
-    val initialMinute = totalMinutes % 60
     val timePickerState = rememberTimePickerState(
-        initialHour = initialHour,
-        initialMinute = initialMinute,
+        initialHour = 0,
+        initialMinute = 0,
         is24Hour = false
     )
-    var basalRate by remember { mutableStateOf(InsulinUnit.from1000To1(segment.profileBasalRate.toLong()).toString()) }
-    var carbRatio by remember { mutableStateOf(segment.profileCarbRatio.toString()) }
-    var targetBG by remember { mutableStateOf(segment.profileTargetBG.toString()) }
-    var isf by remember { mutableStateOf(segment.profileISF.toString()) }
+    var basalRate by remember { mutableStateOf("") }
+    var carbRatio by remember { mutableStateOf("") }
+    var targetBG by remember { mutableStateOf("") }
+    var isf by remember { mutableStateOf("") }
     var errorMessage by remember { mutableStateOf("") }
 
     AlertDialog(
         onDismissRequest = onDismiss,
         title = {
-            Text("Edit Profile Segment")
+            Text("Add Profile Segment")
         },
         text = {
             LazyColumn(
@@ -68,7 +62,7 @@ fun EditSegmentDialog(
                     .padding(horizontal = 0.dp),
             ) {
                 item {
-                    Text("Editing segment ${segmentIndex} in ${profile.idpSettingsResponse.name} (#${profile.idpId})", fontSize = 14.sp)
+                    Text("Adding to ${profile.idpSettingsResponse.name} (#${profile.idpId})", fontSize = 14.sp)
                 }
                 item {
                     Text(
@@ -142,7 +136,7 @@ fun EditSegmentDialog(
                     try {
                         val hours = timePickerState.hour
                         val minutes = timePickerState.minute
-                        val newStartTime = MinsTime(hours, minutes)
+                        val startTime = MinsTime(hours, minutes)
                         val basalRateFloat = basalRate.toFloatOrNull() ?: 0f
                         val carbRatioLong = carbRatio.toLongOrNull() ?: 0L
                         val targetBGInt = targetBG.toIntOrNull() ?: 0
@@ -169,14 +163,14 @@ fun EditSegmentDialog(
                             return@TextButton
                         }
 
-                        onConfirm(newStartTime, basalRateFloat, carbRatioLong, targetBGInt, isfInt)
+                        onConfirm(startTime, basalRateFloat, carbRatioLong, targetBGInt, isfInt)
                     } catch (e: Exception) {
                         errorMessage = "Error: ${e.message}"
-                        Timber.e(e, "Error updating segment")
+                        Timber.e(e, "Error creating segment")
                     }
                 }
             ) {
-                Text("Update Segment")
+                Text("Add Segment")
             }
         },
         dismissButton = {
@@ -189,12 +183,12 @@ fun EditSegmentDialog(
     )
 }
 
-@Preview(showBackground = true, name = "Edit Segment Dialog")
+@Preview(showBackground = true, name = "Add Segment Dialog")
 @Composable
-internal fun EditSegmentDialogPreview() {
+internal fun AddSegmentDialogPreview() {
     ControlX2Theme() {
-        // Create a mock profile and segment for preview
-        val mockResponse = com.jwoglom.pumpx2.pump.messages.response.currentStatus.IDPSettingsResponse(
+        // Create a mock profile for preview
+        val mockResponse = IDPSettingsResponse(
             1, // idpId
             "Morning Profile", // name
             1, // carbEntryEnabled
@@ -204,21 +198,8 @@ internal fun EditSegmentDialogPreview() {
         )
         val mockProfile = IDPManager.Profile(mockResponse, false)
 
-        val mockSegment = IDPSegmentResponse(
-            0, // profileId
-            0, // segmentId
-            480, // profileStartTime - 8:00 AM in minutes
-            0, // profileEndTime
-            1000L, // profileBasalRate - 1.0 u/hr in milliunits (Long)
-            10, // profileCarbRatio
-            50, // profileISF
-            110 // profileTargetBG
-        )
-
-        EditSegmentDialog(
+        AddSegmentDialog(
             profile = mockProfile,
-            segment = mockSegment,
-            segmentIndex = 0,
             onDismiss = {},
             onConfirm = { _, _, _, _, _ -> }
         )

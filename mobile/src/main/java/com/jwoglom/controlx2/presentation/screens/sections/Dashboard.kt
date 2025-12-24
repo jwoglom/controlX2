@@ -53,11 +53,11 @@ import com.jwoglom.controlx2.presentation.components.LastConnectionUpdatedTimest
 import com.jwoglom.controlx2.presentation.components.PumpSetupStageDescription
 import com.jwoglom.controlx2.presentation.components.PumpSetupStageProgress
 import com.jwoglom.controlx2.presentation.components.ServiceDisabledMessage
-import com.jwoglom.controlx2.presentation.screens.sections.components.ActiveTherapyCardFromDataStore
-import com.jwoglom.controlx2.presentation.screens.sections.components.GlucoseHeroCard
+import com.jwoglom.controlx2.presentation.screens.sections.components.cards.ActiveTherapyCardFromDataStore
+import com.jwoglom.controlx2.presentation.screens.sections.components.cards.GlucoseHeroCard
 import com.jwoglom.controlx2.presentation.screens.sections.components.PumpStatusBar
-import com.jwoglom.controlx2.presentation.screens.sections.components.SensorInfoCardFromDataStore
-import com.jwoglom.controlx2.presentation.screens.sections.components.TherapyMetricsCardFromDataStore
+import com.jwoglom.controlx2.presentation.screens.sections.components.cards.SensorInfoCardFromDataStore
+import com.jwoglom.controlx2.presentation.screens.sections.components.cards.TherapyMetricsCardFromDataStore
 import com.jwoglom.controlx2.presentation.screens.sections.components.VicoCgmChartCard
 import com.jwoglom.controlx2.presentation.screens.setUpPreviewState
 import com.jwoglom.controlx2.presentation.theme.ControlX2Theme

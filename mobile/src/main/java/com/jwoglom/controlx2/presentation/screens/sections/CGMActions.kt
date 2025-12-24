@@ -53,8 +53,8 @@ import com.jwoglom.controlx2.dataStore
 import com.jwoglom.controlx2.db.historylog.HistoryLogViewModel
 import com.jwoglom.controlx2.presentation.components.HeaderLine
 import com.jwoglom.controlx2.presentation.components.Line
-import com.jwoglom.controlx2.presentation.screens.sections.components.DexcomG6SensorCode
-import com.jwoglom.controlx2.presentation.screens.sections.components.DexcomG6TransmitterCode
+import com.jwoglom.controlx2.presentation.components.input.DexcomG6SensorCode
+import com.jwoglom.controlx2.presentation.components.input.DexcomG6TransmitterCode
 import com.jwoglom.controlx2.presentation.screens.setUpPreviewState
 import com.jwoglom.controlx2.presentation.theme.ControlX2Theme
 import com.jwoglom.controlx2.presentation.util.LifecycleStateObserver
@@ -71,7 +71,6 @@ import com.jwoglom.pumpx2.pump.messages.request.control.StopDexcomCGMSensorSessi
 import com.jwoglom.pumpx2.pump.messages.request.currentStatus.CGMStatusRequest
 import com.jwoglom.pumpx2.pump.messages.request.currentStatus.GetSavedG7PairingCodeRequest
 import com.jwoglom.pumpx2.pump.messages.request.currentStatus.HomeScreenMirrorRequest
-import com.jwoglom.pumpx2.pump.messages.response.currentStatus.GetSavedG7PairingCodeResponse
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch

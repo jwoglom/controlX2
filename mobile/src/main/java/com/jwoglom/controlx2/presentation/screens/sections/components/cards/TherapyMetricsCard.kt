@@ -1,4 +1,4 @@
-package com.jwoglom.controlx2.presentation.screens.sections.components
+package com.jwoglom.controlx2.presentation.screens.sections.components.cards
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -33,13 +33,13 @@ import com.jwoglom.controlx2.presentation.theme.InsulinColors
 import com.jwoglom.controlx2.presentation.theme.CarbColor
 import com.jwoglom.controlx2.presentation.theme.Spacing
 import com.jwoglom.controlx2.presentation.theme.SurfaceBackground
-import com.jwoglom.pumpx2.pump.messages.helpers.Dates
 import com.jwoglom.pumpx2.pump.messages.response.historyLog.BolusDeliveryHistoryLog
 import com.jwoglom.pumpx2.pump.messages.response.historyLog.DexcomG6CGMHistoryLog
 import com.jwoglom.pumpx2.pump.messages.response.historyLog.DexcomG7CGMHistoryLog
 import com.jwoglom.pumpx2.pump.messages.response.historyLog.CgmDataGxHistoryLog
 import java.time.Instant
 import java.time.ZoneId
+import kotlin.math.exp
 
 /**
  * Therapy Metrics Card displaying IOB, COB, and Time in Range.
@@ -195,7 +195,7 @@ fun TherapyMetricsCardFromDataStore(
                         val timestamp = dao.pumpTime.atZone(ZoneId.systemDefault()).toEpochSecond()
                         val elapsedSeconds = currentTimeSeconds - timestamp
                         if (elapsedSeconds >= 0 && elapsedSeconds < absorptionTimeSeconds * 2) {
-                            val remaining = carbs * kotlin.math.exp(-elapsedSeconds / tau)
+                            val remaining = carbs * exp(-elapsedSeconds / tau)
                             totalCob += remaining.toFloat()
                         }
                     }

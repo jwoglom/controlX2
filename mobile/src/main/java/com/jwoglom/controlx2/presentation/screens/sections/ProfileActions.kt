@@ -5,19 +5,16 @@
 
 package com.jwoglom.controlx2.presentation.screens.sections
 
-import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.wrapContentSize
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.material.ExperimentalMaterialApi
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
@@ -36,8 +33,6 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.ListItem
-import androidx.compose.material3.ListItemDefaults
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -62,8 +57,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
-import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.compose.ui.zIndex
 import androidx.navigation.NavHostController
@@ -74,9 +67,9 @@ import com.jwoglom.controlx2.db.historylog.HistoryLogViewModel
 import com.jwoglom.controlx2.presentation.components.HeaderLine
 import com.jwoglom.controlx2.presentation.components.Line
 import com.jwoglom.controlx2.presentation.components.LoadSpinner
-import com.jwoglom.controlx2.presentation.screens.sections.components.AddProfileDialog
-import com.jwoglom.controlx2.presentation.screens.sections.components.AddSegmentDialog
-import com.jwoglom.controlx2.presentation.screens.sections.components.EditSegmentDialog
+import com.jwoglom.controlx2.presentation.screens.sections.components.dialogs.AddProfileDialog
+import com.jwoglom.controlx2.presentation.screens.sections.components.dialogs.AddSegmentDialog
+import com.jwoglom.controlx2.presentation.screens.sections.components.dialogs.EditSegmentDialog
 import com.jwoglom.controlx2.presentation.screens.setUpPreviewState
 import com.jwoglom.controlx2.presentation.theme.ControlX2Theme
 import com.jwoglom.controlx2.presentation.util.LifecycleStateObserver

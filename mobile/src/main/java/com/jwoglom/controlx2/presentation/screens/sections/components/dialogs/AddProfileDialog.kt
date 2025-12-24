@@ -1,6 +1,6 @@
 @file:OptIn(ExperimentalMaterial3Api::class)
 
-package com.jwoglom.controlx2.presentation.screens.sections.components
+package com.jwoglom.controlx2.presentation.screens.sections.components.dialogs
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.fillMaxWidth
