@@ -92,11 +92,9 @@ import com.patrykandpatrick.vico.core.common.Insets
 import com.patrykandpatrick.vico.core.common.component.Component
 import com.patrykandpatrick.vico.core.common.component.TextComponent
 import com.patrykandpatrick.vico.core.common.data.ExtraStore
-import java.text.SimpleDateFormat
 import java.time.Instant
 import java.time.ZoneId
 import java.time.ZoneOffset
-import java.util.Date
 import java.util.Locale
 import kotlin.math.max
 import kotlin.math.min
@@ -469,6 +467,7 @@ private fun rememberModeData(
     timeRange: TimeRange
 ): List<ModeEvent> {
     // Try to find mode-related HistoryLog type IDs
+    @Suppress("UNCHECKED_CAST")
     val modeClasses = listOfNotNull(
         tryLoadClass("com.jwoglom.pumpx2.pump.messages.response.historyLog.SleepModeActivatedHistoryLog"),
         tryLoadClass("com.jwoglom.pumpx2.pump.messages.response.historyLog.SleepModeDeactivatedHistoryLog"),
@@ -476,7 +475,7 @@ private fun rememberModeData(
         tryLoadClass("com.jwoglom.pumpx2.pump.messages.response.historyLog.ExerciseModeDeactivatedHistoryLog"),
         tryLoadClass("com.jwoglom.pumpx2.pump.messages.response.historyLog.UserModeChangeHistoryLog"),
         tryLoadClass("com.jwoglom.pumpx2.pump.messages.response.historyLog.ControlIQModeChangeHistoryLog")
-    )
+    ) as List<Class<out com.jwoglom.pumpx2.pump.messages.response.historyLog.HistoryLog>>
 
     val modeHistoryLogs = if (modeClasses.isNotEmpty()) {
         historyLogViewModel?.latestItemsForTypes(
@@ -486,7 +485,7 @@ private fun rememberModeData(
     } else null
 
     return remember(modeHistoryLogs?.value, timeRange) {
-        modeHistoryLogs?.value?.mapNotNull { dao ->
+        modeHistoryLogs?.value?.mapNotNull { dao: com.jwoglom.controlx2.db.historylog.HistoryLogItem ->
             try {
                 val parsed = dao.parse()
                 val modeClass = parsed.javaClass

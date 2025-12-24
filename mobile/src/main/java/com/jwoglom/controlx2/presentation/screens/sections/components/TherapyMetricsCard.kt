@@ -143,14 +143,7 @@ fun TherapyMetricsCardFromDataStore(
     val ds = LocalDataStore.current
     val iobUnits = ds.iobUnits.observeAsState()
 
-    // Parse IOB string to float (format: "X.XX U")
-    val iob = iobUnits.value?.let { iobString ->
-        try {
-            iobString.replace(" U", "").replace("U", "").toFloatOrNull()
-        } catch (e: Exception) {
-            null
-        }
-    }
+    val iob = iobUnits.value
 
     // Calculate TIR from CGM history (last 24 hours)
     val cgmHistoryLogs = historyLogViewModel?.latestItemsForTypes(
@@ -213,7 +206,7 @@ fun TherapyMetricsCardFromDataStore(
     }
 
     TherapyMetricsCard(
-        iob = iob,
+        iob = iob?.toFloat(),
         cob = cob,
         timeInRange = timeInRange,
         modifier = modifier
