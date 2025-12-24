@@ -125,17 +125,6 @@ private fun MetricDisplay(
     }
 }
 
-// Helper to safely get field value using reflection
-private inline fun <reified T> tryGetField(clazz: Class<*>, obj: Any, fieldName: String): T? {
-    return try {
-        val field = clazz.getDeclaredField(fieldName)
-        field.isAccessible = true
-        val value = field.get(obj)
-        if (value is T) value else null
-    } catch (e: Exception) {
-        null
-    }
-}
 
 /**
  * TherapyMetricsCard that automatically reads from the DataStore and calculates COB/TIR.
@@ -179,10 +168,10 @@ fun TherapyMetricsCardFromDataStore(
 //        }
 //    }
 //
-//    // Calculate COB from bolus history (carbs with exponential decay)
-//    val bolusHistoryLogs = historyLogViewModel?.latestItemsForTypes(
-//        listOf(BolusDeliveryHistoryLog::class.java),
-//        50 // Last ~50 boluses
+//    // Calculate COB from carb history (carbs with exponential decay)
+//    val carbHistoryLogs = historyLogViewModel?.latestItemsForTypes(
+//        listOf(com.jwoglom.pumpx2.pump.messages.response.historyLog.CarbEnteredHistoryLog::class.java),
+//        50 // Last ~50 carb entries
 //    )?.observeAsState()
 //
 //    // TODO(jwoglom): THIS IS NOT READY YET
@@ -190,15 +179,13 @@ fun TherapyMetricsCardFromDataStore(
 //    val absorptionTimeSeconds = 180 * 60L // 3 hours
 //    val tau = absorptionTimeSeconds / 3.0
 //
-//    val cob = remember(bolusHistoryLogs?.value, currentTimeSeconds) {
-//        bolusHistoryLogs?.value?.let { logs ->
+//    val cob = remember(carbHistoryLogs?.value, currentTimeSeconds) {
+//        carbHistoryLogs?.value?.let { logs ->
 //            var totalCob = 0f
 //            logs.forEach { dao ->
 //                val parsed = dao.parse()
-//                if (parsed is BolusDeliveryHistoryLog) {
-//                    val carbs = tryGetField<Int>(parsed.javaClass, parsed, "bolusCarbs")
-//                        ?: tryGetField<Int>(parsed.javaClass, parsed, "carbsGrams")
-//                        ?: 0
+//                if (parsed is com.jwoglom.pumpx2.pump.messages.response.historyLog.CarbEnteredHistoryLog) {
+//                    val carbs = parsed.carbs.toInt()
 //                    if (carbs > 0) {
 //                        val timestamp = dao.pumpTime.atZone(ZoneId.systemDefault()).toEpochSecond()
 //                        val elapsedSeconds = currentTimeSeconds - timestamp
