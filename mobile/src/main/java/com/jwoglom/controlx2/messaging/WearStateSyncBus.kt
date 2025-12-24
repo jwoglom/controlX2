@@ -1,6 +1,7 @@
 package com.jwoglom.controlx2.messaging
 
 import android.content.Context
+import com.google.android.gms.common.GoogleApiAvailability
 import com.google.android.gms.wearable.DataClient
 import com.google.android.gms.wearable.DataEvent
 import com.google.android.gms.wearable.DataEventBuffer
@@ -23,11 +24,16 @@ import java.time.Instant
 class WearStateSyncBus(context: Context) : StateSyncBus {
     private val dataClient: DataClient = Wearable.getDataClient(context)
 
+    public val isWearableApiSupported = GoogleApiAvailability.getInstance().checkApiAvailability(dataClient).isSuccessful
+
     init {
         Timber.d("WearStateSyncBus initialized with Wearable Data Layer")
     }
 
     override suspend fun putState(key: String, value: Pair<String, Instant>?) {
+        if (!isWearableApiSupported) {
+            return
+        }
         Timber.d("WearStateSyncBus.putState: $key = $value")
 
         try {
@@ -142,6 +148,9 @@ class WearStateSyncBus(context: Context) : StateSyncBus {
     }
 
     override suspend fun clearAllStates() {
+        if (!isWearableApiSupported) {
+            return
+        }
         Timber.d("WearStateSyncBus.clearAllStates")
 
         try {
