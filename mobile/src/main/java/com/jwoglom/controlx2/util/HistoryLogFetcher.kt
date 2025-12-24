@@ -56,14 +56,17 @@ class HistoryLogFetcher(val context: Context, val pump: TandemPump, val peripher
         for (i in startLog..endLog step chunkSize.toLong()) {
             totalNums++
         }
-        for (i in startLog..endLog step chunkSize.toLong()) {
-            val count = if (i+chunkSize >= endLog) (endLog - i + 1).toInt() else chunkSize
-            val endI = i+count-1
-            Timber.i("HistoryLogFetcher.triggerRangeStart $i - $endI ($count)")
+
+        // Iterate backwards from endLog to startLog to fetch newest chunks first
+        var i = endLog
+        while (i >= startLog) {
+            val count = min(chunkSize.toLong(), i - startLog + 1).toInt()
+            val startI = i - count + 1
+            Timber.i("HistoryLogFetcher.triggerRangeStart $startI - $i ($count)")
 
             // HistoryLogRequest returns items backward from the start ID,
-            // so we request from the END of the range to get all items in [i, endI]
-            request(endI, count)
+            // so we request from the END of the range to get all items in [startI, i]
+            request(i, count)
 
             withContext(Dispatchers.IO) {
                 Thread.sleep(500)
@@ -75,18 +78,19 @@ class HistoryLogFetcher(val context: Context, val pump: TandemPump, val peripher
                     Thread.sleep(250)
                 }
                 waitTimeMs += 250
-                val dbCount = historyLogRepo.getCount(pumpSid, i, endI).firstOrNull() ?: 0
+                val dbCount = historyLogRepo.getCount(pumpSid, startI, i).firstOrNull() ?: 0
                 Timber.d("HistoryLogFetcher dbCount=${dbCount} / count=$count")
                 if (dbCount >= count) {
                     break
                 }
                 if (waitTimeMs >= FetchGroupTimeoutMs) {
-                    Timber.i("HistoryLogFetcher subset $i - $endI timed out: latest=$latestSeqId waitTime=$waitTimeMs")
+                    Timber.i("HistoryLogFetcher subset $startI - $i timed out: latest=$latestSeqId waitTime=$waitTimeMs")
                     break
                 }
             }
-            Timber.i("HistoryLogFetcher.triggerRangeDone $i - $endI: latest=$latestSeqId")
+            Timber.i("HistoryLogFetcher.triggerRangeDone $startI - $i: latest=$latestSeqId")
             num++
+            i = startI - 1
         }
     }
     suspend fun onStatusResponse(message: HistoryLogStatusResponse, scope: CoroutineScope) {
@@ -138,7 +142,7 @@ class HistoryLogFetcher(val context: Context, val pump: TandemPump, val peripher
 
         scope.launch {
             Timber.i("HistoryLogFetcher.onStatusResponse: launching ranges: $missingIds (dbCount=$dbCount)")
-            missingIds.forEach {
+            missingIds.reversed().forEach {
                 triggerRange(it.first, it.last)
             }
             Timber.i("HistoryLogFetcher.onStatusResponse: completed, fetched $missingIdsTotal")
