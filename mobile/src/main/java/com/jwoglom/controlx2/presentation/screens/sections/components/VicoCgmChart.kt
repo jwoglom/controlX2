@@ -241,19 +241,6 @@ private fun rememberCgmChartData(
     }
 }
 
-// Helper function to safely extract field values using reflection
-private inline fun <reified T> tryGetField(clazz: Class<*>, obj: Any, fieldName: String): T? {
-    return try {
-        val field = clazz.getDeclaredField(fieldName)
-        field.isAccessible = true
-        val value = field.get(obj)
-        if (value is T) value else null
-    } catch (e: NoSuchFieldException) {
-        null
-    } catch (e: Exception) {
-        null
-    }
-}
 
 private fun formatBolusUnits(units: Float): String {
     val pattern = if (units >= 1f) "%.1fU" else "%.2fU"
@@ -328,19 +315,15 @@ private fun rememberBolusData(
             try {
                 val parsed = dao.parse()
                 if (parsed is BolusDeliveryHistoryLog) {
-                    val bolusClass = parsed.javaClass
-
-                    // Extract insulin units
-                    val units = tryGetField<Int>(bolusClass, parsed, "totalVolumeDelivered")
-                        ?.let { it / 100f }  // Convert to units (0.01U precision)
-                        ?: 0f
+                    // Extract insulin units delivered (in 0.01U precision)
+                    val units = parsed.deliveredTotal / 100f
 
                     // Determine if automated bolus
-                    val bolusSource = tryGetField<Any>(bolusClass, parsed, "bolusSource")?.toString() ?: ""
-                    val isAutomated = bolusSource.contains("CLOSED_LOOP_AUTO_BOLUS", ignoreCase = true)
+                    val bolusSource = parsed.bolusSource
+                    val isAutomated = bolusSource == BolusDeliveryHistoryLog.BolusSource.CONTROL_IQ_AUTO_BOLUS
 
-                    // Get bolus type
-                    val bolusType = tryGetField<Any>(bolusClass, parsed, "bolusType")?.toString() ?: "UNKNOWN"
+                    // Get bolus type as string representation
+                    val bolusType = parsed.bolusTypes.toString()
 
                     val timestamp = dao.pumpTime.atZone(ZoneId.systemDefault()).toEpochSecond()
 
@@ -366,54 +349,56 @@ private fun rememberBasalData(
     historyLogViewModel: HistoryLogViewModel?,
     timeRange: TimeRange
 ): List<BasalDataPoint> {
-    // Try to find basal-related HistoryLog types
-    val basalClasses = listOfNotNull(
-            com.jwoglom.pumpx2.pump.messages.response.historyLog.BasalRateChangeHistoryLog::class.java,
-            com.jwoglom.pumpx2.pump.messages.response.historyLog.TempRateActivatedHistoryLog::class.java,
-            com.jwoglom.pumpx2.pump.messages.response.historyLog.BasalRateChangeHistoryLog::class.java
-        )
+    // Use BasalRateChangeHistoryLog and TempRateActivatedHistoryLog
+    val basalClasses = listOf(
+        com.jwoglom.pumpx2.pump.messages.response.historyLog.BasalRateChangeHistoryLog::class.java,
+        com.jwoglom.pumpx2.pump.messages.response.historyLog.TempRateActivatedHistoryLog::class.java
+    )
 
-    val basalHistoryLogs = if (basalClasses.isNotEmpty()) {
-        historyLogViewModel?.latestItemsForTypes(
-            basalClasses,
-            // Basal changes: ~1-4 per hour for temp basals
-            (timeRange.hours * 4) + 10
-        )?.observeAsState()
-    } else null
+    val basalHistoryLogs = historyLogViewModel?.latestItemsForTypes(
+        basalClasses,
+        // Basal changes: ~1-4 per hour for temp basals
+        (timeRange.hours * 4) + 10
+    )?.observeAsState()
 
     return remember(basalHistoryLogs?.value, timeRange) {
         basalHistoryLogs?.value?.mapNotNull { dao: com.jwoglom.controlx2.db.historylog.HistoryLogItem ->
             try {
                 val parsed = dao.parse()
-                val basalClass = parsed.javaClass
-
-                // Extract basal rate
-                val rate = tryGetField<Int>(basalClass, parsed, "basalRate")
-                    ?.let { it / 1000f }  // Convert from milli-units/hr to units/hr
-                    ?: tryGetField<Int>(basalClass, parsed, "rate")
-                        ?.let { it / 1000f }
-                    ?: 0f
-
-                // Determine if temp basal
-                val isTemp = tryGetField<Boolean>(basalClass, parsed, "isTemp")
-                    ?: tryGetField<String>(basalClass, parsed, "basalType")?.contains("TEMP", ignoreCase = true)
-                    ?: false
-
-                // Get duration
-                val durationSeconds = tryGetField<Int>(basalClass, parsed, "duration")
-                    ?: tryGetField<Long>(basalClass, parsed, "duration")?.toInt()
-                val duration = durationSeconds?.let { it / 60 } // Convert to minutes
-
                 val timestamp = dao.pumpTime.atZone(ZoneId.systemDefault()).toEpochSecond()
 
-                if (rate > 0) {
-                    BasalDataPoint(
-                        timestamp = timestamp,
-                        rate = rate,
-                        isTemp = isTemp,
-                        duration = duration
-                    )
-                } else null
+                when (parsed) {
+                    is com.jwoglom.pumpx2.pump.messages.response.historyLog.BasalRateChangeHistoryLog -> {
+                        // Extract basal rate (already in units/hr)
+                        val rate = parsed.commandBasalRate
+                        
+                        // Determine if temp basal based on change type ID
+                        // TEMP_RATE_START = 4, TEMP_RATE_END = 8
+                        val changeTypeId = parsed.changeTypeId
+                        val isTemp = changeTypeId == 4  // TEMP_RATE_START
+
+                        if (rate > 0) {
+                            BasalDataPoint(
+                                timestamp = timestamp,
+                                rate = rate,
+                                isTemp = isTemp,
+                                duration = null  // Duration not available in BasalRateChangeHistoryLog
+                            )
+                        } else null
+                    }
+                    is com.jwoglom.pumpx2.pump.messages.response.historyLog.TempRateActivatedHistoryLog -> {
+                        // TempRateActivatedHistoryLog provides percent and duration
+                        // We need the base rate to calculate actual rate, which we don't have here
+                        // For now, we'll just mark this as a temp basal event
+                        val duration = parsed.duration.toInt()  // Already in minutes
+
+                        // Note: We can't determine the actual rate without the base basal rate
+                        // This would require looking up the corresponding BasalRateChangeHistoryLog
+                        // For now, skip these or use a placeholder
+                        null  // Skip TempRateActivatedHistoryLog for now since we need base rate
+                    }
+                    else -> null
+                }
             } catch (e: Exception) {
                 null
             }
@@ -421,29 +406,24 @@ private fun rememberBasalData(
     }
 }
 
-// Helper function to fetch and convert Carb data from bolus history
+// Helper function to fetch and convert Carb data
 @Composable
 private fun rememberCarbData(
     historyLogViewModel: HistoryLogViewModel?,
     timeRange: TimeRange
 ): List<CarbEvent> {
-    // Carbs are recorded in BolusDeliveryHistoryLog along with bolus delivery
-    val bolusHistoryLogs = historyLogViewModel?.latestItemsForTypes(
-        listOf(BolusDeliveryHistoryLog::class.java),
+    // Carbs are recorded in CarbEnteredHistoryLog
+    val carbHistoryLogs = historyLogViewModel?.latestItemsForTypes(
+        listOf(com.jwoglom.pumpx2.pump.messages.response.historyLog.CarbEnteredHistoryLog::class.java),
         (timeRange.hours * 2) + 10
     )?.observeAsState()
 
-    return remember(bolusHistoryLogs?.value, timeRange) {
-        bolusHistoryLogs?.value?.mapNotNull { dao ->
+    return remember(carbHistoryLogs?.value, timeRange) {
+        carbHistoryLogs?.value?.mapNotNull { dao ->
             try {
                 val parsed = dao.parse()
-                if (parsed is BolusDeliveryHistoryLog) {
-                    val bolusClass = parsed.javaClass
-
-                    // Extract carbs from bolus record
-                    val carbs = tryGetField<Int>(bolusClass, parsed, "bolusCarbs")
-                        ?: tryGetField<Int>(bolusClass, parsed, "carbsGrams")
-                        ?: 0
+                if (parsed is com.jwoglom.pumpx2.pump.messages.response.historyLog.CarbEnteredHistoryLog) {
+                    val carbs = parsed.carbs.toInt()
 
                     if (carbs > 0) {
                         val timestamp = dao.pumpTime.atZone(ZoneId.systemDefault()).toEpochSecond()
@@ -467,79 +447,48 @@ private fun rememberModeData(
     historyLogViewModel: HistoryLogViewModel?,
     timeRange: TimeRange
 ): List<ModeEvent> {
-    // Try to find mode-related HistoryLog type IDs
-    @Suppress("UNCHECKED_CAST")
-    val modeClasses = listOfNotNull(
-        tryLoadClass("com.jwoglom.pumpx2.pump.messages.response.historyLog.SleepModeActivatedHistoryLog"),
-        tryLoadClass("com.jwoglom.pumpx2.pump.messages.response.historyLog.SleepModeDeactivatedHistoryLog"),
-        tryLoadClass("com.jwoglom.pumpx2.pump.messages.response.historyLog.ExerciseModeActivatedHistoryLog"),
-        tryLoadClass("com.jwoglom.pumpx2.pump.messages.response.historyLog.ExerciseModeDeactivatedHistoryLog"),
-        tryLoadClass("com.jwoglom.pumpx2.pump.messages.response.historyLog.UserModeChangeHistoryLog"),
-        tryLoadClass("com.jwoglom.pumpx2.pump.messages.response.historyLog.ControlIQModeChangeHistoryLog")
-    ) as List<Class<out com.jwoglom.pumpx2.pump.messages.response.historyLog.HistoryLog>>
+    // Use ControlIQUserModeChangeHistoryLog to track mode changes
+    val modeClasses = listOf(
+        com.jwoglom.pumpx2.pump.messages.response.historyLog.ControlIQUserModeChangeHistoryLog::class.java
+    )
 
-    val modeHistoryLogs = if (modeClasses.isNotEmpty()) {
-        historyLogViewModel?.latestItemsForTypes(
-            modeClasses,
-            (timeRange.hours * 2) + 10
-        )?.observeAsState()
-    } else null
+    val modeHistoryLogs = historyLogViewModel?.latestItemsForTypes(
+        modeClasses,
+        (timeRange.hours * 2) + 10
+    )?.observeAsState()
 
     return remember(modeHistoryLogs?.value, timeRange) {
         modeHistoryLogs?.value?.mapNotNull { dao: com.jwoglom.controlx2.db.historylog.HistoryLogItem ->
             try {
                 val parsed = dao.parse()
-                val modeClass = parsed.javaClass
-                val className = modeClass.simpleName
-
-                // Determine mode from class name
-                val mode = when {
-                    className.contains("Sleep", ignoreCase = true) -> TherapyMode.SLEEP
-                    className.contains("Exercise", ignoreCase = true) -> TherapyMode.EXERCISE
-                    else -> {
-                        // Try to extract mode from fields
-                        val modeValue = tryGetField<Any>(modeClass, parsed, "newMode")
-                            ?: tryGetField<Any>(modeClass, parsed, "mode")
-                            ?: tryGetField<Any>(modeClass, parsed, "userMode")
-                        when {
-                            modeValue?.toString()?.contains("SLEEP", ignoreCase = true) == true -> TherapyMode.SLEEP
-                            modeValue?.toString()?.contains("EXERCISE", ignoreCase = true) == true -> TherapyMode.EXERCISE
-                            else -> TherapyMode.STANDARD
-                        }
+                if (parsed is com.jwoglom.pumpx2.pump.messages.response.historyLog.ControlIQUserModeChangeHistoryLog) {
+                    // Get the current user mode using the typed accessor
+                    val userModeId = parsed.currentUserMode
+                    val userModeType = com.jwoglom.pumpx2.pump.messages.response.currentStatus.ControlIQInfoAbstractResponse.UserModeType.fromId(userModeId)
+                    
+                    // Map UserModeType to TherapyMode
+                    val mode = when (userModeType) {
+                        com.jwoglom.pumpx2.pump.messages.response.currentStatus.ControlIQInfoAbstractResponse.UserModeType.SLEEP -> TherapyMode.SLEEP
+                        com.jwoglom.pumpx2.pump.messages.response.currentStatus.ControlIQInfoAbstractResponse.UserModeType.EXERCISE -> TherapyMode.EXERCISE
+                        else -> TherapyMode.STANDARD
                     }
-                }
 
-                // Check if activated or deactivated
-                val isActivated = className.contains("Activated", ignoreCase = true) ||
-                        className.contains("Started", ignoreCase = true)
+                    val timestamp = dao.pumpTime.atZone(ZoneId.systemDefault()).toEpochSecond()
 
-                // Get duration if available
-                val durationSeconds = tryGetField<Int>(modeClass, parsed, "duration")
-                    ?: tryGetField<Long>(modeClass, parsed, "duration")?.toInt()
-                val duration = durationSeconds?.let { it / 60 }
-
-                val timestamp = dao.pumpTime.atZone(ZoneId.systemDefault()).toEpochSecond()
-
-                // Only return mode events for Sleep/Exercise activations
-                if ((mode == TherapyMode.SLEEP || mode == TherapyMode.EXERCISE) && isActivated) {
-                    ModeEvent(
-                        timestamp = timestamp,
-                        mode = mode,
-                        duration = duration
-                    )
+                    // Only return mode events for Sleep/Exercise activations
+                    // We don't have duration data in this history log, so use null
+                    if (mode == TherapyMode.SLEEP || mode == TherapyMode.EXERCISE) {
+                        ModeEvent(
+                            timestamp = timestamp,
+                            mode = mode,
+                            duration = null  // Duration not available in ControlIQUserModeChangeHistoryLog
+                        )
+                    } else null
                 } else null
             } catch (e: Exception) {
                 null
             }
         }?.reversed() ?: emptyList()
-    }
-}
-
-private fun tryLoadClass(className: String): Class<*>? {
-    return try {
-        Class.forName(className)
-    } catch (e: ClassNotFoundException) {
-        null
     }
 }
 
