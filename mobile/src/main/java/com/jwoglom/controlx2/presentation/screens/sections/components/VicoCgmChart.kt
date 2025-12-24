@@ -49,6 +49,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color as ComposeColor
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -872,10 +873,11 @@ fun VicoCgmChart(
     if (cgmDataPoints.isEmpty() || !hasValidCgmData) {
         // Show placeholder when no data
         Text(
-            text = "No CGM data available for selected time range",
-            modifier = modifier.fillMaxWidth().height(300.dp).padding(16.dp),
+            text = "CGM data unavailable",
+            modifier = modifier.fillMaxWidth().height(300.dp),
             style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            textAlign = TextAlign.Center
         )
     } else {
         val yAxisLabels = remember(fixedGlucoseRange) {

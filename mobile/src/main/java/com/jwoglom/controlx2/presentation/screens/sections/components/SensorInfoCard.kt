@@ -37,12 +37,14 @@ import com.jwoglom.controlx2.presentation.theme.Elevation
 import com.jwoglom.controlx2.presentation.theme.GlucoseColors
 import com.jwoglom.controlx2.presentation.theme.Spacing
 import com.jwoglom.controlx2.presentation.theme.SurfaceBackground
+import com.jwoglom.controlx2.shared.enums.CGMSessionState
 
 /**
  * Sensor Info Card displaying CGM sensor expiration and transmitter battery.
  */
 @Composable
 fun SensorInfoCard(
+    cgmSessionState: CGMSessionState? = null,
     sensorExpiration: String? = null,
     transmitterBattery: String? = null,
     modifier: Modifier = Modifier
@@ -64,19 +66,44 @@ fun SensorInfoCard(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceEvenly
             ) {
-                SensorItem(
-                    icon = Icons.Default.Sensors,
-                    label = "Sensor Expires",
-                    value = sensorExpiration ?: "--",
-                    color = getSensorExpirationColor(sensorExpiration)
-                )
+                if (cgmSessionState == CGMSessionState.ACTIVE) {
+                    SensorItem(
+                        icon = Icons.Default.Sensors,
+                        label = "Sensor Expires",
+                        value = if (!sensorExpiration.isNullOrEmpty()) sensorExpiration else null,
+                        color = getSensorExpirationColor(sensorExpiration)
+                    )
+                } else if (cgmSessionState == CGMSessionState.STARTING) {
+                    SensorItem(
+                        icon = Icons.Default.Sensors,
+                        label = "Sensor Starting",
+                        value = null,
+                        color = GlucoseColors.InRange
+                    )
+                } else if (cgmSessionState == CGMSessionState.STOPPING) {
+                    SensorItem(
+                        icon = Icons.Default.Sensors,
+                        label = "Sensor Stopping",
+                        value = null,
+                        color = GlucoseColors.InRange
+                    )
+                } else if (cgmSessionState == CGMSessionState.STOPPED) {
+                    SensorItem(
+                        icon = Icons.Default.Sensors,
+                        label = "No Sensor Active",
+                        value = null,
+                        color = GlucoseColors.InRange
+                    )
+                }
 
-                SensorItem(
-                    icon = getTransmitterBatteryIcon(transmitterBattery),
-                    label = "Transmitter",
-                    value = transmitterBattery ?: "--",
-                    color = getTransmitterBatteryColor(transmitterBattery)
-                )
+                if (!transmitterBattery.isNullOrEmpty()) {
+                    SensorItem(
+                        icon = getTransmitterBatteryIcon(transmitterBattery),
+                        label = "Transmitter",
+                        value = transmitterBattery ?: "--",
+                        color = getTransmitterBatteryColor(transmitterBattery)
+                    )
+                }
             }
         }
     }
@@ -86,7 +113,7 @@ fun SensorInfoCard(
 private fun SensorItem(
     icon: ImageVector,
     label: String,
-    value: String,
+    value: String?,
     color: Color,
     modifier: Modifier = Modifier
 ) {
@@ -103,12 +130,14 @@ private fun SensorItem(
         )
 
         Column {
-            Text(
-                text = value,
-                style = MaterialTheme.typography.bodyMedium,
-                fontWeight = FontWeight.SemiBold,
-                color = MaterialTheme.colorScheme.onSurface
-            )
+            if (!value.isNullOrEmpty()) {
+                Text(
+                    text = value,
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+            }
             Text(
                 text = label,
                 style = MaterialTheme.typography.labelSmall,
@@ -154,10 +183,12 @@ fun SensorInfoCardFromDataStore(
     modifier: Modifier = Modifier
 ) {
     val ds = LocalDataStore.current
+    val cgmSessionState = ds.cgmSessionState.observeAsState()
     val cgmSessionExpireRelative = ds.cgmSessionExpireRelative.observeAsState()
     val cgmTransmitterStatus = ds.cgmTransmitterStatus.observeAsState()
 
     SensorInfoCard(
+        cgmSessionState = cgmSessionState.value,
         sensorExpiration = cgmSessionExpireRelative.value,
         transmitterBattery = cgmTransmitterStatus.value,
         modifier = modifier

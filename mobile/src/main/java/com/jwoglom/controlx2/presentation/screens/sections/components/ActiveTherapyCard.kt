@@ -161,7 +161,7 @@ fun ActiveTherapyCardFromDataStore(
     val displayedMode = when (controlIQMode.value) {
         UserMode.SLEEP -> "Sleep"
         UserMode.EXERCISE -> "Exercise"
-        else -> controlIQStatus.value?.toString() ?: "Active"
+        else -> controlIQStatus.value?.toString() ?: "None"
     }
 
     ActiveTherapyCard(

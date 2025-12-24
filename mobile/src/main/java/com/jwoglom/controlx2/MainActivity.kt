@@ -664,7 +664,11 @@ class MainActivity : ComponentActivity() {
                 dataStore.cartridgeRemainingUnits.value = message.currentInsulinAmount
             }
             is LastBolusStatusAbstractResponse -> {
-                dataStore.lastBolusStatus.value = "${twoDecimalPlaces1000Unit(message.deliveredVolume)}u at ${shortTime(pumpTimeToLocalTz(message.timestampInstant))}"
+
+                dataStore.lastBolusStatus.value = if (message.timestamp > 0)
+                    "${twoDecimalPlaces1000Unit(message.deliveredVolume)}u at ${shortTime(pumpTimeToLocalTz(message.timestampInstant))}"
+                else
+                    null
                 dataStore.lastBolusStatusResponse.value = message
             }
             is HomeScreenMirrorResponse -> {
