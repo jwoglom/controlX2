@@ -1060,10 +1060,14 @@ class CommService : Service() {
             sendInitPumpFinderComm()
         } else {
             val pairingCodeType = Prefs(applicationContext).pumpFinderPairingCodeType().orEmpty()
+            val pairingCodeTypeEnum = if (!pairingCodeType.isEmpty())
+                PairingCodeType.fromLabel(pairingCodeType)
+            else
+                PairingCodeType.SHORT_6CHAR
             val filterToMac = Prefs(applicationContext).pumpFinderPumpMac().orEmpty()
             Timber.i("Starting CommService in standard mode: filterToMac=$filterToMac pairingCodeType=$pairingCodeType")
 
-            sendInitPumpComm(PairingCodeType.fromLabel(pairingCodeType), filterToMac)
+            sendInitPumpComm(pairingCodeTypeEnum, filterToMac)
         }
 
         // If we get killed, after returning from here, restart
