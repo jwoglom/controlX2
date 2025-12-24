@@ -38,6 +38,7 @@ import com.jwoglom.controlx2.presentation.theme.GlucoseColors
 import com.jwoglom.controlx2.presentation.theme.Spacing
 import com.jwoglom.controlx2.presentation.theme.SurfaceBackground
 import com.jwoglom.controlx2.shared.enums.CGMSessionState
+import com.jwoglom.controlx2.shared.icons.filled.SensorAlert
 
 /**
  * Sensor Info Card displaying CGM sensor expiration and transmitter battery.
@@ -89,7 +90,7 @@ fun SensorInfoCard(
                     )
                 } else if (cgmSessionState == CGMSessionState.STOPPED) {
                     SensorItem(
-                        icon = Icons.Default.Sensors,
+                        icon = Icons.Default.SensorAlert,
                         label = "No Sensor Active",
                         value = null,
                         color = GlucoseColors.InRange

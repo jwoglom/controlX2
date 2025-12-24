@@ -677,7 +677,7 @@ class MainActivity : ComponentActivity() {
                     HomeScreenMirrorResponse.ApControlStateIcon.STATE_GRAY_RED_BIQ_CIQ_BASAL_SUSPENDED -> "Suspended"
                     HomeScreenMirrorResponse.ApControlStateIcon.STATE_GRAY_BLUE_CIQ_INCREASE_BASAL -> "Increase"
                     HomeScreenMirrorResponse.ApControlStateIcon.STATE_GRAY_ORANGE_CIQ_ATTENUATION_BASAL -> "Reduced"
-                    else -> "Off"
+                    else -> "CIQ Off"
                 }
                 dataStore.cgmStatusText.value = when (message.cgmAlertIcon) {
                     HomeScreenMirrorResponse.CGMAlertIcon.STARTUP_1, HomeScreenMirrorResponse.CGMAlertIcon.STARTUP_2, HomeScreenMirrorResponse.CGMAlertIcon.STARTUP_3, HomeScreenMirrorResponse.CGMAlertIcon.STARTUP_4 -> "Starting up"

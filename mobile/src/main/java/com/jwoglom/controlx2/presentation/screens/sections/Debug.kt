@@ -520,7 +520,8 @@ fun Debug(
             historyLogViewModel?.let {
                 item {
                     HistoryLogSyncProgressBar(
-                        historyLogViewModel = it
+                        historyLogViewModel = it,
+                        replaceWithPaddingWhenComplete = true
                     )
                 }
                 item {

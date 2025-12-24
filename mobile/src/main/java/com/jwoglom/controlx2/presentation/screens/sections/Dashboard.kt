@@ -201,16 +201,6 @@ fun Dashboard(
                     )
                 }
 
-                // History Log Sync Progress
-                historyLogViewModel?.let {
-                    item {
-                        HistoryLogSyncProgressBar(
-                            historyLogViewModel = it,
-                            hideWhenComplete = true
-                        )
-                    }
-                }
-
                 // Therapy Metrics Card - IOB, COB, TIR
                 item {
                     TherapyMetricsCardFromDataStore(historyLogViewModel = historyLogViewModel)
@@ -224,6 +214,16 @@ fun Dashboard(
                 // Sensor Info Card - Sensor expiration, Transmitter status
                 item {
                     SensorInfoCardFromDataStore()
+                }
+
+                // History Log Sync Progress
+                historyLogViewModel?.let {
+                    item {
+                        HistoryLogSyncProgressBar(
+                            historyLogViewModel = it,
+                            replaceWithPaddingWhenComplete = true
+                        )
+                    }
                 }
             }
         )

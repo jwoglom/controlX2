@@ -134,17 +134,6 @@ fun PumpSetupStageDescription(
                 })
                 Line("Options > Device Settings > Bluetooth Settings", bold = true)
                 Line("Ensure the 'Mobile Connection' option is enabled.")
-                Spacer(Modifier.height(16.dp))
-                Line(buildAnnotatedString {
-                    withStyle(
-                        style = SpanStyle(
-                            fontWeight = FontWeight.Bold
-                        )
-                    ) {
-                        append("For Mobi: ")
-                    }
-                    append("Place the pump on the wireless charger.")
-                })
             }
         }
         PumpSetupStage.PUMP_FINDER_SELECT_PUMP -> {

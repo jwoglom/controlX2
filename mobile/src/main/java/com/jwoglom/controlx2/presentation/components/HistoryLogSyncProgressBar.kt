@@ -38,7 +38,8 @@ import kotlin.math.max
 fun HistoryLogSyncProgressBar(
     historyLogViewModel: HistoryLogViewModel,
     modifier: Modifier = Modifier,
-    hideWhenComplete: Boolean = false
+    hideWhenComplete: Boolean = false,
+    replaceWithPaddingWhenComplete: Boolean = false
 ) {
     val dataStore = LocalDataStore.current
     val historyLogStatus by dataStore.historyLogStatus.observeAsState()
@@ -68,7 +69,7 @@ fun HistoryLogSyncProgressBar(
         
         val isSynced = syncedLogs >= totalLogs
 
-        if (hideWhenComplete && isSynced) {
+        if (replaceWithPaddingWhenComplete && isSynced) {
             Column(
                 modifier = modifier
                     .fillMaxWidth()
@@ -77,6 +78,10 @@ fun HistoryLogSyncProgressBar(
             ) {
                 Spacer(modifier = Modifier.fillMaxWidth())
             }
+            return
+        }
+
+        if (hideWhenComplete && isSynced) {
             return
         }
 

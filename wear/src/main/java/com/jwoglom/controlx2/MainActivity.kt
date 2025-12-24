@@ -384,7 +384,7 @@ class MainActivity : ComponentActivity(), MessageClient.OnMessageReceivedListene
                     ApControlStateIcon.STATE_GRAY_RED_BIQ_CIQ_BASAL_SUSPENDED -> "Suspended"
                     ApControlStateIcon.STATE_GRAY_BLUE_CIQ_INCREASE_BASAL -> "Increase"
                     ApControlStateIcon.STATE_GRAY_ORANGE_CIQ_ATTENUATION_BASAL -> "Reduced"
-                    else -> "Off"
+                    else -> "CIQ Off"
                 }
                 dataStore.cgmStatusText.value = when (message.cgmAlertIcon) {
                     CGMAlertIcon.STARTUP_1, CGMAlertIcon.STARTUP_2, CGMAlertIcon.STARTUP_3, CGMAlertIcon.STARTUP_4 -> "Starting up"
