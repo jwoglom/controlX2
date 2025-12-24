@@ -6,6 +6,12 @@ import com.jwoglom.controlx2.sync.nightscout.NightscoutSyncConfig
 import com.jwoglom.controlx2.sync.nightscout.ProcessorType
 import com.jwoglom.controlx2.sync.nightscout.api.NightscoutApi
 import com.jwoglom.controlx2.sync.nightscout.models.NightscoutTreatment
+import com.jwoglom.pumpx2.pump.messages.response.historyLog.CgmAlertActivatedDexHistoryLog
+import com.jwoglom.pumpx2.pump.messages.response.historyLog.CgmAlertActivatedFsl2HistoryLog
+import com.jwoglom.pumpx2.pump.messages.response.historyLog.CgmAlertActivatedHistoryLog
+import com.jwoglom.pumpx2.pump.messages.response.historyLog.CgmAlertClearedDexHistoryLog
+import com.jwoglom.pumpx2.pump.messages.response.historyLog.CgmAlertClearedFsl2HistoryLog
+import com.jwoglom.pumpx2.pump.messages.response.historyLog.CgmAlertClearedHistoryLog
 import com.jwoglom.pumpx2.pump.messages.response.historyLog.HistoryLogParser
 import timber.log.Timber
 
@@ -22,28 +28,14 @@ class ProcessCGMAlert(
     override fun processorType() = ProcessorType.CGM_ALERT
 
     override fun supportedTypeIds(): Set<Int> {
-        // Try to find CGM alert-related HistoryLog types
-        val possibleClasses = listOf(
-            "com.jwoglom.pumpx2.pump.messages.response.historyLog.CGMAlertActivatedHistoryLog",
-            "com.jwoglom.pumpx2.pump.messages.response.historyLog.CGMAlertClearedHistoryLog",
-            "com.jwoglom.pumpx2.pump.messages.response.historyLog.CGMAlertHistoryLog",
-            "com.jwoglom.pumpx2.pump.messages.response.historyLog.LowGlucoseAlertHistoryLog",
-            "com.jwoglom.pumpx2.pump.messages.response.historyLog.HighGlucoseAlertHistoryLog",
-            "com.jwoglom.pumpx2.pump.messages.response.historyLog.CGMHighAlertHistoryLog",
-            "com.jwoglom.pumpx2.pump.messages.response.historyLog.CGMLowAlertHistoryLog",
-            "com.jwoglom.pumpx2.pump.messages.response.historyLog.UrgentLowAlertHistoryLog",
-            "com.jwoglom.pumpx2.pump.messages.response.historyLog.UrgentLowSoonAlertHistoryLog"
+        return setOfNotNull(
+            HistoryLogParser.LOG_MESSAGE_CLASS_TO_ID[CgmAlertActivatedHistoryLog::class.java],
+            HistoryLogParser.LOG_MESSAGE_CLASS_TO_ID[CgmAlertClearedHistoryLog::class.java],
+            HistoryLogParser.LOG_MESSAGE_CLASS_TO_ID[CgmAlertActivatedDexHistoryLog::class.java],
+            HistoryLogParser.LOG_MESSAGE_CLASS_TO_ID[CgmAlertClearedDexHistoryLog::class.java],
+            HistoryLogParser.LOG_MESSAGE_CLASS_TO_ID[CgmAlertActivatedFsl2HistoryLog::class.java],
+            HistoryLogParser.LOG_MESSAGE_CLASS_TO_ID[CgmAlertClearedFsl2HistoryLog::class.java]
         )
-
-        return possibleClasses.mapNotNull { className ->
-            try {
-                val clazz = Class.forName(className)
-                HistoryLogParser.LOG_MESSAGE_CLASS_TO_ID[clazz]
-            } catch (e: ClassNotFoundException) {
-                Timber.d("CGM alert HistoryLog class not found: $className")
-                null
-            }
-        }.toSet()
     }
 
     override suspend fun process(
@@ -79,125 +71,108 @@ class ProcessCGMAlert(
 
     private fun cgmAlertToNightscoutTreatment(item: HistoryLogItem): NightscoutTreatment? {
         val parsed = item.parse()
-        val alertClass = parsed.javaClass
 
-        // Extract alert data using reflection
-        val alertData = extractAlertData(alertClass, parsed)
-
-        return NightscoutTreatment.fromTimestamp(
-            eventType = "Announcement",
-            timestamp = item.pumpTime,
-            seqId = item.seqId,
-            reason = alertData.reason,
-            notes = alertData.notes
-        )
-    }
-
-    private data class AlertData(
-        val reason: String,
-        val notes: String
-    )
-
-    private fun extractAlertData(clazz: Class<*>, obj: Any): AlertData {
-        try {
-            // Try to get alert type/ID
-            val alertId = tryGetField<Int>(clazz, obj, "alertId")
-                ?: tryGetField<Int>(clazz, obj, "id")
-
-            val alertType = tryGetField<Int>(clazz, obj, "alertType")
-                ?: tryGetField<String>(clazz, obj, "alertType")
-
-            // Try to get alert name/description
-            val alertName = tryGetField<String>(clazz, obj, "alertName")
-                ?: tryGetField<String>(clazz, obj, "name")
-                ?: tryGetField<String>(clazz, obj, "description")
-
-            // Try to get glucose value at alert time
-            val glucoseValue = tryGetField<Int>(clazz, obj, "glucoseValue")
-                ?: tryGetField<Int>(clazz, obj, "bgValue")
-                ?: tryGetField<Int>(clazz, obj, "currentGlucose")
-
-            // Try to get threshold value
-            val threshold = tryGetField<Int>(clazz, obj, "threshold")
-                ?: tryGetField<Int>(clazz, obj, "alertThreshold")
-
-            // Try to get cleared status
-            val isCleared = tryGetField<Boolean>(clazz, obj, "cleared")
-                ?: tryGetField<Boolean>(clazz, obj, "isCleared")
-                ?: false
-
-            // Determine alert category based on class name
-            val className = clazz.simpleName
-            val alertCategory = when {
-                className.contains("Low", ignoreCase = true) -> "Low Glucose"
-                className.contains("High", ignoreCase = true) -> "High Glucose"
-                className.contains("UrgentLow", ignoreCase = true) -> "Urgent Low"
-                else -> "CGM Alert"
-            }
-
-            // Build reason
-            val reason = buildString {
-                if (isCleared) {
-                    append("$alertCategory cleared")
+        return when (parsed) {
+            is CgmAlertActivatedHistoryLog -> {
+                val alert = parsed.alert
+                val reason = if (alert != null) {
+                    "CGM Alert: ${alert.name}"
                 } else {
-                    append(alertCategory)
+                    "CGM Alert (ID: ${parsed.alertId})"
                 }
 
-                alertName?.let {
-                    append(": $it")
-                }
-
-                glucoseValue?.let {
-                    append(" (BG: ${it}mg/dL)")
-                }
+                NightscoutTreatment.fromTimestamp(
+                    eventType = "Announcement",
+                    timestamp = item.pumpTime,
+                    seqId = item.seqId,
+                    reason = reason,
+                    notes = "CGM alert activated, ID: ${parsed.alertId}"
+                )
             }
-
-            // Build notes with all available info
-            val notes = buildString {
-                append(if (isCleared) "$alertCategory cleared" else alertCategory)
-
-                alertType?.let {
-                    append(", type: $it")
+            is CgmAlertClearedHistoryLog -> {
+                val alert = parsed.alert
+                val reason = if (alert != null) {
+                    "CGM Alert Cleared: ${alert.name}"
+                } else {
+                    "CGM Alert Cleared (ID: ${parsed.alertId})"
                 }
 
-                alertId?.let {
-                    append(", ID: $it")
-                }
-
-                alertName?.let {
-                    append(", name: $it")
-                }
-
-                glucoseValue?.let {
-                    append(", glucose: ${it}mg/dL")
-                }
-
-                threshold?.let {
-                    append(", threshold: ${it}mg/dL")
-                }
+                NightscoutTreatment.fromTimestamp(
+                    eventType = "Announcement",
+                    timestamp = item.pumpTime,
+                    seqId = item.seqId,
+                    reason = reason,
+                    notes = "CGM alert cleared, ID: ${parsed.alertId}"
+                )
             }
+            is CgmAlertActivatedDexHistoryLog -> {
+                val alert = parsed.alert
+                val reason = if (alert != null) {
+                    "Dexcom Alert: ${alert.name}"
+                } else {
+                    "Dexcom Alert (ID: ${parsed.alertId})"
+                }
 
-            return AlertData(
-                reason = reason,
-                notes = notes
-            )
-        } catch (e: Exception) {
-            Timber.e(e, "Error extracting CGM alert data")
-            return AlertData("CGM Alert", "CGM alert (details unavailable)")
-        }
-    }
+                NightscoutTreatment.fromTimestamp(
+                    eventType = "Announcement",
+                    timestamp = item.pumpTime,
+                    seqId = item.seqId,
+                    reason = reason,
+                    notes = "Dexcom alert activated, ID: ${parsed.alertId}"
+                )
+            }
+            is CgmAlertClearedDexHistoryLog -> {
+                val alert = parsed.alert
+                val reason = if (alert != null) {
+                    "Dexcom Alert Cleared: ${alert.name}"
+                } else {
+                    "Dexcom Alert Cleared (ID: ${parsed.alertId})"
+                }
 
-    private inline fun <reified T> tryGetField(clazz: Class<*>, obj: Any, fieldName: String): T? {
-        return try {
-            val field = clazz.getDeclaredField(fieldName)
-            field.isAccessible = true
-            val value = field.get(obj)
-            if (value is T) value else null
-        } catch (e: NoSuchFieldException) {
-            null
-        } catch (e: Exception) {
-            Timber.w(e, "Failed to access field: $fieldName")
-            null
+                NightscoutTreatment.fromTimestamp(
+                    eventType = "Announcement",
+                    timestamp = item.pumpTime,
+                    seqId = item.seqId,
+                    reason = reason,
+                    notes = "Dexcom alert cleared, ID: ${parsed.alertId}"
+                )
+            }
+            is CgmAlertActivatedFsl2HistoryLog -> {
+                val alert = parsed.alert
+                val reason = if (alert != null) {
+                    "FreeStyle Libre Alert: ${alert.name}"
+                } else {
+                    "FreeStyle Libre Alert (ID: ${parsed.alertId})"
+                }
+
+                NightscoutTreatment.fromTimestamp(
+                    eventType = "Announcement",
+                    timestamp = item.pumpTime,
+                    seqId = item.seqId,
+                    reason = reason,
+                    notes = "FreeStyle Libre alert activated, ID: ${parsed.alertId}"
+                )
+            }
+            is CgmAlertClearedFsl2HistoryLog -> {
+                val alert = parsed.alert
+                val reason = if (alert != null) {
+                    "FreeStyle Libre Alert Cleared: ${alert.name}"
+                } else {
+                    "FreeStyle Libre Alert Cleared (ID: ${parsed.alertId})"
+                }
+
+                NightscoutTreatment.fromTimestamp(
+                    eventType = "Announcement",
+                    timestamp = item.pumpTime,
+                    seqId = item.seqId,
+                    reason = reason,
+                    notes = "FreeStyle Libre alert cleared, ID: ${parsed.alertId}"
+                )
+            }
+            else -> {
+                Timber.w("Unexpected CGM alert type: ${parsed.javaClass.simpleName}")
+                null
+            }
         }
     }
 }

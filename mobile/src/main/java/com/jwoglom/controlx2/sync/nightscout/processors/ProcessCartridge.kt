@@ -6,7 +6,10 @@ import com.jwoglom.controlx2.sync.nightscout.NightscoutSyncConfig
 import com.jwoglom.controlx2.sync.nightscout.ProcessorType
 import com.jwoglom.controlx2.sync.nightscout.api.NightscoutApi
 import com.jwoglom.controlx2.sync.nightscout.models.NightscoutTreatment
+import com.jwoglom.pumpx2.pump.messages.response.historyLog.CannulaFilledHistoryLog
+import com.jwoglom.pumpx2.pump.messages.response.historyLog.CartridgeFilledHistoryLog
 import com.jwoglom.pumpx2.pump.messages.response.historyLog.HistoryLogParser
+import com.jwoglom.pumpx2.pump.messages.response.historyLog.TubingFilledHistoryLog
 import timber.log.Timber
 
 /**
@@ -22,27 +25,11 @@ class ProcessCartridge(
     override fun processorType() = ProcessorType.CARTRIDGE
 
     override fun supportedTypeIds(): Set<Int> {
-        // Try to find cartridge-related HistoryLog types
-        val possibleClasses = listOf(
-            "com.jwoglom.pumpx2.pump.messages.response.historyLog.CartridgeChangeHistoryLog",
-            "com.jwoglom.pumpx2.pump.messages.response.historyLog.InsulinCartridgeChangeHistoryLog",
-            "com.jwoglom.pumpx2.pump.messages.response.historyLog.CartridgeFilledHistoryLog",
-            "com.jwoglom.pumpx2.pump.messages.response.historyLog.InsulinChangeHistoryLog",
-            "com.jwoglom.pumpx2.pump.messages.response.historyLog.SiteChangeHistoryLog",
-            "com.jwoglom.pumpx2.pump.messages.response.historyLog.TubingFilledHistoryLog",
-            "com.jwoglom.pumpx2.pump.messages.response.historyLog.CannulaFilledHistoryLog",
-            "com.jwoglom.pumpx2.pump.messages.response.historyLog.LoadCartridgeHistoryLog"
+        return setOfNotNull(
+            HistoryLogParser.LOG_MESSAGE_CLASS_TO_ID[CartridgeFilledHistoryLog::class.java],
+            HistoryLogParser.LOG_MESSAGE_CLASS_TO_ID[TubingFilledHistoryLog::class.java],
+            HistoryLogParser.LOG_MESSAGE_CLASS_TO_ID[CannulaFilledHistoryLog::class.java]
         )
-
-        return possibleClasses.mapNotNull { className ->
-            try {
-                val clazz = Class.forName(className)
-                HistoryLogParser.LOG_MESSAGE_CLASS_TO_ID[clazz]
-            } catch (e: ClassNotFoundException) {
-                Timber.d("Cartridge HistoryLog class not found: $className")
-                null
-            }
-        }.toSet()
     }
 
     override suspend fun process(
@@ -78,115 +65,36 @@ class ProcessCartridge(
 
     private fun cartridgeToNightscoutTreatment(item: HistoryLogItem): NightscoutTreatment? {
         val parsed = item.parse()
-        val cartridgeClass = parsed.javaClass
 
-        // Extract cartridge change data using reflection
-        val cartridgeData = extractCartridgeData(cartridgeClass, parsed)
-
-        // Determine event type based on change type
-        val eventType = when {
-            cartridgeData.isSiteChange -> "Site Change"
-            else -> "Insulin Change"
-        }
-
-        return NightscoutTreatment.fromTimestamp(
-            eventType = eventType,
-            timestamp = item.pumpTime,
-            seqId = item.seqId,
-            notes = cartridgeData.notes
-        )
-    }
-
-    private data class CartridgeData(
-        val isSiteChange: Boolean,
-        val notes: String
-    )
-
-    private fun extractCartridgeData(clazz: Class<*>, obj: Any): CartridgeData {
-        try {
-            // Determine change type from class name
-            val className = clazz.simpleName
-            val isSiteChange = className.contains("Site", ignoreCase = true) ||
-                              className.contains("Tubing", ignoreCase = true) ||
-                              className.contains("Cannula", ignoreCase = true)
-
-            // Try to get cartridge volume
-            val cartridgeVolume = tryGetField<Int>(clazz, obj, "cartridgeVolume")
-                ?: tryGetField<Int>(clazz, obj, "volume")
-                ?: tryGetField<Int>(clazz, obj, "insulinVolume")
-
-            // Try to get fill amount (for tubing/cannula fills)
-            val fillAmount = tryGetField<Int>(clazz, obj, "fillAmount")
-                ?.let { it / 1000.0 } // Convert milli-units to units
-                ?: tryGetField<Int>(clazz, obj, "primeAmount")
-                    ?.let { it / 1000.0 }
-                ?: tryGetField<Double>(clazz, obj, "fillAmount")
-                ?: tryGetField<Double>(clazz, obj, "primeAmount")
-
-            // Try to get cartridge type
-            val cartridgeType = tryGetField<Int>(clazz, obj, "cartridgeType")
-                ?: tryGetField<String>(clazz, obj, "cartridgeType")
-
-            // Try to get serial number
-            val serialNumber = tryGetField<String>(clazz, obj, "serialNumber")
-                ?: tryGetField<Long>(clazz, obj, "serialNumber")?.toString()
-
-            // Build notes with all available info
-            val notes = buildString {
-                if (isSiteChange) {
-                    append("Site change")
-                } else {
-                    append("Insulin cartridge change")
-                }
-
-                cartridgeVolume?.let {
-                    append(", volume: ${it}U")
-                }
-
-                fillAmount?.let {
-                    append(", filled: ${it}U")
-                }
-
-                cartridgeType?.let {
-                    append(", type: $it")
-                }
-
-                serialNumber?.let {
-                    append(", S/N: $it")
-                }
-
-                // Check for specific fill types
-                if (className.contains("Tubing", ignoreCase = true)) {
-                    append(" (tubing)")
-                } else if (className.contains("Cannula", ignoreCase = true)) {
-                    append(" (cannula)")
-                }
+        return when (parsed) {
+            is CartridgeFilledHistoryLog -> {
+                NightscoutTreatment.fromTimestamp(
+                    eventType = "Insulin Change",
+                    timestamp = item.pumpTime,
+                    seqId = item.seqId,
+                    notes = "Cartridge filled with ${parsed.insulinDisplay}U (actual: ${parsed.insulinActual}U)"
+                )
             }
-
-            return CartridgeData(
-                isSiteChange = isSiteChange,
-                notes = notes
-            )
-        } catch (e: Exception) {
-            Timber.e(e, "Error extracting cartridge data")
-            return CartridgeData(
-                isSiteChange = false,
-                notes = "Cartridge change (details unavailable)"
-            )
-        }
-    }
-
-    private inline fun <reified T> tryGetField(clazz: Class<*>, obj: Any, fieldName: String): T? {
-        return try {
-            val field = clazz.getDeclaredField(fieldName)
-            field.isAccessible = true
-            val value = field.get(obj)
-            if (value is T) value else null
-        } catch (e: NoSuchFieldException) {
-            null
-        } catch (e: Exception) {
-            Timber.w(e, "Failed to access field: $fieldName")
-            null
+            is TubingFilledHistoryLog -> {
+                NightscoutTreatment.fromTimestamp(
+                    eventType = "Site Change",
+                    timestamp = item.pumpTime,
+                    seqId = item.seqId,
+                    notes = "Tubing filled/primed with ${parsed.primeSize}U"
+                )
+            }
+            is CannulaFilledHistoryLog -> {
+                NightscoutTreatment.fromTimestamp(
+                    eventType = "Site Change",
+                    timestamp = item.pumpTime,
+                    seqId = item.seqId,
+                    notes = "Cannula filled/primed with ${parsed.primeSize}U"
+                )
+            }
+            else -> {
+                Timber.w("Unexpected cartridge type: ${parsed.javaClass.simpleName}")
+                null
+            }
         }
     }
 }

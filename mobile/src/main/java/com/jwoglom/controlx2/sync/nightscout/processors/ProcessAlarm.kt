@@ -6,6 +6,10 @@ import com.jwoglom.controlx2.sync.nightscout.NightscoutSyncConfig
 import com.jwoglom.controlx2.sync.nightscout.ProcessorType
 import com.jwoglom.controlx2.sync.nightscout.api.NightscoutApi
 import com.jwoglom.controlx2.sync.nightscout.models.NightscoutTreatment
+import com.jwoglom.pumpx2.pump.messages.response.historyLog.AlarmActivatedHistoryLog
+import com.jwoglom.pumpx2.pump.messages.response.historyLog.AlarmClearedHistoryLog
+import com.jwoglom.pumpx2.pump.messages.response.historyLog.AlertActivatedHistoryLog
+import com.jwoglom.pumpx2.pump.messages.response.historyLog.AlertClearedHistoryLog
 import com.jwoglom.pumpx2.pump.messages.response.historyLog.HistoryLogParser
 import timber.log.Timber
 
@@ -22,25 +26,12 @@ class ProcessAlarm(
     override fun processorType() = ProcessorType.ALARM
 
     override fun supportedTypeIds(): Set<Int> {
-        // Try to find alarm-related HistoryLog types
-        val possibleClasses = listOf(
-            "com.jwoglom.pumpx2.pump.messages.response.historyLog.AlarmActivatedHistoryLog",
-            "com.jwoglom.pumpx2.pump.messages.response.historyLog.AlarmClearedHistoryLog",
-            "com.jwoglom.pumpx2.pump.messages.response.historyLog.AlarmHistoryLog",
-            "com.jwoglom.pumpx2.pump.messages.response.historyLog.PumpAlarmHistoryLog",
-            "com.jwoglom.pumpx2.pump.messages.response.historyLog.AlertActivatedHistoryLog",
-            "com.jwoglom.pumpx2.pump.messages.response.historyLog.AlertClearedHistoryLog"
+        return setOfNotNull(
+            HistoryLogParser.LOG_MESSAGE_CLASS_TO_ID[AlarmActivatedHistoryLog::class.java],
+            HistoryLogParser.LOG_MESSAGE_CLASS_TO_ID[AlarmClearedHistoryLog::class.java],
+            HistoryLogParser.LOG_MESSAGE_CLASS_TO_ID[AlertActivatedHistoryLog::class.java],
+            HistoryLogParser.LOG_MESSAGE_CLASS_TO_ID[AlertClearedHistoryLog::class.java]
         )
-
-        return possibleClasses.mapNotNull { className ->
-            try {
-                val clazz = Class.forName(className)
-                HistoryLogParser.LOG_MESSAGE_CLASS_TO_ID[clazz]
-            } catch (e: ClassNotFoundException) {
-                Timber.d("Alarm HistoryLog class not found: $className")
-                null
-            }
-        }.toSet()
     }
 
     override suspend fun process(
@@ -76,110 +67,76 @@ class ProcessAlarm(
 
     private fun alarmToNightscoutTreatment(item: HistoryLogItem): NightscoutTreatment? {
         val parsed = item.parse()
-        val alarmClass = parsed.javaClass
 
-        // Extract alarm data using reflection
-        val alarmData = extractAlarmData(alarmClass, parsed)
-
-        return NightscoutTreatment.fromTimestamp(
-            eventType = "Announcement",
-            timestamp = item.pumpTime,
-            seqId = item.seqId,
-            reason = alarmData.reason,
-            notes = alarmData.notes
-        )
-    }
-
-    private data class AlarmData(
-        val reason: String,
-        val notes: String
-    )
-
-    private fun extractAlarmData(clazz: Class<*>, obj: Any): AlarmData {
-        try {
-            // Try to get alarm ID/type
-            val alarmId = tryGetField<Int>(clazz, obj, "alarmId")
-                ?: tryGetField<Int>(clazz, obj, "alertId")
-                ?: tryGetField<Int>(clazz, obj, "id")
-
-            val alarmType = tryGetField<Int>(clazz, obj, "alarmType")
-                ?: tryGetField<Int>(clazz, obj, "alertType")
-                ?: tryGetField<String>(clazz, obj, "alarmType")
-                ?: tryGetField<String>(clazz, obj, "alertType")
-
-            // Try to get alarm description
-            val description = tryGetField<String>(clazz, obj, "description")
-                ?: tryGetField<String>(clazz, obj, "alarmDescription")
-                ?: tryGetField<String>(clazz, obj, "message")
-
-            // Try to get alarm severity
-            val severity = tryGetField<Int>(clazz, obj, "severity")
-                ?: tryGetField<String>(clazz, obj, "severity")
-
-            // Try to get cleared/activated status
-            val isCleared = tryGetField<Boolean>(clazz, obj, "cleared")
-                ?: tryGetField<Boolean>(clazz, obj, "isCleared")
-                ?: false
-
-            // Build reason
-            val reason = buildString {
-                if (isCleared) {
-                    append("Alarm cleared")
+        return when (parsed) {
+            is AlarmActivatedHistoryLog -> {
+                val alarmType = parsed.alarmResponseType
+                val reason = if (alarmType != null) {
+                    "Alarm activated: ${alarmType.name}"
                 } else {
-                    append("Alarm activated")
+                    "Alarm activated: ID ${parsed.alarmId}"
                 }
 
-                alarmId?.let {
-                    append(": ID $it")
-                }
-
-                description?.let {
-                    append(" - $it")
-                }
+                NightscoutTreatment.fromTimestamp(
+                    eventType = "Announcement",
+                    timestamp = item.pumpTime,
+                    seqId = item.seqId,
+                    reason = reason,
+                    notes = "Pump alarm activated, ID: ${parsed.alarmId}"
+                )
             }
-
-            // Build notes with all available info
-            val notes = buildString {
-                append(if (isCleared) "Alarm cleared" else "Pump alarm")
-
-                alarmType?.let {
-                    append(", type: $it")
+            is AlarmClearedHistoryLog -> {
+                val alarmType = parsed.alarmResponseType
+                val reason = if (alarmType != null) {
+                    "Alarm cleared: ${alarmType.name}"
+                } else {
+                    "Alarm cleared: ID ${parsed.alarmId}"
                 }
 
-                alarmId?.let {
-                    append(", ID: $it")
-                }
-
-                severity?.let {
-                    append(", severity: $it")
-                }
-
-                description?.let {
-                    append(", description: $it")
-                }
+                NightscoutTreatment.fromTimestamp(
+                    eventType = "Announcement",
+                    timestamp = item.pumpTime,
+                    seqId = item.seqId,
+                    reason = reason,
+                    notes = "Pump alarm cleared, ID: ${parsed.alarmId}"
+                )
             }
+            is AlertActivatedHistoryLog -> {
+                val alertType = parsed.alertResponseType
+                val reason = if (alertType != null) {
+                    "Alert activated: ${alertType.name}"
+                } else {
+                    "Alert activated: ID ${parsed.alertId}"
+                }
 
-            return AlarmData(
-                reason = reason,
-                notes = notes
-            )
-        } catch (e: Exception) {
-            Timber.e(e, "Error extracting alarm data")
-            return AlarmData("Pump alarm", "Pump alarm (details unavailable)")
-        }
-    }
+                NightscoutTreatment.fromTimestamp(
+                    eventType = "Announcement",
+                    timestamp = item.pumpTime,
+                    seqId = item.seqId,
+                    reason = reason,
+                    notes = "Pump alert activated, ID: ${parsed.alertId}"
+                )
+            }
+            is AlertClearedHistoryLog -> {
+                val alertType = parsed.alertResponseType
+                val reason = if (alertType != null) {
+                    "Alert cleared: ${alertType.name}"
+                } else {
+                    "Alert cleared: ID ${parsed.alertId}"
+                }
 
-    private inline fun <reified T> tryGetField(clazz: Class<*>, obj: Any, fieldName: String): T? {
-        return try {
-            val field = clazz.getDeclaredField(fieldName)
-            field.isAccessible = true
-            val value = field.get(obj)
-            if (value is T) value else null
-        } catch (e: NoSuchFieldException) {
-            null
-        } catch (e: Exception) {
-            Timber.w(e, "Failed to access field: $fieldName")
-            null
+                NightscoutTreatment.fromTimestamp(
+                    eventType = "Announcement",
+                    timestamp = item.pumpTime,
+                    seqId = item.seqId,
+                    reason = reason,
+                    notes = "Pump alert cleared, ID: ${parsed.alertId}"
+                )
+            }
+            else -> {
+                Timber.w("Unexpected alarm type: ${parsed.javaClass.simpleName}")
+                null
+            }
         }
     }
 }

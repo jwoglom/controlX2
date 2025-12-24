@@ -67,8 +67,7 @@ class ProcessBolus(
             return null
         }
 
-        // Extract bolus data using reflection since we don't have direct access to pumpx2 internals
-        // The bolus object should have these fields based on the pump protocol
+        // Extract bolus data
         val bolusData = extractBolusData(parsed)
 
         return NightscoutTreatment.fromTimestamp(
@@ -76,67 +75,54 @@ class ProcessBolus(
             timestamp = item.pumpTime,
             seqId = item.seqId,
             insulin = bolusData.insulin,
-            carbs = bolusData.carbs,
+            carbs = null, // Carbs are not stored in BolusDeliveryHistoryLog
             notes = bolusData.notes
         )
     }
 
     private data class BolusData(
         val insulin: Double?,
-        val carbs: Double?,
         val notes: String?
     )
 
     private fun extractBolusData(bolus: BolusDeliveryHistoryLog): BolusData {
         try {
-            // Try to access common bolus fields using reflection
-            val bolusClass = bolus.javaClass
+            // Get insulin delivered (in milliunits, convert to units)
+            val insulin = bolus.deliveredTotal / 1000.0
 
-            // Try to get insulin delivered (common field names)
-            val insulin = tryGetField<Int>(bolusClass, bolus, "insulinDelivered")
-                ?.let { it / 1000.0 } // Convert from milli-units to units
-                ?: tryGetField<Int>(bolusClass, bolus, "totalVolumeDelivered")
-                    ?.let { it / 1000.0 }
-                ?: tryGetField<Double>(bolusClass, bolus, "insulinAmount")
+            // Build notes with bolus details
+            val bolusTypes = bolus.bolusTypes
+            val bolusSource = bolus.bolusSource
 
-            // Try to get carbs (common field names)
-            val carbs = tryGetField<Int>(bolusClass, bolus, "carbSize")?.toDouble()
-                ?: tryGetField<Int>(bolusClass, bolus, "carbs")?.toDouble()
-                ?: tryGetField<Double>(bolusClass, bolus, "carbAmount")
-
-            // Build notes with available info
             val notes = buildString {
                 append("Bolus delivery")
-                tryGetField<Long>(bolusClass, bolus, "bolusRequestId")?.let {
-                    append(", ID: $it")
+
+                if (bolusTypes.isNotEmpty()) {
+                    append(", types: ${bolusTypes.joinToString(", ") { it.name }}")
                 }
-                tryGetField<Int>(bolusClass, bolus, "bolusTypeBitmask")?.let {
-                    append(", type: $it")
+
+                bolusSource?.let {
+                    append(", source: ${it.name}")
+                }
+
+                append(", ID: ${bolus.bolusID}")
+
+                if (bolus.requestedNow > 0) {
+                    append(", requested: ${bolus.requestedNow / 1000.0}U")
+                }
+
+                if (bolus.correction > 0) {
+                    append(", correction: ${bolus.correction / 1000.0}U")
                 }
             }
 
             return BolusData(
                 insulin = insulin,
-                carbs = carbs,
-                notes = notes.takeIf { it.length > "Bolus delivery".length }
+                notes = notes
             )
         } catch (e: Exception) {
             Timber.e(e, "Error extracting bolus data, using defaults")
-            return BolusData(null, null, "Bolus delivery (details unavailable)")
-        }
-    }
-
-    private inline fun <reified T> tryGetField(clazz: Class<*>, obj: Any, fieldName: String): T? {
-        return try {
-            val field = clazz.getDeclaredField(fieldName)
-            field.isAccessible = true
-            val value = field.get(obj)
-            if (value is T) value else null
-        } catch (e: NoSuchFieldException) {
-            null
-        } catch (e: Exception) {
-            Timber.w(e, "Failed to access field: $fieldName")
-            null
+            return BolusData(null, "Bolus delivery (details unavailable)")
         }
     }
 }
