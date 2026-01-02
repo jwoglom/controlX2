@@ -2,30 +2,25 @@
 
 package com.jwoglom.controlx2.presentation.screens
 
-import android.app.AlertDialog
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.selection.toggleable
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Checkbox
 import androidx.compose.material3.Button
 import androidx.compose.material3.Divider
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -38,11 +33,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.semantics.Role
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.input.KeyboardType
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavHostController
@@ -75,11 +66,11 @@ fun AppSetup(
     var checkForUpdates by remember { mutableStateOf(Prefs(context).checkForUpdates()) }
     var autoFetchHistoryLogs by remember { mutableStateOf(Prefs(context).autoFetchHistoryLogs()) }
     var glucoseUnit by remember { mutableStateOf(Prefs(context).glucoseUnit()) }
-    var showGlucoseUnitDialog by remember { mutableStateOf(false) }
 
-    val setupComplete by remember { mutableStateOf(true) }
-    
-    val checkboxPadding = 8.dp
+    var showGlucoseUnitDialog by remember { mutableStateOf(false) }
+    var showInsulinWarningDialog by remember { mutableStateOf(false) }
+    var showBolusThresholdDialog by remember { mutableStateOf(false) }
+    var showUpdatesWarningDialog by remember { mutableStateOf(false) }
 
     DialogScreen(
         "App Setup",
@@ -94,27 +85,22 @@ fun AppSetup(
             ) {
                 Text("Back")
             }
-            when {
-                setupComplete -> {
-                    Button(
-                        onClick = {
-                            Prefs(context).setAppSetupComplete(true)
-                            coroutineScope.launch {
-                                withContext(Dispatchers.IO) {
-                                    Thread.sleep(250)
-                                }
-                                sendMessage(
-                                    "/to-phone/app-reload",
-                                    "".toByteArray()
-                                )
-                            }
-                            navController?.navigate(Screen.Landing.route)
+            Button(
+                onClick = {
+                    Prefs(context).setAppSetupComplete(true)
+                    coroutineScope.launch {
+                        withContext(Dispatchers.IO) {
+                            Thread.sleep(250)
                         }
-                    ) {
-                        Text("Continue")
+                        sendMessage(
+                            "/to-phone/app-reload",
+                            "".toByteArray()
+                        )
                     }
+                    navController?.navigate(Screen.Landing.route)
                 }
-                else -> {}
+            ) {
+                Text("Continue")
             }
         }
     ) {
@@ -122,15 +108,19 @@ fun AppSetup(
             ServiceDisabledMessage(sendMessage = sendMessage)
         }
         item {
-            Row(
-                Modifier
-                    .fillMaxWidth()
-                    .height(56.dp)
-                    .toggleable(
-                        value = connectionSharingEnabled,
-                        onValueChange = {
-                            connectionSharingEnabled = !connectionSharingEnabled
-                            Prefs(context).setConnectionSharingEnabled(connectionSharingEnabled)
+            ListItem(
+                headlineContent = {
+                    Text("Connection Sharing")
+                },
+                supportingContent = {
+                    Text("Enable t:connect app connection sharing. Enables workarounds to run ControlX2 and the t:connect app at the same time.")
+                },
+                trailingContent = {
+                    Switch(
+                        checked = connectionSharingEnabled,
+                        onCheckedChange = {
+                            connectionSharingEnabled = it
+                            Prefs(context).setConnectionSharingEnabled(it)
                             coroutineScope.launch {
                                 withContext(Dispatchers.IO) {
                                     Thread.sleep(250)
@@ -140,35 +130,42 @@ fun AppSetup(
                                     "".toByteArray()
                                 )
                             }
-                        },
-                        role = Role.Checkbox
+                        }
                     )
-                    .padding(horizontal = checkboxPadding),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Checkbox(
-                    checked = connectionSharingEnabled,
-                    onCheckedChange = null // null recommended for accessibility with screenreaders
-                )
-                Line(
-                    "Enable t:connect app connection sharing",
-                    bold = true,
-                    modifier = Modifier.padding(start = checkboxPadding))
-            }
-            Line("Enables workarounds to run ControlX2 and the t:connect app at the same time.")
+                },
+                modifier = Modifier.clickable {
+                    connectionSharingEnabled = !connectionSharingEnabled
+                    Prefs(context).setConnectionSharingEnabled(connectionSharingEnabled)
+                    coroutineScope.launch {
+                        withContext(Dispatchers.IO) {
+                            Thread.sleep(250)
+                        }
+                        sendMessage(
+                            "/to-phone/app-reload",
+                            "".toByteArray()
+                        )
+                    }
+                }
+            )
             Divider()
         }
         item {
-            Row(
-                Modifier
-                    .fillMaxWidth()
-                    .height(56.dp)
-                    .toggleable(
-                        value = insulinDeliveryActions,
-                        onValueChange = {
-                            fun update() {
-                                insulinDeliveryActions = !insulinDeliveryActions
-                                Prefs(context).setInsulinDeliveryActions(insulinDeliveryActions)
+            ListItem(
+                headlineContent = {
+                    Text("Insulin Delivery Actions")
+                },
+                supportingContent = {
+                    Text("Allow remote boluses from your phone or watch.")
+                },
+                trailingContent = {
+                    Switch(
+                        checked = insulinDeliveryActions,
+                        onCheckedChange = {
+                            if (!insulinDeliveryActions) {
+                                showInsulinWarningDialog = true
+                            } else {
+                                insulinDeliveryActions = false
+                                Prefs(context).setInsulinDeliveryActions(false)
                                 coroutineScope.launch {
                                     withContext(Dispatchers.IO) {
                                         Thread.sleep(250)
@@ -179,194 +176,130 @@ fun AppSetup(
                                     )
                                 }
                             }
-                            if (!insulinDeliveryActions) {
-                                AlertDialog.Builder(context)
-                                    .setMessage("WARNING: THIS SOFTWARE IS UNOFFICIAL AND EXPERIMENTAL. ENABLING INSULIN DELIVERY ACTIONS WILL ALLOW YOUR PHONE OR WATCH TO REMOTELY SEND BOLUSES TO YOUR PUMP. BE AWARE OF THE SECURITY AND SAFETY IMPLICATIONS OF ENABLING THIS SETTING. FOR SAFETY, VERIFY BOLUS OPERATIONS ON YOUR PUMP. THE PUMP WILL BEEP WHEN A BOLUS COMMAND IS SENT.")
-                                    .setNegativeButton("Cancel") { dialog, _ -> dialog.dismiss() }
-                                    .setPositiveButton("Enable") { dialog, _ ->
-                                        dialog.dismiss()
-                                        update()
-                                    }
-                                    .show()
-                            } else {
-                                update()
-                            }
-                        },
-                        role = Role.Checkbox
+                        }
                     )
-                    .padding(horizontal = checkboxPadding),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Checkbox(
-                    checked = insulinDeliveryActions,
-                    onCheckedChange = null // null recommended for accessibility with screenreaders
-                )
-                Line(
-                    "Enable insulin delivery actions",
-                    bold = true,
-                    modifier = Modifier.padding(start = checkboxPadding))
-            }
-            Line("Enabling insulin delivery actions allows you to perform remote boluses from your phone or watch.")
-            Spacer(Modifier.height(checkboxPadding))
+                },
+                modifier = Modifier.clickable {
+                    if (!insulinDeliveryActions) {
+                        showInsulinWarningDialog = true
+                    } else {
+                        insulinDeliveryActions = false
+                        Prefs(context).setInsulinDeliveryActions(false)
+                        coroutineScope.launch {
+                            withContext(Dispatchers.IO) {
+                                Thread.sleep(250)
+                            }
+                            sendMessage(
+                                "/to-phone/app-reload",
+                                "".toByteArray()
+                            )
+                        }
+                    }
+                }
+            )
             Divider()
         }
         item {
             if (insulinDeliveryActions || preview) {
-                Row(
-                    Modifier
-                        .fillMaxWidth()
-                        .height(42.dp),
-                    verticalAlignment = Alignment.Top,
-                    horizontalArrangement = Arrangement.Center,
-                ) {
-                    Text(
-                        text = "Require bolus confirmation:",
-                        style = MaterialTheme.typography.bodyLarge,
-                        fontWeight = FontWeight.Bold,
-                        modifier = Modifier.padding(top = 4.dp)
-                    )
-
-                    BasicTextField(
-                        value = bolusConfirmationInsulinThreshold.let { if (it == 0.0) "" else "$it" },
-                        onValueChange = { itStr ->
-                            itStr.toDoubleOrNull()?.let {
-                                bolusConfirmationInsulinThreshold = it
-                                Prefs(context).setBolusConfirmationInsulinThreshold(it)
+                ListItem(
+                    headlineContent = {
+                        Text("Bolus Confirmation Threshold")
+                    },
+                    supportingContent = {
+                        Text(
+                            bolusConfirmationInsulinThreshold.let {
+                                if (it == 0.0) "Require confirmation for all boluses"
+                                else "Require confirmation for boluses above ${twoDecimalPlaces(it)}u"
                             }
-                        },
-                        keyboardOptions = KeyboardOptions(
-                            autoCorrect = false,
-                            capitalization = KeyboardCapitalization.None,
-                            keyboardType = KeyboardType.Number,
-                        ),
-                        decorationBox = {
-                            Row(
-                                horizontalArrangement = Arrangement.Center,
-                                modifier = Modifier
-                                    .fillMaxSize()
-                            ) {
-                                Text(
-                                    text = bolusConfirmationInsulinThreshold.let { if (it == 0.0) "always" else "above ${twoDecimalPlaces(it)} u"},
-                                    style = MaterialTheme.typography.bodyLarge,
-                                    textAlign = TextAlign.Center,
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .border(
-                                            1.dp,
-                                            Color.DarkGray,
-                                            RoundedCornerShape(4.dp)
-                                        )
-                                        .padding(4.dp)
-                                )
-                            }
-                        },
-                        textStyle = MaterialTheme.typography.bodySmall,
-                        modifier = Modifier.fillMaxWidth().padding(start = checkboxPadding),
-                    )
-                }
-                Spacer(Modifier.height(8.dp))
+                        )
+                    },
+                    trailingContent = {
+                        Text(
+                            text = bolusConfirmationInsulinThreshold.let { if (it == 0.0) "always" else "${twoDecimalPlaces(it)}u" },
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    },
+                    modifier = Modifier.clickable {
+                        showBolusThresholdDialog = true
+                    }
+                )
                 Divider()
             }
         }
         item {
-            Row(
-                Modifier
-                    .fillMaxWidth()
-                    .height(56.dp)
-                    .toggleable(
-                        value = checkForUpdates,
-                        onValueChange = {
-                            fun update() {
-                                checkForUpdates = !checkForUpdates
-                                Prefs(context).setCheckForUpdates(checkForUpdates)
-                            }
+            ListItem(
+                headlineContent = {
+                    Text("Check for Updates")
+                },
+                supportingContent = {
+                    Text("Automatically check for ControlX2 updates")
+                },
+                trailingContent = {
+                    Switch(
+                        checked = checkForUpdates,
+                        onCheckedChange = {
                             if (checkForUpdates) {
-                                AlertDialog.Builder(context)
-                                    .setMessage("Please regularly check the ControlX2 GitHub page and subscribe to release notifications to ensure you stay up to date. Warning: by disabling this option, you will not be alerted to any new feature, security, or safety updates.")
-                                    .setNegativeButton("Cancel") { dialog, _ -> dialog.dismiss() }
-                                    .setPositiveButton("Disable") { dialog, _ ->
-                                        dialog.dismiss()
-                                        update()
-                                    }
-                                    .show()
+                                showUpdatesWarningDialog = true
                             } else {
-                                update()
+                                checkForUpdates = true
+                                Prefs(context).setCheckForUpdates(true)
                             }
-                        },
-                        role = Role.Checkbox
+                        }
                     )
-                    .padding(horizontal = checkboxPadding),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Checkbox(
-                    checked = checkForUpdates,
-                    onCheckedChange = null // null recommended for accessibility with screenreaders
-                )
-                Line(
-                    "Automatically check for ControlX2 updates",
-                    bold = true,
-                    modifier = Modifier.padding(start = checkboxPadding))
-            }
-            Spacer(Modifier.height(checkboxPadding))
-            Divider()
-        }
-        item {
-            Row(
-                Modifier
-                    .fillMaxWidth()
-                    .height(56.dp)
-                    .toggleable(
-                        value = autoFetchHistoryLogs,
-                        onValueChange = {
-                            fun update() {
-                                autoFetchHistoryLogs = !autoFetchHistoryLogs
-                                Prefs(context).setAutoFetchHistoryLogs(autoFetchHistoryLogs)
-                            }
-                            update()
-                        },
-                        role = Role.Checkbox
-                    )
-                    .padding(horizontal = checkboxPadding),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Checkbox(
-                    checked = autoFetchHistoryLogs,
-                    onCheckedChange = null // null recommended for accessibility with screenreaders
-                )
-                Line(
-                    "Automatically fetch history logs",
-                    bold = true,
-                    modifier = Modifier.padding(start = checkboxPadding))
-            }
-            Line("Fetching history logs allows for rendering a CGM graph on the dashboard screen.")
-            Spacer(Modifier.height(checkboxPadding))
-            Divider()
-        }
-        item {
-            Row(
-                Modifier
-                    .fillMaxWidth()
-                    .height(56.dp)
-                    .clickable {
-                        showGlucoseUnitDialog = true
+                },
+                modifier = Modifier.clickable {
+                    if (checkForUpdates) {
+                        showUpdatesWarningDialog = true
+                    } else {
+                        checkForUpdates = true
+                        Prefs(context).setCheckForUpdates(true)
                     }
-                    .padding(horizontal = checkboxPadding),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    text = "Glucose Unit",
-                    fontWeight = FontWeight.Bold,
-                    modifier = Modifier.padding(start = checkboxPadding)
-                )
-                Spacer(Modifier.weight(1f))
-                Text(
-                    text = glucoseUnit?.abbreviation ?: "Not Set",
-                    modifier = Modifier.padding(end = checkboxPadding),
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-            Line("Choose between mg/dL or mmol/L for glucose values")
-            Spacer(Modifier.height(checkboxPadding))
+                }
+            )
+            Divider()
+        }
+        item {
+            ListItem(
+                headlineContent = {
+                    Text("Auto Fetch History Logs")
+                },
+                supportingContent = {
+                    Text("Fetching history logs allows for rendering a CGM graph on the dashboard screen.")
+                },
+                trailingContent = {
+                    Switch(
+                        checked = autoFetchHistoryLogs,
+                        onCheckedChange = {
+                            autoFetchHistoryLogs = it
+                            Prefs(context).setAutoFetchHistoryLogs(it)
+                        }
+                    )
+                },
+                modifier = Modifier.clickable {
+                    autoFetchHistoryLogs = !autoFetchHistoryLogs
+                    Prefs(context).setAutoFetchHistoryLogs(autoFetchHistoryLogs)
+                }
+            )
+            Divider()
+        }
+        item {
+            ListItem(
+                headlineContent = {
+                    Text("Glucose Unit")
+                },
+                supportingContent = {
+                    Text("Choose between mg/dL or mmol/L for glucose values")
+                },
+                trailingContent = {
+                    Text(
+                        text = glucoseUnit?.abbreviation ?: "Not Set",
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                },
+                modifier = Modifier.clickable {
+                    showGlucoseUnitDialog = true
+                }
+            )
             Divider()
         }
     }
@@ -409,6 +342,96 @@ fun AppSetup(
             },
             confirmButton = {
                 TextButton(onClick = { showGlucoseUnitDialog = false }) {
+                    Text("Cancel")
+                }
+            }
+        )
+    }
+
+    // Insulin Delivery Warning Dialog
+    if (showInsulinWarningDialog) {
+        AlertDialog(
+            onDismissRequest = { showInsulinWarningDialog = false },
+            title = { Text("Warning") },
+            text = {
+                Text("WARNING: THIS SOFTWARE IS UNOFFICIAL AND EXPERIMENTAL. ENABLING INSULIN DELIVERY ACTIONS WILL ALLOW YOUR PHONE OR WATCH TO REMOTELY SEND BOLUSES TO YOUR PUMP. BE AWARE OF THE SECURITY AND SAFETY IMPLICATIONS OF ENABLING THIS SETTING. FOR SAFETY, VERIFY BOLUS OPERATIONS ON YOUR PUMP. THE PUMP WILL BEEP WHEN A BOLUS COMMAND IS SENT.")
+            },
+            confirmButton = {
+                Button(onClick = {
+                    insulinDeliveryActions = true
+                    Prefs(context).setInsulinDeliveryActions(true)
+                    showInsulinWarningDialog = false
+                    coroutineScope.launch {
+                        withContext(Dispatchers.IO) {
+                            Thread.sleep(250)
+                        }
+                        sendMessage("/to-phone/app-reload", "".toByteArray())
+                    }
+                }) {
+                    Text("Enable")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showInsulinWarningDialog = false }) {
+                    Text("Cancel")
+                }
+            }
+        )
+    }
+
+    // Updates Warning Dialog
+    if (showUpdatesWarningDialog) {
+        AlertDialog(
+            onDismissRequest = { showUpdatesWarningDialog = false },
+            title = { Text("Disable Update Checks") },
+            text = {
+                Text("Please regularly check the ControlX2 GitHub page and subscribe to release notifications to ensure you stay up to date. Warning: by disabling this option, you will not be alerted to any new feature, security, or safety updates.")
+            },
+            confirmButton = {
+                Button(onClick = {
+                    checkForUpdates = false
+                    Prefs(context).setCheckForUpdates(false)
+                    showUpdatesWarningDialog = false
+                }) {
+                    Text("Disable")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showUpdatesWarningDialog = false }) {
+                    Text("Cancel")
+                }
+            }
+        )
+    }
+
+    // Bolus Threshold Dialog
+    if (showBolusThresholdDialog) {
+        var thresholdInput by remember { mutableStateOf(bolusConfirmationInsulinThreshold.let { if (it == 0.0) "" else "$it" }) }
+        AlertDialog(
+            onDismissRequest = { showBolusThresholdDialog = false },
+            title = { Text("Bolus Confirmation Threshold") },
+            text = {
+                OutlinedTextField(
+                    value = thresholdInput,
+                    onValueChange = { thresholdInput = it },
+                    label = { Text("Threshold (units)") },
+                    supportingText = { Text("Enter 0 to always require confirmation") },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                    modifier = Modifier.fillMaxWidth()
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    val newValue = thresholdInput.toDoubleOrNull() ?: 0.0
+                    bolusConfirmationInsulinThreshold = newValue
+                    Prefs(context).setBolusConfirmationInsulinThreshold(newValue)
+                    showBolusThresholdDialog = false
+                }) {
+                    Text("Save")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showBolusThresholdDialog = false }) {
                     Text("Cancel")
                 }
             }
