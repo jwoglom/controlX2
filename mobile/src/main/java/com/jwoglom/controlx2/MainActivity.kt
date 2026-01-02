@@ -922,10 +922,16 @@ class MainActivity : ComponentActivity() {
     private fun getRequiredPermissions(): Array<String> {
         val targetSdkVersion = applicationInfo.targetSdkVersion
         return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && targetSdkVersion >= Build.VERSION_CODES.S) {
-            arrayOf(Manifest.permission.BLUETOOTH_SCAN, Manifest.permission.BLUETOOTH_CONNECT)
-        } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q && targetSdkVersion >= Build.VERSION_CODES.Q) {
-            arrayOf(Manifest.permission.ACCESS_FINE_LOCATION)
-        } else arrayOf(Manifest.permission.ACCESS_COARSE_LOCATION)
+            // Android 12+ (API 31+) - Need Bluetooth AND Location permissions
+            arrayOf(
+                Manifest.permission.BLUETOOTH_SCAN,
+                Manifest.permission.BLUETOOTH_CONNECT,
+                Manifest.permission.ACCESS_COARSE_LOCATION
+            )
+        } else {
+            // Android 11 (API 30) - minSdk is 30, so this handles the edge case
+            arrayOf(Manifest.permission.ACCESS_COARSE_LOCATION)
+        }
     }
 
     private fun permissionsGranted() {
@@ -1002,8 +1008,8 @@ class MainActivity : ComponentActivity() {
             permissionsGranted()
         } else {
             AlertDialog.Builder(this)
-                .setTitle("Permission is required for scanning Bluetooth peripherals")
-                .setMessage("Please grant permissions")
+                .setTitle("Permissions required for Bluetooth scanning")
+                .setMessage("This app requires Nearby Devices and Location permissions to scan for Bluetooth devices. Please grant all requested permissions.")
                 .setPositiveButton(
                     "Retry"
                 ) { dialogInterface, i ->
