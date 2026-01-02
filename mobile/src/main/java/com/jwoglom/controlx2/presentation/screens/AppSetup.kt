@@ -4,24 +4,30 @@ package com.jwoglom.controlx2.presentation.screens
 
 import android.app.AlertDialog
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.Button
 import androidx.compose.material3.Divider
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -47,6 +53,7 @@ import com.jwoglom.controlx2.presentation.components.Line
 import com.jwoglom.controlx2.presentation.components.ServiceDisabledMessage
 import com.jwoglom.controlx2.presentation.navigation.Screen
 import com.jwoglom.controlx2.presentation.theme.ControlX2Theme
+import com.jwoglom.controlx2.shared.enums.GlucoseUnit
 import com.jwoglom.controlx2.shared.util.twoDecimalPlaces
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -67,6 +74,8 @@ fun AppSetup(
     var bolusConfirmationInsulinThreshold by remember { mutableStateOf(Prefs(context).bolusConfirmationInsulinThreshold()) }
     var checkForUpdates by remember { mutableStateOf(Prefs(context).checkForUpdates()) }
     var autoFetchHistoryLogs by remember { mutableStateOf(Prefs(context).autoFetchHistoryLogs()) }
+    var glucoseUnit by remember { mutableStateOf(Prefs(context).glucoseUnit()) }
+    var showGlucoseUnitDialog by remember { mutableStateOf(false) }
 
     val setupComplete by remember { mutableStateOf(true) }
     
@@ -333,6 +342,77 @@ fun AppSetup(
             Spacer(Modifier.height(checkboxPadding))
             Divider()
         }
+        item {
+            Row(
+                Modifier
+                    .fillMaxWidth()
+                    .height(56.dp)
+                    .clickable {
+                        showGlucoseUnitDialog = true
+                    }
+                    .padding(horizontal = checkboxPadding),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "Glucose Unit",
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.padding(start = checkboxPadding)
+                )
+                Spacer(Modifier.weight(1f))
+                Text(
+                    text = glucoseUnit?.abbreviation ?: "Not Set",
+                    modifier = Modifier.padding(end = checkboxPadding),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            Line("Choose between mg/dL or mmol/L for glucose values")
+            Spacer(Modifier.height(checkboxPadding))
+            Divider()
+        }
+    }
+
+    // Glucose Unit Selection Dialog
+    if (showGlucoseUnitDialog) {
+        AlertDialog(
+            onDismissRequest = { showGlucoseUnitDialog = false },
+            title = { Text("Select Glucose Unit") },
+            text = {
+                Column {
+                    GlucoseUnit.values().forEach { unit ->
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable {
+                                    glucoseUnit = unit
+                                    Prefs(context).setGlucoseUnit(unit)
+                                    showGlucoseUnitDialog = false
+                                    // Trigger app reload
+                                    coroutineScope.launch {
+                                        withContext(Dispatchers.IO) {
+                                            Thread.sleep(250)
+                                        }
+                                        sendMessage("/to-phone/app-reload", "".toByteArray())
+                                    }
+                                }
+                                .padding(vertical = 12.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            RadioButton(
+                                selected = glucoseUnit == unit,
+                                onClick = null
+                            )
+                            Spacer(Modifier.width(8.dp))
+                            Text(text = unit.displayName)
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { showGlucoseUnitDialog = false }) {
+                    Text("Cancel")
+                }
+            }
+        )
     }
 }
 

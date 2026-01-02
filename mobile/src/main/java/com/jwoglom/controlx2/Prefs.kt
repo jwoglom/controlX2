@@ -3,6 +3,7 @@ package com.jwoglom.controlx2
 import android.content.Context
 import android.content.SharedPreferences
 import com.google.android.gms.wearable.WearableListenerService
+import com.jwoglom.controlx2.shared.enums.GlucoseUnit
 import com.jwoglom.pumpx2.pump.messages.models.InsulinUnit
 
 class Prefs(val context: Context) {
@@ -141,6 +142,18 @@ class Prefs(val context: Context) {
 
     fun setAutoFetchHistoryLogs(b: Boolean) {
         prefs().edit().putBoolean("auto-fetch-history-logs", b).commit()
+    }
+
+    /**
+     * User's preferred glucose unit (mg/dL or mmol/L)
+     */
+    fun glucoseUnit(): GlucoseUnit? {
+        val unitStr = prefs().getString("glucose-unit", null)
+        return GlucoseUnit.fromName(unitStr)
+    }
+
+    fun setGlucoseUnit(unit: GlucoseUnit?) {
+        prefs().edit().putString("glucose-unit", unit?.name).commit()
     }
 
     /**
