@@ -80,6 +80,7 @@ import com.jwoglom.controlx2.dataStore
 import com.jwoglom.controlx2.presentation.DataStore
 import com.jwoglom.controlx2.presentation.components.LineTextDescription
 import com.jwoglom.controlx2.presentation.defaultTheme
+import com.jwoglom.controlx2.shared.enums.GlucoseUnit
 import com.jwoglom.controlx2.shared.presentation.LifecycleStateObserver
 import com.jwoglom.controlx2.shared.util.SendType
 import com.jwoglom.controlx2.shared.util.firstLetterCapitalized
@@ -131,6 +132,8 @@ fun BolusScreen(
     var refreshing by remember { mutableStateOf(true) }
 
     val dataStore = LocalDataStore.current
+    val glucoseUnit by dataStore.glucoseUnitPreference.observeAsState(GlucoseUnit.MGDL)
+    val unitAbbrev = glucoseUnit.abbreviation
 
     fun buildBolusCalculator(
         dataSnapshot: BolusCalcDataSnapshotResponse?,
@@ -338,9 +341,9 @@ fun BolusScreen(
                 else -> "?"
             }
             dataStore.bolusBGDisplayedSubtitle.value = when {
-                bolusBgMgdlUserInput != null -> "Entered (mg/dL)"
-                autofilledBg != null -> "CGM (mg/dL)"
-                else -> "BG (mg/dL)"
+                bolusBgMgdlUserInput != null -> "Entered ($unitAbbrev)"
+                autofilledBg != null -> "CGM ($unitAbbrev)"
+                else -> "BG ($unitAbbrev)"
             }
         }
 
@@ -507,7 +510,7 @@ fun BolusScreen(
                             ) {
                                 Text(
                                     text = when (bolusBGDisplayedSubtitle.value) {
-                                        null -> "BG (mg/dL)"
+                                        null -> "BG ($unitAbbrev)"
                                         else -> "${bolusBGDisplayedSubtitle.value}"
                                     },
                                     maxLines = 1,

@@ -133,6 +133,7 @@ import com.jwoglom.controlx2.db.historylog.HistoryLogViewModel
 import com.jwoglom.controlx2.presentation.components.HeaderLine
 import com.jwoglom.controlx2.presentation.components.HistoryLogSyncProgressBar
 import com.jwoglom.controlx2.presentation.theme.ControlX2Theme
+import com.jwoglom.controlx2.shared.enums.GlucoseUnit
 import com.jwoglom.controlx2.shared.util.SendType
 import com.jwoglom.controlx2.shared.util.shortTimeAgo
 import com.jwoglom.pumpx2.pump.PumpState
@@ -1363,7 +1364,8 @@ fun triggerRemoteBgEntryRequestMessage(
     val layout = LinearLayout(context)
     layout.orientation = LinearLayout.VERTICAL
     val bgInput = EditText(context)
-    bgInput.hint = "BG (mg/dL)"
+    val glucoseUnit = dataStore.glucoseUnitPreference.value ?: GlucoseUnit.MGDL
+    bgInput.hint = "BG (${glucoseUnit.abbreviation})"
     bgInput.inputType = InputType.TYPE_CLASS_NUMBER
     val calibrationInput = EditText(context)
     calibrationInput.hint = "Use for CGM calibration? (true/false/1/0)"

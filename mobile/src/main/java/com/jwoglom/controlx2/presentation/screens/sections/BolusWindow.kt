@@ -82,6 +82,7 @@ import com.jwoglom.controlx2.presentation.screens.BolusPreview
 import com.jwoglom.controlx2.presentation.screens.sections.components.DecimalOutlinedText
 import com.jwoglom.controlx2.presentation.screens.sections.components.IntegerOutlinedText
 import com.jwoglom.controlx2.presentation.util.LifecycleStateObserver
+import com.jwoglom.controlx2.shared.enums.GlucoseUnit
 import com.jwoglom.controlx2.shared.util.SendType
 import com.jwoglom.controlx2.shared.util.snakeCaseToSpace
 import com.jwoglom.controlx2.shared.util.twoDecimalPlaces
@@ -108,13 +109,16 @@ fun BolusWindow(
     val refreshScope = rememberCoroutineScope()
     var refreshing by remember { mutableStateOf(true) }
 
+    val glucoseUnit by dataStore.glucoseUnitPreference.observeAsState(GlucoseUnit.MGDL)
+    val unitAbbrev = glucoseUnit.abbreviation
+
     val unitsRawValue = dataStore.bolusUnitsRawValue.observeAsState()
     val carbsRawValue = dataStore.bolusCarbsRawValue.observeAsState()
     val glucoseRawValue = dataStore.bolusGlucoseRawValue.observeAsState()
 
     var unitsSubtitle by remember { mutableStateOf<String>("Units") }
     var carbsSubtitle by remember { mutableStateOf<String>("Carbs (g)") }
-    var glucoseSubtitle by remember { mutableStateOf<String>("BG (mg/dL)") }
+    var glucoseSubtitle by remember { mutableStateOf<String>("BG ($unitAbbrev)") }
 
     var unitsHumanEntered by remember { mutableStateOf<Double?>(null) }
     var unitsHumanFocus by remember { mutableStateOf(false) }
@@ -289,9 +293,9 @@ fun BolusWindow(
             dataStore.bolusGlucoseRawValue.value = "$autofilledBg"
         }
         glucoseSubtitle = when {
-            glucoseHumanEntered != null -> "Entered (mg/dL)"
-            autofilledBg != null -> "CGM (mg/dL)"
-            else -> "BG (mg/dL)"
+            glucoseHumanEntered != null -> "Entered ($unitAbbrev)"
+            autofilledBg != null -> "CGM ($unitAbbrev)"
+            else -> "BG ($unitAbbrev)"
         }
     }
 

@@ -16,6 +16,7 @@ import androidx.compose.material3.TimePicker
 import androidx.compose.material3.rememberTimePickerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.livedata.observeAsState
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -26,7 +27,9 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.jwoglom.controlx2.LocalDataStore
 import com.jwoglom.controlx2.presentation.theme.ControlX2Theme
+import com.jwoglom.controlx2.shared.enums.GlucoseUnit
 import com.jwoglom.pumpx2.pump.messages.builders.IDPManager
 import com.jwoglom.pumpx2.pump.messages.models.InsulinUnit
 import com.jwoglom.pumpx2.pump.messages.models.MinsTime
@@ -42,6 +45,9 @@ fun EditSegmentDialog(
     onDismiss: () -> Unit,
     onConfirm: (MinsTime, Float, Long, Int, Int) -> Unit
 ) {
+    val dataStore = LocalDataStore.current
+    val glucoseUnit by dataStore.glucoseUnitPreference.observeAsState(GlucoseUnit.MGDL)
+
     val totalMinutes = segment.profileStartTime
     val initialHour = totalMinutes / 60
     val initialMinute = totalMinutes % 60
@@ -120,7 +126,12 @@ fun EditSegmentDialog(
                         value = isf,
                         onValueChange = { isf = it },
                         label = { Text("ISF (Insulin Sensitivity Factor)") },
-                        supportingText = { Text("Example: 50 = 1u:50 mg/dL") },
+                        supportingText = {
+                            Text(when (glucoseUnit) {
+                                GlucoseUnit.MGDL -> "Example: 50 = 1u:50 mg/dL"
+                                GlucoseUnit.MMOL -> "Example: 2.8 = 1u:2.8 mmol/L"
+                            })
+                        },
                         placeholder = { Text("e.g., 50") },
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                         modifier = Modifier.fillMaxWidth()

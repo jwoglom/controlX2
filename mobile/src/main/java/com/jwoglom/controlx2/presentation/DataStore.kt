@@ -21,6 +21,7 @@ import com.jwoglom.pumpx2.pump.messages.response.historyLog.HistoryLog
 import com.jwoglom.controlx2.presentation.screens.PumpSetupStage
 import com.jwoglom.controlx2.shared.enums.BasalStatus
 import com.jwoglom.controlx2.shared.enums.CGMSessionState
+import com.jwoglom.controlx2.shared.enums.GlucoseUnit
 import com.jwoglom.controlx2.shared.enums.UserMode
 import com.jwoglom.pumpx2.pump.messages.builders.IDPManager
 import com.jwoglom.pumpx2.pump.messages.models.NotificationBundle
@@ -127,6 +128,8 @@ class DataStore {
     val debugMessageCache = MutableLiveData<List<Pair<Message, Instant>>>()
     val debugPromptAwaitingResponses = MutableLiveData<MutableSet<String>>()
 
+    val glucoseUnitPreference = MutableLiveData<GlucoseUnit>()
+
     init {
         pumpConnected.observeForever { t -> Timber.i("DataStore.pumpConnected=$t") }
         pumpLastConnectionTimestamp.observeForever { t -> Timber.i("DataStore.pumpLastConnectionTimestamp=$t") }
@@ -217,6 +220,8 @@ class DataStore {
         historyLogCache.observeForever { t -> Timber.i("DataStore.historyLogCache=$t") }
         debugMessageCache.observeForever { t -> Timber.i("DataStore.debugMessageCache=$t") }
         debugPromptAwaitingResponses.observeForever { t -> Timber.i("DataStore.debugPromptAwaitingResponses=$t") }
+
+        glucoseUnitPreference.observeForever { t -> Timber.i("DataStore.glucoseUnitPreference=$t") }
     }
 
 

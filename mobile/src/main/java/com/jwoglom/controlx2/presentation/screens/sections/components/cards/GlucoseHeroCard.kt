@@ -16,17 +16,22 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.livedata.observeAsState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import com.jwoglom.controlx2.LocalDataStore
 import com.jwoglom.controlx2.presentation.theme.CardBackground
 import com.jwoglom.controlx2.presentation.theme.ControlX2Theme
 import com.jwoglom.controlx2.presentation.theme.Elevation
 import com.jwoglom.controlx2.presentation.theme.GlucoseColors
 import com.jwoglom.controlx2.presentation.theme.Spacing
+import com.jwoglom.controlx2.shared.enums.GlucoseUnit
+import com.jwoglom.controlx2.shared.util.GlucoseConverter
 
 @Composable
 fun GlucoseHeroCard(
@@ -34,6 +39,9 @@ fun GlucoseHeroCard(
     deltaArrow: String?,
     modifier: Modifier = Modifier
 ) {
+    val dataStore = LocalDataStore.current
+    val glucoseUnit by dataStore.glucoseUnitPreference.observeAsState(GlucoseUnit.MGDL)
+
     // 0 value == no CGM connected
     val noCgmConnected = (glucoseValue == 0)
 
@@ -65,11 +73,19 @@ fun GlucoseHeroCard(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.Center
             ) {
+                val displayValue = if (!noCgmConnected && glucoseValue != null) {
+                    when (glucoseUnit) {
+                        GlucoseUnit.MGDL -> glucoseValue.toString()
+                        GlucoseUnit.MMOL -> String.format("%.1f", glucoseValue * GlucoseConverter.MGDL_TO_MMOL_FACTOR)
+                    }
+                } else if (!noCgmConnected) {
+                    "--"
+                } else {
+                    "n/a"
+                }
+
                 Text(
-                    text = if (!noCgmConnected)
-                        glucoseValue?.toString() ?: "--"
-                    else
-                        "n/a",
+                    text = displayValue,
                     style = MaterialTheme.typography.displayLarge.copy(
                         fontWeight = FontWeight.Bold
                     ),
@@ -95,7 +111,7 @@ fun GlucoseHeroCard(
 
             // Unit label
             Text(
-                "mg/dL",
+                glucoseUnit.abbreviation,
                 style = MaterialTheme.typography.labelMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )

@@ -53,6 +53,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.jwoglom.controlx2.LocalDataStore
 import com.jwoglom.controlx2.db.historylog.HistoryLogViewModel
 import com.jwoglom.controlx2.presentation.theme.CardBackground
 import com.jwoglom.controlx2.presentation.theme.ControlX2Theme
@@ -65,6 +66,8 @@ import com.jwoglom.controlx2.presentation.theme.TargetRangeColor
 import com.jwoglom.controlx2.presentation.theme.InsulinColors
 import com.jwoglom.controlx2.presentation.theme.CarbColor
 import com.jwoglom.controlx2.presentation.theme.ModeColors
+import com.jwoglom.controlx2.shared.enums.GlucoseUnit
+import com.jwoglom.controlx2.shared.util.GlucoseConverter
 import com.jwoglom.pumpx2.pump.messages.helpers.Dates
 import com.jwoglom.pumpx2.pump.messages.models.InsulinUnit
 import com.jwoglom.pumpx2.pump.messages.response.currentStatus.LastBolusStatusAbstractResponse
@@ -579,6 +582,9 @@ fun VicoCgmChart(
     timeRange: TimeRange = TimeRange.SIX_HOURS,
     previewData: ChartPreviewData? = null
 ) {
+    val dataStore = LocalDataStore.current
+    val glucoseUnit by dataStore.glucoseUnitPreference.observeAsState(GlucoseUnit.MGDL)
+
     // Fetch all chart data
     val cgmDataPoints = previewData?.cgmDataPoints ?: rememberCgmChartData(historyLogViewModel, timeRange)
     val bolusEvents = previewData?.bolusEvents ?: rememberBolusData(historyLogViewModel, timeRange)
@@ -742,7 +748,7 @@ fun VicoCgmChart(
     val axisTimeFormatter = remember {
         SimpleDateFormat("h:mm a", Locale.getDefault())
     }
-    val markerValueFormatter = remember {
+    val markerValueFormatter = remember(glucoseUnit) {
         DefaultCartesianMarker.ValueFormatter { _, targets ->
             val lineTarget = targets.filterIsInstance<LineCartesianLayerMarkerTarget>().firstOrNull()
             val entry = lineTarget?.points?.firstOrNull()?.entry ?: return@ValueFormatter ""
@@ -753,7 +759,11 @@ fun VicoCgmChart(
             // entry.x is now a timestamp in seconds
             val timestamp = entry.x.toLong()
             val timeText = axisTimeFormatter.format(Date.from(Dates.fromJan12008EpochSecondsToDate(timestamp)))
-            val glucoseText = "${entry.y.roundToInt()} mg/dL"
+            val glucoseValue = entry.y.roundToInt()
+            val glucoseText = when (glucoseUnit) {
+                GlucoseUnit.MGDL -> "$glucoseValue mg/dL"
+                GlucoseUnit.MMOL -> "${String.format("%.1f", glucoseValue * GlucoseConverter.MGDL_TO_MMOL_FACTOR)} mmol/L"
+            }
             "$timeText\n$glucoseText"
         }
     }

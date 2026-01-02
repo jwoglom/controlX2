@@ -45,6 +45,7 @@ import com.jwoglom.controlx2.presentation.util.ShouldLogToFile
 import com.jwoglom.controlx2.shared.PumpMessageSerializer
 import com.jwoglom.controlx2.shared.enums.BasalStatus
 import com.jwoglom.controlx2.shared.enums.CGMSessionState
+import com.jwoglom.controlx2.shared.enums.GlucoseUnit
 import com.jwoglom.controlx2.shared.enums.UserMode
 import com.jwoglom.controlx2.shared.util.SendType
 import com.jwoglom.controlx2.shared.util.pumpTimeToLocalTz
@@ -157,6 +158,15 @@ class MainActivity : ComponentActivity() {
                 },
                 historyLogViewModel = historyLogViewModel
             )
+        }
+
+        // Load glucose unit preference into DataStore
+        val savedGlucoseUnit = Prefs(applicationContext).glucoseUnit()
+        if (savedGlucoseUnit != null) {
+            dataStore.glucoseUnitPreference.value = savedGlucoseUnit
+        } else {
+            // Default to mg/dL if not set
+            dataStore.glucoseUnitPreference.value = GlucoseUnit.MGDL
         }
 
         // Initialize MessageBus and register as listener

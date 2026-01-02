@@ -14,6 +14,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.livedata.observeAsState
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -22,13 +23,19 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import com.jwoglom.controlx2.LocalDataStore
 import com.jwoglom.controlx2.presentation.theme.ControlX2Theme
+import com.jwoglom.controlx2.shared.enums.GlucoseUnit
 
 @Composable
 fun AddProfileDialog(
     onDismiss: () -> Unit,
     onConfirm: (String, Int, Int, Int, Int, Int, Boolean) -> Unit
 ) {
+    val dataStore = LocalDataStore.current
+    val glucoseUnit by dataStore.glucoseUnitPreference.observeAsState(GlucoseUnit.MGDL)
+    val unitAbbrev = glucoseUnit.abbreviation
+
     var profileName by remember { mutableStateOf("") }
     var carbRatio by remember { mutableStateOf("10") }
     var basalRate by remember { mutableStateOf("1.0") }
@@ -88,7 +95,7 @@ fun AddProfileDialog(
                     OutlinedTextField(
                         value = targetBG,
                         onValueChange = { targetBG = it },
-                        label = { Text("Target BG (mg/dL)") },
+                        label = { Text("Target BG ($unitAbbrev)") },
                         supportingText = { Text("Example: 110") },
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                         modifier = Modifier.fillMaxWidth()
@@ -98,8 +105,13 @@ fun AddProfileDialog(
                     OutlinedTextField(
                         value = isf,
                         onValueChange = { isf = it },
-                        label = { Text("ISF (mg/dL per u)") },
-                        supportingText = { Text("Example: 50 = 1u:50 mg/dL") },
+                        label = { Text("ISF ($unitAbbrev per u)") },
+                        supportingText = {
+                            Text(when (glucoseUnit) {
+                                GlucoseUnit.MGDL -> "Example: 50 = 1u:50 mg/dL"
+                                GlucoseUnit.MMOL -> "Example: 2.8 = 1u:2.8 mmol/L"
+                            })
+                        },
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                         modifier = Modifier.fillMaxWidth()
                     )

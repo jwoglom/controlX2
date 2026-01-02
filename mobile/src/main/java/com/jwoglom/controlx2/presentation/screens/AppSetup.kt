@@ -318,6 +318,7 @@ fun AppSetup(
                                 .clickable {
                                     glucoseUnit = unit
                                     Prefs(context).setGlucoseUnit(unit)
+                                    ds.glucoseUnitPreference.value = unit
                                     showGlucoseUnitDialog = false
                                     // Trigger app reload
                                     coroutineScope.launch {
