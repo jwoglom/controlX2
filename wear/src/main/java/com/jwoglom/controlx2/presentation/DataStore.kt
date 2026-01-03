@@ -2,6 +2,7 @@ package com.jwoglom.controlx2.presentation
 
 import androidx.lifecycle.MutableLiveData
 import com.jwoglom.controlx2.shared.enums.BasalStatus
+import com.jwoglom.controlx2.shared.enums.GlucoseUnit
 import com.jwoglom.controlx2.shared.enums.UserMode
 import com.jwoglom.pumpx2.pump.messages.builders.IDPManager
 import com.jwoglom.pumpx2.pump.messages.calculator.BolusCalcCondition
@@ -22,6 +23,7 @@ import timber.log.Timber
 class DataStore {
     val connectionStatus = MutableLiveData<String>()
 
+    val glucoseUnitPreference = MutableLiveData<GlucoseUnit>()
     val batteryPercent = MutableLiveData<Int>()
     val iobUnits = MutableLiveData<Double>()
     val cartridgeRemainingUnits = MutableLiveData<Int>()

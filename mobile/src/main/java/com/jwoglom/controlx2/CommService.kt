@@ -27,22 +27,22 @@ import com.jwoglom.controlx2.db.historylog.HistoryLogDatabase
 import com.jwoglom.controlx2.db.historylog.HistoryLogRepo
 import com.jwoglom.controlx2.messaging.MessageBusFactory
 import com.jwoglom.controlx2.presentation.util.ShouldLogToFile
-import com.jwoglom.controlx2.shared.messaging.MessageBus
-import com.jwoglom.controlx2.shared.messaging.MessageBusSender
-import com.jwoglom.controlx2.shared.messaging.MessageListener
 import com.jwoglom.controlx2.shared.CommServiceCodes
 import com.jwoglom.controlx2.shared.InitiateConfirmedBolusSerializer
 import com.jwoglom.controlx2.shared.PumpMessageSerializer
 import com.jwoglom.controlx2.shared.PumpQualifyingEventsSerializer
+import com.jwoglom.controlx2.shared.messaging.MessageBus
+import com.jwoglom.controlx2.shared.messaging.MessageBusSender
+import com.jwoglom.controlx2.shared.messaging.MessageListener
 import com.jwoglom.controlx2.shared.util.setupTimber
 import com.jwoglom.controlx2.shared.util.shortTime
 import com.jwoglom.controlx2.shared.util.twoDecimalPlaces
+import com.jwoglom.controlx2.sync.nightscout.NightscoutSyncWorker
 import com.jwoglom.controlx2.util.AppVersionCheck
 import com.jwoglom.controlx2.util.DataClientState
 import com.jwoglom.controlx2.util.HistoryLogFetcher
 import com.jwoglom.controlx2.util.HistoryLogSyncWorker
 import com.jwoglom.controlx2.util.extractPumpSid
-import com.jwoglom.controlx2.sync.nightscout.NightscoutSyncWorker
 import com.jwoglom.pumpx2.pump.PumpState
 import com.jwoglom.pumpx2.pump.TandemError
 import com.jwoglom.pumpx2.pump.bluetooth.TandemBluetoothHandler
@@ -53,6 +53,7 @@ import com.jwoglom.pumpx2.pump.messages.Packetize
 import com.jwoglom.pumpx2.pump.messages.bluetooth.Characteristic
 import com.jwoglom.pumpx2.pump.messages.bluetooth.CharacteristicUUID
 import com.jwoglom.pumpx2.pump.messages.bluetooth.PumpStateSupplier
+import com.jwoglom.pumpx2.pump.messages.bluetooth.ServiceUUID
 import com.jwoglom.pumpx2.pump.messages.builders.CurrentBatteryRequestBuilder
 import com.jwoglom.pumpx2.pump.messages.helpers.Bytes
 import com.jwoglom.pumpx2.pump.messages.models.ApiVersion
@@ -68,14 +69,12 @@ import com.jwoglom.pumpx2.pump.messages.request.currentStatus.InsulinStatusReque
 import com.jwoglom.pumpx2.pump.messages.request.currentStatus.TimeSinceResetRequest
 import com.jwoglom.pumpx2.pump.messages.response.authentication.AbstractCentralChallengeResponse
 import com.jwoglom.pumpx2.pump.messages.response.authentication.AbstractPumpChallengeResponse
-import com.jwoglom.pumpx2.pump.messages.response.control.BolusPermissionReleaseResponse
 import com.jwoglom.pumpx2.pump.messages.response.control.BolusPermissionResponse
 import com.jwoglom.pumpx2.pump.messages.response.control.InitiateBolusResponse
-import com.jwoglom.pumpx2.pump.messages.response.currentStatus.BolusCalcDataSnapshotResponse
-import com.jwoglom.pumpx2.pump.messages.response.currentStatus.CurrentBolusStatusResponse
 import com.jwoglom.pumpx2.pump.messages.response.currentStatus.ControlIQIOBResponse
 import com.jwoglom.pumpx2.pump.messages.response.currentStatus.CurrentBasalStatusResponse
 import com.jwoglom.pumpx2.pump.messages.response.currentStatus.CurrentBatteryAbstractResponse
+import com.jwoglom.pumpx2.pump.messages.response.currentStatus.CurrentBolusStatusResponse
 import com.jwoglom.pumpx2.pump.messages.response.currentStatus.CurrentEGVGuiDataResponse
 import com.jwoglom.pumpx2.pump.messages.response.currentStatus.HistoryLogStatusResponse
 import com.jwoglom.pumpx2.pump.messages.response.currentStatus.InsulinStatusResponse
@@ -86,17 +85,20 @@ import com.jwoglom.pumpx2.pump.messages.response.qualifyingEvent.QualifyingEvent
 import com.jwoglom.pumpx2.shared.Hex
 import com.welie.blessed.BluetoothPeripheral
 import com.welie.blessed.HciStatus
+import com.welie.blessed.WriteType
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
 import org.bouncycastle.jce.provider.BouncyCastleProvider
+import org.json.JSONObject
 import timber.log.Timber
 import java.security.Security
 import java.time.Duration
 import java.time.Instant
 import java.util.Collections
+import java.util.UUID
 import java.util.function.Supplier
 
 
@@ -636,6 +638,37 @@ class CommService : Service() {
                         }
                     }
                 }
+                CommServiceCodes.DEBUG_WRITE_BT_CHARACTERISTIC.ordinal -> {
+                    Timber.i("pumpCommHandler debug_write_bt_characteristic: ${String(msg.obj as ByteArray)}")
+                    try {
+                        val contents = JSONObject(String(msg.obj as ByteArray));
+                        val uuidStr = contents.getString("characteristicUuid")
+                        val uuid = UUID.fromString(uuidStr)
+
+                        val valuesStr = contents.getJSONArray("valuesHex")
+                        var valuesHex = ArrayList<ByteArray>()
+                        for (i in 0..valuesStr.length()) {
+                            valuesHex.add(Hex.decodeHex(valuesStr.getString(i)))
+                        }
+
+                        if (pumpConnectedPrecondition()) {
+                            if (!Prefs(applicationContext).insulinDeliveryActions()) {
+                                return
+                            }
+                            valuesHex.forEach {
+                                Packetize.txId.increment()
+                                pump.lastPeripheral?.writeCharacteristic(
+                                    ServiceUUID.PUMP_SERVICE_UUID,
+                                    uuid,
+                                    it,
+                                    WriteType.WITH_RESPONSE
+                                )
+                            }
+                        }
+                    } catch (e: Exception) {
+                        Timber.e(e)
+                    }
+                }
                 CommServiceCodes.WRITE_CHARACTERISTIC_FAILED_CALLBACK.ordinal -> {
                     val uuidStr = msg.obj as String
                     if (pumpConnectedPrecondition(checkConnected = false)) {
@@ -1034,6 +1067,9 @@ class CommService : Service() {
             "/to-pump/debug-historylog-cache" -> {
                 handleDebugGetHistoryLogCache()
             }
+            "/to-pump/debug-write-bt-characteristic" -> {
+                sendDebugWriteBtCharacteristic(data)
+            }
         }
     }
 
@@ -1234,6 +1270,14 @@ class CommService : Service() {
     private fun handleDebugGetHistoryLogCache() {
         pumpCommHandler?.obtainMessage()?.also { msg ->
             msg.what = CommServiceCodes.DEBUG_GET_HISTORYLOG_CACHE.ordinal
+            pumpCommHandler?.sendMessage(msg)
+        }
+    }
+
+    private fun sendDebugWriteBtCharacteristic(jsonBlobBytes: ByteArray) {
+        pumpCommHandler?.obtainMessage()?.also { msg ->
+            msg.what = CommServiceCodes.DEBUG_WRITE_BT_CHARACTERISTIC.ordinal
+            msg.obj = jsonBlobBytes
             pumpCommHandler?.sendMessage(msg)
         }
     }

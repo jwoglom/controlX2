@@ -6,6 +6,7 @@ import com.jwoglom.pumpx2.pump.messages.Message
 import com.jwoglom.pumpx2.pump.messages.bluetooth.Characteristic
 import com.jwoglom.controlx2.shared.PumpMessageSerializer
 import com.jwoglom.controlx2.util.AppVersionInfo
+import com.jwoglom.pumpx2.shared.Hex
 import fi.iki.elonen.NanoHTTPD
 import org.json.JSONArray
 import org.json.JSONObject
@@ -171,6 +172,7 @@ class HttpDebugApiService(private val context: Context, private val port: Int = 
                 method == Method.GET && uri == "/api/comm/messages" -> handleMessagingStream(session)
                 method == Method.POST && uri == "/api/comm/messages" -> handleMessagingPost(session)
                 method == Method.GET && uri == "/api/prefs" -> handlePrefsGet()
+                method == Method.POST && uri == "/api/pump/debug-write-bt-characteristic" -> handlePumpDebugWriteBtCharacteristic(session)
                 else -> newFixedLengthResponse(
                     Response.Status.NOT_FOUND,
                     MIME_PLAINTEXT,
@@ -542,6 +544,23 @@ class HttpDebugApiService(private val context: Context, private val port: Int = 
                     errorJson.toString()
                 )
             }
+        }
+
+        private fun handlePumpDebugWriteBtCharacteristic(session: IHTTPSession): Response {
+
+
+            val buildRequestBlob: (String, List<ByteArray>) -> ByteArray = {
+                uuid: String, values: List<ByteArray> ->
+                    val obj = JSONObject()
+                    obj.put("characteristicUuid", uuid.toString())
+                    obj.put("valuesHex", values.map { Hex.encodeHexString(it) })
+
+                    obj.toString() as ByteArray
+            }
+
+            // todo
+
+            return newFixedLengthResponse("")
         }
     }
 }
