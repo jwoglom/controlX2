@@ -71,6 +71,55 @@
           "error": {"type": "string"}
         }
       },
+      "HistoryLogEntry": {
+        "type": "object",
+        "properties": {
+          "seqId": {"type": "integer"},
+          "pumpSid": {"type": "integer"},
+          "typeId": {"type": "integer"},
+          "cargoHex": {"type": "string"},
+          "pumpTime": {"type": "string", "format": "date-time"},
+          "addedTime": {"type": "string", "format": "date-time"},
+          "typeName": {"type": "string"},
+          "parsed": {"type": "object"},
+          "parseError": {"type": "string"}
+        },
+        "required": ["seqId", "pumpSid", "typeId", "pumpTime", "addedTime"]
+      },
+      "HistoryLogStatus": {
+        "type": "object",
+        "properties": {
+          "pumpSid": {"type": "integer"},
+          "totalCount": {"type": "integer"},
+          "oldestSeqId": {"type": "integer", "nullable": true},
+          "newestSeqId": {"type": "integer", "nullable": true},
+          "oldestPumpTime": {"type": "string", "format": "date-time", "nullable": true},
+          "newestPumpTime": {"type": "string", "format": "date-time", "nullable": true},
+          "oldestAddedTime": {"type": "string", "format": "date-time", "nullable": true},
+          "newestAddedTime": {"type": "string", "format": "date-time", "nullable": true}
+        }
+      },
+      "HistoryLogTypeStat": {
+        "type": "object",
+        "properties": {
+          "typeId": {"type": "integer"},
+          "typeName": {"type": "string", "nullable": true},
+          "count": {"type": "integer"},
+          "latestSeqId": {"type": "integer", "nullable": true},
+          "latestPumpTime": {"type": "string", "format": "date-time", "nullable": true}
+        }
+      },
+      "HistoryLogEntriesResponse": {
+        "type": "object",
+        "properties": {
+          "entries": {
+            "type": "array",
+            "items": {"$ref": "#/components/schemas/HistoryLogEntry"}
+          },
+          "count": {"type": "integer"},
+          "hasMore": {"type": "boolean"}
+        }
+      },
       "Success": {
         "type": "object",
         "properties": {
@@ -229,36 +278,7 @@
             "description": "Unauthorized"
           }
         }
-      }
-    },
-    "/api/prefs": {
-      "get": {
-        "summary": "Get all preferences",
-        "description": "Returns all SharedPreferences as a JSON object",
-        "responses": {
-          "200": {
-            "description": "All preferences",
-            "content": {
-              "application/json": {
-                "schema": {"$ref": "#/components/schemas/Preferences"}
-              }
-            }
-          },
-          "401": {
-            "description": "Unauthorized"
-          },
-          "500": {
-            "description": "Internal server error",
-            "content": {
-              "application/json": {
-                "schema": {"$ref": "#/components/schemas/Error"}
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/comm/messages": {
+      },
       "post": {
         "summary": "Send message bus message",
         "description": "Sends a message to the message bus. Does not wait for or return a response.",
@@ -314,6 +334,182 @@
               }
             }
           }
+        }
+      }
+    },
+    "/api/prefs": {
+      "get": {
+        "summary": "Get all preferences",
+        "description": "Returns all SharedPreferences as a JSON object",
+        "responses": {
+          "200": {
+            "description": "All preferences",
+            "content": {
+              "application/json": {
+                "schema": {"$ref": "#/components/schemas/Preferences"}
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "500": {
+            "description": "Internal server error",
+            "content": {
+              "application/json": {
+                "schema": {"$ref": "#/components/schemas/Error"}
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/historylog/status": {
+      "get": {
+        "summary": "History log status",
+        "description": "Returns counts and newest/oldest sequence info for the history log table",
+        "responses": {
+          "200": {
+            "description": "Status summary",
+            "content": {
+              "application/json": {
+                "schema": {"$ref": "#/components/schemas/HistoryLogStatus"}
+              }
+            }
+          },
+          "400": {"description": "Bad request"},
+          "401": {"description": "Unauthorized"}
+        }
+      }
+    },
+    "/api/historylog/stats": {
+      "get": {
+        "summary": "History log counts grouped by type",
+        "parameters": [
+          {
+            "name": "pumpSid",
+            "in": "query",
+            "required": false,
+            "schema": {"type": "integer"},
+            "description": "Optional pump SID to query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Type stats",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "pumpSid": {"type": "integer"},
+                    "totalEntries": {"type": "integer"},
+                    "typeStats": {
+                      "type": "array",
+                      "items": {"$ref": "#/components/schemas/HistoryLogTypeStat"}
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {"description": "Bad request"},
+          "401": {"description": "Unauthorized"}
+        }
+      }
+    },
+    "/api/historylog/entries": {
+      "get": {
+        "summary": "Query history log entries",
+        "parameters": [
+          {"name": "pumpSid", "in": "query", "schema": {"type": "integer"}, "required": false},
+          {"name": "limit", "in": "query", "schema": {"type": "integer", "default": 100}},
+          {"name": "offset", "in": "query", "schema": {"type": "integer", "default": 0}},
+          {"name": "typeId", "in": "query", "schema": {"type": "integer"}, "required": false},
+          {"name": "seqIdMin", "in": "query", "schema": {"type": "integer"}, "required": false},
+          {"name": "seqIdMax", "in": "query", "schema": {"type": "integer"}, "required": false},
+          {"name": "pumpTimeMin", "in": "query", "schema": {"type": "string", "format": "date-time"}, "required": false},
+          {"name": "pumpTimeMax", "in": "query", "schema": {"type": "string", "format": "date-time"}, "required": false},
+          {"name": "format", "in": "query", "schema": {"type": "string", "enum": ["raw", "parsed"], "default": "raw"}}
+        ],
+        "responses": {
+          "200": {
+            "description": "Paged history log entries",
+            "content": {
+              "application/json": {
+                "schema": {"$ref": "#/components/schemas/HistoryLogEntriesResponse"}
+              }
+            }
+          },
+          "400": {"description": "Bad request"},
+          "401": {"description": "Unauthorized"}
+        }
+      }
+    },
+    "/api/historylog/entries/{seqId}": {
+      "get": {
+        "summary": "Get a specific history log entry",
+        "parameters": [
+          {"name": "seqId", "in": "path", "required": true, "schema": {"type": "integer"}},
+          {"name": "pumpSid", "in": "query", "schema": {"type": "integer"}, "required": false},
+          {"name": "format", "in": "query", "schema": {"type": "string", "enum": ["raw", "parsed"], "default": "raw"}}
+        ],
+        "responses": {
+          "200": {
+            "description": "History log entry",
+            "content": {
+              "application/json": {
+                "schema": {"$ref": "#/components/schemas/HistoryLogEntry"}
+              }
+            }
+          },
+          "400": {"description": "Bad request"},
+          "401": {"description": "Unauthorized"},
+          "404": {"description": "Not found"}
+        }
+      }
+    },
+    "/api/historylog/types": {
+      "get": {
+        "summary": "List available history log types",
+        "responses": {
+          "200": {
+            "description": "Types with counts",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "types": {
+                      "type": "array",
+                      "items": {"$ref": "#/components/schemas/HistoryLogTypeStat"}
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {"description": "Unauthorized"}
+        }
+      }
+    },
+    "/api/historylog/stream": {
+      "get": {
+        "summary": "Stream new history log entries",
+        "parameters": [
+          {"name": "pumpSid", "in": "query", "schema": {"type": "integer"}, "required": false},
+          {"name": "format", "in": "query", "schema": {"type": "string", "enum": ["raw", "parsed"], "default": "raw"}}
+        ],
+        "responses": {
+          "200": {
+            "description": "NDJSON stream of history log entries",
+            "content": {
+              "application/x-ndjson": {
+                "schema": {"type": "string"}
+              }
+            }
+          },
+          "401": {"description": "Unauthorized"}
         }
       }
     }

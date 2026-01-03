@@ -4,6 +4,7 @@ import android.content.Context
 import android.util.LruCache
 import com.jwoglom.controlx2.CommService
 import com.jwoglom.controlx2.Prefs
+import com.jwoglom.controlx2.db.historylog.HistoryLogItem
 import com.jwoglom.pumpx2.pump.bluetooth.TandemPump
 import com.jwoglom.pumpx2.pump.messages.request.currentStatus.HistoryLogRequest
 import com.jwoglom.pumpx2.pump.messages.response.currentStatus.HistoryLogStatusResponse
@@ -19,6 +20,8 @@ import kotlinx.coroutines.withContext
 import timber.log.Timber
 import java.lang.Long.max
 import java.lang.Long.min
+import java.time.LocalDateTime
+import java.time.ZoneId
 
 const val InitialHistoryLogCount = 5000
 const val FetchGroupTimeoutMs = 2500
@@ -154,9 +157,18 @@ class HistoryLogFetcher(val context: Context, val pump: TandemPump, val peripher
     suspend fun onStreamResponse(log: HistoryLog) {
         streamResponseLock.withLock {
             Timber.d("HistoryLogFetcher onStreamResponse ${log.sequenceNum}")
-            historyLogRepo.insert(log, pumpSid)
+            val item = HistoryLogItem(
+                seqId = log.sequenceNum,
+                pumpSid = pumpSid,
+                typeId = log.typeId(),
+                cargo = log.cargo,
+                pumpTime = LocalDateTime.ofInstant(log.pumpTimeSecInstant, ZoneId.systemDefault()),
+                addedTime = LocalDateTime.now()
+            )
+            historyLogRepo.insert(item)
             latestSeqId = max(latestSeqId, log.sequenceNum)
             recentSeqIds.put(log.sequenceNum, log.sequenceNum)
+            (context as? CommService)?.broadcastHistoryLogItem(item)
         }
     }
 }

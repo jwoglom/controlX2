@@ -24,6 +24,7 @@ import android.widget.Toast
 import androidx.core.app.NotificationCompat
 import androidx.core.graphics.drawable.IconCompat
 import com.jwoglom.controlx2.db.historylog.HistoryLogDatabase
+import com.jwoglom.controlx2.db.historylog.HistoryLogItem
 import com.jwoglom.controlx2.db.historylog.HistoryLogRepo
 import com.jwoglom.controlx2.messaging.MessageBusFactory
 import com.jwoglom.controlx2.presentation.util.ShouldLogToFile
@@ -143,6 +144,10 @@ class CommService : Service() {
     private inner class PumpCommHandler(looper: Looper) : Handler(looper) {
         private lateinit var pump: Pump
         private lateinit var tandemBTHandler: TandemBluetoothHandler
+
+        fun getPumpSid(): Int? {
+            return if (this::pump.isInitialized) pump.pumpSid else null
+        }
 
         private inner class Pump(var tandemConfig: TandemConfig) : TandemPump(applicationContext, tandemConfig) {
             private val scope = CoroutineScope(SupervisorJob(parent = supervisorJob) + Dispatchers.IO)
@@ -900,8 +905,10 @@ class CommService : Service() {
         // Initialize and start HTTP Debug API service
         httpDebugApiService = HttpDebugApiService(applicationContext)
         httpDebugApiService?.getCurrentPumpDataCallback = { getCurrentPumpDataJson() }
+        httpDebugApiService?.getCurrentPumpSidCallback = { pumpCommHandler?.getPumpSid() ?: Prefs(applicationContext).currentPumpSid() }
         httpDebugApiService?.sendPumpMessagesCallback = { data -> sendPumpCommMessages(data) }
         httpDebugApiService?.sendMessagingCallback = { path, data -> sendWearCommMessage(path, data) }
+        httpDebugApiService?.onHistoryLogInsertedCallback = { item -> httpDebugApiService?.onHistoryLogInserted(item) }
         httpDebugApiService?.start()
 
         if (Prefs(applicationContext).pumpFinderServiceEnabled()) {
@@ -1035,6 +1042,10 @@ class CommService : Service() {
                 handleDebugGetHistoryLogCache()
             }
         }
+    }
+
+    fun broadcastHistoryLogItem(item: HistoryLogItem) {
+        httpDebugApiService?.onHistoryLogInsertedCallback?.invoke(item)
     }
 
     private var started = false
