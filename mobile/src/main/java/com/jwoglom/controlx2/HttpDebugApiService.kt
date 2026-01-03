@@ -2,10 +2,15 @@ package com.jwoglom.controlx2
 
 import android.content.Context
 import android.util.Base64
+import com.jwoglom.controlx2.shared.PumpMessageSerializer
+import com.jwoglom.controlx2.db.historylog.HistoryLogDatabase
+import com.jwoglom.controlx2.db.historylog.HistoryLogItem
+import com.jwoglom.controlx2.db.historylog.HistoryLogRepo
+import com.jwoglom.controlx2.db.historylog.HistoryLogTypeStats
+import com.jwoglom.controlx2.util.AppVersionInfo
 import com.jwoglom.pumpx2.pump.messages.Message
 import com.jwoglom.pumpx2.pump.messages.bluetooth.Characteristic
-import com.jwoglom.controlx2.shared.PumpMessageSerializer
-import com.jwoglom.controlx2.util.AppVersionInfo
+import com.jwoglom.pumpx2.pump.messages.response.historyLog.HistoryLog
 import com.jwoglom.pumpx2.shared.Hex
 import fi.iki.elonen.NanoHTTPD
 import org.json.JSONArray
@@ -15,18 +20,31 @@ import java.io.IOException
 import java.io.OutputStream
 import java.io.PrintWriter
 import java.time.Instant
+import java.time.LocalDateTime
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.CopyOnWriteArrayList
 import java.util.concurrent.TimeUnit
+import kotlinx.coroutines.flow.firstOrNull
+import kotlinx.coroutines.runBlocking
 
 class HttpDebugApiService(private val context: Context, private val port: Int = 18282) {
 
     private var server: DebugApiServer? = null
     private val prefs = Prefs(context)
 
+    private val historyLogDb by lazy { HistoryLogDatabase.getDatabase(context) }
+    private val historyLogRepo by lazy { HistoryLogRepo(historyLogDb.historyLogDao()) }
+
     // Streaming clients for /api/pump/messages
     private val pumpMessageStreamClients = CopyOnWriteArrayList<PrintWriter>()
+
+    private data class HistoryLogStreamClient(val writer: PrintWriter, val format: String, val pumpSid: Int?)
+
+    // Streaming clients for /api/historylog/stream
+    private val historyLogStreamClients = CopyOnWriteArrayList<HistoryLogStreamClient>()
 
     // Streaming clients for /api/comm/messages/stream
     private val messagingStreamClients = CopyOnWriteArrayList<PrintWriter>()
@@ -37,11 +55,17 @@ class HttpDebugApiService(private val context: Context, private val port: Int = 
     // Callbacks to get current pump data from CommService
     var getCurrentPumpDataCallback: (() -> String)? = null
 
+    // Callback to get current pump SID from CommService
+    var getCurrentPumpSidCallback: (() -> Int?)? = null
+
     // Callback to send pump messages
     var sendPumpMessagesCallback: ((ByteArray) -> Unit)? = null
 
     // Callback to send messaging messages
     var sendMessagingCallback: ((String, ByteArray) -> Unit)? = null
+
+    // Callback when new history log entries are inserted
+    var onHistoryLogInsertedCallback: ((HistoryLogItem) -> Unit)? = null
 
     fun start() {
         if (!prefs.httpDebugApiEnabled()) {
@@ -70,6 +94,7 @@ class HttpDebugApiService(private val context: Context, private val port: Int = 
         server?.stop()
         server = null
         pumpMessageStreamClients.clear()
+        historyLogStreamClients.clear()
         messagingStreamClients.clear()
         Timber.i("HttpDebugApiService stopped")
     }
@@ -103,6 +128,10 @@ class HttpDebugApiService(private val context: Context, private val port: Int = 
         jsonObject.put("dataString", dataString)
         jsonObject.put("dataHex", dataHex)
         broadcastToMessagingClients(jsonObject.toString())
+    }
+
+    fun onHistoryLogInserted(item: HistoryLogItem) {
+        broadcastToHistoryLogClients(item)
     }
 
     private fun broadcastToPumpMessageClients(message: String) {
@@ -140,6 +169,27 @@ class HttpDebugApiService(private val context: Context, private val port: Int = 
         messagingStreamClients.removeAll(toRemove)
     }
 
+    private fun broadcastToHistoryLogClients(item: HistoryLogItem) {
+        val toRemove = mutableListOf<PrintWriter>()
+        historyLogStreamClients.forEach { client ->
+            if (client.pumpSid != null && client.pumpSid != item.pumpSid) {
+                return@forEach
+            }
+            try {
+                val message = historyLogItemToJson(item, client.format).toString()
+                client.writer.println(message)
+                client.writer.flush()
+                if (client.writer.checkError()) {
+                    toRemove.add(client.writer)
+                }
+            } catch (e: Exception) {
+                Timber.w(e, "Error writing to history log stream client")
+                toRemove.add(client.writer)
+            }
+        }
+        historyLogStreamClients.removeAll { toRemove.contains(it.writer) }
+    }
+
     private inner class DebugApiServer(
         port: Int,
         private val username: String,
@@ -172,6 +222,12 @@ class HttpDebugApiService(private val context: Context, private val port: Int = 
                 method == Method.GET && uri == "/api/comm/messages" -> handleMessagingStream(session)
                 method == Method.POST && uri == "/api/comm/messages" -> handleMessagingPost(session)
                 method == Method.GET && uri == "/api/prefs" -> handlePrefsGet()
+                method == Method.GET && uri == "/api/historylog/status" -> handleHistoryLogStatus(session)
+                method == Method.GET && uri == "/api/historylog/stats" -> handleHistoryLogStats(session)
+                method == Method.GET && uri == "/api/historylog/entries" -> handleHistoryLogEntries(session)
+                method == Method.GET && uri.startsWith("/api/historylog/entries/") -> handleHistoryLogEntry(session, uri)
+                method == Method.GET && uri == "/api/historylog/types" -> handleHistoryLogTypes(session)
+                method == Method.GET && uri == "/api/historylog/stream" -> handleHistoryLogStream(session)
                 method == Method.POST && uri == "/api/pump/debug-write-bt-characteristic" -> handlePumpDebugWriteBtCharacteristic(session)
                 else -> newFixedLengthResponse(
                     Response.Status.NOT_FOUND,
@@ -358,6 +414,230 @@ class HttpDebugApiService(private val context: Context, private val port: Int = 
                     "application/json",
                     errorJson.toString()
                 )
+            }
+        }
+
+        private fun getPumpSidFromSession(session: IHTTPSession?): Int? {
+            val paramSid = session?.parameters?.get("pumpSid")?.firstOrNull()?.toIntOrNull()
+            if (paramSid != null) {
+                return paramSid
+            }
+            return getCurrentPumpSidCallback?.invoke() ?: Prefs(context).currentPumpSid()
+        }
+
+        private fun handleHistoryLogStatus(session: IHTTPSession): Response {
+            val pumpSid = getPumpSidFromSession(session)
+                ?: return errorResponse("No pumpSid available", Response.Status.BAD_REQUEST)
+
+            return try {
+                val oldest = runBlocking { historyLogRepo.getOldest(pumpSid).firstOrNull() }
+                val latest = runBlocking { historyLogRepo.getLatest(pumpSid).firstOrNull() }
+                val count = runBlocking { historyLogRepo.getCount(pumpSid).firstOrNull() } ?: 0
+
+                val json = JSONObject()
+                json.put("pumpSid", pumpSid)
+                json.put("totalCount", count)
+                json.put("oldestSeqId", oldest?.seqId)
+                json.put("newestSeqId", latest?.seqId)
+                json.put("oldestPumpTime", oldest?.pumpTime?.toString())
+                json.put("newestPumpTime", latest?.pumpTime?.toString())
+                json.put("oldestAddedTime", oldest?.addedTime?.toString())
+                json.put("newestAddedTime", latest?.addedTime?.toString())
+
+                newFixedLengthResponse(Response.Status.OK, "application/json", json.toString())
+            } catch (e: Exception) {
+                Timber.e(e, "Error handling history log status")
+                errorResponse("${e.message}", Response.Status.INTERNAL_ERROR)
+            }
+        }
+
+        private fun handleHistoryLogStats(session: IHTTPSession): Response {
+            val pumpSid = getPumpSidFromSession(session)
+                ?: return errorResponse("No pumpSid available", Response.Status.BAD_REQUEST)
+
+            return try {
+                val stats: List<HistoryLogTypeStats> = historyLogRepo.getTypeStats(pumpSid)
+                val totalEntries = runBlocking { historyLogRepo.getCount(pumpSid).firstOrNull() } ?: 0
+                val json = JSONObject()
+                json.put("pumpSid", pumpSid)
+                json.put("totalEntries", totalEntries)
+
+                val typeStatsArray = JSONArray()
+                stats.forEach { stat ->
+                    val obj = JSONObject()
+                    obj.put("typeId", stat.typeId)
+                    obj.put("typeName", typeNameFromTypeId(stat.typeId))
+                    obj.put("count", stat.count)
+                    obj.put("latestSeqId", stat.latestSeqId)
+                    obj.put("latestPumpTime", stat.latestPumpTime?.toString())
+                    typeStatsArray.put(obj)
+                }
+
+                json.put("typeStats", typeStatsArray)
+                newFixedLengthResponse(Response.Status.OK, "application/json", json.toString())
+            } catch (e: Exception) {
+                Timber.e(e, "Error handling history log stats")
+                errorResponse("${e.message}", Response.Status.INTERNAL_ERROR)
+            }
+        }
+
+        private fun handleHistoryLogEntries(session: IHTTPSession): Response {
+            val pumpSid = getPumpSidFromSession(session)
+                ?: return errorResponse("No pumpSid available", Response.Status.BAD_REQUEST)
+
+            val params = session.parameters
+            val limit = params["limit"]?.firstOrNull()?.toIntOrNull()?.coerceIn(1, 1000) ?: 100
+            val offset = params["offset"]?.firstOrNull()?.toIntOrNull()?.coerceAtLeast(0) ?: 0
+            val typeId = params["typeId"]?.firstOrNull()?.toIntOrNull()
+            val seqIdMin = params["seqIdMin"]?.firstOrNull()?.toLongOrNull()
+            val seqIdMax = params["seqIdMax"]?.firstOrNull()?.toLongOrNull()
+            val pumpTimeMin = parseTimeParam(params["pumpTimeMin"]?.firstOrNull())
+            val pumpTimeMax = parseTimeParam(params["pumpTimeMax"]?.firstOrNull())
+            val format = params["format"]?.firstOrNull()?.lowercase() ?: "raw"
+
+            return try {
+                val items = runBlocking {
+                    when {
+                        typeId != null && (seqIdMin != null || seqIdMax != null) -> historyLogRepo.getRangeForType(
+                            pumpSid,
+                            typeId,
+                            seqIdMin ?: 0,
+                            seqIdMax ?: Long.MAX_VALUE
+                        ).firstOrNull() ?: emptyList()
+                        typeId != null -> historyLogRepo.allForType(pumpSid, typeId).firstOrNull() ?: emptyList()
+                        seqIdMin != null || seqIdMax != null -> historyLogRepo.getRange(
+                            pumpSid,
+                            seqIdMin ?: 0,
+                            seqIdMax ?: Long.MAX_VALUE
+                        ).firstOrNull() ?: emptyList()
+                        else -> historyLogRepo.getAll(pumpSid).firstOrNull() ?: emptyList()
+                    }
+                }
+
+                val filtered = filterByTimeRange(items, pumpTimeMin, pumpTimeMax)
+                val paged = filtered.drop(offset).take(limit)
+                val jsonArray = JSONArray()
+                paged.forEach { item ->
+                    jsonArray.put(historyLogItemToJson(item, format))
+                }
+
+                val json = JSONObject()
+                json.put("entries", jsonArray)
+                json.put("count", paged.size)
+                json.put("hasMore", filtered.size > offset + paged.size)
+
+                newFixedLengthResponse(Response.Status.OK, "application/json", json.toString())
+            } catch (e: Exception) {
+                Timber.e(e, "Error handling history log entries")
+                errorResponse("${e.message}", Response.Status.INTERNAL_ERROR)
+            }
+        }
+
+        private fun handleHistoryLogEntry(session: IHTTPSession, uri: String): Response {
+            val pumpSid = getPumpSidFromSession(session)
+                ?: return errorResponse("No pumpSid available", Response.Status.BAD_REQUEST)
+
+            val seqId = uri.substringAfterLast("/").toLongOrNull()
+                ?: return errorResponse("Invalid seqId", Response.Status.BAD_REQUEST)
+            val format = session.parameters["format"]?.firstOrNull()?.lowercase() ?: "raw"
+
+            val item = runBlocking { historyLogRepo.getRange(pumpSid, seqId, seqId).firstOrNull()?.firstOrNull() }
+                ?: return errorResponse("History log entry not found: seqId=$seqId, pumpSid=$pumpSid", Response.Status.NOT_FOUND)
+
+            return newFixedLengthResponse(
+                Response.Status.OK,
+                "application/json",
+                historyLogItemToJson(item, format).toString()
+            )
+        }
+
+        private fun handleHistoryLogTypes(session: IHTTPSession): Response {
+            val pumpSid = getPumpSidFromSession(session)
+                ?: return errorResponse("No pumpSid available", Response.Status.BAD_REQUEST)
+
+            return try {
+                val stats: List<HistoryLogTypeStats> = historyLogRepo.getTypeStats(pumpSid)
+                val typesArray = JSONArray()
+                stats.forEach { stat ->
+                    val obj = JSONObject()
+                    obj.put("typeId", stat.typeId)
+                    obj.put("typeName", typeNameFromTypeId(stat.typeId))
+                    obj.put("count", stat.count)
+                    typesArray.put(obj)
+                }
+
+                val json = JSONObject()
+                json.put("types", typesArray)
+                newFixedLengthResponse(Response.Status.OK, "application/json", json.toString())
+            } catch (e: Exception) {
+                Timber.e(e, "Error handling history log types")
+                errorResponse("${e.message}", Response.Status.INTERNAL_ERROR)
+            }
+        }
+
+        private fun handleHistoryLogStream(session: IHTTPSession): Response {
+            val pumpSid = getPumpSidFromSession(session)
+                ?: return errorResponse("No pumpSid available", Response.Status.BAD_REQUEST)
+            val format = session.parameters["format"]?.firstOrNull()?.lowercase() ?: "raw"
+            val inputStream = object : java.io.InputStream() {
+                private val buffer = java.io.PipedOutputStream()
+                private val input = java.io.PipedInputStream(buffer, 8192)
+                private val writer = PrintWriter(buffer, true)
+                private val client = HistoryLogStreamClient(writer, format, pumpSid)
+
+                init {
+                    historyLogStreamClients.add(client)
+                    Timber.i("New history log stream client connected")
+
+                    writer.println("\n")
+                    writer.flush()
+                }
+
+                override fun read(): Int {
+                    return input.read()
+                }
+
+                override fun read(b: ByteArray, off: Int, len: Int): Int {
+                    return input.read(b, off, len)
+                }
+
+                override fun available(): Int {
+                    return input.available()
+                }
+
+                override fun close() {
+                    historyLogStreamClients.remove(client)
+                    buffer.close()
+                    input.close()
+                    Timber.i("History log stream client disconnected")
+                }
+            }
+
+            val response = newFixedLengthResponse(Response.Status.OK, "application/x-ndjson", inputStream, -1)
+            response.addHeader("Cache-Control", "no-cache")
+            return response
+        }
+
+        private fun errorResponse(message: String, status: Response.Status = Response.Status.BAD_REQUEST): Response {
+            val json = JSONObject()
+            json.put("error", message)
+            return newFixedLengthResponse(status, "application/json", json.toString())
+        }
+
+        private fun parseTimeParam(value: String?): LocalDateTime? {
+            if (value.isNullOrBlank()) return null
+            return try {
+                LocalDateTime.parse(value, DateTimeFormatter.ISO_DATE_TIME)
+            } catch (e: Exception) {
+                null
+            }
+        }
+
+        private fun filterByTimeRange(items: List<HistoryLogItem>, min: LocalDateTime?, max: LocalDateTime?): List<HistoryLogItem> {
+            return items.filter { item ->
+                val afterMin = min?.let { item.pumpTime >= it } ?: true
+                val beforeMax = max?.let { item.pumpTime <= it } ?: true
+                afterMin && beforeMax
             }
         }
 
@@ -562,5 +842,35 @@ class HttpDebugApiService(private val context: Context, private val port: Int = 
 
             return newFixedLengthResponse("")
         }
+    }
+
+    private fun typeNameFromTypeId(typeId: Int): String? {
+        return try {
+            HistoryLog.fromTypeId(typeId)?.javaClass?.simpleName
+        } catch (e: Exception) {
+            null
+        }
+    }
+
+    private fun historyLogItemToJson(item: HistoryLogItem, format: String = "raw"): JSONObject {
+        val json = JSONObject()
+        json.put("seqId", item.seqId)
+        json.put("pumpSid", item.pumpSid)
+        json.put("typeId", item.typeId)
+        json.put("cargoHex", item.cargo.joinToString("") { "%02x".format(it) })
+        json.put("pumpTime", item.pumpTime.toString())
+        json.put("addedTime", item.addedTime.toString())
+
+        if (format == "parsed") {
+            try {
+                val historyLog = item.parse()
+                json.put("typeName", historyLog.javaClass.simpleName)
+                json.put("parsed", JSONObject(historyLog.jsonToString()))
+            } catch (e: Exception) {
+                json.put("parseError", e.message)
+            }
+        }
+
+        return json
     }
 }

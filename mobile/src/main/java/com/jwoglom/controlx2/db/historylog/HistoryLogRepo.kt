@@ -26,6 +26,10 @@ class HistoryLogRepo(private val historyLogDao: HistoryLogDao) {
         return historyLogDao.getLatestForType(pumpSid, typeId)
     }
 
+    fun getTypeStats(pumpSid: Int): List<HistoryLogTypeStats> {
+        return historyLogDao.getTypeStats(pumpSid)
+    }
+
     fun getLatestItemsForType(pumpSid: Int, typeId: Int, maxItems: Int): Flow<List<HistoryLogItem>> {
         return historyLogDao.getLatestItemsForType(pumpSid, typeId, maxItems)
     }

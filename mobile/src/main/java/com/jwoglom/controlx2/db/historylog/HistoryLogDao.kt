@@ -5,6 +5,14 @@ import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
 import kotlinx.coroutines.flow.Flow
+import java.time.LocalDateTime
+
+data class HistoryLogTypeStats(
+    val typeId: Int,
+    val count: Long,
+    val latestSeqId: Long?,
+    val latestPumpTime: LocalDateTime?
+)
 
 @Dao
 interface HistoryLogDao {
@@ -109,6 +117,14 @@ interface HistoryLogDao {
         LIMIT 1
     """)
     fun getLatestForType(pumpSid: Int, typeId: Int): Flow<HistoryLogItem?>
+
+    @Query("""
+        SELECT typeId AS typeId, COUNT(*) AS count, MAX(seqId) AS latestSeqId, MAX(pumpTime) AS latestPumpTime
+        FROM $HistoryLogTable
+        WHERE pumpSid = :pumpSid
+        GROUP BY typeId
+    """)
+    fun getTypeStats(pumpSid: Int): List<HistoryLogTypeStats>
 
     @Query("""
         SELECT * FROM $HistoryLogTable
