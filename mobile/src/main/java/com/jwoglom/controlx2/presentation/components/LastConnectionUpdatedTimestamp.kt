@@ -26,7 +26,7 @@ fun LastConnectionUpdatedTimestamp() {
         pumpLastMessageTimestampRelative = pumpLastMessageTimestamp.value?.let {
             shortTimeAgo(it, nowThresholdSeconds = 1)
         }
-        Timber.d("set pumpLastMessageTimestampRelative=%s", pumpLastMessageTimestampRelative)
+        //Timber.d("set pumpLastMessageTimestampRelative=%s", pumpLastMessageTimestampRelative)
     }
 
     LaunchedEffect (pumpConnected.value, pumpLastMessageTimestamp.value) {

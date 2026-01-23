@@ -35,12 +35,12 @@ class WearMessageBus(private val context: Context) : MessageBus, MessageClient.O
     }
 
     override fun sendMessage(path: String, data: ByteArray, sender: MessageBusSender) {
-        Timber.i("WearMessageBus (watch).sendMessage: $path ${String(data)} (sender: $sender)")
+        //Timber.i("WearMessageBus (watch).sendMessage: $path ${String(data)} (sender: $sender)")
 
         fun sendToNode(node: Node) {
             messageClient.sendMessage(node.id, path, data)
                 .addOnSuccessListener {
-                    Timber.d("WearMessageBus (watch) message sent: $path to ${node.displayName}")
+                    //Timber.d("WearMessageBus (watch) message sent: $path to ${node.displayName}")
                 }
                 .addOnFailureListener { e ->
                     Timber.w(e, "WearMessageBus (watch) sendMessage failed: $path to ${node.displayName}")
@@ -64,7 +64,7 @@ class WearMessageBus(private val context: Context) : MessageBus, MessageClient.O
     }
 
     override fun onMessageReceived(messageEvent: MessageEvent) {
-        Timber.i("WearMessageBus (watch).onMessageReceived: ${messageEvent.path} from ${messageEvent.sourceNodeId}")
+        //Timber.i("WearMessageBus (watch).onMessageReceived: ${messageEvent.path} from ${messageEvent.sourceNodeId}")
 
         listeners.forEach { listener ->
             try {
@@ -80,12 +80,12 @@ class WearMessageBus(private val context: Context) : MessageBus, MessageClient.O
     }
 
     override fun addMessageListener(listener: MessageListener) {
-        Timber.d("WearMessageBus (watch).addMessageListener: $listener")
+        //Timber.d("WearMessageBus (watch).addMessageListener: $listener")
         listeners.add(listener)
     }
 
     override fun removeMessageListener(listener: MessageListener) {
-        Timber.d("WearMessageBus (watch).removeMessageListener: $listener")
+        //Timber.d("WearMessageBus (watch).removeMessageListener: $listener")
         listeners.remove(listener)
     }
 

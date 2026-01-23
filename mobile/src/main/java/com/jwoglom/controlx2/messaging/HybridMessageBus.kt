@@ -32,25 +32,25 @@ class HybridMessageBus(
     // Proxy listeners that forward messages from each transport to our listeners
     private val broadcastProxyListener = object : MessageListener {
         override fun onMessageReceived(path: String, data: ByteArray, sourceNodeId: String) {
-            Timber.d("HybridMessageBus: Message from Broadcast transport: $path")
+            //Timber.d("HybridMessageBus: Message from Broadcast transport: $path")
             notifyListeners(path, data, sourceNodeId)
         }
     }
 
     private val wearProxyListener = object : MessageListener {
         override fun onMessageReceived(path: String, data: ByteArray, sourceNodeId: String) {
-            Timber.d("HybridMessageBus: Message from Wear transport: $path")
+            //Timber.d("HybridMessageBus: Message from Wear transport: $path")
 
             // Only forward /to-phone/* messages from Wear transport
             // Other messages (like /from-pump/*) will come via Broadcast transport instead
             if (path.startsWith("/to-phone/")) {
-                Timber.d("HybridMessageBus: Re-broadcasting /to-phone/* from Wear locally")
+                //Timber.d("HybridMessageBus: Re-broadcasting /to-phone/* from Wear locally")
                 broadcastBus.sendMessage(path, data, MessageBusSender.WEAR_UI)
 
                 // Also notify listeners directly (for any components listening to Wear messages)
                 notifyListeners(path, data, sourceNodeId)
             } else {
-                Timber.d("HybridMessageBus: Ignoring non-/to-phone/* message from Wear transport (will come via Broadcast): $path")
+                //Timber.d("HybridMessageBus: Ignoring non-/to-phone/* message from Wear transport (will come via Broadcast): $path")
             }
         }
     }
@@ -58,7 +58,7 @@ class HybridMessageBus(
     private val _connectionState = MutableStateFlow<ConnectionState>(ConnectionState.Connecting)
 
     init {
-        Timber.d("HybridMessageBus initialized with Broadcast + Wear transports")
+        //Timber.d("HybridMessageBus initialized with Broadcast + Wear transports")
 
         // Register proxy listeners with both transports
         broadcastBus.addMessageListener(broadcastProxyListener)
@@ -70,49 +70,49 @@ class HybridMessageBus(
     }
 
     override fun sendMessage(path: String, data: ByteArray, sender: MessageBusSender) {
-        Timber.i("HybridMessageBus.sendMessage: $path (sender: $sender)")
+        //Timber.i("HybridMessageBus.sendMessage: $path (sender: $sender)")
 
         when {
             // Messages TO CommService from Mobile UI
             path.startsWith("/to-phone/") && sender == MessageBusSender.MOBILE_UI -> {
-                Timber.d("Routing /to-phone/* from Mobile UI → Broadcast only")
+                //Timber.d("Routing /to-phone/* from Mobile UI → Broadcast only")
                 broadcastBus.sendMessage(path, data, sender)
             }
 
             // Messages TO CommService+Mobile UI from Wear UI
             path.startsWith("/to-phone/") && sender == MessageBusSender.WEAR_UI -> {
-                Timber.d("Routing /to-phone/* from Wear UI → Wear only (will re-broadcast on phone)")
+                //Timber.d("Routing /to-phone/* from Wear UI → Wear only (will re-broadcast on phone)")
                 wearBus.sendMessage(path, data, sender)
             }
 
             // Messages TO Wear from Mobile UI or CommService
             path.startsWith("/to-wear/") -> {
-                Timber.d("Routing /to-wear/* → Wear only")
+                //Timber.d("Routing /to-wear/* → Wear only")
                 wearBus.sendMessage(path, data, sender)
             }
 
             // Messages TO Pump from Mobile UI
             path.startsWith("/to-pump/") && sender == MessageBusSender.MOBILE_UI -> {
-                Timber.d("Routing /to-pump/* from Mobile UI → Broadcast only")
+                //Timber.d("Routing /to-pump/* from Mobile UI → Broadcast only")
                 broadcastBus.sendMessage(path, data, sender)
             }
 
             // Messages TO Pump from Wear UI
             path.startsWith("/to-pump/") && sender == MessageBusSender.WEAR_UI -> {
-                Timber.d("Routing /to-pump/* from Wear UI → Wear only")
+                //Timber.d("Routing /to-pump/* from Wear UI → Wear only")
                 wearBus.sendMessage(path, data, sender)
             }
 
             // Messages FROM Pump (broadcast to all UIs)
             path.startsWith("/from-pump/") -> {
-                Timber.d("Routing /from-pump/* → Both transports (broadcast to all)")
+                //Timber.d("Routing /from-pump/* → Both transports (broadcast to all)")
                 broadcastBus.sendMessage(path, data, sender)
                 wearBus.sendMessage(path, data, sender)
             }
 
             else -> {
                 // Unknown pattern - send via both for safety
-                Timber.w("Unknown message pattern: $path (sender: $sender) - sending via both transports")
+                //Timber.w("Unknown message pattern: $path (sender: $sender) - sending via both transports")
                 broadcastBus.sendMessage(path, data, sender)
                 wearBus.sendMessage(path, data, sender)
             }
@@ -120,12 +120,12 @@ class HybridMessageBus(
     }
 
     override fun addMessageListener(listener: MessageListener) {
-        Timber.d("HybridMessageBus.addMessageListener: $listener")
+        //Timber.d("HybridMessageBus.addMessageListener: $listener")
         listeners.add(listener)
     }
 
     override fun removeMessageListener(listener: MessageListener) {
-        Timber.d("HybridMessageBus.removeMessageListener: $listener")
+        //Timber.d("HybridMessageBus.removeMessageListener: $listener")
         listeners.remove(listener)
     }
 
@@ -149,7 +149,7 @@ class HybridMessageBus(
         val allNodes = (broadcastNodes + wearNodes)
             .distinctBy { it.id }
 
-        Timber.d("HybridMessageBus.getConnectedNodes: ${allNodes.size} nodes total")
+        //Timber.d("HybridMessageBus.getConnectedNodes: ${allNodes.size} nodes total")
         return allNodes
     }
 
@@ -158,7 +158,7 @@ class HybridMessageBus(
     }
 
     override fun close() {
-        Timber.d("HybridMessageBus.close()")
+        //Timber.d("HybridMessageBus.close()")
 
         // Remove proxy listeners
         broadcastBus.removeMessageListener(broadcastProxyListener)

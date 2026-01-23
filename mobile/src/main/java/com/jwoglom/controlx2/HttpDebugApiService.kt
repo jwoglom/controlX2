@@ -2,14 +2,17 @@ package com.jwoglom.controlx2
 
 import android.content.Context
 import android.util.Base64
-import com.jwoglom.controlx2.shared.PumpMessageSerializer
 import com.jwoglom.controlx2.db.historylog.HistoryLogDatabase
 import com.jwoglom.controlx2.db.historylog.HistoryLogItem
 import com.jwoglom.controlx2.db.historylog.HistoryLogRepo
 import com.jwoglom.controlx2.db.historylog.HistoryLogTypeStats
+import com.jwoglom.controlx2.shared.PumpMessageSerializer
 import com.jwoglom.controlx2.util.AppVersionInfo
+import com.jwoglom.pumpx2.pump.TandemError
 import com.jwoglom.pumpx2.pump.messages.Message
+import com.jwoglom.pumpx2.pump.messages.Messages
 import com.jwoglom.pumpx2.pump.messages.bluetooth.Characteristic
+import com.jwoglom.pumpx2.pump.messages.response.ErrorResponse
 import com.jwoglom.pumpx2.pump.messages.response.historyLog.HistoryLog
 import com.jwoglom.pumpx2.shared.Hex
 import fi.iki.elonen.NanoHTTPD
@@ -17,16 +20,14 @@ import org.json.JSONArray
 import org.json.JSONObject
 import timber.log.Timber
 import java.io.IOException
-import java.io.OutputStream
 import java.io.PrintWriter
-import java.time.Instant
 import java.time.LocalDateTime
-import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.CopyOnWriteArrayList
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicBoolean
 import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.runBlocking
 
@@ -66,6 +67,9 @@ class HttpDebugApiService(private val context: Context, private val port: Int = 
 
     // Callback when new history log entries are inserted
     var onHistoryLogInsertedCallback: ((HistoryLogItem) -> Unit)? = null
+
+    var pumpConnected: AtomicBoolean = AtomicBoolean(false)
+    val pumpConnectedWaiters = CopyOnWriteArrayList<CompletableFuture<Boolean>>()
 
     fun start() {
         if (!prefs.httpDebugApiEnabled()) {
@@ -108,18 +112,47 @@ class HttpDebugApiService(private val context: Context, private val port: Int = 
         Timber.d("onPumpMessageReceived: $message")
         // parse+decode to force as a single line
         val jsonString = JSONObject(message.jsonToString()).toString()
-        Timber.d("Broadcasting pump message to ${pumpMessageStreamClients.size} clients")
-        broadcastToPumpMessageClients(jsonString)
+        if (pumpMessageStreamClients.isNotEmpty()) {
+            Timber.d("Broadcasting pump message to ${pumpMessageStreamClients.size} clients")
+            broadcastToPumpMessageClients(jsonString)
+        }
 
         // Check if this message is a response to a pending request
         val key = Pair(message.characteristic, message.opCode())
         pendingPumpRequests[key]?.complete(message)
     }
 
+    fun onPumpCriticalError(reason: TandemError) {
+        if (reason == TandemError.ERROR_RESPONSE) {
+            if (reason.initiatingMessage != null && reason.errorResponse != null) {
+                pendingPumpRequests.forEach { (pair, future) ->
+                    if (pair.first == reason.initiatingMessage.characteristic && pair.second == reason.initiatingMessage.responseOpCode) {
+                        future.complete(reason.errorResponse)
+                    }
+                }
+            } else {
+                pendingPumpRequests.forEach { (pair, future) ->
+                    future.completeExceptionally(
+                        RuntimeException("ErrorResponse")
+                    )
+                }
+            }
+        }
+    }
+
     /**
      * Called when a message is received (from CommService.handleMessageReceived)
      */
     fun onMessagingReceived(path: String, data: ByteArray, sourceNodeId: String) {
+        when {
+            path == "/from-pump/pump-connected" -> {
+                this.pumpConnected.set(true)
+                this.pumpConnectedWaiters.forEach { it.complete(true) }
+            }
+            path == "/from-pump/pump-disconnected" -> {
+                this.pumpConnected.set(false)
+            }
+        }
         val dataString = String(data)
         val dataHex = data.joinToString("") { "%02x".format(it) }
         val jsonObject = JSONObject()
@@ -217,6 +250,9 @@ class HttpDebugApiService(private val context: Context, private val port: Int = 
                 method == Method.GET && uri == "/" -> handleIndex()
                 method == Method.GET && uri == "/openapi.json" -> handleOpenApiSpec()
                 method == Method.GET && uri == "/api/pump/current" -> handlePumpCurrent()
+                method == Method.GET && uri == "/api/pump/commands" -> handlePumpCommandsGet()
+                method == Method.GET && uri == "/api/pump/connected" -> handlePumpConnected()
+                method == Method.GET && uri == "/api/pump/wait-connected" -> handlePumpWaitConnected()
                 method == Method.GET && uri == "/api/pump/messages" -> handlePumpMessagesStream(session)
                 method == Method.POST && uri == "/api/pump/messages" -> handlePumpMessagesPost(session)
                 method == Method.GET && uri == "/api/comm/messages" -> handleMessagingStream(session)
@@ -309,6 +345,55 @@ class HttpDebugApiService(private val context: Context, private val port: Int = 
                 "application/json",
                 currentData
             )
+        }
+
+        private fun handlePumpConnected(): Response {
+            val c = pumpConnected.get()
+            return newFixedLengthResponse(
+                if (c) Response.Status.OK else Response.Status.GONE,
+                "application/json",
+                if (c) "{\"connected\":true}" else "{\"connected\":false}"
+            )
+        }
+
+        private fun handlePumpWaitConnected(): Response {
+            val start = System.currentTimeMillis()
+            if (pumpConnected.get()) {
+                val j = JSONObject()
+                j.put("connected", true)
+                j.put("wait_ms", System.currentTimeMillis() - start)
+                return newFixedLengthResponse(
+                    Response.Status.OK,
+                    "application/json",
+                    j.toString())
+            }
+            val f = CompletableFuture<Boolean>()
+            pumpConnectedWaiters.add(f)
+
+            try {
+                val c = f.get(60, TimeUnit.SECONDS)
+                pumpConnectedWaiters.remove(f)
+
+                val j = JSONObject()
+                j.put("connected", c)
+                j.put("wait_ms", System.currentTimeMillis() - start)
+                return newFixedLengthResponse(
+                    if (c) Response.Status.OK else Response.Status.GONE,
+                    "application/json",
+                    j.toString()
+                )
+            } catch (e: Exception) {
+                pumpConnectedWaiters.remove(f)
+                val j = JSONObject()
+                j.put("connected", false)
+                j.put("wait_ms", System.currentTimeMillis() - start)
+                j.put("error", e)
+                return newFixedLengthResponse(
+                    Response.Status.GONE,
+                    "application/json",
+                    j.toString()
+                    )
+            }
         }
 
         private fun handlePumpMessagesStream(session: IHTTPSession): Response {
@@ -543,11 +628,38 @@ class HttpDebugApiService(private val context: Context, private val port: Int = 
 
             val item = runBlocking { historyLogRepo.getRange(pumpSid, seqId, seqId).firstOrNull()?.firstOrNull() }
                 ?: return errorResponse("History log entry not found: seqId=$seqId, pumpSid=$pumpSid", Response.Status.NOT_FOUND)
-
             return newFixedLengthResponse(
                 Response.Status.OK,
                 "application/json",
                 historyLogItemToJson(item, format).toString()
+            )
+        }
+
+        private fun handlePumpCommandsGet(): Response {
+            val response = JSONObject()
+            val currentStatus = JSONObject()
+            val control = JSONObject()
+            for (m in Messages.entries) {
+                if (m.requestProps().characteristic == Characteristic.CURRENT_STATUS) {
+                    currentStatus.put(
+                        m.requestOpCode().toString(),
+                        m.requestClass().getSimpleName()
+                    )
+                } else if (m.requestProps().characteristic == Characteristic.CONTROL) {
+                    control.put(
+                        m.requestOpCode().toString(),
+                        m.requestClass().getSimpleName()
+                    )
+                }
+            }
+
+            response.put("currentStatus", currentStatus)
+            response.put("control", control)
+
+            return newFixedLengthResponse(
+                Response.Status.OK,
+                "application/json",
+                response.toString()
             )
         }
 
@@ -715,6 +827,7 @@ class HttpDebugApiService(private val context: Context, private val port: Int = 
                     )
                 }
 
+                val exceptions = JSONArray()
                 // Wait for responses (with 30 second timeout)
                 val responses = mutableListOf<Message>()
                 futures.values.forEach { future ->
@@ -722,6 +835,9 @@ class HttpDebugApiService(private val context: Context, private val port: Int = 
                         val response = future.get(30, TimeUnit.SECONDS)
                         responses.add(response)
                     } catch (e: Exception) {
+                        synchronized (exceptions) {
+                            exceptions.put(exceptions.length(), e.toString())
+                        }
                         Timber.w(e, "Timeout or error waiting for pump message response")
                     }
                 }
@@ -736,8 +852,20 @@ class HttpDebugApiService(private val context: Context, private val port: Int = 
                     jsonArray.put(JSONObject(responseJson))
                 }
 
+                val hasError = responses.any { it is ErrorResponse }
+                if (exceptions.length() > 0) {
+                    val r = JSONObject()
+                    r.put("exceptions", exceptions)
+                    r.put("response", jsonArray)
+                    return newFixedLengthResponse(
+                        Response.Status.INTERNAL_ERROR,
+                        "application/json",
+                        r.toString()
+                    )
+                }
+
                 return newFixedLengthResponse(
-                    Response.Status.OK,
+                    if (hasError) Response.Status.INTERNAL_ERROR else Response.Status.OK,
                     "application/json",
                     jsonArray.toString()
                 )

@@ -402,6 +402,8 @@ class CommService : Service() {
                 sendWearCommMessage("/from-pump/pump-critical-error",
                     reason?.message!!.toByteArray()
                 );
+
+                reason?.let { httpDebugApiService?.onPumpCriticalError(it) }
             }
 
             @Synchronized
@@ -717,7 +719,7 @@ class CommService : Service() {
         }
 
         private fun isBolusCommand(message: com.jwoglom.pumpx2.pump.messages.Message): Boolean {
-            return (message is InitiateBolusRequest) || message.opCode() == InitiateBolusRequest().opCode()
+            return (message is InitiateBolusRequest) || (message.opCode() == InitiateBolusRequest().opCode() && message.characteristic == Characteristic.CONTROL)
         }
     }
 

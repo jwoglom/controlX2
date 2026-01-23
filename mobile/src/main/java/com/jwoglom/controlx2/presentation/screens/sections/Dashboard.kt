@@ -108,9 +108,9 @@ fun Dashboard(
                 break
             }
 
-            Timber.i("Dashboard loading: remaining ${nullFields.size}: ${dashboardFields.map { it.value }}")
+            //Timber.i("Dashboard loading: remaining ${nullFields.size}: ${dashboardFields.map { it.value }}")
             if (sinceLastFetchTime >= 2500) {
-                Timber.i("Dashboard loading re-fetching with cache")
+                //Timber.i("Dashboard loading re-fetching with cache")
                 fetchDataStoreFields(SendType.CACHED)
                 sinceLastFetchTime = 0
             }
