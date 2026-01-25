@@ -147,6 +147,39 @@
         }
       }
     },
+    "/": {
+      "get": {
+        "summary": "Get debug API version info",
+        "description": "Returns ControlX2 and PumpX2 build metadata for the debug API instance",
+        "responses": {
+          "200": {
+            "description": "Version info",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "version": {"type": "string"},
+                    "buildVersion": {"type": "string"},
+                    "buildTime": {"type": "string"},
+                    "pumpx2": {
+                      "type": "object",
+                      "properties": {
+                        "version": {"type": "string"},
+                        "buildTime": {"type": "string"}
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          }
+        }
+      }
+    },
     "/api/pump/current": {
       "get": {
         "summary": "Get current pump data",
@@ -368,6 +401,15 @@
       "get": {
         "summary": "History log status",
         "description": "Returns counts and newest/oldest sequence info for the history log table",
+        "parameters": [
+          {
+            "name": "pumpSid",
+            "in": "query",
+            "required": false,
+            "schema": {"type": "integer"},
+            "description": "Optional pump SID to query"
+          }
+        ],
         "responses": {
           "200": {
             "description": "Status summary",
@@ -472,6 +514,15 @@
     "/api/historylog/types": {
       "get": {
         "summary": "List available history log types",
+        "parameters": [
+          {
+            "name": "pumpSid",
+            "in": "query",
+            "required": false,
+            "schema": {"type": "integer"},
+            "description": "Optional pump SID to query"
+          }
+        ],
         "responses": {
           "200": {
             "description": "Types with counts",
@@ -490,6 +541,20 @@
             }
           },
           "401": {"description": "Unauthorized"}
+        }
+      }
+    },
+    "/api/pump/debug-write-bt-characteristic": {
+      "post": {
+        "summary": "Debug write to pump BLE characteristic",
+        "description": "Debug-only endpoint for writing raw values to a BLE characteristic. Currently returns an empty response.",
+        "responses": {
+          "200": {
+            "description": "Empty response"
+          },
+          "401": {
+            "description": "Unauthorized"
+          }
         }
       }
     },
