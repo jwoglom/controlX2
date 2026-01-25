@@ -39,7 +39,50 @@
       "PumpMessage": {
         "type": "object",
         "description": "Pump message in JSON format from PumpMessageSerializer",
-        "additionalProperties": true
+        "properties": {
+          "cargo": {"type": "string", "description": "Hex-encoded cargo bytes"},
+          "opCode": {"type": "integer"},
+          "characteristic": {
+            "type": "string",
+            "enum": [
+              "CURRENT_STATUS",
+              "HISTORY_LOG",
+              "AUTHORIZATION",
+              "CONTROL",
+              "CONTROL_STREAM"
+            ]
+          }
+        },
+        "required": ["cargo", "opCode", "characteristic"]
+      },
+      "PumpCommands": {
+        "type": "object",
+        "properties": {
+          "currentStatus": {
+            "type": "object",
+            "additionalProperties": {"type": "string"}
+          },
+          "control": {
+            "type": "object",
+            "additionalProperties": {"type": "string"}
+          }
+        }
+      },
+      "PumpConnectionStatus": {
+        "type": "object",
+        "properties": {
+          "connected": {"type": "boolean"}
+        },
+        "required": ["connected"]
+      },
+      "PumpWaitConnected": {
+        "type": "object",
+        "properties": {
+          "connected": {"type": "boolean"},
+          "wait_ms": {"type": "integer"},
+          "error": {"type": "string"}
+        },
+        "required": ["connected", "wait_ms"]
       },
       "MessagingStreamEvent": {
         "type": "object",
@@ -242,6 +285,7 @@
                 "singleMessage": {
                   "summary": "Single message",
                   "value": {
+                    "cargo": "01020304",
                     "opCode": 123,
                     "characteristic": "CURRENT_STATUS"
                   }
@@ -249,8 +293,8 @@
                 "multipleMessages": {
                   "summary": "Multiple messages",
                   "value": [
-                    {"opCode": 123, "characteristic": "CURRENT_STATUS"},
-                    {"opCode": 124, "characteristic": "CURRENT_STATUS"}
+                    {"cargo": "01020304", "opCode": 123, "characteristic": "CURRENT_STATUS"},
+                    {"cargo": "0a0b0c0d", "opCode": 124, "characteristic": "CURRENT_STATUS"}
                   ]
                 }
               }
@@ -287,6 +331,79 @@
                 "schema": {"$ref": "#/components/schemas/Error"}
               }
             }
+          }
+        }
+      }
+    },
+    "/api/pump/commands": {
+      "get": {
+        "summary": "List available pump commands",
+        "description": "Returns a map of current status and control opcodes to request class names",
+        "responses": {
+          "200": {
+            "description": "Command mapping",
+            "content": {
+              "application/json": {
+                "schema": {"$ref": "#/components/schemas/PumpCommands"}
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          }
+        }
+      }
+    },
+    "/api/pump/connected": {
+      "get": {
+        "summary": "Check pump connection status",
+        "description": "Returns whether the pump is currently connected",
+        "responses": {
+          "200": {
+            "description": "Pump is connected",
+            "content": {
+              "application/json": {
+                "schema": {"$ref": "#/components/schemas/PumpConnectionStatus"}
+              }
+            }
+          },
+          "410": {
+            "description": "Pump is not connected",
+            "content": {
+              "application/json": {
+                "schema": {"$ref": "#/components/schemas/PumpConnectionStatus"}
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          }
+        }
+      }
+    },
+    "/api/pump/wait-connected": {
+      "get": {
+        "summary": "Wait for pump connection",
+        "description": "Blocks until the pump connects or 60 seconds elapse",
+        "responses": {
+          "200": {
+            "description": "Pump connected before timeout",
+            "content": {
+              "application/json": {
+                "schema": {"$ref": "#/components/schemas/PumpWaitConnected"}
+              }
+            }
+          },
+          "410": {
+            "description": "Pump did not connect before timeout",
+            "content": {
+              "application/json": {
+                "schema": {"$ref": "#/components/schemas/PumpWaitConnected"}
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
           }
         }
       }
