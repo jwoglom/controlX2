@@ -973,11 +973,9 @@ class HttpDebugApiService(private val context: Context, private val port: Int = 
     }
 
     private fun typeNameFromTypeId(typeId: Int): String? {
-        return try {
-            HistoryLog.fromTypeId(typeId)?.javaClass?.simpleName
-        } catch (e: Exception) {
-            null
-        }
+        // Note: Cannot determine class name from typeId alone without parsing cargo
+        // Return null and let the caller handle the missing typeName
+        return null
     }
 
     private fun historyLogItemToJson(item: HistoryLogItem, format: String = "raw"): JSONObject {
@@ -992,8 +990,13 @@ class HttpDebugApiService(private val context: Context, private val port: Int = 
         if (format == "parsed") {
             try {
                 val historyLog = item.parse()
-                json.put("typeName", historyLog.javaClass.simpleName)
-                json.put("parsed", JSONObject(historyLog.jsonToString()))
+                json.put("typeName", historyLog::class.java.simpleName)
+                val historyLogBytes = PumpMessageSerializer.historyLogToBytes(historyLog)
+                if (historyLogBytes != null) {
+                    json.put("parsed", JSONObject(String(historyLogBytes)))
+                } else {
+                    json.put("parseError", "Failed to serialize HistoryLog")
+                }
             } catch (e: Exception) {
                 json.put("parseError", e.message)
             }

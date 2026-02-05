@@ -66,6 +66,19 @@ class HistoryLogDummyDao(val data: MutableList<HistoryLogItem>) : HistoryLogDao 
         data.filter { it.pumpSid == pumpSid }.minByOrNull { it.seqId }
     )
 
+    override fun getTypeStats(pumpSid: Int): List<HistoryLogTypeStats> {
+        return data.filter { it.pumpSid == pumpSid }
+            .groupBy { it.typeId }
+            .map { (typeId, items) ->
+                HistoryLogTypeStats(
+                    typeId = typeId,
+                    count = items.size.toLong(),
+                    latestSeqId = items.maxOfOrNull { it.seqId },
+                    latestPumpTime = items.maxByOrNull { it.pumpTime }?.pumpTime
+                )
+            }
+    }
+
     override suspend fun insert(historyLogItem: HistoryLogItem) {
         // OnConflictStrategy.IGNORE behavior
         if (!data.any { it.pumpSid == historyLogItem.pumpSid && it.seqId == historyLogItem.seqId }) {
