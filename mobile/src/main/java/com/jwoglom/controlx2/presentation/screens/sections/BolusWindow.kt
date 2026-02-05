@@ -83,6 +83,7 @@ import com.jwoglom.controlx2.presentation.screens.sections.components.DecimalOut
 import com.jwoglom.controlx2.presentation.screens.sections.components.IntegerOutlinedText
 import com.jwoglom.controlx2.presentation.util.LifecycleStateObserver
 import com.jwoglom.controlx2.shared.enums.GlucoseUnit
+import com.jwoglom.controlx2.shared.util.GlucoseConverter
 import com.jwoglom.controlx2.shared.util.SendType
 import com.jwoglom.controlx2.shared.util.snakeCaseToSpace
 import com.jwoglom.controlx2.shared.util.twoDecimalPlaces
@@ -211,12 +212,22 @@ fun BolusWindow(
     }
 
     fun recalculate() {
+        // Convert glucose from display unit to mg/dL for the bolus calculator
+        val glucoseDisplayValue = rawToInt(glucoseRawValue.value)
+        val glucoseMgdlValue = when {
+            glucoseDisplayValue == null -> null
+            glucoseUnit == GlucoseUnit.MMOL -> {
+                val displayDouble = glucoseRawValue.value?.toDoubleOrNull()
+                displayDouble?.let { GlucoseConverter.convert(it, GlucoseUnit.MMOL, GlucoseUnit.MGDL).toInt() }
+            }
+            else -> glucoseDisplayValue
+        }
         dataStore.bolusCalculatorBuilder.value = buildBolusCalculator(
             bolusCalcDataSnapshot.value,
             bolusCalcLastBG.value,
             if (unitsHumanEntered != null) rawToDouble(unitsRawValue.value) else null,
             rawToInt(carbsRawValue.value),
-            rawToInt(glucoseRawValue.value)
+            glucoseMgdlValue
         )
 
         dataStore.bolusCurrentParameters.value =
@@ -290,7 +301,7 @@ fun BolusWindow(
             dataStore.bolusCurrentParameters.value!!.glucoseMgdl > 0 &&
             autofilledBg != null
         ) {
-            dataStore.bolusGlucoseRawValue.value = "$autofilledBg"
+            dataStore.bolusGlucoseRawValue.value = GlucoseConverter.format(autofilledBg, glucoseUnit)
         }
         glucoseSubtitle = when {
             glucoseHumanEntered != null -> "Entered ($unitAbbrev)"

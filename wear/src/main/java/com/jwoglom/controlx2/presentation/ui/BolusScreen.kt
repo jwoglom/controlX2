@@ -81,6 +81,7 @@ import com.jwoglom.controlx2.presentation.DataStore
 import com.jwoglom.controlx2.presentation.components.LineTextDescription
 import com.jwoglom.controlx2.presentation.defaultTheme
 import com.jwoglom.controlx2.shared.enums.GlucoseUnit
+import com.jwoglom.controlx2.shared.util.GlucoseConverter
 import com.jwoglom.controlx2.shared.presentation.LifecycleStateObserver
 import com.jwoglom.controlx2.shared.util.SendType
 import com.jwoglom.controlx2.shared.util.firstLetterCapitalized
@@ -336,8 +337,8 @@ fun BolusScreen(
 
             val autofilledBg = dataStore.bolusCalculatorBuilder.value?.glucoseMgdl?.orElse(null)
             dataStore.bolusBGDisplayedText.value = when {
-                bolusBgMgdlUserInput != null -> "$bolusBgMgdlUserInput"
-                autofilledBg != null -> "$autofilledBg"
+                bolusBgMgdlUserInput != null -> GlucoseConverter.format(bolusBgMgdlUserInput!!, glucoseUnit)
+                autofilledBg != null -> GlucoseConverter.format(autofilledBg, glucoseUnit)
                 else -> "?"
             }
             dataStore.bolusBGDisplayedSubtitle.value = when {

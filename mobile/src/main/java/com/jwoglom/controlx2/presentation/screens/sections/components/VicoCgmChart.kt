@@ -839,9 +839,17 @@ fun VicoCgmChart(
             textAlign = TextAlign.Center
         )
     } else {
-        val yAxisLabels = remember(fixedGlucoseRange) {
-            //listOf("400", "360", "320", "280", "240", "200", "160", "120", "80", "40")
-            listOf("400", " ", " ", "280", " ", "200", "160", "120", "80", "40")
+        val yAxisLabels = remember(fixedGlucoseRange, glucoseUnit) {
+            val mgdlValues = listOf(400, 360, 320, 280, 240, 200, 160, 120, 80, 40)
+            val sparseIndices = setOf(0, 3, 5, 6, 7, 8, 9) // indices to show labels for
+            when (glucoseUnit) {
+                GlucoseUnit.MGDL -> mgdlValues.mapIndexed { i, v ->
+                    if (i in sparseIndices) "$v" else " "
+                }
+                GlucoseUnit.MMOL -> mgdlValues.mapIndexed { i, v ->
+                    if (i in sparseIndices) String.format("%.1f", v * GlucoseConverter.MGDL_TO_MMOL_FACTOR) else " "
+                }
+            }
         }
 
         // Create persistent markers for bolus events

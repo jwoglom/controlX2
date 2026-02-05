@@ -362,6 +362,11 @@ class CommService : Service() {
                 sendWearCommMessage("/from-pump/pump-connected",
                     peripheral?.name!!.toByteArray()
                 )
+                // Sync glucose unit preference to wear app
+                val glucoseUnit = Prefs(applicationContext).glucoseUnit()
+                if (glucoseUnit != null) {
+                    sendWearCommMessage("/to-wear/glucose-unit", glucoseUnit.name.toByteArray())
+                }
                 currentPumpData.connectionTime = Instant.now()
                 updateNotification("Connected to pump")
             }

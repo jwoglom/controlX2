@@ -3,6 +3,7 @@ package com.jwoglom.controlx2.util
 import android.content.Context
 import android.content.SharedPreferences
 import com.google.android.gms.wearable.WearableListenerService
+import com.jwoglom.controlx2.shared.enums.GlucoseUnit
 import timber.log.Timber
 import java.time.Instant
 
@@ -29,6 +30,16 @@ class StatePrefs(val context: Context) {
         get() = get("cgmReading")
         set(value) {
             set("cgmReading", value)
+        }
+
+    var glucoseUnit: GlucoseUnit
+        get() {
+            val name = prefs().getString("StatePrefs_glucoseUnit", null)
+            return GlucoseUnit.fromName(name) ?: GlucoseUnit.MGDL
+        }
+        set(value) {
+            Timber.d("StatePrefs set glucoseUnit=$value")
+            prefs().edit().putString("StatePrefs_glucoseUnit", value.name).apply()
         }
 
     private fun get(key: String): Pair<String, Instant>? {
