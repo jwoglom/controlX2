@@ -513,6 +513,15 @@ class MainActivity : ComponentActivity(), MessageClient.OnMessageReceivedListene
             "/to-wear/bolus-min-notify-threshold" -> {
                 dataStore.bolusMinNotifyThreshold.value = String(messageEvent.data).toDoubleOrNull()
             }
+            "/to-wear/glucose-unit" -> {
+                val unitName = String(messageEvent.data)
+                val unit = com.jwoglom.controlx2.shared.enums.GlucoseUnit.fromName(unitName)
+                if (unit != null) {
+                    dataStore.glucoseUnitPreference.value = unit
+                    com.jwoglom.controlx2.util.StatePrefs(applicationContext).glucoseUnit = unit
+                    com.jwoglom.controlx2.util.UpdateComplication(this, com.jwoglom.controlx2.util.WearX2Complication.CGM_READING)
+                }
+            }
             "/to-wear/initiate-confirmed-bolus" -> {
                 if (inWaitingState()) {
                     Timber.e("in invalid state for initiate-confirmed-bolus")

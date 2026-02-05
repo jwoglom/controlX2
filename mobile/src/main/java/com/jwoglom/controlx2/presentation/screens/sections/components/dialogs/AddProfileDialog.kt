@@ -26,6 +26,8 @@ import androidx.compose.ui.unit.dp
 import com.jwoglom.controlx2.LocalDataStore
 import com.jwoglom.controlx2.presentation.theme.ControlX2Theme
 import com.jwoglom.controlx2.shared.enums.GlucoseUnit
+import com.jwoglom.controlx2.shared.util.GlucoseConverter
+import kotlin.math.roundToInt
 
 @Composable
 fun AddProfileDialog(
@@ -39,8 +41,14 @@ fun AddProfileDialog(
     var profileName by remember { mutableStateOf("") }
     var carbRatio by remember { mutableStateOf("10") }
     var basalRate by remember { mutableStateOf("1.0") }
-    var targetBG by remember { mutableStateOf("110") }
-    var isf by remember { mutableStateOf("50") }
+    var targetBG by remember { mutableStateOf(when (glucoseUnit) {
+        GlucoseUnit.MGDL -> "110"
+        GlucoseUnit.MMOL -> "6.1"
+    }) }
+    var isf by remember { mutableStateOf(when (glucoseUnit) {
+        GlucoseUnit.MGDL -> "50"
+        GlucoseUnit.MMOL -> "2.8"
+    }) }
     var insulinDuration by remember { mutableStateOf("240") }
     var carbEntryEnabled by remember { mutableStateOf(true) }
 
@@ -96,8 +104,11 @@ fun AddProfileDialog(
                         value = targetBG,
                         onValueChange = { targetBG = it },
                         label = { Text("Target BG ($unitAbbrev)") },
-                        supportingText = { Text("Example: 110") },
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        supportingText = { Text(when (glucoseUnit) {
+                            GlucoseUnit.MGDL -> "Example: 110"
+                            GlucoseUnit.MMOL -> "Example: 6.1"
+                        }) },
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                         modifier = Modifier.fillMaxWidth()
                     )
                 }
@@ -112,7 +123,7 @@ fun AddProfileDialog(
                                 GlucoseUnit.MMOL -> "Example: 2.8 = 1u:2.8 mmol/L"
                             })
                         },
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                         modifier = Modifier.fillMaxWidth()
                     )
                 }
@@ -133,16 +144,29 @@ fun AddProfileDialog(
                 onClick = {
                     val carbRatioInt = (carbRatio.toFloatOrNull() ?: 10f) * 1000
                     val basalRateMilliunits = ((basalRate.toFloatOrNull() ?: 1.0f) * 1000).toInt()
-                    val targetBGInt = targetBG.toIntOrNull() ?: 110
-                    val isfInt = isf.toIntOrNull() ?: 50
+                    // Convert glucose values from display unit to mg/dL for pump
+                    val targetBGMgdl = when (glucoseUnit) {
+                        GlucoseUnit.MGDL -> targetBG.toIntOrNull() ?: 110
+                        GlucoseUnit.MMOL -> GlucoseConverter.convert(
+                            targetBG.toDoubleOrNull() ?: 6.1,
+                            GlucoseUnit.MMOL, GlucoseUnit.MGDL
+                        ).roundToInt()
+                    }
+                    val isfMgdl = when (glucoseUnit) {
+                        GlucoseUnit.MGDL -> isf.toIntOrNull() ?: 50
+                        GlucoseUnit.MMOL -> GlucoseConverter.convert(
+                            isf.toDoubleOrNull() ?: 2.8,
+                            GlucoseUnit.MMOL, GlucoseUnit.MGDL
+                        ).roundToInt()
+                    }
                     val insulinDurationInt = insulinDuration.toIntOrNull() ?: 240
 
                     onConfirm(
                         profileName,
                         carbRatioInt.toInt(),
                         basalRateMilliunits,
-                        targetBGInt,
-                        isfInt,
+                        targetBGMgdl,
+                        isfMgdl,
                         insulinDurationInt,
                         carbEntryEnabled
                     )

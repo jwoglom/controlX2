@@ -19,6 +19,8 @@ import com.google.common.base.Strings
 import com.jwoglom.controlx2.LocalDataStore
 import com.jwoglom.controlx2.presentation.defaultTheme
 import com.jwoglom.controlx2.presentation.redTheme
+import com.jwoglom.controlx2.shared.enums.GlucoseUnit
+import com.jwoglom.controlx2.shared.util.GlucoseConverter
 
 @Composable
 fun CurrentCGMText(
@@ -31,13 +33,14 @@ fun CurrentCGMText(
     val cgmStatusText = ds.cgmStatusText.observeAsState()
     val cgmHighLowState = ds.cgmHighLowState.observeAsState()
     val cgmDeltaArrow = ds.cgmDeltaArrow.observeAsState()
+    val glucoseUnit = ds.glucoseUnitPreference.observeAsState()
     val displayText = when (cgmSessionState.value) {
         "Starting", "Stopped", "Stopping", "Unknown" -> cgmStatusText.value!!
         else -> when {
             !Strings.isNullOrEmpty(cgmStatusText.value) -> cgmStatusText.value!!
             else -> when {
-                cgmReading.value != null && cgmDeltaArrow.value != null -> "${cgmReading.value} ${cgmDeltaArrow.value}"
-                cgmReading.value != null -> "${cgmReading.value}"
+                cgmReading.value != null && cgmDeltaArrow.value != null -> "${GlucoseConverter.format(cgmReading.value!!, glucoseUnit.value ?: GlucoseUnit.MGDL)} ${cgmDeltaArrow.value}"
+                cgmReading.value != null -> GlucoseConverter.format(cgmReading.value!!, glucoseUnit.value ?: GlucoseUnit.MGDL)
                 else -> ""
             }
         }
@@ -104,14 +107,16 @@ fun CurvedScope.currentCGMTextCurvedExcludingDeltaArrow(
     cgmReading: Int?,
     cgmDeltaArrow: String?,
     cgmHighLowState: String?,
+    glucoseUnit: GlucoseUnit = GlucoseUnit.MGDL,
 ) {
+    val formattedReading = cgmReading?.let { GlucoseConverter.format(it, glucoseUnit) }
     val displayText = when (cgmSessionState) {
         "Starting", "Stopped", "Stopping", "Unknown" -> cgmStatusText
         else -> when {
             !Strings.isNullOrEmpty(cgmStatusText) -> cgmStatusText
             else -> when {
-                cgmReading != null && cgmDeltaArrow != null -> "${cgmReading}"
-                cgmReading != null -> "${cgmReading}"
+                formattedReading != null && cgmDeltaArrow != null -> formattedReading
+                formattedReading != null -> formattedReading
                 else -> ""
             }
         }

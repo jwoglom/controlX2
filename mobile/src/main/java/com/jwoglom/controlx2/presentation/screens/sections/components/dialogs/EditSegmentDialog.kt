@@ -30,6 +30,8 @@ import androidx.compose.ui.unit.sp
 import com.jwoglom.controlx2.LocalDataStore
 import com.jwoglom.controlx2.presentation.theme.ControlX2Theme
 import com.jwoglom.controlx2.shared.enums.GlucoseUnit
+import com.jwoglom.controlx2.shared.util.GlucoseConverter
+import kotlin.math.roundToInt
 import com.jwoglom.pumpx2.pump.messages.builders.IDPManager
 import com.jwoglom.pumpx2.pump.messages.models.InsulinUnit
 import com.jwoglom.pumpx2.pump.messages.models.MinsTime
@@ -58,8 +60,12 @@ fun EditSegmentDialog(
     )
     var basalRate by remember { mutableStateOf(InsulinUnit.from1000To1(segment.profileBasalRate.toLong()).toString()) }
     var carbRatio by remember { mutableStateOf(segment.profileCarbRatio.toString()) }
-    var targetBG by remember { mutableStateOf(segment.profileTargetBG.toString()) }
-    var isf by remember { mutableStateOf(segment.profileISF.toString()) }
+    var targetBG by remember { mutableStateOf(
+        GlucoseConverter.format(segment.profileTargetBG, glucoseUnit)
+    ) }
+    var isf by remember { mutableStateOf(
+        GlucoseConverter.format(segment.profileISF, glucoseUnit)
+    ) }
     var errorMessage by remember { mutableStateOf("") }
 
     AlertDialog(
@@ -115,9 +121,12 @@ fun EditSegmentDialog(
                     OutlinedTextField(
                         value = targetBG,
                         onValueChange = { targetBG = it },
-                        label = { Text("Target BG") },
-                        placeholder = { Text("e.g., 110") },
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        label = { Text("Target BG (${glucoseUnit.abbreviation})") },
+                        placeholder = { Text(when (glucoseUnit) {
+                            GlucoseUnit.MGDL -> "e.g., 110"
+                            GlucoseUnit.MMOL -> "e.g., 6.1"
+                        }) },
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                         modifier = Modifier.fillMaxWidth()
                     )
                 }
@@ -125,15 +134,18 @@ fun EditSegmentDialog(
                     OutlinedTextField(
                         value = isf,
                         onValueChange = { isf = it },
-                        label = { Text("ISF (Insulin Sensitivity Factor)") },
+                        label = { Text("ISF (${glucoseUnit.abbreviation} per u)") },
                         supportingText = {
                             Text(when (glucoseUnit) {
                                 GlucoseUnit.MGDL -> "Example: 50 = 1u:50 mg/dL"
                                 GlucoseUnit.MMOL -> "Example: 2.8 = 1u:2.8 mmol/L"
                             })
                         },
-                        placeholder = { Text("e.g., 50") },
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        placeholder = { Text(when (glucoseUnit) {
+                            GlucoseUnit.MGDL -> "e.g., 50"
+                            GlucoseUnit.MMOL -> "e.g., 2.8"
+                        }) },
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                         modifier = Modifier.fillMaxWidth()
                     )
                 }
@@ -157,8 +169,21 @@ fun EditSegmentDialog(
                         val newStartTime = MinsTime(hours, minutes)
                         val basalRateFloat = basalRate.toFloatOrNull() ?: 0f
                         val carbRatioLong = carbRatio.toLongOrNull() ?: 0L
-                        val targetBGInt = targetBG.toIntOrNull() ?: 0
-                        val isfInt = isf.toIntOrNull() ?: 0
+                        // Convert glucose values from display unit to mg/dL for pump
+                        val targetBGMgdl = when (glucoseUnit) {
+                            GlucoseUnit.MGDL -> targetBG.toIntOrNull() ?: 0
+                            GlucoseUnit.MMOL -> GlucoseConverter.convert(
+                                targetBG.toDoubleOrNull() ?: 0.0,
+                                GlucoseUnit.MMOL, GlucoseUnit.MGDL
+                            ).roundToInt()
+                        }
+                        val isfMgdl = when (glucoseUnit) {
+                            GlucoseUnit.MGDL -> isf.toIntOrNull() ?: 0
+                            GlucoseUnit.MMOL -> GlucoseConverter.convert(
+                                isf.toDoubleOrNull() ?: 0.0,
+                                GlucoseUnit.MMOL, GlucoseUnit.MGDL
+                            ).roundToInt()
+                        }
 
                         if (hours < 0 || hours > 23 || minutes < 0 || minutes > 59) {
                             errorMessage = "Invalid time. Hours must be 0-23, minutes must be 0-59."
@@ -172,16 +197,16 @@ fun EditSegmentDialog(
                             errorMessage = "Carb ratio must be greater than 0"
                             return@TextButton
                         }
-                        if (targetBGInt <= 0) {
+                        if (targetBGMgdl <= 0) {
                             errorMessage = "Target BG must be greater than 0"
                             return@TextButton
                         }
-                        if (isfInt <= 0) {
+                        if (isfMgdl <= 0) {
                             errorMessage = "ISF must be greater than 0"
                             return@TextButton
                         }
 
-                        onConfirm(newStartTime, basalRateFloat, carbRatioLong, targetBGInt, isfInt)
+                        onConfirm(newStartTime, basalRateFloat, carbRatioLong, targetBGMgdl, isfMgdl)
                     } catch (e: Exception) {
                         errorMessage = "Error: ${e.message}"
                         Timber.e(e, "Error updating segment")

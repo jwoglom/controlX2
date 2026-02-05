@@ -320,8 +320,9 @@ fun AppSetup(
                                     Prefs(context).setGlucoseUnit(unit)
                                     ds.glucoseUnitPreference.value = unit
                                     showGlucoseUnitDialog = false
-                                    // Trigger app reload
+                                    // Sync glucose unit to wear app and trigger reload
                                     coroutineScope.launch {
+                                        sendMessage("/to-wear/glucose-unit", unit.name.toByteArray())
                                         withContext(Dispatchers.IO) {
                                             Thread.sleep(250)
                                         }

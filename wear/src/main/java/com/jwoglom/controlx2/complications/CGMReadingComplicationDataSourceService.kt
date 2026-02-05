@@ -19,6 +19,8 @@ import androidx.wear.watchface.complications.datasource.ComplicationRequest
 import androidx.wear.watchface.complications.datasource.SuspendingComplicationDataSourceService
 import com.jwoglom.controlx2.MainActivity
 import com.jwoglom.controlx2.R
+import com.jwoglom.controlx2.shared.enums.GlucoseUnit
+import com.jwoglom.controlx2.shared.util.GlucoseConverter
 import com.jwoglom.controlx2.util.StatePrefs
 import java.time.Duration
 import java.time.Instant
@@ -33,11 +35,13 @@ class CGMReadingComplicationDataSourceService : SuspendingComplicationDataSource
         Log.i(tag, "onComplicationRequest(${request.complicationType}, ${request.complicationInstanceId}, ${request.immediateResponseRequired})")
 
         val tapIntent = PendingIntent.getActivity(this, 0, Intent(this, MainActivity::class.java), PendingIntent.FLAG_IMMUTABLE)
-        val pumpIOB = StatePrefs(this).cgmReading
+        val statePrefs = StatePrefs(this)
+        val pumpIOB = statePrefs.cgmReading
+        val glucoseUnit = statePrefs.glucoseUnit
 
         return getComplicationDataForType(
             request.complicationType,
-            buildDataFields(readingPair = pumpIOB),
+            buildDataFields(readingPair = pumpIOB, glucoseUnit = glucoseUnit),
             tapIntent,
         )
     }
@@ -57,7 +61,8 @@ class CGMReadingComplicationDataSourceService : SuspendingComplicationDataSource
 
     override fun getPreviewData(type: ComplicationType): ComplicationData? {
         val data = buildDataFields(
-            readingPair = Pair("15.00", Instant.now())
+            readingPair = Pair("15.00", Instant.now()),
+            glucoseUnit = StatePrefs(this).glucoseUnit
         )
         return getComplicationDataForType(type, data, null)
     }
@@ -72,8 +77,9 @@ class CGMReadingComplicationDataSourceService : SuspendingComplicationDataSource
 
     private fun buildDataFields(
         readingPair: Pair<String, Instant>?,
+        glucoseUnit: GlucoseUnit = GlucoseUnit.MGDL,
     ): DataFields {
-        Log.i(tag, "buildDataFields($readingPair)")
+        Log.i(tag, "buildDataFields($readingPair, $glucoseUnit)")
 
         val text: ComplicationText
         val monochromaticImage: MonochromaticImage?
@@ -83,7 +89,7 @@ class CGMReadingComplicationDataSourceService : SuspendingComplicationDataSource
             Duration.between(it, Instant.now())
         } ?: Duration.ZERO
         val cgmNum = readingPair?.first?.toIntOrNull() ?: 0
-        val cgmLabel = "$cgmNum"
+        val cgmLabel = GlucoseConverter.format(cgmNum, glucoseUnit)
         var displayType = ""
 
         when {
@@ -134,8 +140,9 @@ class CGMReadingComplicationDataSourceService : SuspendingComplicationDataSource
             text = "${caseContentDescription}: $cgmLabel"
         ).build()
 
+        val cgmDisplayValue = GlucoseConverter.convert(cgmNum.toDouble(), GlucoseUnit.MGDL, glucoseUnit).toFloat()
         return DataFields(
-            cgmValue = cgmNum.toFloat(),
+            cgmValue = cgmDisplayValue,
             contentDescription = contentDescription,
             text = text,
             monochromaticImage = monochromaticImage,
@@ -147,10 +154,12 @@ class CGMReadingComplicationDataSourceService : SuspendingComplicationDataSource
         data: DataFields,
         tapAction: PendingIntent?
     ): ComplicationData {
+        val glucoseUnit = StatePrefs(this).glucoseUnit
+        val maxValue = GlucoseConverter.convert(MaxMgdl.toDouble(), GlucoseUnit.MGDL, glucoseUnit).toFloat()
         return RangedValueComplicationData.Builder(
             value = data.cgmValue,
             min = 0f,
-            max = MaxMgdl.toFloat(),
+            max = maxValue,
             contentDescription = data.contentDescription
         )
 //            .setColorRamp(ColorRamp(

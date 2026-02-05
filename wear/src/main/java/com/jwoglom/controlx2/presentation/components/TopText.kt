@@ -19,6 +19,7 @@ import androidx.wear.compose.material.TimeText
 import androidx.wear.compose.material.TimeTextDefaults
 import androidx.wear.compose.material.curvedText
 import com.jwoglom.controlx2.LocalDataStore
+import com.jwoglom.controlx2.shared.enums.GlucoseUnit
 
 
 @Composable
@@ -51,6 +52,7 @@ fun TopText(
         val cgmStatusText = ds.cgmStatusText.observeAsState()
         val cgmHighLowState = ds.cgmHighLowState.observeAsState()
         val cgmDeltaArrow = ds.cgmDeltaArrow.observeAsState()
+        val glucoseUnit = ds.glucoseUnitPreference.observeAsState()
         TimeText(
             modifier = modifier,
             startCurvedContent = if (visibleText) {
@@ -77,7 +79,8 @@ fun TopText(
                     cgmStatusText.value,
                     cgmReading.value,
                     cgmDeltaArrow.value,
-                    cgmHighLowState.value
+                    cgmHighLowState.value,
+                    glucoseUnit.value ?: GlucoseUnit.MGDL
                 )
                 curvedComposable (radialAlignment = CurvedAlignment.Radial.Outer) {
                     CurrentCGMTextDeltaArrow(textStyle, modifier = Modifier.padding(start = 2.dp))

@@ -147,6 +147,14 @@ class PhoneCommService : Service() {
                 val pumpMessage = PumpMessageSerializer.fromBytes(data)
                 onPumpMessageReceived(pumpMessage, false)
             }
+            "/to-wear/glucose-unit" -> {
+                val unitName = String(data)
+                val unit = com.jwoglom.controlx2.shared.enums.GlucoseUnit.fromName(unitName)
+                if (unit != null) {
+                    StatePrefs(applicationContext).glucoseUnit = unit
+                    UpdateComplication(this, WearX2Complication.CGM_READING)
+                }
+            }
         }
     }
 

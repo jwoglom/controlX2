@@ -84,6 +84,7 @@ import com.jwoglom.controlx2.presentation.ui.IndeterminateProgressIndicator
 import com.jwoglom.controlx2.presentation.ui.LandingScreen
 import com.jwoglom.controlx2.presentation.ui.ScalingLazyListStateViewModel
 import com.jwoglom.controlx2.presentation.ui.ScrollStateViewModel
+import com.jwoglom.controlx2.shared.enums.GlucoseUnit
 import com.jwoglom.controlx2.shared.enums.UserMode
 import com.jwoglom.controlx2.shared.util.SendType
 import com.jwoglom.pumpx2.pump.messages.request.control.SetModesRequest
@@ -521,9 +522,10 @@ fun WearApp(
 
                 composable(Screen.BolusSelectBGScreen.route) {
                     val currentBG = LocalDataStore.current.bolusCalculatorBuilder.value?.glucoseMgdl?.orElse(null)
+                    val glucoseUnit = LocalDataStore.current.glucoseUnitPreference.value ?: GlucoseUnit.MGDL
 
                     SingleNumberPicker(
-                        label = "BG",
+                        label = "BG (${glucoseUnit.abbreviation})",
                         minNumber = 40,
                         maxNumber = 400,
                         defaultNumber = when {
