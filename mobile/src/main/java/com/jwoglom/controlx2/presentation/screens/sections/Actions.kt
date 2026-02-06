@@ -687,6 +687,50 @@ fun Actions(
                         )
                     }
                 }
+
+                item {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .wrapContentSize(Alignment.TopStart)
+                    ) {
+                        ListItem(
+                            headlineContent = { Text(
+                                "Control-IQ Settings"
+                            )},
+                            supportingContent = {
+                            },
+                            leadingContent = {
+                                Icon(Icons.Filled.Settings, contentDescription = null)
+                            },
+                            modifier = Modifier.clickable {
+                                navigateToSection(LandingSection.CONTROLIQ_SETTINGS_ACTIONS)
+                            }
+                        )
+                    }
+                }
+
+                item {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .wrapContentSize(Alignment.TopStart)
+                    ) {
+                        ListItem(
+                            headlineContent = { Text(
+                                "Safety Limits"
+                            )},
+                            supportingContent = {
+                            },
+                            leadingContent = {
+                                Icon(Icons.Filled.Settings, contentDescription = null)
+                            },
+                            modifier = Modifier.clickable {
+                                navigateToSection(LandingSection.SAFETY_LIMITS_ACTIONS)
+                            }
+                        )
+                    }
+                }
             }
         )
     }

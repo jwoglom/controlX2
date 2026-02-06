@@ -77,10 +77,12 @@ import com.jwoglom.controlx2.presentation.screens.sections.Actions
 import com.jwoglom.controlx2.presentation.screens.sections.BolusWindow
 import com.jwoglom.controlx2.presentation.screens.sections.CGMActions
 import com.jwoglom.controlx2.presentation.screens.sections.CartridgeActions
+import com.jwoglom.controlx2.presentation.screens.sections.ControlIQSettingsActions
 import com.jwoglom.controlx2.presentation.screens.sections.Dashboard
 import com.jwoglom.controlx2.presentation.screens.sections.Debug
 import com.jwoglom.controlx2.presentation.screens.sections.Notifications
 import com.jwoglom.controlx2.presentation.screens.sections.ProfileActions
+import com.jwoglom.controlx2.presentation.screens.sections.SafetyLimitsActions
 import com.jwoglom.controlx2.presentation.screens.sections.Settings
 import com.jwoglom.controlx2.presentation.screens.sections.TempRateWindow
 import com.jwoglom.controlx2.presentation.screens.sections.SoundSettingsActions
@@ -333,6 +335,28 @@ fun Landing(
                                 },
                             )
                         }
+                        LandingSection.CONTROLIQ_SETTINGS_ACTIONS -> {
+                            ControlIQSettingsActions(
+                                innerPadding = innerPadding,
+                                navController = navController,
+                                sendMessage = sendMessage,
+                                sendPumpCommands = sendPumpCommands,
+                                navigateBack = {
+                                    selectedItem = LandingSection.ACTIONS
+                                },
+                            )
+                        }
+                        LandingSection.SAFETY_LIMITS_ACTIONS -> {
+                            SafetyLimitsActions(
+                                innerPadding = innerPadding,
+                                navController = navController,
+                                sendMessage = sendMessage,
+                                sendPumpCommands = sendPumpCommands,
+                                navigateBack = {
+                                    selectedItem = LandingSection.ACTIONS
+                                },
+                            )
+                        }
                         LandingSection.DEBUG -> {
                             Debug(
                                 innerPadding = innerPadding,
@@ -458,6 +482,8 @@ enum class LandingSection(val label: String, val icon: ImageVector, val showInNa
     CARTRIDGE_ACTIONS("Actions", Icons.Filled.Create, false),
     PROFILE_ACTIONS("Profiles", Icons.Filled.Create, false),
     SOUND_SETTINGS_ACTIONS("Profiles", Icons.Filled.Create, false),
+    CONTROLIQ_SETTINGS_ACTIONS("Actions", Icons.Filled.Create, false),
+    SAFETY_LIMITS_ACTIONS("Actions", Icons.Filled.Create, false),
 
     SETTINGS("Settings", Icons.Filled.Settings, true),
     DEBUG("Settings", Icons.Filled.Settings, false),

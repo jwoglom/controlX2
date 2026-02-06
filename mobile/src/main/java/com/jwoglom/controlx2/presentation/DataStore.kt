@@ -32,6 +32,10 @@ import com.jwoglom.pumpx2.pump.messages.response.controlStream.FillCannulaStateS
 import com.jwoglom.pumpx2.pump.messages.response.controlStream.FillTubingStateStreamResponse
 import com.jwoglom.pumpx2.pump.messages.response.controlStream.PumpingStateStreamResponse
 import com.jwoglom.pumpx2.pump.messages.response.currentStatus.AlertStatusResponse
+import com.jwoglom.pumpx2.pump.messages.response.currentStatus.BasalLimitSettingsResponse
+import com.jwoglom.pumpx2.pump.messages.response.currentStatus.ControlIQInfoAbstractResponse
+import com.jwoglom.pumpx2.pump.messages.response.currentStatus.ControlIQSleepScheduleResponse
+import com.jwoglom.pumpx2.pump.messages.response.currentStatus.GlobalMaxBolusSettingsResponse
 import com.jwoglom.pumpx2.pump.messages.response.currentStatus.PumpGlobalsResponse
 import com.jwoglom.pumpx2.pump.messages.response.currentStatus.TempRateResponse
 import timber.log.Timber
@@ -65,6 +69,10 @@ class DataStore {
     var tempRateActive = MutableLiveData<Boolean>()
     var tempRateDetails = MutableLiveData<TempRateResponse>()
     val pumpGlobalsResponse = MutableLiveData<PumpGlobalsResponse>()
+    val controlIQInfoResponse = MutableLiveData<ControlIQInfoAbstractResponse>()
+    val controlIQSleepScheduleResponse = MutableLiveData<ControlIQSleepScheduleResponse>()
+    val globalMaxBolusSettingsResponse = MutableLiveData<GlobalMaxBolusSettingsResponse>()
+    val basalLimitSettingsResponse = MutableLiveData<BasalLimitSettingsResponse>()
     val cgmSessionState = MutableLiveData<CGMSessionState>()
     val cgmSessionExpireRelative = MutableLiveData<String>()
     val cgmSessionExpireExact = MutableLiveData<String>()
@@ -158,6 +166,10 @@ class DataStore {
         tempRateActive.observeForever { t -> Timber.i("DataStore.tempRateActive=$t") }
         tempRateDetails.observeForever { t -> Timber.i("DataStore.tempRateDetails=$t") }
         pumpGlobalsResponse.observeForever { t -> Timber.i("DataStore.pumpGlobalsResponse=$t") }
+        controlIQInfoResponse.observeForever { t -> Timber.i("DataStore.controlIQInfoResponse=$t") }
+        controlIQSleepScheduleResponse.observeForever { t -> Timber.i("DataStore.controlIQSleepScheduleResponse=$t") }
+        globalMaxBolusSettingsResponse.observeForever { t -> Timber.i("DataStore.globalMaxBolusSettingsResponse=$t") }
+        basalLimitSettingsResponse.observeForever { t -> Timber.i("DataStore.basalLimitSettingsResponse=$t") }
         cgmSessionState.observeForever { t -> Timber.i("DataStore.cgmSessionState=$t") }
         cgmSessionExpireRelative.observeForever { t -> Timber.i("DataStore.cgmSessionExpireRelative=$t") }
         cgmSessionExpireExact.observeForever { t -> Timber.i("DataStore.cgmSessionExpireExact=$t") }
