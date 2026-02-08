@@ -13,16 +13,23 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Divider
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
@@ -46,9 +53,12 @@ import com.jwoglom.controlx2.util.AppVersionCheck
 import com.jwoglom.controlx2.util.AppVersionInfo
 import com.jwoglom.pumpx2.pump.PumpState
 import com.jwoglom.pumpx2.pump.messages.Message
+import com.jwoglom.pumpx2.pump.messages.request.control.ChangeTimeDateRequest
+import com.jwoglom.pumpx2.pump.messages.request.control.PlaySoundRequest
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import java.time.Instant
 
 @Composable
 fun Settings(
@@ -61,6 +71,9 @@ fun Settings(
 ) {
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
+
+    var showSyncTimeDialog by remember { mutableStateOf(false) }
+    var showPlaySoundDialog by remember { mutableStateOf(false) }
 
     LazyColumn(
         contentPadding = innerPadding,
@@ -267,6 +280,40 @@ fun Settings(
 
             item {
                 ListItem(
+                    headlineContent = { Text("Sync pump time") },
+                    supportingContent = { Text("Set the pump's clock to the current phone time.") },
+                    leadingContent = {
+                        Icon(
+                            Icons.Filled.Refresh,
+                            contentDescription = "Sync time icon",
+                        )
+                    },
+                    modifier = Modifier.clickable {
+                        showSyncTimeDialog = true
+                    }
+                )
+                Divider()
+            }
+
+            item {
+                ListItem(
+                    headlineContent = { Text("Find my pump") },
+                    supportingContent = { Text("Play a sound on the pump to help locate it.") },
+                    leadingContent = {
+                        Icon(
+                            Icons.Filled.Notifications,
+                            contentDescription = "Play sound icon",
+                        )
+                    },
+                    modifier = Modifier.clickable {
+                        showPlaySoundDialog = true
+                    }
+                )
+                Divider()
+            }
+
+            item {
+                ListItem(
                     headlineContent = { Text("Debug options") },
                     supportingContent = { Text("Perform debug options.") },
                     leadingContent = {
@@ -283,6 +330,58 @@ fun Settings(
             }
         }
     )
+
+    // Sync Time Dialog
+    if (showSyncTimeDialog) {
+        AlertDialog(
+            onDismissRequest = { showSyncTimeDialog = false },
+            title = { Text("Sync Pump Time") },
+            text = { Text("Set the pump's internal clock to the current phone time?") },
+            confirmButton = {
+                TextButton(onClick = {
+                    sendPumpCommands(
+                        SendType.STANDARD,
+                        listOf(ChangeTimeDateRequest(Instant.now()))
+                    )
+                    showSyncTimeDialog = false
+                    Toast.makeText(context, "Pump time sync sent", Toast.LENGTH_SHORT).show()
+                }) {
+                    Text("Sync")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showSyncTimeDialog = false }) {
+                    Text("Cancel")
+                }
+            }
+        )
+    }
+
+    // Play Sound Dialog
+    if (showPlaySoundDialog) {
+        AlertDialog(
+            onDismissRequest = { showPlaySoundDialog = false },
+            title = { Text("Find My Pump") },
+            text = { Text("Play a sound on the pump?") },
+            confirmButton = {
+                TextButton(onClick = {
+                    sendPumpCommands(
+                        SendType.STANDARD,
+                        listOf(PlaySoundRequest())
+                    )
+                    showPlaySoundDialog = false
+                    Toast.makeText(context, "Playing sound on pump", Toast.LENGTH_SHORT).show()
+                }) {
+                    Text("Play Sound")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showPlaySoundDialog = false }) {
+                    Text("Cancel")
+                }
+            }
+        )
+    }
 }
 
 @Preview(showBackground = true)

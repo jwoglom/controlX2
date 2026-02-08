@@ -83,7 +83,9 @@ import com.jwoglom.pumpx2.pump.messages.response.controlStream.PumpingStateStrea
 import com.jwoglom.pumpx2.pump.messages.response.currentStatus.BolusCalcDataSnapshotResponse
 import com.jwoglom.pumpx2.pump.messages.response.currentStatus.CGMStatusResponse
 import com.jwoglom.pumpx2.pump.messages.response.currentStatus.ControlIQIOBResponse
+import com.jwoglom.pumpx2.pump.messages.response.currentStatus.BasalLimitSettingsResponse
 import com.jwoglom.pumpx2.pump.messages.response.currentStatus.ControlIQInfoAbstractResponse
+import com.jwoglom.pumpx2.pump.messages.response.currentStatus.ControlIQSleepScheduleResponse
 import com.jwoglom.pumpx2.pump.messages.response.currentStatus.CurrentBasalStatusResponse
 import com.jwoglom.pumpx2.pump.messages.response.currentStatus.CurrentBatteryAbstractResponse
 import com.jwoglom.pumpx2.pump.messages.response.currentStatus.CurrentBolusStatusResponse
@@ -669,6 +671,29 @@ class MainActivity : ComponentActivity() {
                     ControlIQInfoAbstractResponse.UserModeType.EXERCISE -> UserMode.EXERCISE
                     else -> UserMode.UNKNOWN
                 }
+                dataStore.controlIQInfoResponse.value = message
+                // Extract CIQ fields via reflection since abstract getters are package-private in Java
+                try {
+                    val closedLoopMethod = message.javaClass.getMethod("getClosedLoopEnabled")
+                    val weightMethod = message.javaClass.getMethod("getWeight")
+                    val tdiMethod = message.javaClass.getMethod("getTotalDailyInsulin")
+                    dataStore.controlIQEnabled.value = closedLoopMethod.invoke(message) as Boolean
+                    dataStore.controlIQWeight.value = weightMethod.invoke(message) as Int
+                    dataStore.controlIQTotalDailyInsulin.value = tdiMethod.invoke(message) as Int
+                } catch (e: Exception) {
+                    Timber.w(e, "Failed to extract CIQ info fields")
+                }
+                dataStore.controlIQWeightUnit.value = when (message.weightUnit) {
+                    ControlIQInfoAbstractResponse.WeightUnit.POUNDS -> "lbs"
+                    ControlIQInfoAbstractResponse.WeightUnit.KILOGRAMS -> "kg"
+                    else -> ""
+                }
+            }
+            is ControlIQSleepScheduleResponse -> {
+                dataStore.controlIQSleepScheduleResponse.value = message
+            }
+            is BasalLimitSettingsResponse -> {
+                dataStore.basalLimitSettingsResponse.value = message
             }
             is InsulinStatusResponse -> {
                 dataStore.cartridgeRemainingUnits.value = message.currentInsulinAmount
@@ -775,6 +800,7 @@ class MainActivity : ComponentActivity() {
             }
             is GlobalMaxBolusSettingsResponse -> {
                 dataStore.maxBolusAmount.value = message.maxBolus
+                dataStore.globalMaxBolusSettingsResponse.value = message
             }
             is HistoryLogStatusResponse -> {
                 dataStore.historyLogStatus.value = message

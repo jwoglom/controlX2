@@ -32,6 +32,10 @@ import com.jwoglom.pumpx2.pump.messages.response.controlStream.FillCannulaStateS
 import com.jwoglom.pumpx2.pump.messages.response.controlStream.FillTubingStateStreamResponse
 import com.jwoglom.pumpx2.pump.messages.response.controlStream.PumpingStateStreamResponse
 import com.jwoglom.pumpx2.pump.messages.response.currentStatus.AlertStatusResponse
+import com.jwoglom.pumpx2.pump.messages.response.currentStatus.BasalLimitSettingsResponse
+import com.jwoglom.pumpx2.pump.messages.response.currentStatus.ControlIQInfoAbstractResponse
+import com.jwoglom.pumpx2.pump.messages.response.currentStatus.ControlIQSleepScheduleResponse
+import com.jwoglom.pumpx2.pump.messages.response.currentStatus.GlobalMaxBolusSettingsResponse
 import com.jwoglom.pumpx2.pump.messages.response.currentStatus.PumpGlobalsResponse
 import com.jwoglom.pumpx2.pump.messages.response.currentStatus.TempRateResponse
 import timber.log.Timber
@@ -60,11 +64,19 @@ class DataStore {
     val lastBolusStatus = MutableLiveData<String>()
     val controlIQStatus = MutableLiveData<String>()
     val controlIQMode = MutableLiveData<UserMode>()
+    val controlIQEnabled = MutableLiveData<Boolean>()
+    val controlIQWeight = MutableLiveData<Int>()
+    val controlIQWeightUnit = MutableLiveData<String>()
+    val controlIQTotalDailyInsulin = MutableLiveData<Int>()
     val basalRate = MutableLiveData<String>()
     var basalStatus = MutableLiveData<BasalStatus>()
     var tempRateActive = MutableLiveData<Boolean>()
     var tempRateDetails = MutableLiveData<TempRateResponse>()
     val pumpGlobalsResponse = MutableLiveData<PumpGlobalsResponse>()
+    val controlIQInfoResponse = MutableLiveData<ControlIQInfoAbstractResponse>()
+    val controlIQSleepScheduleResponse = MutableLiveData<ControlIQSleepScheduleResponse>()
+    val globalMaxBolusSettingsResponse = MutableLiveData<GlobalMaxBolusSettingsResponse>()
+    val basalLimitSettingsResponse = MutableLiveData<BasalLimitSettingsResponse>()
     val cgmSessionState = MutableLiveData<CGMSessionState>()
     val cgmSessionExpireRelative = MutableLiveData<String>()
     val cgmSessionExpireExact = MutableLiveData<String>()
@@ -153,11 +165,19 @@ class DataStore {
         lastBolusStatus.observeForever { t -> Timber.i("DataStore.lastBolusStatus=$t") }
         controlIQStatus.observeForever { t -> Timber.i("DataStore.controlIQStatus=$t") }
         controlIQMode.observeForever { t -> Timber.i("DataStore.controlIQMode=$t") }
+        controlIQEnabled.observeForever { t -> Timber.i("DataStore.controlIQEnabled=$t") }
+        controlIQWeight.observeForever { t -> Timber.i("DataStore.controlIQWeight=$t") }
+        controlIQWeightUnit.observeForever { t -> Timber.i("DataStore.controlIQWeightUnit=$t") }
+        controlIQTotalDailyInsulin.observeForever { t -> Timber.i("DataStore.controlIQTotalDailyInsulin=$t") }
         basalRate.observeForever { t -> Timber.i("DataStore.basalRate=$t") }
         basalStatus.observeForever { t -> Timber.i("DataStore.basalStatus=$t") }
         tempRateActive.observeForever { t -> Timber.i("DataStore.tempRateActive=$t") }
         tempRateDetails.observeForever { t -> Timber.i("DataStore.tempRateDetails=$t") }
         pumpGlobalsResponse.observeForever { t -> Timber.i("DataStore.pumpGlobalsResponse=$t") }
+        controlIQInfoResponse.observeForever { t -> Timber.i("DataStore.controlIQInfoResponse=$t") }
+        controlIQSleepScheduleResponse.observeForever { t -> Timber.i("DataStore.controlIQSleepScheduleResponse=$t") }
+        globalMaxBolusSettingsResponse.observeForever { t -> Timber.i("DataStore.globalMaxBolusSettingsResponse=$t") }
+        basalLimitSettingsResponse.observeForever { t -> Timber.i("DataStore.basalLimitSettingsResponse=$t") }
         cgmSessionState.observeForever { t -> Timber.i("DataStore.cgmSessionState=$t") }
         cgmSessionExpireRelative.observeForever { t -> Timber.i("DataStore.cgmSessionExpireRelative=$t") }
         cgmSessionExpireExact.observeForever { t -> Timber.i("DataStore.cgmSessionExpireExact=$t") }

@@ -2,9 +2,11 @@
 
 package com.jwoglom.controlx2.presentation.screens.sections
 
+import android.widget.Toast
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
@@ -19,13 +21,18 @@ import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.pullrefresh.PullRefreshIndicator
 import androidx.compose.material.pullrefresh.pullRefresh
 import androidx.compose.material.pullrefresh.rememberPullRefreshState
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Divider
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ExposedDropdownMenuBox
+import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -50,6 +57,7 @@ import com.jwoglom.controlx2.LocalDataStore
 import com.jwoglom.controlx2.Prefs
 import com.jwoglom.controlx2.dataStore
 import com.jwoglom.controlx2.presentation.components.HeaderLine
+import com.jwoglom.controlx2.presentation.components.Line
 import com.jwoglom.controlx2.presentation.components.LoadSpinner
 import com.jwoglom.controlx2.presentation.screens.LandingSection
 import com.jwoglom.controlx2.presentation.screens.setUpPreviewState
@@ -57,13 +65,17 @@ import com.jwoglom.controlx2.presentation.theme.ControlX2Theme
 import com.jwoglom.controlx2.presentation.util.LifecycleStateObserver
 import com.jwoglom.controlx2.shared.presentation.intervalOf
 import com.jwoglom.controlx2.shared.util.SendType
+import com.jwoglom.controlx2.util.determinePumpModel
 import com.jwoglom.pumpx2.pump.messages.Message
-import com.jwoglom.pumpx2.pump.messages.request.currentStatus.PumpGlobalsRequest
+import com.jwoglom.pumpx2.pump.messages.models.KnownDeviceModel
+import com.jwoglom.pumpx2.pump.messages.request.control.SetPumpAlertSnoozeRequest
 import com.jwoglom.pumpx2.pump.messages.request.control.SetPumpSoundsRequest
+import com.jwoglom.pumpx2.pump.messages.request.control.SetQuickBolusSettingsRequest
+import com.jwoglom.pumpx2.pump.messages.request.currentStatus.PumpGlobalsRequest
 import com.jwoglom.pumpx2.pump.messages.response.currentStatus.PumpGlobalsResponse
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.cancel
-import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import timber.log.Timber
@@ -80,6 +92,7 @@ fun SoundSettingsActions(
     val ds = LocalDataStore.current
 
     val pumpGlobals = ds.pumpGlobalsResponse.observeAsState()
+    val deviceName = ds.setupDeviceName.observeAsState()
 
     val refreshScope = rememberCoroutineScope()
     var refreshing by remember { mutableStateOf(true) }
@@ -139,6 +152,16 @@ fun SoundSettingsActions(
     LaunchedEffect(refreshing) {
         waitForLoaded()
     }
+
+    // Quick Bolus Settings state
+    var showQuickBolusDialog by remember { mutableStateOf(false) }
+    var quickBolusEnabled by remember { mutableStateOf(false) }
+    var quickBolusIncrement by remember { mutableStateOf(SetQuickBolusSettingsRequest.QuickBolusIncrement.DISABLED) }
+
+    // Alert Snooze state
+    var showAlertSnoozeDialog by remember { mutableStateOf(false) }
+    var alertSnoozeEnabled by remember { mutableStateOf(false) }
+    var alertSnoozeDuration by remember { mutableStateOf(10) }
 
     var quickBolusText by remember { mutableStateOf("") }
     var generalText by remember { mutableStateOf("") }
@@ -332,7 +355,7 @@ fun SoundSettingsActions(
                             sendPumpCommands(SendType.STANDARD, listOf(message))
 
                             refreshScope.launch {
-                                kotlinx.coroutines.delay(500)
+                                delay(500)
                                 refresh()
                             }
 
@@ -340,10 +363,186 @@ fun SoundSettingsActions(
                     )
                 }
 
+                // Quick Bolus Settings section
+                item {
+                    Line("\n")
+                    HeaderLine("Quick Bolus Settings")
+                    Divider()
+                }
+
+                item {
+                    ListItem(
+                        headlineContent = { Text("Quick Bolus") },
+                        supportingContent = {
+                            Text("Configure quick bolus mode and increment size")
+                        },
+                        leadingContent = { Icon(Icons.Filled.Settings, contentDescription = null) },
+                        modifier = Modifier.clickable {
+                            showQuickBolusDialog = true
+                        }
+                    )
+                    Divider()
+                }
+
+                // Alert Snooze section (Mobi only)
+                val model = determinePumpModel(deviceName.value ?: "")
+                if (model == KnownDeviceModel.MOBI) {
+                    item {
+                        Line("\n")
+                        HeaderLine("Alert Snooze")
+                        Divider()
+                    }
+
+                    item {
+                        ListItem(
+                            headlineContent = { Text("Button Snooze") },
+                            supportingContent = {
+                                Text("Configure triple-press button to snooze alerts")
+                            },
+                            leadingContent = { Icon(Icons.Filled.Settings, contentDescription = null) },
+                            modifier = Modifier.clickable {
+                                showAlertSnoozeDialog = true
+                            }
+                        )
+                        Divider()
+                    }
+                }
+
                 item {
                     TextButton(onClick = navigateBack, modifier = Modifier.fillMaxWidth()) {
                         Text("Back to ${LandingSection.ACTIONS.label}")
                     }
+                }
+            }
+        )
+    }
+
+    // Quick Bolus Settings Dialog
+    if (showQuickBolusDialog) {
+        var expanded by remember { mutableStateOf(false) }
+
+        AlertDialog(
+            onDismissRequest = { showQuickBolusDialog = false },
+            title = { Text("Quick Bolus Settings") },
+            text = {
+                Column {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text("Enabled", modifier = Modifier.weight(1f))
+                        Switch(
+                            checked = quickBolusEnabled,
+                            onCheckedChange = { quickBolusEnabled = it }
+                        )
+                    }
+                    Text("Increment:", modifier = Modifier.padding(top = 8.dp))
+                    ExposedDropdownMenuBox(
+                        expanded = expanded,
+                        onExpandedChange = { expanded = !expanded }
+                    ) {
+                        OutlinedTextField(
+                            value = quickBolusIncrement.name,
+                            onValueChange = {},
+                            readOnly = true,
+                            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
+                            modifier = Modifier
+                                .menuAnchor()
+                                .fillMaxWidth()
+                        )
+                        ExposedDropdownMenu(
+                            expanded = expanded,
+                            onDismissRequest = { expanded = false }
+                        ) {
+                            SetQuickBolusSettingsRequest.QuickBolusIncrement.values().forEach { increment ->
+                                DropdownMenuItem(
+                                    text = { Text(increment.name) },
+                                    onClick = {
+                                        quickBolusIncrement = increment
+                                        quickBolusEnabled = increment.enabled
+                                        expanded = false
+                                    }
+                                )
+                            }
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    val message = SetQuickBolusSettingsRequest(quickBolusIncrement)
+                    sendPumpCommands(SendType.STANDARD, listOf(message))
+                    showQuickBolusDialog = false
+                    refreshScope.launch {
+                        delay(500)
+                        refresh()
+                    }
+                }) {
+                    Text("Apply")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showQuickBolusDialog = false }) {
+                    Text("Cancel")
+                }
+            }
+        )
+    }
+
+    // Alert Snooze Dialog
+    if (showAlertSnoozeDialog) {
+        AlertDialog(
+            onDismissRequest = { showAlertSnoozeDialog = false },
+            title = { Text("Alert Snooze Settings") },
+            text = {
+                Column {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text("Snooze Enabled", modifier = Modifier.weight(1f))
+                        Switch(
+                            checked = alertSnoozeEnabled,
+                            onCheckedChange = { alertSnoozeEnabled = it }
+                        )
+                    }
+                    if (alertSnoozeEnabled) {
+                        Text("Duration:", modifier = Modifier.padding(top = 8.dp))
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            modifier = Modifier.padding(top = 4.dp)
+                        ) {
+                            listOf(10, 20).forEach { mins ->
+                                TextButton(
+                                    onClick = { alertSnoozeDuration = mins },
+                                ) {
+                                    Text(
+                                        "${mins} min",
+                                        color = if (alertSnoozeDuration == mins) Color.Blue else Color.Gray
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    val duration = if (alertSnoozeEnabled) alertSnoozeDuration else 0
+                    val message = SetPumpAlertSnoozeRequest(alertSnoozeEnabled, duration)
+                    sendPumpCommands(SendType.STANDARD, listOf(message))
+                    showAlertSnoozeDialog = false
+                    refreshScope.launch {
+                        delay(500)
+                        refresh()
+                    }
+                }) {
+                    Text("Apply")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showAlertSnoozeDialog = false }) {
+                    Text("Cancel")
                 }
             }
         )
