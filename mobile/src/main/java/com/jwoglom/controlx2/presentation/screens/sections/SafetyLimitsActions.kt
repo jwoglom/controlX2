@@ -192,8 +192,8 @@ fun SafetyLimitsActions(
                         supportingContent = {
                             if (bolus != null) {
                                 Text(
-                                    "Current: ${InsulinUnit.from1000To1(bolus.maxBolus)} units\n" +
-                                    "Default: ${InsulinUnit.from1000To1(bolus.maxBolusDefault)} units\n" +
+                                    "Current: ${InsulinUnit.from1000To1(bolus.maxBolus.toLong())} units\n" +
+                                    "Default: ${InsulinUnit.from1000To1(bolus.maxBolusDefault.toLong())} units\n" +
                                     "Range: 1 - 25 units"
                                 )
                             } else {
@@ -203,7 +203,7 @@ fun SafetyLimitsActions(
                         leadingContent = { Icon(Icons.Filled.Settings, contentDescription = null) },
                         modifier = Modifier.clickable {
                             maxBolusText = if (bolus != null) {
-                                InsulinUnit.from1000To1(bolus.maxBolus).toString()
+                                InsulinUnit.from1000To1(bolus.maxBolus.toLong()).toString()
                             } else ""
                             showMaxBolusDialog = true
                         }
@@ -219,8 +219,8 @@ fun SafetyLimitsActions(
                         supportingContent = {
                             if (basal != null) {
                                 Text(
-                                    "Current: ${InsulinUnit.from1000To1(basal.basalLimit.toInt())} U/hr\n" +
-                                    "Default: ${InsulinUnit.from1000To1(basal.basalLimitDefault.toInt())} U/hr\n" +
+                                    "Current: ${InsulinUnit.from1000To1(basal.basalLimit)} U/hr\n" +
+                                    "Default: ${InsulinUnit.from1000To1(basal.basalLimitDefault)} U/hr\n" +
                                     "Range: 1 - 15 U/hr"
                                 )
                             } else {
@@ -230,7 +230,7 @@ fun SafetyLimitsActions(
                         leadingContent = { Icon(Icons.Filled.Settings, contentDescription = null) },
                         modifier = Modifier.clickable {
                             maxBasalText = if (basal != null) {
-                                InsulinUnit.from1000To1(basal.basalLimit.toInt()).toString()
+                                InsulinUnit.from1000To1(basal.basalLimit).toString()
                             } else ""
                             showMaxBasalDialog = true
                         }

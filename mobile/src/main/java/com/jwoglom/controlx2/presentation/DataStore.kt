@@ -64,6 +64,10 @@ class DataStore {
     val lastBolusStatus = MutableLiveData<String>()
     val controlIQStatus = MutableLiveData<String>()
     val controlIQMode = MutableLiveData<UserMode>()
+    val controlIQEnabled = MutableLiveData<Boolean>()
+    val controlIQWeight = MutableLiveData<Int>()
+    val controlIQWeightUnit = MutableLiveData<String>()
+    val controlIQTotalDailyInsulin = MutableLiveData<Int>()
     val basalRate = MutableLiveData<String>()
     var basalStatus = MutableLiveData<BasalStatus>()
     var tempRateActive = MutableLiveData<Boolean>()
@@ -161,6 +165,10 @@ class DataStore {
         lastBolusStatus.observeForever { t -> Timber.i("DataStore.lastBolusStatus=$t") }
         controlIQStatus.observeForever { t -> Timber.i("DataStore.controlIQStatus=$t") }
         controlIQMode.observeForever { t -> Timber.i("DataStore.controlIQMode=$t") }
+        controlIQEnabled.observeForever { t -> Timber.i("DataStore.controlIQEnabled=$t") }
+        controlIQWeight.observeForever { t -> Timber.i("DataStore.controlIQWeight=$t") }
+        controlIQWeightUnit.observeForever { t -> Timber.i("DataStore.controlIQWeightUnit=$t") }
+        controlIQTotalDailyInsulin.observeForever { t -> Timber.i("DataStore.controlIQTotalDailyInsulin=$t") }
         basalRate.observeForever { t -> Timber.i("DataStore.basalRate=$t") }
         basalStatus.observeForever { t -> Timber.i("DataStore.basalStatus=$t") }
         tempRateActive.observeForever { t -> Timber.i("DataStore.tempRateActive=$t") }

@@ -67,7 +67,6 @@ import com.jwoglom.pumpx2.pump.messages.builders.ControlIQInfoRequestBuilder
 import com.jwoglom.pumpx2.pump.messages.request.control.ChangeControlIQSettingsRequest
 import com.jwoglom.pumpx2.pump.messages.request.control.SetSleepScheduleRequest
 import com.jwoglom.pumpx2.pump.messages.request.currentStatus.ControlIQSleepScheduleRequest
-import com.jwoglom.pumpx2.pump.messages.response.currentStatus.ControlIQInfoAbstractResponse
 import com.jwoglom.pumpx2.pump.messages.response.currentStatus.ControlIQSleepScheduleResponse
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.cancel
@@ -88,6 +87,10 @@ fun ControlIQSettingsActions(
     val ds = LocalDataStore.current
 
     val controlIQInfo = ds.controlIQInfoResponse.observeAsState()
+    val controlIQEnabled = ds.controlIQEnabled.observeAsState()
+    val controlIQWeight = ds.controlIQWeight.observeAsState()
+    val controlIQWeightUnit = ds.controlIQWeightUnit.observeAsState()
+    val controlIQTotalDailyInsulin = ds.controlIQTotalDailyInsulin.observeAsState()
     val sleepSchedule = ds.controlIQSleepScheduleResponse.observeAsState()
 
     val refreshScope = rememberCoroutineScope()
@@ -166,12 +169,10 @@ fun ControlIQSettingsActions(
     var sleepDays by remember { mutableStateOf("") }
 
     // Populate from current values
-    LaunchedEffect(controlIQInfo.value) {
-        controlIQInfo.value?.let { info ->
-            ciqEnabled = info.closedLoopEnabled
-            weightText = info.weight.toString()
-            tdiText = info.totalDailyInsulin.toString()
-        }
+    LaunchedEffect(controlIQEnabled.value, controlIQWeight.value, controlIQTotalDailyInsulin.value) {
+        controlIQEnabled.value?.let { ciqEnabled = it }
+        controlIQWeight.value?.let { weightText = it.toString() }
+        controlIQTotalDailyInsulin.value?.let { tdiText = it.toString() }
     }
 
     Box(
@@ -211,15 +212,14 @@ fun ControlIQSettingsActions(
 
                 // Control-IQ enabled status display
                 item {
-                    val info = controlIQInfo.value
                     ListItem(
                         headlineContent = { Text("Control-IQ") },
                         supportingContent = {
-                            if (info != null) {
+                            if (controlIQEnabled.value != null) {
                                 Text(
-                                    "Status: ${if (info.closedLoopEnabled) "Enabled" else "Disabled"}\n" +
-                                    "Weight: ${info.weight} ${if (info.weightUnit == ControlIQInfoAbstractResponse.WeightUnit.POUNDS) "lbs" else "kg"}\n" +
-                                    "Total Daily Insulin: ${info.totalDailyInsulin} units"
+                                    "Status: ${if (controlIQEnabled.value == true) "Enabled" else "Disabled"}\n" +
+                                    "Weight: ${controlIQWeight.value ?: "?"} ${controlIQWeightUnit.value ?: ""}\n" +
+                                    "Total Daily Insulin: ${controlIQTotalDailyInsulin.value ?: "?"} units"
                                 )
                             } else {
                                 Text("Loading...")
@@ -476,7 +476,7 @@ val controlIQSettingsCommands = listOf(
 )
 
 val controlIQSettingsFields = listOf(
-    dataStore.controlIQInfoResponse,
+    dataStore.controlIQEnabled,
     dataStore.controlIQSleepScheduleResponse,
 )
 

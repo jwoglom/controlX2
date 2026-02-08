@@ -672,6 +672,22 @@ class MainActivity : ComponentActivity() {
                     else -> UserMode.UNKNOWN
                 }
                 dataStore.controlIQInfoResponse.value = message
+                // Extract CIQ fields via reflection since abstract getters are package-private in Java
+                try {
+                    val closedLoopMethod = message.javaClass.getMethod("getClosedLoopEnabled")
+                    val weightMethod = message.javaClass.getMethod("getWeight")
+                    val tdiMethod = message.javaClass.getMethod("getTotalDailyInsulin")
+                    dataStore.controlIQEnabled.value = closedLoopMethod.invoke(message) as Boolean
+                    dataStore.controlIQWeight.value = weightMethod.invoke(message) as Int
+                    dataStore.controlIQTotalDailyInsulin.value = tdiMethod.invoke(message) as Int
+                } catch (e: Exception) {
+                    Timber.w(e, "Failed to extract CIQ info fields")
+                }
+                dataStore.controlIQWeightUnit.value = when (message.weightUnit) {
+                    ControlIQInfoAbstractResponse.WeightUnit.POUNDS -> "lbs"
+                    ControlIQInfoAbstractResponse.WeightUnit.KILOGRAMS -> "kg"
+                    else -> ""
+                }
             }
             is ControlIQSleepScheduleResponse -> {
                 dataStore.controlIQSleepScheduleResponse.value = message
