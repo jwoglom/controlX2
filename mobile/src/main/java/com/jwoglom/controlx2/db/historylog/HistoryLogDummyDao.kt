@@ -76,4 +76,17 @@ class HistoryLogDummyDao(val data: MutableList<HistoryLogItem>) : HistoryLogDao 
     override suspend fun deleteAll() {
         data.clear()
     }
+
+    override fun getTypeStats(pumpSid: Int): List<HistoryLogTypeStats> {
+        return data.filter { it.pumpSid == pumpSid }
+            .groupBy { it.typeId }
+            .map { (typeId, items) ->
+                HistoryLogTypeStats(
+                    typeId = typeId,
+                    count = items.size.toLong(),
+                    latestSeqId = items.maxOfOrNull { it.seqId },
+                    latestPumpTime = items.maxOfOrNull { it.pumpTime }
+                )
+            }
+    }
 }

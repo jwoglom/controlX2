@@ -14,7 +14,9 @@ import com.jwoglom.pumpx2.pump.messages.Messages
 import com.jwoglom.pumpx2.pump.messages.bluetooth.Characteristic
 import com.jwoglom.pumpx2.pump.messages.response.ErrorResponse
 import com.jwoglom.pumpx2.pump.messages.response.historyLog.HistoryLog
+import com.jwoglom.pumpx2.pump.messages.response.historyLog.HistoryLogParser
 import com.jwoglom.pumpx2.shared.Hex
+import com.jwoglom.pumpx2.shared.JavaHelpers
 import fi.iki.elonen.NanoHTTPD
 import org.json.JSONArray
 import org.json.JSONObject
@@ -974,7 +976,7 @@ class HttpDebugApiService(private val context: Context, private val port: Int = 
 
     private fun typeNameFromTypeId(typeId: Int): String? {
         return try {
-            HistoryLog.fromTypeId(typeId)?.javaClass?.simpleName
+            HistoryLogParser.LOG_MESSAGE_IDS.get(typeId)?.simpleName
         } catch (e: Exception) {
             null
         }
@@ -993,7 +995,7 @@ class HttpDebugApiService(private val context: Context, private val port: Int = 
             try {
                 val historyLog = item.parse()
                 json.put("typeName", historyLog.javaClass.simpleName)
-                json.put("parsed", JSONObject(historyLog.jsonToString()))
+                json.put("parsed", JSONObject(JavaHelpers.autoToStringJson(historyLog, setOf())))
             } catch (e: Exception) {
                 json.put("parseError", e.message)
             }
