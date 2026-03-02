@@ -295,10 +295,6 @@ fun PumpSetupStageDescription(
                 else -> {
                     Line("1. Toggle Bluetooth on and off.")
                     Line("2. If the t:connect Android application is open, force-stop it: long-press the app, select App Info, then 'Force Stop'")
-                    Line("3. Open your pump and select:")
-                    Line("Options > Device Settings > Bluetooth Settings", bold = true)
-                    Line("Disable and then re-enable 'Mobile Connection'.")
-                    Line("If 'Pair Device' is displayed, press it.")
                 }
             }
         }
