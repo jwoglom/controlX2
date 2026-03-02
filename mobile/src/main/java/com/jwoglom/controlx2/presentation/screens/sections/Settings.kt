@@ -71,6 +71,7 @@ fun Settings(
 ) {
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
+    var showPumpSetupConfirmDialog by remember { mutableStateOf(false) }
 
     var showSyncTimeDialog by remember { mutableStateOf(false) }
     var showPlaySoundDialog by remember { mutableStateOf(false) }
@@ -207,7 +208,7 @@ fun Settings(
             item {
                 ListItem(
                     headlineContent = { Text("Reconfigure pump") },
-                    supportingContent = { Text("Change or re-pair with the connected pump.") },
+                    supportingContent = { Text("Disconnect and re-pair with a pump.") },
                     leadingContent = {
                         Icon(
                             painterResource(R.drawable.pump),
@@ -217,27 +218,7 @@ fun Settings(
                         )
                     },
                     modifier = Modifier.clickable {
-                        Prefs(context).setPumpSetupComplete(false)
-                        Prefs(context).setPumpFinderPumpMac("")
-                        Prefs(context).setPumpFinderPairingCodeType("")
-                        Prefs(context).setPumpFinderServiceEnabled(false)
-                        PumpState.setPairingCode(context, "")
-                        PumpState.setJpakeDerivedSecret(context, "")
-                        PumpState.setJpakeServerNonce(context, "")
-                        PumpState.setSavedBluetoothMAC(context, "")
-                        coroutineScope.launch {
-                            withContext(Dispatchers.IO) {
-                                Thread.sleep(500)
-                            }
-                            sendMessage(
-                                "/to-phone/app-reload",
-                                "".toByteArray()
-                            )
-                            withContext(Dispatchers.IO) {
-                                Thread.sleep(500)
-                            }
-                            navController?.navigate(Screen.PumpSetup.route)
-                        }
+                        showPumpSetupConfirmDialog = true
                     }
                 )
                 Divider()
@@ -330,6 +311,37 @@ fun Settings(
             }
         }
     )
+
+    if (showPumpSetupConfirmDialog) {
+        AlertDialog(
+            onDismissRequest = { showPumpSetupConfirmDialog = false },
+            title = { Text("Disconnect from pump?") },
+            text = {
+                Text("This will disconnect from the current pump and clear saved pairing details. You will need the charging pad available to pair again.")
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        showPumpSetupConfirmDialog = false
+                        Prefs(context).setPumpSetupComplete(false)
+                        Prefs(context).setPumpFinderPumpMac("")
+                        Prefs(context).setPumpFinderPairingCodeType("")
+                        Prefs(context).setPumpFinderServiceEnabled(true)
+                        Prefs(context).setCurrentPumpSid(-1)
+                        PumpState.resetState(context)
+                        sendMessage("/to-phone/app-reload", "".toByteArray())
+                    }
+                ) {
+                    Text("Disconnect")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showPumpSetupConfirmDialog = false }) {
+                    Text("Cancel")
+                }
+            }
+        )
+    }
 
     // Sync Time Dialog
     if (showSyncTimeDialog) {

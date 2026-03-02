@@ -78,6 +78,7 @@ import com.jwoglom.controlx2.presentation.components.ServiceDisabledMessage
 import com.jwoglom.controlx2.presentation.navigation.Screen
 import com.jwoglom.controlx2.presentation.theme.ControlX2Theme
 import com.jwoglom.controlx2.util.determinePumpModel
+import com.jwoglom.pumpx2.pump.bluetooth.PumpReadyState
 import com.jwoglom.pumpx2.pump.messages.models.KnownDeviceModel
 import com.jwoglom.pumpx2.pump.messages.models.PairingCodeType
 import com.jwoglom.pumpx2.pump.messages.response.authentication.CentralChallengeResponse
@@ -201,8 +202,8 @@ fun PumpSetup(
                             try {
                                 Timber.i("enterPairingCode: $pairingCodeText ${ds.setupPairingCodeType.value} (${PumpState.getPairingCode(context)})")
                                 val code = PumpChallengeRequestBuilder.processPairingCode(pairingCodeText, ds.setupPairingCodeType.value)
-                                sendMessage("/to-phone/set-pairing-code", code.toByteArray())
                                 ds.pumpSetupStage.value = setupStage.value!!.nextStage(PumpSetupStage.WAITING_PUMP_FINDER_CLEANUP)
+                                sendMessage("/to-phone/set-pairing-code", code.toByteArray())
                             } catch (e: Exception) {
                                 Timber.w("pairingCodeInput: $e")
                                 Toast.makeText(context, e.toString().replaceBefore("$", "").substring(1), Toast.LENGTH_SHORT).show()
@@ -351,6 +352,7 @@ fun PumpSetup(
         }
         item {
             val setupDeviceName = ds.setupDeviceName.observeAsState()
+            val pumpReadyState = ds.pumpReadyState.observeAsState()
             val setupPairingCodeType = ds.setupPairingCodeType.observeAsState()
             PumpSetupStageDescription(
                 initialSetup = true,
@@ -406,9 +408,22 @@ fun PumpSetup(
                                 ) {
                                     append("For Mobi: ")
                                 }
-                                append("Please enter the pairing PIN located adjacent to the cartridge area.")
-                                Line("Once you hit Pair, press the pump button twice until you hear a beep to accept the connection.", bold = true)
+                                when (pumpReadyState.value) {
+                                    PumpReadyState.PICKED_UP -> {
+                                        append("Press the pump button twice to begin pairing.")
+                                    }
+                                    PumpReadyState.PICKED_UP_WITH_TAP -> {
+                                        append("Enter the pairing PIN located adjacent to the cartridge area.")
+                                    }
+                                    else -> {}
+                                }
                             })
+
+                            LaunchedEffect (pumpReadyState.value) {
+                                if (pumpReadyState.value != PumpReadyState.PICKED_UP && pumpReadyState.value != PumpReadyState.PICKED_UP_WITH_TAP) {
+                                    ds.pumpSetupStage.value = PumpSetupStage.PUMP_FINDER_CHOOSE_PAIRING_CODE_TYPE
+                                }
+                            }
                         }
                         else -> {}
                     }
@@ -492,71 +507,78 @@ fun PumpSetup(
                             )
                         }
                         PairingCodeType.SHORT_6CHAR -> {
-                            BasicTextField(
-                                value = pairingCodeText,
-                                onValueChange = {
-                                    fun filterShortPairingCode(text: String): String {
-                                        var processed = ""
-                                        for (c in text.toCharArray()) {
-                                            if (c in '0'..'9') {
-                                                processed += c
+                            if (pumpReadyState.value == PumpReadyState.PICKED_UP_WITH_TAP) {
+                                BasicTextField(
+                                    value = pairingCodeText,
+                                    onValueChange = {
+                                        fun filterShortPairingCode(text: String): String {
+                                            var processed = ""
+                                            for (c in text.toCharArray()) {
+                                                if (c in '0'..'9') {
+                                                    processed += c
+                                                }
                                             }
+                                            return processed
                                         }
-                                        return processed
-                                    }
 
-                                    val newPairingCode = filterShortPairingCode(it)
-                                    if (pairingCodeText.length < 6 && newPairingCode.length == 6) {
-                                        focusManager.clearFocus()
-                                    }
+                                        val newPairingCode = filterShortPairingCode(it)
+                                        if (pairingCodeText.length < 6 && newPairingCode.length == 6) {
+                                            focusManager.clearFocus()
+                                        }
 
-                                    pairingCodeText = newPairingCode
-                                    Timber.i("newPairingCode(SHORT_6CHAR): $newPairingCode")
-                                    PumpState.setPairingCode(context, newPairingCode)
-                                },
-                                keyboardOptions = KeyboardOptions(
-                                    autoCorrect = false,
-                                    capitalization = KeyboardCapitalization.None,
-                                    keyboardType = KeyboardType.Number,
-                                ),
-                                modifier = Modifier
-                                    .focusRequester(focusRequester),
-                                decorationBox = {
-                                    Row(
-                                        horizontalArrangement = Arrangement.Center,
-                                        modifier = Modifier
-                                            .focusRequester(focusRequester)
-                                            .fillMaxWidth()
-                                    ) {
-                                        repeat(6) { index ->
-                                            val chars = when {
-                                                1*index >= pairingCodeText.length -> ""
-                                                1*(index+1) >= pairingCodeText.length -> pairingCodeText.substring(1 * index)
-                                                else -> pairingCodeText.substring(1 * index, 1 * (index+1))
-                                            }
-                                            val isFocused = index == pairingCodeText.length / 1
-                                            Text(
-                                                text = chars,
-                                                style = MaterialTheme.typography.headlineMedium,
-                                                fontFamily = FontFamily.Monospace,
-                                                color = Color.DarkGray,
-                                                textAlign = TextAlign.Center,
-                                                modifier = Modifier
-                                                    .width(30.dp)
-                                                    .border(
-                                                        if (isFocused) 2.dp else 1.dp,
-                                                        if (isFocused) Color.DarkGray else Color.LightGray,
-                                                        RoundedCornerShape(8.dp)
+                                        pairingCodeText = newPairingCode
+                                        Timber.i("newPairingCode(SHORT_6CHAR): $newPairingCode")
+                                        PumpState.setPairingCode(context, newPairingCode)
+                                    },
+                                    keyboardOptions = KeyboardOptions(
+                                        autoCorrect = false,
+                                        capitalization = KeyboardCapitalization.None,
+                                        keyboardType = KeyboardType.Number,
+                                    ),
+                                    modifier = Modifier
+                                        .focusRequester(focusRequester),
+                                    decorationBox = {
+                                        Row(
+                                            horizontalArrangement = Arrangement.Center,
+                                            modifier = Modifier
+                                                .focusRequester(focusRequester)
+                                                .fillMaxWidth()
+                                        ) {
+                                            repeat(6) { index ->
+                                                val chars = when {
+                                                    1 * index >= pairingCodeText.length -> ""
+                                                    1 * (index + 1) >= pairingCodeText.length -> pairingCodeText.substring(
+                                                        1 * index
                                                     )
-                                                    .padding(2.dp),
-                                            )
-                                            Spacer(modifier = Modifier.width(8.dp))
-                                            Spacer(modifier = Modifier.width(8.dp))
+
+                                                    else -> pairingCodeText.substring(
+                                                        1 * index,
+                                                        1 * (index + 1)
+                                                    )
+                                                }
+                                                val isFocused = index == pairingCodeText.length / 1
+                                                Text(
+                                                    text = chars,
+                                                    style = MaterialTheme.typography.headlineMedium,
+                                                    fontFamily = FontFamily.Monospace,
+                                                    color = Color.DarkGray,
+                                                    textAlign = TextAlign.Center,
+                                                    modifier = Modifier
+                                                        .width(30.dp)
+                                                        .border(
+                                                            if (isFocused) 2.dp else 1.dp,
+                                                            if (isFocused) Color.DarkGray else Color.LightGray,
+                                                            RoundedCornerShape(8.dp)
+                                                        )
+                                                        .padding(2.dp),
+                                                )
+                                                Spacer(modifier = Modifier.width(8.dp))
+                                                Spacer(modifier = Modifier.width(8.dp))
+                                            }
                                         }
                                     }
-                                }
-                            )
-
+                                )
+                            }
                         }
                         null -> {}
                     }

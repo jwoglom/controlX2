@@ -46,6 +46,7 @@ import com.jwoglom.controlx2.shared.presentation.intervalOf
 import com.jwoglom.controlx2.shared.util.shortTimeAgo
 import com.jwoglom.controlx2.util.determinePumpModel
 import com.jwoglom.pumpx2.pump.PumpState
+import com.jwoglom.pumpx2.pump.bluetooth.PumpReadyState
 import com.jwoglom.pumpx2.pump.messages.models.KnownDeviceModel
 import com.jwoglom.pumpx2.pump.messages.models.PairingCodeType
 import kotlinx.coroutines.Dispatchers
@@ -67,6 +68,7 @@ fun PumpSetupStageDescription(
     val setupStage = ds.pumpSetupStage.observeAsState()
     val pumpFinderPumps = ds.pumpFinderPumps.observeAsState()
     val setupDeviceName = ds.setupDeviceName.observeAsState()
+    val pumpReadyState = ds.pumpReadyState.observeAsState()
     val setupDeviceModel = ds.setupDeviceModel.observeAsState()
     val pumpCriticalError = ds.pumpCriticalError.observeAsState()
 
@@ -120,6 +122,9 @@ fun PumpSetupStageDescription(
                     }
                     append("Place the pump on the wireless charger.")
                 })
+                Line("Ensure the Mobi is turned on and charging.")
+                Line("Take the Mobi off the charger and place it back on.")
+                Line("Use a USB-A to USB-C cable.")
             } else {
                 Line("Searching for pump...")
                 Line(buildAnnotatedString {
@@ -154,10 +159,10 @@ fun PumpSetupStageDescription(
             Line("")
         }
         PumpSetupStage.PUMP_FINDER_CHOOSE_PAIRING_CODE_TYPE -> {
-            Line("Choose the correct pairing code type:")
-            Line("")
 
             if (ds.setupDeviceName.value?.let { determinePumpModel(it) } == KnownDeviceModel.TSLIM_X2) {
+                Line("Choose the correct pairing code type:")
+                Line("")
                 Button(
                     onClick = {
                         Prefs(context).setPumpFinderPairingCodeType(PairingCodeType.LONG_16CHAR.label)
@@ -170,17 +175,18 @@ fun PumpSetupStageDescription(
                 }
 
                 Line("")
+
+                Button(
+                    onClick = {
+                        Prefs(context).setPumpFinderPairingCodeType(PairingCodeType.SHORT_6CHAR.label)
+                        ds.setupPairingCodeType.value = PairingCodeType.SHORT_6CHAR
+                        ds.pumpSetupStage.value = ds.pumpSetupStage.value?.nextStage(PumpSetupStage.PUMP_FINDER_ENTER_PAIRING_CODE)
+                    }
+                ) {
+                    Text("SHORT: 6 numbers")
+                }
             }
 
-            Button(
-                onClick = {
-                    Prefs(context).setPumpFinderPairingCodeType(PairingCodeType.SHORT_6CHAR.label)
-                    ds.setupPairingCodeType.value = PairingCodeType.SHORT_6CHAR
-                    ds.pumpSetupStage.value = ds.pumpSetupStage.value?.nextStage(PumpSetupStage.PUMP_FINDER_ENTER_PAIRING_CODE)
-                }
-            ) {
-                Text("SHORT: 6 numbers")
-            }
             Line("")
             when (ds.setupDeviceName.value?.let { determinePumpModel(it) }) {
                 KnownDeviceModel.TSLIM_X2 -> {
@@ -210,6 +216,17 @@ fun PumpSetupStageDescription(
                 else -> {}
             }
 
+            LaunchedEffect(pumpReadyState.value) {
+                when (pumpReadyState.value) {
+                    PumpReadyState.PICKED_UP, PumpReadyState.PICKED_UP_WITH_TAP -> {
+                        Prefs(context).setPumpFinderPairingCodeType(PairingCodeType.SHORT_6CHAR.label)
+                        ds.setupPairingCodeType.value = PairingCodeType.SHORT_6CHAR
+                        ds.pumpSetupStage.value = ds.pumpSetupStage.value?.nextStage(PumpSetupStage.PUMP_FINDER_ENTER_PAIRING_CODE)
+                    }
+
+                    else -> {}
+                }
+            }
         }
         PumpSetupStage.PUMP_FINDER_ENTER_PAIRING_CODE, PumpSetupStage.PUMPX2_WAITING_FOR_PAIRING_CODE, PumpSetupStage.PUMPX2_INVALID_PAIRING_CODE -> {
             if (initialSetup) {

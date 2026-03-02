@@ -1,6 +1,7 @@
 package com.jwoglom.controlx2.presentation
 
 import androidx.lifecycle.MutableLiveData
+import com.jwoglom.pumpx2.pump.bluetooth.PumpReadyState
 import com.jwoglom.pumpx2.pump.messages.Message
 import com.jwoglom.pumpx2.pump.messages.calculator.BolusCalcCondition
 import com.jwoglom.pumpx2.pump.messages.calculator.BolusCalcUnits
@@ -50,6 +51,7 @@ class DataStore {
     val pumpSetupStage = MutableLiveData<PumpSetupStage>(PumpSetupStage.WAITING_PUMP_FINDER_INIT)
     val pumpFinderPumps = MutableLiveData<List<Pair<String, String>>>() // pump name, pump MAC
     val setupDeviceName = MutableLiveData<String>()
+    val pumpReadyState = MutableLiveData<PumpReadyState>()
     val setupPairingCodeType = MutableLiveData<PairingCodeType>()
     val pumpSid = MutableLiveData<Int>()
     val setupDeviceModel = MutableLiveData<String>()

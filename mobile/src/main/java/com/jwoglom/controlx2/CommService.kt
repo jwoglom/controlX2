@@ -46,6 +46,7 @@ import com.jwoglom.controlx2.util.HistoryLogSyncWorker
 import com.jwoglom.controlx2.util.extractPumpSid
 import com.jwoglom.pumpx2.pump.PumpState
 import com.jwoglom.pumpx2.pump.TandemError
+import com.jwoglom.pumpx2.pump.bluetooth.PumpReadyState
 import com.jwoglom.pumpx2.pump.bluetooth.TandemBluetoothHandler
 import com.jwoglom.pumpx2.pump.bluetooth.TandemConfig
 import com.jwoglom.pumpx2.pump.bluetooth.TandemPump
@@ -295,10 +296,14 @@ class CommService : Service() {
              */
             override fun onPumpDiscovered(
                 peripheral: BluetoothPeripheral?,
-                scanResult: ScanResult?
+                scanResult: ScanResult?,
+                readyState: PumpReadyState
             ): Boolean {
-                sendWearCommMessage("/from-pump/pump-discovered", "${peripheral?.name}".toByteArray())
-                return super.onPumpDiscovered(peripheral, scanResult)
+                sendWearCommMessage(
+                    "/from-pump/pump-discovered",
+                    "${peripheral?.name.orEmpty()};;${readyState.name}".toByteArray()
+                )
+                return super.onPumpDiscovered(peripheral, scanResult, readyState)
             }
 
             override fun onInitialPumpConnection(peripheral: BluetoothPeripheral?) {
@@ -743,25 +748,27 @@ class CommService : Service() {
                 return "PumpFinder(pumpFinderActive=${pumpFinderActive},foundPumps=${foundPumps.joinToString(";")})"
             }
 
-            override fun onDiscoveredPump(peripheral: BluetoothPeripheral?, scanResult: ScanResult?) {
+            override fun onDiscoveredPump(
+                peripheral: BluetoothPeripheral?,
+                scanResult: ScanResult?,
+                readyState: PumpReadyState
+            ) {
                 val name = when {
                     peripheral?.name.isNullOrEmpty() -> "NO NAME"
                     else -> peripheral?.name
                 }
                 val key = "${name}=${peripheral?.address}"
-                // onDiscoveredPump is typically called quite extensively, each time it sees
-                // a BT packet, which can be quite spammy
-                if (foundPumps.contains(key)) {
-                    return
-                }
                 sendWearCommMessage(
                     "/from-pump/pump-finder-pump-discovered",
-                    key.toByteArray()
+                    "${key};;${readyState.name}".toByteArray()
                 )
-                foundPumps.add(key)
-                sendWearCommMessage("/from-pump/pump-finder-found-pumps",
-                    foundPumps.joinToString(";").toByteArray()
-                )
+                // Keep emitting ready-state transitions, but only add each pump once to selection list.
+                if (!foundPumps.contains(key)) {
+                    foundPumps.add(key)
+                    sendWearCommMessage("/from-pump/pump-finder-found-pumps",
+                        foundPumps.joinToString(";").toByteArray()
+                    )
+                }
             }
 
             override fun onBluetoothState(bluetoothEnabled: Boolean) {
@@ -1209,14 +1216,14 @@ class CommService : Service() {
     private fun sendStopPumpFinderComm() {
         pumpFinderCommHandler?.obtainMessage()?.also { msg ->
             msg.what = CommServiceCodes.STOP_PUMP_FINDER_COMM.ordinal
-            pumpCommHandler?.sendMessage(msg)
+            pumpFinderCommHandler?.sendMessage(msg)
         }
     }
 
     private fun sendCheckPumpFinderFoundPumps() {
         pumpFinderCommHandler?.obtainMessage()?.also { msg ->
             msg.what = CommServiceCodes.CHECK_PUMP_FINDER_FOUND_PUMPS.ordinal
-            pumpCommHandler?.sendMessage(msg)
+            pumpFinderCommHandler?.sendMessage(msg)
         }
     }
 

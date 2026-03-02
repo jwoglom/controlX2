@@ -27,6 +27,7 @@ import androidx.compose.runtime.compositionLocalOf
 import androidx.core.app.ActivityCompat
 import com.google.android.gms.common.ConnectionResult
 import com.google.android.gms.common.GoogleApiAvailability
+import com.google.common.base.Strings
 import com.jwoglom.controlx2.db.historylog.HistoryLogDatabase
 import com.jwoglom.controlx2.messaging.MessageBusFactory
 import com.jwoglom.controlx2.shared.messaging.MessageBus
@@ -55,6 +56,7 @@ import com.jwoglom.controlx2.shared.util.shortTimeAgo
 import com.jwoglom.controlx2.shared.util.twoDecimalPlaces1000Unit
 import com.jwoglom.controlx2.util.extractPumpSid
 import com.jwoglom.pumpx2.pump.PumpState
+import com.jwoglom.pumpx2.pump.bluetooth.PumpReadyState
 import com.jwoglom.pumpx2.pump.messages.Message
 import com.jwoglom.pumpx2.pump.messages.bluetooth.PumpStateSupplier
 import com.jwoglom.pumpx2.pump.messages.builders.IDPManager
@@ -509,19 +511,38 @@ class MainActivity : ComponentActivity() {
                 }
             }
 
+            "/from-pump/pump-finder-pump-discovered" -> {
+                val payload = String(data)
+                val discoveredKey = payload.substringBefore(";;")
+                val discoveredName = discoveredKey.substringBefore("=")
+                val discoveredMac = Strings.emptyToNull(discoveredKey.substringAfter("=", "")) ?: ""
+                val readyStateRaw = Strings.emptyToNull(payload.substringAfter(";;", "UNKNOWN")) ?: "UNKNOWN"
+                val readyState = try {
+                    PumpReadyState.valueOf(readyStateRaw)
+                } catch (_: IllegalArgumentException) {
+                    PumpReadyState.UNKNOWN
+                }
+
+                Timber.i("pump-finder-pump-discovered: name=$discoveredName mac=$discoveredMac readyState=$readyState")
+                if (dataStore.setupDeviceName.value == null || dataStore.setupDeviceName.value == discoveredName) {
+                    dataStore.setupDeviceName.value = discoveredName
+                    dataStore.pumpReadyState.value = readyState
+                }
+            }
+
             "/to-phone/set-pairing-code" -> {
                 val pairingCodeText = String(data)
                 PumpState.setPairingCode(applicationContext, pairingCodeText)
                 Toast.makeText(applicationContext, "Set pairing code: $pairingCodeText", Toast.LENGTH_SHORT).show()
 
-                if (dataStore.pumpSetupStage.value == PumpSetupStage.PUMP_FINDER_ENTER_PAIRING_CODE ||
-                    dataStore.pumpSetupStage.value == PumpSetupStage.PUMPX2_INVALID_PAIRING_CODE ||
-                    dataStore.pumpSetupStage.value == PumpSetupStage.WAITING_PUMP_FINDER_CLEANUP)
+                if (dataStore.pumpSetupStage.value == PumpSetupStage.WAITING_PUMP_FINDER_CLEANUP)
                 {
                     Prefs(applicationContext).setPumpFinderServiceEnabled(false)
                     sendMessage("/to-phone/stop-pump-finder", "init_comm".toByteArray())
                 } else if (dataStore.pumpSetupStage.value == PumpSetupStage.PUMPX2_WAITING_FOR_PAIRING_CODE) {
                     sendMessage("/to-pump/pair", "".toByteArray())
+                } else {
+                    Timber.w("set-pairing-code ignored for stage=${dataStore.pumpSetupStage.value}")
                 }
             }
 
@@ -534,9 +555,14 @@ class MainActivity : ComponentActivity() {
             }
 
             "/from-pump/pump-discovered" -> {
+                val payload = String(data)
+                val setupDeviceName = payload.substringBefore(";;")
+                val readyState = Strings.emptyToNull(payload.substringAfter(";;", "UNKNOWN")) ?: "UNKNOWN"
+                Timber.i("pump-discovered: name=$setupDeviceName readyState=$readyState")
                 dataStore.pumpSetupStage.value = dataStore.pumpSetupStage.value?.nextStage(PumpSetupStage.PUMPX2_PUMP_DISCOVERED)
-                dataStore.setupDeviceName.value = String(data)
-                extractPumpSid(String(data))?.let {
+                dataStore.setupDeviceName.value = setupDeviceName
+                dataStore.pumpReadyState.value = PumpReadyState.valueOf(readyState)
+                extractPumpSid(setupDeviceName)?.let {
                     dataStore.pumpSid.value = it
                 }
             }
