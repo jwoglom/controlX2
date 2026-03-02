@@ -90,8 +90,16 @@ import com.jwoglom.controlx2.shared.util.twoDecimalPlaces
 import com.jwoglom.controlx2.shared.util.twoDecimalPlaces1000Unit
 import com.jwoglom.pumpx2.pump.messages.bluetooth.PumpStateSupplier
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.filter
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeout
 import timber.log.Timber
 
 @OptIn(ExperimentalMaterialApi::class)
@@ -131,6 +139,7 @@ fun BolusScreen(
 
     val refreshScope = rememberCoroutineScope()
     var refreshing by remember { mutableStateOf(true) }
+    var loadJob by remember { mutableStateOf<Job?>(null) }
 
     val dataStore = LocalDataStore.current
     val glucoseUnit by dataStore.glucoseUnitPreference.observeAsState(GlucoseUnit.MGDL)
@@ -198,35 +207,45 @@ fun BolusScreen(
         dataStore.bolusCurrentParameters
     )
 
-    @Synchronized
-    fun waitForLoaded() = refreshScope.launch {
-        var sinceLastFetchTime = 0
-        while (true) {
-            val nullBaseFields = baseFields.filter { field -> field.value == null }.toSet()
-            if (nullBaseFields.isEmpty()) {
-                break
-            }
+    suspend fun waitForLoaded() {
+        flow {
+            var sinceLastFetchTime = 0
+            var nullBaseFields = baseFields.filter { field -> field.value == null }.toSet()
+            emit(nullBaseFields)
+            while (nullBaseFields.isNotEmpty()) {
+                delay(250)
+                sinceLastFetchTime += 250
 
-            Timber.i("BolusScreen loading: remaining ${nullBaseFields.size}: ${baseFields.map { it.value }}")
-            if (sinceLastFetchTime >= 2500) {
-                Timber.i("BolusScreen loading re-fetching")
-                // for safety reasons, NEVER CACHE.
-                sendPumpCommands(SendType.STANDARD, commands)
-                sinceLastFetchTime = 0
-            }
+                if (sinceLastFetchTime >= 2500) {
+                    Timber.i("BolusScreen loading re-fetching")
+                    // for safety reasons, NEVER CACHE.
+                    sendPumpCommands(SendType.STANDARD, commands)
+                    sinceLastFetchTime = 0
+                }
 
-            withContext(Dispatchers.IO) {
-                Thread.sleep(250)
+                nullBaseFields = baseFields.filter { field -> field.value == null }.toSet()
+                emit(nullBaseFields)
             }
-            sinceLastFetchTime += 250
         }
+            .distinctUntilChanged()
+            .onEach { nullBaseFields ->
+                Timber.i("BolusScreen loading: remaining ${nullBaseFields.size}: ${baseFields.map { it.value }}")
+            }
+            .filter { nullBaseFields -> nullBaseFields.isEmpty() }
+            .first()
+
         Timber.i("BolusScreen base loading done: ${baseFields.map { it.value }}")
-        if (sinceLastFetchTime == 0) {
-            withContext(Dispatchers.IO) {
-                Thread.sleep(250)
+        delay(250)
+        refreshing = false
+    }
+
+    fun launchLoadJob() {
+        loadJob?.cancel()
+        loadJob = refreshScope.launch {
+            withTimeout(30_000) {
+                waitForLoaded()
             }
         }
-        refreshing = false
     }
 
     fun refresh() = refreshScope.launch {
@@ -235,17 +254,22 @@ fun BolusScreen(
         baseFields.forEach { field -> field.value = null }
         calculatedFields.forEach { field -> field.value = null }
         sendPumpCommands(SendType.BUST_CACHE, commands)
+        launchLoadJob()
     }
 
     val state = rememberPullRefreshState(refreshing, ::refresh)
 
     LifecycleStateObserver(lifecycleOwner = LocalLifecycleOwner.current, onStop = {
+        loadJob?.cancel()
     }) {
         sendPumpCommands(SendType.BUST_CACHE, commands)
+        launchLoadJob()
     }
 
-    LaunchedEffect (refreshing) {
-        waitForLoaded()
+    LaunchedEffect(refreshing) {
+        if (refreshing && loadJob?.isActive != true) {
+            launchLoadJob()
+        }
     }
 
     Box(

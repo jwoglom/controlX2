@@ -84,10 +84,15 @@ import com.jwoglom.controlx2.shared.enums.BasalStatus
 import com.jwoglom.controlx2.shared.enums.UserMode
 import com.jwoglom.controlx2.shared.util.SendType
 import hu.supercluster.paperwork.Paperwork
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.cancel
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.filter
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeout
 import timber.log.Timber
 
 @OptIn(ExperimentalMaterialApi::class, ExperimentalWearMaterialApi::class)
@@ -102,8 +107,9 @@ fun LandingScreen(
     navController: NavHostController,
     modifier: Modifier = Modifier,
 ) {
-    val refreshScope = rememberCoroutineScope()
+    val loadScope = rememberCoroutineScope()
     var refreshing by remember { mutableStateOf(true) }
+    var loadJob by remember { mutableStateOf<Job?>(null) }
 
 
     fun apiVersion(): ApiVersion {
@@ -145,54 +151,74 @@ fun LandingScreen(
         sendPumpCommands(type, commands)
     }
 
-    fun waitForLoaded() = refreshScope.launch {
-        var sinceLastFetchTime = 0
-        while (true) {
-            val nullFields = fields.filter { field -> field.value == null }.toSet()
-            if (nullFields.isEmpty()) {
-                break
-            }
+    suspend fun waitForLoaded() {
+        flow {
+            var sinceLastFetchTime = 0
+            var nullFields = fields.filter { field -> field.value == null }.toSet()
+            emit(nullFields)
+            while (nullFields.isNotEmpty()) {
+                delay(250)
+                sinceLastFetchTime += 250
 
-            Timber.i("LandingPage loading: remaining ${nullFields.size}: ${fields.map { it.value }}")
-            if (sinceLastFetchTime >= 2500) {
-                Timber.i("LandingPage loading re-fetching with cache")
-                fetchDataStoreFields(SendType.CACHED)
-                sinceLastFetchTime = 0
-            }
+                if (sinceLastFetchTime >= 2500) {
+                    Timber.i("LandingPage loading re-fetching with cache")
+                    fetchDataStoreFields(SendType.CACHED)
+                    sinceLastFetchTime = 0
+                }
 
-            withContext(Dispatchers.IO) {
-                Thread.sleep(250)
+                nullFields = fields.filter { field -> field.value == null }.toSet()
+                emit(nullFields)
             }
-            sinceLastFetchTime += 250
         }
+            .distinctUntilChanged()
+            .onEach { nullFields ->
+                Timber.i("LandingPage loading: remaining ${nullFields.size}: ${fields.map { it.value }}")
+            }
+            .filter { nullFields -> nullFields.isEmpty() }
+            .first()
+
         Timber.i("LandingPage loading done: ${fields.map { it.value }}")
         refreshing = false
     }
 
-    fun refresh() = refreshScope.launch {
+    fun launchLoadJob() {
+        loadJob?.cancel()
+        loadJob = loadScope.launch {
+            withTimeout(30_000) {
+                waitForLoaded()
+            }
+        }
+    }
+
+    fun refresh() = loadScope.launch {
         Timber.i("reloading LandingPage with force")
         refreshing = true
 
         fields.forEach { field -> field.value = null }
         fetchDataStoreFields(SendType.BUST_CACHE)
+        launchLoadJob()
     }
 
     val state = rememberPullRefreshState(refreshing, ::refresh)
 
     LifecycleStateObserver(lifecycleOwner = LocalLifecycleOwner.current, onStop = {
-        refreshScope.cancel()
+        loadJob?.cancel()
     }) {
         Timber.i("reloading LandingPage from onStart lifecyclestate")
         fetchDataStoreFields(SendType.BUST_CACHE)
+        launchLoadJob()
     }
 
     LaunchedEffect(intervalOf(60)) {
         Timber.i("reloading LandingPage from interval")
         fetchDataStoreFields(SendType.BUST_CACHE)
+        launchLoadJob()
     }
 
-    LaunchedEffect (refreshing) {
-        waitForLoaded()
+    LaunchedEffect(refreshing) {
+        if (refreshing && loadJob?.isActive != true) {
+            launchLoadJob()
+        }
     }
 
     Box(modifier = modifier
