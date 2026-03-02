@@ -1128,8 +1128,20 @@ class CommService : Service() {
         return START_STICKY
     }
 
-    private fun startForegroundWrapped(id: Int, notification: Notification) {
-        startForeground(id, notification, FOREGROUND_SERVICE_TYPE_CONNECTED_DEVICE)
+    private fun startForegroundWrapped(id: Int, notification: Notification): Boolean {
+        return try {
+            startForeground(id, notification, FOREGROUND_SERVICE_TYPE_CONNECTED_DEVICE)
+            true
+        } catch (e: SecurityException) {
+            Timber.e(e, "Unable to start foreground service: missing connectedDevice permissions")
+            Toast.makeText(
+                this,
+                "ControlX2 needs Bluetooth permissions before starting the background service",
+                Toast.LENGTH_LONG
+            ).show()
+            stopSelf()
+            false
+        }
     }
 
 

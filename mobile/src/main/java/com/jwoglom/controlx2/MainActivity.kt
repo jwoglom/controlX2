@@ -249,8 +249,31 @@ class MainActivity : ComponentActivity() {
             Timber.i("commService not started because first TOS not accepted")
         } else if (!Prefs(applicationContext).serviceEnabled()) {
             Timber.i("commService not started because service not enabled")
+        } else if (!hasCommServicePermissions()) {
+            Timber.i("commService not started because required permissions are not granted yet")
+            startBTPermissionsCheck()
         } else {
             startCommService()
+        }
+    }
+
+    private fun hasCommServicePermissions(): Boolean {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) {
+            return true
+        }
+
+        val hasConnectedDevicePermission =
+            checkSelfPermission(Manifest.permission.BLUETOOTH_CONNECT) == PackageManager.PERMISSION_GRANTED ||
+                checkSelfPermission(Manifest.permission.BLUETOOTH_SCAN) == PackageManager.PERMISSION_GRANTED ||
+                checkSelfPermission(Manifest.permission.BLUETOOTH_ADVERTISE) == PackageManager.PERMISSION_GRANTED
+        if (!hasConnectedDevicePermission) {
+            return false
+        }
+
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+            checkSelfPermission(Manifest.permission.FOREGROUND_SERVICE_CONNECTED_DEVICE) == PackageManager.PERMISSION_GRANTED
+        } else {
+            true
         }
     }
     private fun startCommService() {
@@ -893,6 +916,15 @@ class MainActivity : ComponentActivity() {
      */
 
     private fun startBTPermissionsCheck() {
+        val missingPermissions = getMissingPermissions(getRequiredPermissions())
+        if (missingPermissions.isNotEmpty()) {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                val ACCESS_LOCATION_REQUEST = 2
+                requestPermissions(missingPermissions, ACCESS_LOCATION_REQUEST)
+            }
+            return
+        }
+
         if (getBluetoothManager().getAdapter() != null) {
             if (!isBluetoothEnabled()) {
                 val enableBtIntent = Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE)
@@ -975,10 +1007,10 @@ class MainActivity : ComponentActivity() {
         val targetSdkVersion = applicationInfo.targetSdkVersion
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S && targetSdkVersion < Build.VERSION_CODES.S) {
             if (checkLocationServices()) {
-                // getBluetoothHandler().startScan()
+                startCommServiceWithPreconditions()
             }
         } else {
-            // getBluetoothHandler().startScan()
+            startCommServiceWithPreconditions()
         }
     }
 
