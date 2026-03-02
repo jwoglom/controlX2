@@ -1,6 +1,6 @@
 # ControlX2
 
-Android app for phones and Wear OS watches which controls a Tandem t:slim X2 pump with [PumpX2](https://github.com/jwoglom/pumpx2). 
+Android app for phones and Wear OS watches which controls a Tandem t:slim X2 or Mobi pump with [PumpX2](https://github.com/jwoglom/pumpx2). 
 
 > **Warning**\
 > **This application is for EXPERIMENTAL USE ONLY and can be used to MODIFY ACTIVE INSULIN DELIVERY ON YOUR INSULIN PUMP.**\
@@ -29,9 +29,11 @@ Android app for phones and Wear OS watches which controls a Tandem t:slim X2 pum
 * Accepting/rejecting insulin corrections 
 * Bolus calculator (to compute units based on entered carbs and BG)
 * Bolus cancellation
+* Temp Basal and Profile settings (Tandem Mobi only)
 
 **Work in progress features:**
 
+* CGM history graph
 * Watch face complications
 * App background service stability
 * Mobile UI
@@ -39,7 +41,6 @@ Android app for phones and Wear OS watches which controls a Tandem t:slim X2 pum
 **Planned features:**
 
 * Watch tile
-* Show CGM history graph
 * Send pump alerts/alarms as notifications
 * Upload data to Nightscout
 
