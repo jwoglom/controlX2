@@ -1,6 +1,8 @@
 package com.jwoglom.controlx2.presentation.theme
 
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.lightColorScheme
+import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
 
 val Purple80 = Color(0xFFD0BCFF)
@@ -46,7 +48,15 @@ val CarbColor = Color(0xFFFF8F00)         // Orange
 val TargetRangeColor = Color(0xFFE0F2F1) // Background (Teal)
 val GridLineColor = Color(0xFFEEEEEE)     // Light Gray
 val SurfaceBackground = Color(0xFFFAFAFA) // Background (Off-white)
-val CardBackground = Color(0xFFFFFFFF)    // Card Background (White)
+
+// Card Background - Dynamic based on dark mode
+val CardBackground: Color
+    @Composable
+    get() = if (isSystemInDarkTheme()) {
+        Color(0xFF2C2C2E)  // Dark gray for dark mode
+    } else {
+        Color(0xFFFFFFFF)  // White for light mode
+    }
 
 // Therapy Mode Colors
 object ModeColors {
