@@ -656,6 +656,12 @@ class MainActivity : ComponentActivity(), MessageClient.OnMessageReceivedListene
 }
 
 private fun NavController.navigateClearBackStack(route: String) {
-    navigate(route)
-    currentBackStackEntry?.id?.let { clearBackStack(it) }
+    navigate(route) {
+        launchSingleTop = true
+        restoreState = false
+        popUpTo(graph.startDestinationId) {
+            inclusive = true
+            saveState = false
+        }
+    }
 }
