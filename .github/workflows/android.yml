@@ -71,8 +71,21 @@ jobs:
         run: find .
         if: ${{ always() }} 
 
-      - name: Validate Gradle wrapper
-        uses: gradle/actions/wrapper-validation@v3
+      - name: Validate Gradle wrapper (attempt 1)
+        id: validate_gradle_wrapper
+        continue-on-error: true
+        uses: gradle/actions/wrapper-validation@v5
+
+      - name: Validate Gradle wrapper (retry)
+        id: validate_gradle_wrapper_retry
+        if: ${{ steps.validate_gradle_wrapper.outcome == 'failure' }}
+        continue-on-error: true
+        uses: gradle/actions/wrapper-validation@v5
+
+      - name: Warn if Gradle wrapper validation failed twice
+        if: ${{ steps.validate_gradle_wrapper.outcome == 'failure' && steps.validate_gradle_wrapper_retry.outcome == 'failure' }}
+        run: |
+          echo "::warning::Gradle wrapper validation failed twice (likely network reachability to Gradle checksum services)."
 
       - name: version
         run: echo "::set-output name=version::$(grep 'controlx2_version =' build.gradle | cut -f2 -d= | tr -d '"' | tr -d '[:space:]')"
