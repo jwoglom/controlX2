@@ -72,7 +72,11 @@ import com.jwoglom.pumpx2.pump.messages.response.currentStatus.TimeSinceResetRes
 import com.jwoglom.pumpx2.pump.messages.response.historyLog.BolusDeliveryHistoryLog
 import com.jwoglom.pumpx2.pump.messages.response.qualifyingEvent.QualifyingEvent
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.asExecutor
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import timber.log.Timber
 import java.time.temporal.ChronoUnit
 import kotlin.math.roundToInt
@@ -86,6 +90,7 @@ class MainActivity : ComponentActivity(), MessageClient.OnMessageReceivedListene
     private lateinit var messageClient: MessageClient
 
     private lateinit var initialRoute: String
+    private val uiScope = kotlinx.coroutines.CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         installSplashScreen()
@@ -291,6 +296,7 @@ class MainActivity : ComponentActivity(), MessageClient.OnMessageReceivedListene
 
     override fun onDestroy() {
         messageClient.removeListener(this)
+        uiScope.cancel()
         super.onDestroy()
     }
 
@@ -523,35 +529,34 @@ class MainActivity : ComponentActivity(), MessageClient.OnMessageReceivedListene
                 }
             }
             "/to-wear/initiate-confirmed-bolus" -> {
-                if (inWaitingState()) {
-                    Timber.e("in invalid state for initiate-confirmed-bolus")
-                    runOnUiThread {
+                uiScope.launch {
+                    if (inWaitingState()) {
+                        Timber.e("in invalid state for initiate-confirmed-bolus")
                         navController.navigate(Screen.BolusBlocked.route)
+                        return@launch
                     }
-                    return
-                }
 
-                if (navController.currentDestination?.route != Screen.Bolus.route) {
-                    Timber.e("in non-bolus state for initiate-confirmed-bolus")
-                    runOnUiThread {
+                    if (navController.currentDestination?.route != Screen.Bolus.route) {
+                        Timber.e("in non-bolus state for initiate-confirmed-bolus")
                         navController.navigate(Screen.BolusBlocked.route)
+                        return@launch
                     }
-                    return
-                }
 
-                val dataStoreUnits = dataStore.bolusFinalParameters.value?.units
-                val confirmedBolus = InitiateConfirmedBolusSerializer.fromBytes("IGNORED_BY_WEAR", messageEvent.data)
-                val initiateBolusRequest = confirmedBolus.right as InitiateBolusRequest
-                if (initiateBolusRequest.totalVolume != InsulinUnit.from1To1000(dataStoreUnits)) {
-                    Timber.e("blocked bolus with different volume amount $initiateBolusRequest vs $dataStoreUnits")
-                    runOnUiThread {
+                    val dataStoreUnits = dataStore.bolusFinalParameters.value?.units
+                    val initiateBolusRequest = withContext(Dispatchers.Default) {
+                        val confirmedBolus = InitiateConfirmedBolusSerializer.fromBytes("IGNORED_BY_WEAR", messageEvent.data)
+                        confirmedBolus.right as InitiateBolusRequest
+                    }
+
+                    if (initiateBolusRequest.totalVolume != InsulinUnit.from1To1000(dataStoreUnits)) {
+                        Timber.e("blocked bolus with different volume amount $initiateBolusRequest vs $dataStoreUnits")
                         navController.navigate(Screen.BolusBlocked.route)
+                        return@launch
                     }
-                    return
-                }
 
-                Timber.i("sending initiate-confirmed-bolus from wearable to phone")
-                sendMessage("/to-phone/initiate-confirmed-bolus", messageEvent.data)
+                    Timber.i("sending initiate-confirmed-bolus from wearable to phone")
+                    sendMessage("/to-phone/initiate-confirmed-bolus", messageEvent.data)
+                }
             }
             "/to-wear/blocked-bolus-signature" -> {
                 Timber.w("blocked bolus signature")
@@ -627,26 +632,34 @@ class MainActivity : ComponentActivity(), MessageClient.OnMessageReceivedListene
                 dataStore.connectionStatus.value = "Error: ${String(messageEvent.data)}"
             }
             "/from-pump/receive-qualifying-event" -> {
-                val pumpEvents = PumpQualifyingEventsSerializer.fromBytes(messageEvent.data)
-                onPumpQualifyingEventReceived(pumpEvents)
+                uiScope.launch {
+                    val pumpEvents = withContext(Dispatchers.Default) {
+                        PumpQualifyingEventsSerializer.fromBytes(messageEvent.data)
+                    }
+                    onPumpQualifyingEventReceived(pumpEvents)
+                }
             }
             "/from-pump/receive-message" -> {
-                if (inWaitingState()) {
-                    runOnUiThread {
+                uiScope.launch {
+                    if (inWaitingState()) {
                         navController.navigateClearBackStack(initialRoute)
                     }
+                    val pumpMessage = withContext(Dispatchers.Default) {
+                        PumpMessageSerializer.fromBytes(messageEvent.data)
+                    }
+                    onPumpMessageReceived(pumpMessage, false)
                 }
-                val pumpMessage = PumpMessageSerializer.fromBytes(messageEvent.data)
-                onPumpMessageReceived(pumpMessage, false)
             }
             "/from-pump/receive-cached-message" -> {
-                if (inWaitingState()) {
-                    runOnUiThread {
+                uiScope.launch {
+                    if (inWaitingState()) {
                         navController.navigateClearBackStack(initialRoute)
                     }
+                    val pumpMessage = withContext(Dispatchers.Default) {
+                        PumpMessageSerializer.fromBytes(messageEvent.data)
+                    }
+                    onPumpMessageReceived(pumpMessage, true)
                 }
-                val pumpMessage = PumpMessageSerializer.fromBytes(messageEvent.data)
-                onPumpMessageReceived(pumpMessage, true)
             }
             else -> {
                 Timber.w("wear activity unhandled receive: ${messageEvent.path} ${String(messageEvent.data)}")

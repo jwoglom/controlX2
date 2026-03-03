@@ -35,6 +35,12 @@ import com.jwoglom.pumpx2.pump.messages.models.InsulinUnit
 import com.jwoglom.pumpx2.pump.messages.response.currentStatus.ControlIQIOBResponse
 import com.jwoglom.pumpx2.pump.messages.response.currentStatus.CurrentBatteryAbstractResponse
 import com.jwoglom.pumpx2.pump.messages.response.currentStatus.CurrentEGVGuiDataResponse
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import timber.log.Timber
 import java.time.Instant
 
@@ -45,6 +51,7 @@ class PhoneCommService : Service() {
 
     private lateinit var messageBus: MessageBus
     private val notificationManagerCompat: NotificationManagerCompat by lazy { NotificationManagerCompat.from(this) }
+    private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
 
     override fun onCreate() {
         super.onCreate()
@@ -144,8 +151,12 @@ class PhoneCommService : Service() {
                     .putExtra("route", Screen.BolusNotEnabled.route)
             }
             "/to-wear/service-receive-message" -> {
-                val pumpMessage = PumpMessageSerializer.fromBytes(data)
-                onPumpMessageReceived(pumpMessage, false)
+                serviceScope.launch {
+                    val pumpMessage = withContext(Dispatchers.Default) {
+                        PumpMessageSerializer.fromBytes(data)
+                    }
+                    onPumpMessageReceived(pumpMessage, false)
+                }
             }
             "/to-wear/glucose-unit" -> {
                 val unitName = String(data)
@@ -156,6 +167,11 @@ class PhoneCommService : Service() {
                 }
             }
         }
+    }
+
+    override fun onDestroy() {
+        serviceScope.cancel()
+        super.onDestroy()
     }
 
     // keep in sync with CommService.PumpCommHandler#onReceiveMessage to ensure messages are sent
