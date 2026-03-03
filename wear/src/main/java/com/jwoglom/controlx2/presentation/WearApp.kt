@@ -21,6 +21,7 @@ import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.size
+import android.os.SystemClock
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.DirectionsRun
 import androidx.compose.material.icons.filled.KingBed
@@ -90,6 +91,7 @@ import com.jwoglom.controlx2.shared.util.SendType
 import com.jwoglom.pumpx2.pump.messages.request.control.SetModesRequest
 import kotlin.math.abs
 import kotlin.math.pow
+import kotlinx.coroutines.awaitCancellation
 
 @Composable
 fun WearApp(
@@ -134,6 +136,7 @@ fun WearApp(
         // later navigate into it again, it should be in its initial scroll state (not the last
         // scroll location it was in before you backed out).
         val currentBackStackEntry by navController.currentBackStackEntryAsState()
+        val currentRoute = currentBackStackEntry?.destination?.route
 
         val scrollType =
             currentBackStackEntry?.arguments?.getSerializable(SCROLL_TYPE_NAV_ARGUMENT)
@@ -156,8 +159,28 @@ fun WearApp(
             navController.navigate(Screen.WaitingForPhone.route)
         }
 
-        LaunchedEffect (navController.currentDestination) {
-            sendPhoneConnectionCheck()
+        val lifecycleOwner = LocalLifecycleOwner.current
+        val connectionCheckMinIntervalMs = 1500L
+        var lastConnectionCheckTimestampMs by remember { mutableStateOf(0L) }
+        val requestConnectionCheck = {
+            val now = SystemClock.elapsedRealtime()
+            if (now - lastConnectionCheckTimestampMs >= connectionCheckMinIntervalMs) {
+                lastConnectionCheckTimestampMs = now
+                sendPhoneConnectionCheck()
+            }
+        }
+
+        LaunchedEffect(currentRoute) {
+            if (currentRoute != null) {
+                requestConnectionCheck()
+            }
+        }
+
+        LaunchedEffect(lifecycleOwner) {
+            lifecycleOwner.repeatOnLifecycle(state = Lifecycle.State.RESUMED) {
+                requestConnectionCheck()
+                awaitCancellation()
+            }
         }
 
         Scaffold(
