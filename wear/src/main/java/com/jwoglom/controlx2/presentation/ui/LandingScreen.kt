@@ -71,7 +71,6 @@ import com.jwoglom.pumpx2.pump.messages.request.currentStatus.HomeScreenMirrorRe
 import com.jwoglom.pumpx2.pump.messages.request.currentStatus.InsulinStatusRequest
 import com.jwoglom.controlx2.LocalDataStore
 import com.jwoglom.controlx2.R
-import com.jwoglom.controlx2.dataStore
 import com.jwoglom.controlx2.presentation.components.FirstRowChip
 import com.jwoglom.controlx2.shared.presentation.LifecycleStateObserver
 import com.jwoglom.controlx2.presentation.components.LineInfoChip
@@ -102,6 +101,13 @@ fun LandingScreen(
     navController: NavHostController,
     modifier: Modifier = Modifier,
 ) {
+    val dataStore = LocalDataStore.current
+    val context = LocalContext.current
+    val paperwork = remember(context) { Paperwork(context) }
+    val buildVersion = remember(paperwork) { paperwork.get("build_version") }
+    val buildTime = remember(paperwork) { paperwork.get("build_time") }
+    val autoCenteringParams = remember { AutoCenteringParams() }
+
     val refreshScope = rememberCoroutineScope()
     var refreshing by remember { mutableStateOf(true) }
 
@@ -207,14 +213,12 @@ fun LandingScreen(
         ScalingLazyColumn(
             modifier = Modifier.scrollableColumn(focusRequester, scalingLazyListState),
             state = scalingLazyListState,
-            autoCentering = AutoCenteringParams()
+            autoCentering = autoCenteringParams
         ) {
 
             item {
                 // Signify we have drawn the content of the first screen
                 ReportFullyDrawn()
-
-                val dataStore = LocalDataStore.current
 
                 FlowRow {
                     val batteryPercent = dataStore.batteryPercent.observeAsState()
@@ -403,8 +407,8 @@ fun LandingScreen(
             }
 
             item {
-                val controlIQStatus = LocalDataStore.current.controlIQStatus.observeAsState()
-                val controlIQMode = LocalDataStore.current.controlIQMode.observeAsState()
+                val controlIQStatus = dataStore.controlIQStatus.observeAsState()
+                val controlIQMode = dataStore.controlIQMode.observeAsState()
                 val landingControlIQDisplayedText = dataStore.landingControlIQDisplayedText.observeAsState()
 
                 LaunchedEffect (controlIQStatus.value, controlIQMode.value) {
@@ -428,9 +432,9 @@ fun LandingScreen(
 
             item {
                 var showExact by remember { mutableStateOf(false) }
-                val cgmSessionState = LocalDataStore.current.cgmSessionState.observeAsState()
-                val cgmSessionExpireRelative = LocalDataStore.current.cgmSessionExpireRelative.observeAsState()
-                val cgmSessionExpireExact = LocalDataStore.current.cgmSessionExpireExact.observeAsState()
+                val cgmSessionState = dataStore.cgmSessionState.observeAsState()
+                val cgmSessionExpireRelative = dataStore.cgmSessionExpireRelative.observeAsState()
+                val cgmSessionExpireExact = dataStore.cgmSessionExpireExact.observeAsState()
                 LineInfoChip(
                     "CGM Sensor",
                     when (cgmSessionState.value) {
@@ -448,7 +452,7 @@ fun LandingScreen(
             }
 
             item {
-                val cgmTransmitterStatus = LocalDataStore.current.cgmTransmitterStatus.observeAsState()
+                val cgmTransmitterStatus = dataStore.cgmTransmitterStatus.observeAsState()
                 LineInfoChip(
                     "CGM Battery",
                     when(cgmTransmitterStatus.value) {
@@ -489,8 +493,6 @@ fun LandingScreen(
             }
 
             item {
-                val context = LocalContext.current
-                val p = Paperwork(context)
                 Text(buildAnnotatedString {
                     withStyle(style = SpanStyle(fontWeight = FontWeight.Bold, fontSize = 12.sp)) {
                         append("ControlX2 ")
@@ -505,13 +507,13 @@ fun LandingScreen(
                     withStyle(style = SpanStyle(fontWeight = FontWeight.Bold)) {
                         append("Build: ")
                     }
-                    append(p.get("build_version"))
+                    append(buildVersion)
                     append("\n")
 
                     withStyle(style = SpanStyle(fontWeight = FontWeight.Bold)) {
                         append("Build time: ")
                     }
-                    append(p.get("build_time"))
+                    append(buildTime)
                     append("\n")
                 }, color = Color.White, fontSize = 8.sp, modifier = Modifier.padding(start = 16.dp))
             }
