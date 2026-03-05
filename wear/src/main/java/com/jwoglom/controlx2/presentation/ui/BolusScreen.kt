@@ -79,6 +79,8 @@ import com.jwoglom.controlx2.R
 import com.jwoglom.controlx2.dataStore
 import com.jwoglom.controlx2.presentation.DataStore
 import com.jwoglom.controlx2.presentation.components.LineTextDescription
+import com.jwoglom.controlx2.presentation.ui.components.BolusCarbsAndBgRow
+import com.jwoglom.controlx2.presentation.ui.components.BolusUnitsChip
 import com.jwoglom.controlx2.presentation.defaultTheme
 import com.jwoglom.controlx2.shared.enums.GlucoseUnit
 import com.jwoglom.controlx2.shared.util.GlucoseConverter
@@ -369,168 +371,19 @@ fun BolusScreen(
             autoCentering = AutoCenteringParams()
         ) {
             item {
-                val bolusUnitsDisplayedText = dataStore.bolusUnitsDisplayedText.observeAsState()
-                val bolusUnitsDisplayedSubtitle = dataStore.bolusUnitsDisplayedSubtitle.observeAsState()
-
-                Box(modifier = Modifier.padding(top = 24.dp)) {
-                    Chip(
-                        onClick = {
-                            if (dataStore.bolusCurrentParameters.value != null) {
-                                onClickUnits(dataStore.bolusCurrentParameters.value!!.units)
-                            } else {
-                                onClickUnits(null)
-                            }
-                        },
-                        label = {
-                            Column(
-                                Modifier
-                                    .fillMaxWidth(),
-                                verticalArrangement = Arrangement.Center,
-                                horizontalAlignment = Alignment.CenterHorizontally
-                            ) {
-                                Text(
-                                    "${bolusUnitsDisplayedText.value}",
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis,
-                                    textAlign = TextAlign.Center,
-                                    fontSize = 18.sp,
-                                )
-                            }
-                        },
-                        secondaryLabel = {
-                            Column(
-                                Modifier
-                                    .fillMaxWidth(),
-                                verticalArrangement = Arrangement.Center,
-                                horizontalAlignment = Alignment.CenterHorizontally
-                            ) {
-                                Text(
-                                    text = when (bolusUnitsDisplayedSubtitle.value) {
-                                        null -> "Units"
-                                        else -> "${bolusUnitsDisplayedSubtitle.value}"
-                                    },
-                                    maxLines = 1,
-                                    textAlign = TextAlign.Center,
-                                    fontSize = 10.sp,
-                                )
-                            }
-                        },
-                        contentPadding = PaddingValues(
-                            start = 2.dp, end = 2.dp,
-                            top = 2.dp, bottom = 2.dp
-                        ),
-                        shape = MaterialTheme.shapes.medium,
-                        modifier = Modifier
-                            .fillMaxWidth(fraction = 0.5f)
-                            .height(40.dp)
-                    )
-                }
+                BolusUnitsChip(
+                    onClickUnits = onClickUnits,
+                    currentUnits = dataStore.bolusCurrentParameters.value?.units,
+                )
             }
 
             item {
-                Row(
-                    modifier = Modifier.fillMaxWidth().padding(PaddingValues(top = 4.dp))
-                ) {
-                    Chip(
-                        onClick = onClickCarbs,
-                        label = {
-                            Column(
-                                Modifier
-                                    .fillMaxWidth(),
-                                verticalArrangement = Arrangement.Center,
-                                horizontalAlignment = Alignment.CenterHorizontally
-                            ) {
-                                Text(
-                                    text = when (bolusCarbsGramsUserInput) {
-                                        null -> "0"
-                                        else -> "$bolusCarbsGramsUserInput"
-                                    },
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis,
-                                    textAlign = TextAlign.Center,
-                                    fontSize = 34.sp,
-                                )
-                            }
-                        },
-                        secondaryLabel = {
-                            Column(
-                                Modifier
-                                    .fillMaxWidth(),
-                                verticalArrangement = Arrangement.Center,
-                                horizontalAlignment = Alignment.CenterHorizontally
-                            ) {
-                                Text(
-                                    text = "Carbs (grams)",
-                                    maxLines = 1,
-                                    textAlign = TextAlign.Center,
-                                    fontSize = 10.sp,
-                                )
-                            }
-                        },
-                        contentPadding = PaddingValues(
-                            start = 2.dp, end = 2.dp,
-                            top = 2.dp, bottom = 2.dp
-                        ),
-                        shape = MaterialTheme.shapes.medium,
-                        modifier = Modifier
-                            .padding(PaddingValues(end = 4.dp))
-                            .height(60.dp)
-                            .weight(1f)
-                    )
-
-                    val bolusBGDisplayedText = dataStore.bolusBGDisplayedText.observeAsState()
-                    val bolusBGDisplayedSubtitle = dataStore.bolusBGDisplayedSubtitle.observeAsState()
-
-                    Chip(
-                        onClick = onClickBG,
-                        label = {
-                            Column(
-                                Modifier
-                                    .fillMaxWidth(),
-                                verticalArrangement = Arrangement.Center,
-                                horizontalAlignment = Alignment.CenterHorizontally
-                            ) {
-                                Text(
-                                    text = when (bolusBGDisplayedText.value) {
-                                        null -> ""
-                                        else -> "${bolusBGDisplayedText.value}"
-                                    },
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis,
-                                    textAlign = TextAlign.Center,
-                                    fontSize = 34.sp,
-                                )
-                            }
-                        },
-                        secondaryLabel = {
-                            Column(
-                                Modifier
-                                    .fillMaxWidth(),
-                                verticalArrangement = Arrangement.Center,
-                                horizontalAlignment = Alignment.CenterHorizontally
-                            ) {
-                                Text(
-                                    text = when (bolusBGDisplayedSubtitle.value) {
-                                        null -> "BG ($unitAbbrev)"
-                                        else -> "${bolusBGDisplayedSubtitle.value}"
-                                    },
-                                    maxLines = 1,
-                                    textAlign = TextAlign.Center,
-                                    fontSize = 10.sp,
-                                )
-                            }
-                        },
-                        contentPadding = PaddingValues(
-                            start = 2.dp, end = 2.dp,
-                            top = 2.dp, bottom = 2.dp
-                        ),
-                        shape = MaterialTheme.shapes.medium,
-                        modifier = Modifier
-                            .padding(PaddingValues(start = 4.dp))
-                            .height(60.dp)
-                            .weight(1f)
-                    )
-                }
+                BolusCarbsAndBgRow(
+                    carbsGrams = bolusCarbsGramsUserInput,
+                    unitAbbrev = unitAbbrev,
+                    onClickCarbs = onClickCarbs,
+                    onClickBg = onClickBG,
+                )
             }
 
             item {
@@ -1175,6 +1028,7 @@ fun BolusScreen(
         }
     }
 }
+
 
 fun resetBolusDataStoreState(dataStore: DataStore) {
     dataStore.bolusPermissionResponse.value = null
