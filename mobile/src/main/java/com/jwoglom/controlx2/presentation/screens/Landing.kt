@@ -115,10 +115,7 @@ fun Landing(
     val ds = LocalDataStore.current
     val coroutineScope = rememberCoroutineScope()
 
-    val setupStage = ds.pumpSetupStage.observeAsState()
     val pumpConnected = ds.pumpConnected.observeAsState()
-    val pumpLastConnectionTimestamp = ds.pumpLastConnectionTimestamp.observeAsState()
-    val pumpLastMessageTimestamp = ds.pumpLastMessageTimestamp.observeAsState()
     val deviceName = ds.setupDeviceName.observeAsState()
     val notificationBundle = ds.notificationBundle.observeAsState()
 
