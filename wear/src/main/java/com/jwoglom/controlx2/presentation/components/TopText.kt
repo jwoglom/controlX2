@@ -48,7 +48,6 @@ fun TopText(
         val ds = LocalDataStore.current
         val cgmSessionState = ds.cgmSessionState.observeAsState()
         val cgmReading = ds.cgmReading.observeAsState()
-        val cgmDelta = ds.cgmDelta.observeAsState()
         val cgmStatusText = ds.cgmStatusText.observeAsState()
         val cgmHighLowState = ds.cgmHighLowState.observeAsState()
         val cgmDeltaArrow = ds.cgmDeltaArrow.observeAsState()
@@ -83,11 +82,25 @@ fun TopText(
                     glucoseUnit.value ?: GlucoseUnit.MGDL
                 )
                 curvedComposable (radialAlignment = CurvedAlignment.Radial.Outer) {
-                    CurrentCGMTextDeltaArrow(textStyle, modifier = Modifier.padding(start = 2.dp))
+                    CurrentCGMTextDeltaArrow(
+                        cgmSessionState = cgmSessionState.value,
+                        cgmStatusText = cgmStatusText.value,
+                        cgmDeltaArrow = cgmDeltaArrow.value,
+                        cgmHighLowState = cgmHighLowState.value,
+                        textStyle = textStyle,
+                        modifier = Modifier.padding(start = 2.dp)
+                    )
                 }
             },
             endLinearContent = {
-                CurrentCGMText()
+                CurrentCGMText(
+                    cgmSessionState = cgmSessionState.value,
+                    cgmStatusText = cgmStatusText.value,
+                    cgmReading = cgmReading.value,
+                    cgmDeltaArrow = cgmDeltaArrow.value,
+                    cgmHighLowState = cgmHighLowState.value,
+                    glucoseUnit = glucoseUnit.value ?: GlucoseUnit.MGDL
+                )
             }
         )
     }
