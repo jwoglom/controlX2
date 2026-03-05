@@ -86,12 +86,26 @@ fun ControlIQSettingsActions(
     val context = LocalContext.current
     val ds = LocalDataStore.current
 
-    val controlIQInfo = ds.controlIQInfoResponse.observeAsState()
     val controlIQEnabled = ds.controlIQEnabled.observeAsState()
     val controlIQWeight = ds.controlIQWeight.observeAsState()
     val controlIQWeightUnit = ds.controlIQWeightUnit.observeAsState()
     val controlIQTotalDailyInsulin = ds.controlIQTotalDailyInsulin.observeAsState()
     val sleepSchedule = ds.controlIQSleepScheduleResponse.observeAsState()
+
+    val controlIQSummaryText = remember(
+        controlIQEnabled.value,
+        controlIQWeight.value,
+        controlIQWeightUnit.value,
+        controlIQTotalDailyInsulin.value,
+    ) {
+        if (controlIQEnabled.value == null) {
+            "Loading..."
+        } else {
+            "Status: ${if (controlIQEnabled.value == true) "Enabled" else "Disabled"}\n" +
+                "Weight: ${controlIQWeight.value ?: "?"} ${controlIQWeightUnit.value ?: ""}\n" +
+                "Total Daily Insulin: ${controlIQTotalDailyInsulin.value ?: "?"} units"
+        }
+    }
 
     val refreshScope = rememberCoroutineScope()
     var refreshing by remember { mutableStateOf(true) }
@@ -215,15 +229,7 @@ fun ControlIQSettingsActions(
                     ListItem(
                         headlineContent = { Text("Control-IQ") },
                         supportingContent = {
-                            if (controlIQEnabled.value != null) {
-                                Text(
-                                    "Status: ${if (controlIQEnabled.value == true) "Enabled" else "Disabled"}\n" +
-                                    "Weight: ${controlIQWeight.value ?: "?"} ${controlIQWeightUnit.value ?: ""}\n" +
-                                    "Total Daily Insulin: ${controlIQTotalDailyInsulin.value ?: "?"} units"
-                                )
-                            } else {
-                                Text("Loading...")
-                            }
+                            Text(controlIQSummaryText)
                         },
                         leadingContent = { Icon(Icons.Filled.Settings, contentDescription = null) },
                         modifier = Modifier.clickable {
