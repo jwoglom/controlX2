@@ -2,7 +2,6 @@ package com.jwoglom.controlx2.presentation.components
 
 import androidx.compose.foundation.background
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.livedata.observeAsState
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.TextStyle
@@ -16,7 +15,6 @@ import androidx.wear.compose.material.MaterialTheme
 import androidx.wear.compose.material.Text
 import androidx.wear.compose.material.curvedText
 import com.google.common.base.Strings
-import com.jwoglom.controlx2.LocalDataStore
 import com.jwoglom.controlx2.presentation.defaultTheme
 import com.jwoglom.controlx2.presentation.redTheme
 import com.jwoglom.controlx2.shared.enums.GlucoseUnit
@@ -24,28 +22,26 @@ import com.jwoglom.controlx2.shared.util.GlucoseConverter
 
 @Composable
 fun CurrentCGMText(
+    cgmSessionState: String?,
+    cgmStatusText: String?,
+    cgmReading: Int?,
+    cgmDeltaArrow: String?,
+    cgmHighLowState: String?,
+    glucoseUnit: GlucoseUnit = GlucoseUnit.MGDL,
     textStyle: TextStyle? = null,
 ) {
-    val ds = LocalDataStore.current
-    val cgmSessionState = ds.cgmSessionState.observeAsState()
-    val cgmReading = ds.cgmReading.observeAsState()
-    val cgmDelta = ds.cgmDelta.observeAsState()
-    val cgmStatusText = ds.cgmStatusText.observeAsState()
-    val cgmHighLowState = ds.cgmHighLowState.observeAsState()
-    val cgmDeltaArrow = ds.cgmDeltaArrow.observeAsState()
-    val glucoseUnit = ds.glucoseUnitPreference.observeAsState()
-    val displayText = when (cgmSessionState.value) {
-        "Starting", "Stopped", "Stopping", "Unknown" -> cgmStatusText.value!!
+    val displayText = when (cgmSessionState) {
+        "Starting", "Stopped", "Stopping", "Unknown" -> cgmStatusText!!
         else -> when {
-            !Strings.isNullOrEmpty(cgmStatusText.value) -> cgmStatusText.value!!
+            !Strings.isNullOrEmpty(cgmStatusText) -> cgmStatusText!!
             else -> when {
-                cgmReading.value != null && cgmDeltaArrow.value != null -> "${GlucoseConverter.format(cgmReading.value!!, glucoseUnit.value ?: GlucoseUnit.MGDL)} ${cgmDeltaArrow.value}"
-                cgmReading.value != null -> GlucoseConverter.format(cgmReading.value!!, glucoseUnit.value ?: GlucoseUnit.MGDL)
+                cgmReading != null && cgmDeltaArrow != null -> "${GlucoseConverter.format(cgmReading, glucoseUnit)} ${cgmDeltaArrow}"
+                cgmReading != null -> GlucoseConverter.format(cgmReading, glucoseUnit)
                 else -> ""
             }
         }
     }
-    val primaryColor = when (cgmHighLowState.value) {
+    val primaryColor = when (cgmHighLowState) {
         "HIGH" -> redTheme.colors.secondary
         "LOW" -> redTheme.colors.primary
         else -> MaterialTheme.colors.primary
@@ -63,27 +59,24 @@ fun CurrentCGMText(
 
 @Composable
 fun CurrentCGMTextDeltaArrow(
+    cgmSessionState: String?,
+    cgmStatusText: String?,
+    cgmDeltaArrow: String?,
+    cgmHighLowState: String?,
     textStyle: TextStyle? = null,
     modifier: Modifier = Modifier,
 ) {
-    val ds = LocalDataStore.current
-    val cgmSessionState = ds.cgmSessionState.observeAsState()
-    val cgmReading = ds.cgmReading.observeAsState()
-    val cgmDelta = ds.cgmDelta.observeAsState()
-    val cgmStatusText = ds.cgmStatusText.observeAsState()
-    val cgmHighLowState = ds.cgmHighLowState.observeAsState()
-    val cgmDeltaArrow = ds.cgmDeltaArrow.observeAsState()
-    val displayText = when (cgmSessionState.value) {
+    val displayText = when (cgmSessionState) {
         "Starting", "Stopped", "Stopping", "Unknown" -> ""
         else -> when {
-            !Strings.isNullOrEmpty(cgmStatusText.value) -> ""
+            !Strings.isNullOrEmpty(cgmStatusText) -> ""
             else -> when {
-                cgmDeltaArrow.value != null -> "${cgmDeltaArrow.value}"
+                cgmDeltaArrow != null -> "${cgmDeltaArrow}"
                 else -> ""
             }
         }
     }
-    val primaryColor = when (cgmHighLowState.value) {
+    val primaryColor = when (cgmHighLowState) {
         "HIGH" -> redTheme.colors.secondary
         "LOW" -> redTheme.colors.primary
         else -> defaultTheme.colors.primary
