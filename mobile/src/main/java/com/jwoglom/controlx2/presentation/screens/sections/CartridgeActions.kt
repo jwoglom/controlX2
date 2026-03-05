@@ -1,35 +1,16 @@
-@file:OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3Api::class,
-    ExperimentalMaterialApi::class
-)
+@file:OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterialApi::class)
 
 package com.jwoglom.controlx2.presentation.screens.sections
 
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.wrapContentSize
-import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.ExperimentalMaterialApi
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowBack
-import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.pullrefresh.PullRefreshIndicator
 import androidx.compose.material.pullrefresh.pullRefresh
 import androidx.compose.material.pullrefresh.rememberPullRefreshState
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Divider
-import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.Icon
-import androidx.compose.material3.ListItem
 import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -47,42 +28,43 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
 import androidx.navigation.NavHostController
-import com.google.common.base.Strings
 import com.jwoglom.controlx2.LocalDataStore
 import com.jwoglom.controlx2.Prefs
 import com.jwoglom.controlx2.dataStore
 import com.jwoglom.controlx2.db.historylog.HistoryLogViewModel
-import com.jwoglom.controlx2.presentation.components.HeaderLine
-import com.jwoglom.controlx2.presentation.components.Line
-import com.jwoglom.controlx2.presentation.components.LoadSpinner
-import com.jwoglom.controlx2.presentation.screens.sections.components.DecimalOutlinedText
 import com.jwoglom.controlx2.presentation.screens.setUpPreviewState
-import com.jwoglom.controlx2.presentation.theme.ControlX2Theme
-import com.jwoglom.controlx2.presentation.util.LifecycleStateObserver
-import com.jwoglom.controlx2.shared.enums.BasalStatus
-import com.jwoglom.controlx2.shared.presentation.intervalOf
-import com.jwoglom.controlx2.shared.util.SendType
-import com.jwoglom.controlx2.util.determinePumpModel
-import com.jwoglom.pumpx2.pump.messages.Message
+import com.jwoglom.controlx2.presentation.screens.sections.components.cartridge.CartridgeActionsMenuScreen
+import com.jwoglom.controlx2.presentation.screens.sections.components.cartridge.ChangeCartridgeWorkflowScreen
+import com.jwoglom.controlx2.presentation.screens.sections.components.cartridge.FillCannulaWorkflowScreen
+import com.jwoglom.controlx2.presentation.screens.sections.components.cartridge.FillTubingWorkflowScreen
 import com.jwoglom.pumpx2.pump.messages.models.InsulinUnit
-import com.jwoglom.pumpx2.pump.messages.models.KnownDeviceModel
 import com.jwoglom.pumpx2.pump.messages.request.control.EnterChangeCartridgeModeRequest
 import com.jwoglom.pumpx2.pump.messages.request.control.EnterFillTubingModeRequest
 import com.jwoglom.pumpx2.pump.messages.request.control.ExitChangeCartridgeModeRequest
 import com.jwoglom.pumpx2.pump.messages.request.control.ExitFillTubingModeRequest
 import com.jwoglom.pumpx2.pump.messages.request.control.FillCannulaRequest
+import com.jwoglom.controlx2.presentation.theme.ControlX2Theme
+import com.jwoglom.controlx2.presentation.util.LifecycleStateObserver
+import com.jwoglom.controlx2.shared.enums.BasalStatus
+import com.jwoglom.controlx2.shared.presentation.intervalOf
+import com.jwoglom.controlx2.shared.util.SendType
+import com.jwoglom.pumpx2.pump.messages.Message
 import com.jwoglom.pumpx2.pump.messages.request.currentStatus.CGMStatusRequest
 import com.jwoglom.pumpx2.pump.messages.request.currentStatus.HomeScreenMirrorRequest
 import com.jwoglom.pumpx2.pump.messages.request.currentStatus.TimeSinceResetRequest
 import com.jwoglom.pumpx2.pump.messages.request.currentStatus.UnknownMobiOpcode20Request
-import com.jwoglom.pumpx2.pump.messages.response.controlStream.EnterChangeCartridgeModeStateStreamResponse
-import com.jwoglom.pumpx2.pump.messages.response.controlStream.ExitFillTubingModeStateStreamResponse
-import com.jwoglom.pumpx2.pump.messages.response.controlStream.FillCannulaStateStreamResponse
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import timber.log.Timber
+
+private enum class CartridgeSubScreen {
+    MENU,
+    CHANGE_CARTRIDGE,
+    FILL_TUBING,
+    FILL_CANNULA,
+}
 
 @Composable
 fun CartridgeActions(
@@ -96,18 +78,28 @@ fun CartridgeActions(
     _fillCannulaMenuState: Boolean = false,
     navigateBack: () -> Unit
 ) {
-    val coroutineScope = rememberCoroutineScope()
-
-    var showChangeCartridgeMenu by remember { mutableStateOf(_changeCartridgeMenuState) }
-    var showFillTubingMenu by remember { mutableStateOf(_fillTubingMenuState) }
-    var showFillCannulaMenu by remember { mutableStateOf(_fillCannulaMenuState) }
-
     val context = LocalContext.current
     val ds = LocalDataStore.current
     val deviceName = ds.setupDeviceName.observeAsState()
 
     val refreshScope = rememberCoroutineScope()
     var refreshing by remember { mutableStateOf(true) }
+    var willRestartTubingFill by remember { mutableStateOf(false) }
+    var cannulaFillAmountStr by remember { mutableStateOf<String?>(null) }
+    var cannulaFillAmount by remember { mutableStateOf<Double?>(null) }
+
+    var subScreen by remember {
+        mutableStateOf(
+            when {
+                _changeCartridgeMenuState -> CartridgeSubScreen.CHANGE_CARTRIDGE
+                _fillTubingMenuState -> CartridgeSubScreen.FILL_TUBING
+                _fillCannulaMenuState -> CartridgeSubScreen.FILL_CANNULA
+                else -> CartridgeSubScreen.MENU
+            }
+        )
+    }
+
+    fun allowedCannulaFillAmount(units: Double?): Boolean = units != null && units > 0 && units <= 3.0
 
     fun fetchDataStoreFields(type: SendType) {
         sendPumpCommands(type, cartridgeActionsCommands)
@@ -118,23 +110,15 @@ fun CartridgeActions(
         var sinceLastFetchTime = 0
         while (true) {
             val nullFields = cartridgeActionsFields.filter { field -> field.value == null }.toSet()
-            if (nullFields.isEmpty()) {
-                break
-            }
+            if (nullFields.isEmpty()) break
 
-            Timber.i("CartridgeActions loading: remaining ${nullFields.size}: ${cartridgeActionsFields.map { it.value }}")
             if (sinceLastFetchTime >= 2500) {
-                Timber.i("CartridgeActions loading re-fetching with cache")
                 fetchDataStoreFields(SendType.CACHED)
                 sinceLastFetchTime = 0
             }
-
-            withContext(Dispatchers.IO) {
-                Thread.sleep(250)
-            }
+            withContext(Dispatchers.IO) { Thread.sleep(250) }
             sinceLastFetchTime += 250
         }
-        Timber.i("CartridgeActions loading done: ${cartridgeActionsFields.map { it.value }}")
         refreshing = false
     }
 
@@ -142,591 +126,127 @@ fun CartridgeActions(
         if (!Prefs(context).serviceEnabled()) return@launch
         Timber.i("reloading CartridgeActions with force")
         refreshing = true
-
         cartridgeActionsFields.forEach { field -> field.value = null }
         fetchDataStoreFields(SendType.BUST_CACHE)
     }
 
     val state = rememberPullRefreshState(refreshing, ::refresh)
 
-    LifecycleStateObserver(lifecycleOwner = LocalLifecycleOwner.current, onStop = {
-        refreshScope.cancel()
-    }) {
-        Timber.i("reloading CartridgeActions from onStart lifecyclestate")
+    LifecycleStateObserver(lifecycleOwner = LocalLifecycleOwner.current, onStop = { refreshScope.cancel() }) {
         fetchDataStoreFields(SendType.STANDARD)
     }
 
     LaunchedEffect(intervalOf(60)) {
-        Timber.i("reloading CartridgeActions from interval")
         fetchDataStoreFields(SendType.STANDARD)
     }
 
-    LaunchedEffect(refreshing) {
-        waitForLoaded()
-    }
+    LaunchedEffect(refreshing) { waitForLoaded() }
 
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .pullRefresh(state)
-    ) {
-        PullRefreshIndicator(
-            refreshing, state,
-            Modifier
-                .align(Alignment.TopCenter)
-                .zIndex(10f)
-        )
-        LazyColumn(
-            contentPadding = innerPadding,
-            verticalArrangement = Arrangement.spacedBy(0.dp),
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(horizontal = 0.dp),
-            content = {
-                item {
-                    HeaderLine("Cartridge Actions")
-                    Divider()
+    val basalStatus = ds.basalStatus.observeAsState()
+    val inChangeCartridgeMode = ds.inChangeCartridgeMode.observeAsState()
+    val enterChangeCartridgeState = ds.enterChangeCartridgeState.observeAsState()
+    val detectingCartridgeState = ds.detectingCartridgeState.observeAsState()
+    val inFillTubingMode = ds.inFillTubingMode.observeAsState()
+    val fillTubingState = ds.fillTubingState.observeAsState()
+    val exitFillTubingState = ds.exitFillTubingState.observeAsState()
+    val fillCannulaState = ds.fillCannulaState.observeAsState()
 
-                    val model = determinePumpModel(deviceName.value ?: "")
-                    if (model == KnownDeviceModel.TSLIM_X2) {
-                        Line("Insulin control is not supported on this device model (${model}).")
-                        Line("")
+    Box(modifier = Modifier.fillMaxSize().pullRefresh(state)) {
+        PullRefreshIndicator(refreshing, state, Modifier.align(Alignment.TopCenter).zIndex(10f))
+
+        when (subScreen) {
+            CartridgeSubScreen.MENU -> CartridgeActionsMenuScreen(
+                innerPadding = innerPadding,
+                deviceName = deviceName.value ?: "",
+                onChangeCartridge = {
+                    refreshScope.launch {
+                        ds.enterChangeCartridgeState.value = null
+                        ds.detectingCartridgeState.value = null
+                        sendPumpCommands(SendType.BUST_CACHE, listOf(TimeSinceResetRequest()))
+                        subScreen = CartridgeSubScreen.CHANGE_CARTRIDGE
                     }
-                }
+                },
+                onFillTubing = {
+                    refreshScope.launch {
+                        ds.fillTubingState.value = null
+                        ds.exitFillTubingState.value = null
+                        ds.inFillTubingMode.value = false
+                        willRestartTubingFill = false
+                        sendPumpCommands(SendType.BUST_CACHE, listOf(TimeSinceResetRequest()))
+                        subScreen = CartridgeSubScreen.FILL_TUBING
+                    }
+                },
+                onFillCannula = {
+                    refreshScope.launch {
+                        ds.fillCannulaState.value = null
+                        cannulaFillAmount = null
+                        cannulaFillAmountStr = null
+                        sendPumpCommands(SendType.BUST_CACHE, listOf(TimeSinceResetRequest()))
+                        subScreen = CartridgeSubScreen.FILL_CANNULA
+                    }
+                },
+                onBack = navigateBack,
+            )
 
-                item {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .wrapContentSize(Alignment.TopStart)
-                    ) {
-                        ListItem(
-                            headlineContent = {
-                                Text(
-                                    "Change Cartridge"
-                                )
-                            },
-                            supportingContent = {
-                            },
-                            leadingContent = {
-                                Icon(Icons.Filled.Settings, contentDescription = null)
-                            },
-                            modifier = Modifier.clickable {
-                                refreshScope.launch {
-                                    ds.enterChangeCartridgeState.value = null
-                                    ds.detectingCartridgeState.value = null
-                                    sendPumpCommands(
-                                        SendType.BUST_CACHE, listOf(
-                                            TimeSinceResetRequest()
-                                        )
-                                    )
-                                    showChangeCartridgeMenu = true
-                                }
-                            }
-                        )
+            CartridgeSubScreen.CHANGE_CARTRIDGE -> ChangeCartridgeWorkflowScreen(
+                basalStatus = basalStatus.value,
+                inChangeCartridgeMode = inChangeCartridgeMode.value == true,
+                enterChangeCartridgeState = enterChangeCartridgeState.value,
+                detectingCartridgeState = detectingCartridgeState.value,
+                onBack = { subScreen = CartridgeSubScreen.MENU },
+                onEnter = { sendPumpCommands(SendType.BUST_CACHE, listOf(EnterChangeCartridgeModeRequest())) },
+                onExit = { sendPumpCommands(SendType.BUST_CACHE, listOf(ExitChangeCartridgeModeRequest())) },
+                onDone = { subScreen = CartridgeSubScreen.MENU },
+            )
 
-                        DropdownMenu(
-                            expanded = showChangeCartridgeMenu,
-                            onDismissRequest = {  },
-                            modifier = Modifier.fillMaxWidth().fillMaxHeight(0.7f),
-                        ) {
-                            val basalStatus = ds.basalStatus.observeAsState()
-                            val inChangeCartridgeMode = ds.inChangeCartridgeMode.observeAsState()
-                            val enterChangeCartridgeState = ds.enterChangeCartridgeState.observeAsState()
-                            val detectingCartridgeState = ds.detectingCartridgeState.observeAsState()
+            CartridgeSubScreen.FILL_TUBING -> FillTubingWorkflowScreen(
+                basalStatus = basalStatus.value,
+                inFillTubingMode = inFillTubingMode.value == true,
+                fillTubingButtonDown = fillTubingState.value?.buttonDown,
+                exitFillTubingState = exitFillTubingState.value,
+                willRestartTubingFill = willRestartTubingFill,
+                onBack = { subScreen = CartridgeSubScreen.MENU },
+                onBeginFillTubing = { sendPumpCommands(SendType.BUST_CACHE, listOf(EnterFillTubingModeRequest())) },
+                onFinishFillTubing = { restart ->
+                    willRestartTubingFill = restart
+                    sendPumpCommands(SendType.BUST_CACHE, listOf(ExitFillTubingModeRequest()))
+                },
+                onRestartFill = {
+                    ds.exitFillTubingState.value = null
+                    willRestartTubingFill = false
+                    sendPumpCommands(SendType.BUST_CACHE, listOf(EnterFillTubingModeRequest()))
+                },
+                onDone = { subScreen = CartridgeSubScreen.MENU },
+            )
 
-                            AlertDialog(
-                                onDismissRequest = {
-                                    if (inChangeCartridgeMode.value == false) {
-                                        showChangeCartridgeMenu = false
-                                    }
-                                },
-                                title = {
-                                    Text("Change Cartridge")
-                                },
-                                text = {
-                                    LazyColumn(
-                                        contentPadding = innerPadding,
-                                        verticalArrangement = Arrangement.spacedBy(0.dp),
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .fillMaxHeight(0.7f)
-                                            .padding(horizontal = 0.dp),
-                                        content = {
-                                            if (detectingCartridgeState.value != null) {
-                                                if (detectingCartridgeState.value?.isComplete == true) {
-                                                    item {
-                                                        Text("Cartridge change complete.")
-                                                        Text("\n")
-                                                        Text("${detectingCartridgeState.value?.percentComplete}% complete")
-                                                    }
-                                                } else {
-                                                    item {
-                                                        LoadSpinner("Detecting insulin in the cartridge...\n${detectingCartridgeState.value?.percentComplete}% complete")
-                                                    }
-                                                }
-                                            } else if (enterChangeCartridgeState.value?.state == EnterChangeCartridgeModeStateStreamResponse.ChangeCartridgeState.READY_TO_CHANGE) {
-                                                item {
-                                                    Text("You can now remove the cartridge from the pump.")
-                                                    Text("\n")
-                                                    Text("When you've inserted a new cartridge, press Cartridge Inserted below.")
-                                                }
-                                            } else if (inChangeCartridgeMode.value == true) {
-                                                item {
-                                                    LoadSpinner("Preparing to change cartridge...\n")
-                                                }
-                                            } else if (basalStatus.value == BasalStatus.PUMP_SUSPENDED) {
-                                                item {
-                                                    Text("Disconnect your pump from your body/site and press Change Cartridge below.")
-                                                    Text("\n")
-                                                }
-                                            } else {
-                                                item {
-                                                    Text("Before changing your cartridge, stop delivery of insulin.")
-                                                    Text("\n")
-                                                }
-                                            }
-                                        }
-                                    )
-                                },
-                                dismissButton = {
-                                    if (inChangeCartridgeMode.value == true) {
-                                        /* */
-                                    } else if (detectingCartridgeState.value?.isComplete == true) {
-                                        /* */
-                                    } else if (enterChangeCartridgeState.value?.state == EnterChangeCartridgeModeStateStreamResponse.ChangeCartridgeState.READY_TO_CHANGE) {
-                                        /* */
-                                    } else {
-                                        TextButton(
-                                            onClick = {
-                                                showChangeCartridgeMenu = false
-                                            },
-                                            modifier = Modifier.padding(top = 16.dp)
-                                        ) {
-                                            Text("Cancel")
-                                        }
-                                    }
-                                },
-                                confirmButton = {
-                                    if (detectingCartridgeState.value?.isComplete == true) {
-                                        TextButton(
-                                            onClick = {
-                                                showChangeCartridgeMenu = false
-                                            },
-                                            modifier = Modifier.padding(top = 16.dp)
-                                        ) {
-                                            Text("Done")
-                                        }
-                                    } else if (enterChangeCartridgeState.value?.state == EnterChangeCartridgeModeStateStreamResponse.ChangeCartridgeState.READY_TO_CHANGE) {
-                                        TextButton(
-                                            onClick = {
-                                                refreshScope.launch {
-                                                    sendPumpCommands(
-                                                        SendType.BUST_CACHE, listOf(
-                                                            ExitChangeCartridgeModeRequest()
-                                                        )
-                                                    )
-
-                                                }
-                                            },
-                                            modifier = Modifier.padding(top = 16.dp)
-                                        ) {
-                                            Text("Cartridge Inserted")
-                                        }
-                                    } else {
-                                        TextButton(
-                                            onClick = {
-                                                refreshScope.launch {
-                                                    sendPumpCommands(
-                                                        SendType.BUST_CACHE, listOf(
-                                                            EnterChangeCartridgeModeRequest()
-                                                        )
-                                                    )
-
-                                                }
-                                            },
-                                            enabled = basalStatus.value == BasalStatus.PUMP_SUSPENDED,
-                                            modifier = Modifier.padding(top = 16.dp)
-                                        ) {
-                                            Text("Change Cartridge")
-                                        }
-                                    }
-                                }
+            CartridgeSubScreen.FILL_CANNULA -> FillCannulaWorkflowScreen(
+                basalStatus = basalStatus.value,
+                fillCannulaState = fillCannulaState.value,
+                cannulaFillAmount = cannulaFillAmount,
+                cannulaFillAmountStr = cannulaFillAmountStr,
+                allowedCannulaFillAmount = ::allowedCannulaFillAmount,
+                onBack = { subScreen = CartridgeSubScreen.MENU },
+                onDone = { subScreen = CartridgeSubScreen.MENU },
+                onCannulaAmountChange = { str, amount ->
+                    cannulaFillAmountStr = str
+                    cannulaFillAmount = amount
+                },
+                onSendFillRequest = {
+                    cannulaFillAmount?.let {
+                        if (allowedCannulaFillAmount(it)) {
+                            sendPumpCommands(
+                                SendType.BUST_CACHE,
+                                listOf(FillCannulaRequest(InsulinUnit.from1To1000(it).toInt()))
                             )
-
                         }
-
                     }
                 }
-
-                item {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .wrapContentSize(Alignment.TopStart)
-                    ) {
-                        ListItem(
-                            headlineContent = {
-                                Text(
-                                    "Fill Tubing"
-                                )
-                            },
-                            supportingContent = {
-                            },
-                            leadingContent = {
-                                Icon(Icons.Filled.Settings, contentDescription = null)
-                            },
-                            modifier = Modifier.clickable {
-                                refreshScope.launch {
-                                    ds.fillTubingState.value = null
-                                    ds.exitFillTubingState.value = null
-                                    ds.inFillTubingMode.value = false
-                                    sendPumpCommands(
-                                        SendType.BUST_CACHE, listOf(
-                                            TimeSinceResetRequest()
-                                        )
-                                    )
-                                    showFillTubingMenu = true
-                                }
-                            }
-                        )
-
-                        DropdownMenu(
-                            expanded = showFillTubingMenu,
-                            onDismissRequest = {  },
-                            modifier = Modifier.fillMaxWidth().fillMaxHeight(0.7f),
-                        ) {
-                            val basalStatus = ds.basalStatus.observeAsState()
-                            val inFillTubingMode = ds.inFillTubingMode.observeAsState()
-                            val fillTubingState = ds.fillTubingState.observeAsState()
-                            val exitFillTubingState = ds.exitFillTubingState.observeAsState()
-
-                            AlertDialog(
-                                onDismissRequest = {
-                                    if (inFillTubingMode.value == false) {
-                                        showFillTubingMenu = false
-                                    }
-                                },
-                                title = {
-                                    Text("Fill Tubing")
-                                },
-                                text = {
-                                    LazyColumn(
-                                        contentPadding = innerPadding,
-                                        verticalArrangement = Arrangement.spacedBy(0.dp),
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .fillMaxHeight(0.7f)
-                                            .padding(horizontal = 0.dp),
-                                        content = {
-                                            if (exitFillTubingState.value != null) {
-                                                if (exitFillTubingState.value?.state == ExitFillTubingModeStateStreamResponse.ExitFillTubingModeState.TUBING_FILLED) {
-                                                    item {
-                                                        Text("Successfully filled tubing. Press Done to exit.")
-                                                    }
-                                                } else {
-                                                    item {
-                                                        LoadSpinner("Please wait, finalizing tubing fill...\n\n${exitFillTubingState.value?.state} (${exitFillTubingState.value?.stateId})")
-                                                    }
-                                                }
-                                            } else if (inFillTubingMode.value == true) {
-                                                if (fillTubingState.value == null) {
-                                                    item {
-                                                        Text("Hold down the pump button to fill insulin through the tubing.\n\n")
-                                                        Text("You haven't filled any insulin through the tubing yet.")
-                                                    }
-                                                } else if (fillTubingState.value?.buttonDown == true) {
-                                                    item {
-                                                        Text("FILLING... continue to hold down button until you see insulin drops at the cannula.")
-                                                    }
-                                                } else if (fillTubingState.value?.buttonDown == false) {
-                                                    item {
-                                                        Text("STOPPED FILLING... do you see insulin drops at the cannula?\n\n")
-                                                        Text("If you're done filling, press Complete Fill below. Otherwise, hold down the pump button again.")
-                                                    }
-                                                }
-                                            } else if (basalStatus.value == BasalStatus.PUMP_SUSPENDED) {
-                                                item {
-                                                    Text("Disconnect your pump from your body/site and press Begin Tubing Fill below.")
-                                                    Text("\n")
-                                                }
-                                            } else {
-                                                item {
-                                                    Text("Before filling your tubing, stop delivery of insulin.")
-                                                    Text("\n")
-                                                }
-                                            }
-                                        }
-                                    )
-                                },
-                                dismissButton = {
-                                    if (inFillTubingMode.value == true) {
-                                    } else {
-                                        TextButton(
-                                            onClick = {
-                                                showFillTubingMenu = false
-                                            },
-                                            modifier = Modifier.padding(top = 16.dp)
-                                        ) {
-                                            Text("Cancel")
-                                        }
-                                    }
-                                },
-                                confirmButton = {
-                                    if (exitFillTubingState.value != null) {
-                                        if (exitFillTubingState.value?.state == ExitFillTubingModeStateStreamResponse.ExitFillTubingModeState.TUBING_FILLED) {
-                                            TextButton(
-                                                onClick = {
-                                                    showFillTubingMenu = false
-                                                },
-                                                enabled = basalStatus.value == BasalStatus.PUMP_SUSPENDED,
-                                                modifier = Modifier.padding(top = 16.dp)
-                                            ) {
-                                                Text("Done")
-                                            }
-                                        }
-                                    } else if (inFillTubingMode.value == true) {
-                                        if (fillTubingState.value?.buttonDown == false) {
-                                            TextButton(
-                                                onClick = {
-                                                    refreshScope.launch {
-                                                        sendPumpCommands(
-                                                            SendType.BUST_CACHE, listOf(
-                                                                ExitFillTubingModeRequest()
-                                                            )
-                                                        )
-
-                                                    }
-                                                },
-                                                enabled = basalStatus.value == BasalStatus.PUMP_SUSPENDED,
-                                                modifier = Modifier.padding(top = 16.dp)
-                                            ) {
-                                                Text("Complete Fill")
-                                            }
-                                        }
-                                    } else {
-                                        TextButton(
-                                            onClick = {
-                                                refreshScope.launch {
-                                                    sendPumpCommands(
-                                                        SendType.BUST_CACHE, listOf(
-                                                            EnterFillTubingModeRequest()
-                                                        )
-                                                    )
-
-                                                }
-                                            },
-                                            enabled = basalStatus.value == BasalStatus.PUMP_SUSPENDED,
-                                            modifier = Modifier.padding(top = 16.dp)
-                                        ) {
-                                            Text("Begin Tubing Fill")
-                                        }
-                                    }
-                                }
-                            )
-
-                        }
-
-                    }
-                }
-
-                item {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .wrapContentSize(Alignment.TopStart)
-                    ) {
-                        ListItem(
-                            headlineContent = {
-                                Text(
-                                    "Fill Cannula"
-                                )
-                            },
-                            supportingContent = {
-                            },
-                            leadingContent = {
-                                Icon(Icons.Filled.Settings, contentDescription = null)
-                            },
-                            modifier = Modifier.clickable {
-                                refreshScope.launch {
-                                    ds.fillCannulaState.value = null
-                                    sendPumpCommands(
-                                        SendType.BUST_CACHE, listOf(
-                                            TimeSinceResetRequest()
-                                        )
-                                    )
-                                    showFillCannulaMenu = true
-                                }
-                            }
-                        )
-
-                        DropdownMenu(
-                            expanded = showFillCannulaMenu,
-                            onDismissRequest = {  },
-                            modifier = Modifier.fillMaxWidth().fillMaxHeight(0.7f),
-                        ) {
-                            val basalStatus = ds.basalStatus.observeAsState()
-                            val fillCannulaState = ds.fillCannulaState.observeAsState()
-                            var cannulaFillAmountStr by remember { mutableStateOf<String?>(null) }
-                            var cannulaFillAmount by remember { mutableStateOf<Double?>(null) }
-
-                            fun allowedCannulaFillAmount(units: Double?): Boolean {
-                                return units != null && units > 0 && units <= 3.0
-                            }
-
-                            AlertDialog(
-                                onDismissRequest = {
-                                },
-                                title = {
-                                    Text("Fill Cannula")
-                                },
-                                text = {
-                                    LazyColumn(
-                                        contentPadding = innerPadding,
-                                        verticalArrangement = Arrangement.spacedBy(0.dp),
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .fillMaxHeight(0.7f)
-                                            .padding(horizontal = 0.dp),
-                                        content = {
-                                            if (fillCannulaState.value != null) {
-                                                if (fillCannulaState.value?.state == FillCannulaStateStreamResponse.FillCannulaState.CANNULA_FILLED) {
-                                                    item {
-                                                        Text("Cannula filled.")
-                                                    }
-                                                } else {
-                                                    item {
-                                                        LoadSpinner("Filling cannula with ${cannulaFillAmount} units...\n\nState: ${fillCannulaState.value?.stateId}")
-                                                    }
-                                                }
-
-                                            } else if (basalStatus.value == BasalStatus.PUMP_SUSPENDED) {
-                                                item {
-                                                    Text("Enter the cannula fill size:")
-                                                    Text("\n\n")
-                                                    DecimalOutlinedText(
-                                                        title = "Fill size",
-                                                        value = cannulaFillAmountStr,
-                                                        onValueChange = {
-                                                            cannulaFillAmountStr = it
-                                                            cannulaFillAmount = when {
-                                                                it == "" -> null
-                                                                else -> {
-                                                                    val d = it.toDoubleOrNull()
-                                                                    if (!allowedCannulaFillAmount(d)) {
-                                                                        null
-                                                                    } else {
-                                                                        d
-                                                                    }
-                                                                }
-                                                            }
-                                                        }
-                                                    )
-                                                    Text("\n")
-
-                                                }
-                                            } else {
-                                                item {
-                                                    Text("Before filling your cannula, stop delivery of insulin.")
-                                                    Text("\n")
-                                                }
-                                            }
-                                        }
-                                    )
-                                },
-                                dismissButton = {
-                                    if (fillCannulaState.value != null) {
-                                        /* */
-                                    } else {
-                                        TextButton(
-                                            onClick = {
-                                                showFillCannulaMenu = false
-                                            },
-                                            modifier = Modifier.padding(top = 16.dp)
-                                        ) {
-                                            Text("Cancel")
-                                        }
-                                    }
-                                },
-                                confirmButton = {
-                                    if (fillCannulaState.value != null) {
-                                        if (fillCannulaState.value?.state == FillCannulaStateStreamResponse.FillCannulaState.CANNULA_FILLED) {
-                                            TextButton(
-                                                onClick = {
-                                                    showFillCannulaMenu = false
-                                                },
-                                                modifier = Modifier.padding(top = 16.dp)
-                                            ) {
-                                                Text("Done")
-                                            }
-                                        }
-                                    } else if (basalStatus.value == BasalStatus.PUMP_SUSPENDED) {
-                                        TextButton(
-                                            onClick = {
-                                                refreshScope.launch {
-                                                    cannulaFillAmount.let {
-                                                        if (allowedCannulaFillAmount(it)) {
-                                                            sendPumpCommands(
-                                                                SendType.BUST_CACHE, listOf(
-                                                                    FillCannulaRequest(
-                                                                        InsulinUnit.from1To1000(it).toInt()
-                                                                    )
-                                                                )
-                                                            )
-                                                        }
-                                                    }
-                                                }
-                                            },
-                                            enabled = basalStatus.value == BasalStatus.PUMP_SUSPENDED && cannulaFillAmount != null && allowedCannulaFillAmount(cannulaFillAmount),
-                                            modifier = Modifier.padding(top = 16.dp)
-                                        ) {
-                                            if (allowedCannulaFillAmount(cannulaFillAmount)) {
-                                                Text("Fill ${cannulaFillAmount}u Cannula")
-                                            } else {
-                                                Text("Fill Cannula")
-                                            }
-                                        }
-                                    }
-                                }
-                            )
-
-                        }
-
-                    }
-                }
-
-
-                item {
-                    Line("\n")
-                }
-
-                item {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .wrapContentSize(Alignment.BottomStart)
-                    ) {
-                        ListItem(
-                            headlineContent = {
-                                Text(
-                                    "Back"
-                                )
-                            },
-                            supportingContent = {
-                            },
-                            leadingContent = {
-                                Icon(Icons.Filled.ArrowBack, contentDescription = null)
-                            },
-                            modifier = Modifier.clickable {
-                                navigateBack()
-                            }
-                        )
-                    }
-                }
-            }
-        )
+            )
+        }
     }
 }
+
+
 val cartridgeActionsCommands = listOf(
     HomeScreenMirrorRequest(),
     CGMStatusRequest(),
@@ -741,37 +261,10 @@ val cartridgeActionsFields = listOf(
 @Preview(showBackground = true)
 @Composable
 internal fun CartridgeActionsDefaultPreview() {
-    ControlX2Theme() {
-        Surface(
-            modifier = Modifier.fillMaxSize(),
-            color = Color.White,
-        ) {
+    ControlX2Theme {
+        Surface(modifier = Modifier.fillMaxSize(), color = Color.White) {
             setUpPreviewState(LocalDataStore.current)
-            CartridgeActions(
-                sendMessage = { _, _ -> },
-                sendPumpCommands = { _, _ -> },
-                navigateBack = {},
-            )
-        }
-    }
-}
-
-@Preview(showBackground = true)
-@Composable
-internal fun CartridgeActionsDefaultPreviewChangeCartridge_InsulinNotStopped() {
-    ControlX2Theme() {
-        Surface(
-            modifier = Modifier.fillMaxSize(),
-            color = Color.White,
-        ) {
-            setUpPreviewState(LocalDataStore.current)
-            LocalDataStore.current.basalStatus.value = BasalStatus.ON
-            CartridgeActions(
-                sendMessage = { _, _ -> },
-                sendPumpCommands = { _, _ -> },
-                _changeCartridgeMenuState = true,
-                navigateBack = {},
-            )
+            CartridgeActions(sendMessage = { _, _ -> }, sendPumpCommands = { _, _ -> }, navigateBack = {})
         }
     }
 }
@@ -779,17 +272,48 @@ internal fun CartridgeActionsDefaultPreviewChangeCartridge_InsulinNotStopped() {
 @Preview(showBackground = true)
 @Composable
 internal fun CartridgeActionsDefaultPreviewChangeCartridge_InsulinStopped() {
-    ControlX2Theme() {
-        Surface(
-            modifier = Modifier.fillMaxSize(),
-            color = Color.White,
-        ) {
+    ControlX2Theme {
+        Surface(modifier = Modifier.fillMaxSize(), color = Color.White) {
             setUpPreviewState(LocalDataStore.current)
             LocalDataStore.current.basalStatus.value = BasalStatus.PUMP_SUSPENDED
             CartridgeActions(
                 sendMessage = { _, _ -> },
                 sendPumpCommands = { _, _ -> },
                 _changeCartridgeMenuState = true,
+                navigateBack = {},
+            )
+        }
+    }
+}
+
+@Preview(showBackground = true)
+@Composable
+internal fun CartridgeActionsDefaultPreviewFillTubing_InsulinStopped() {
+    ControlX2Theme {
+        Surface(modifier = Modifier.fillMaxSize(), color = Color.White) {
+            setUpPreviewState(LocalDataStore.current)
+            LocalDataStore.current.basalStatus.value = BasalStatus.PUMP_SUSPENDED
+            CartridgeActions(
+                sendMessage = { _, _ -> },
+                sendPumpCommands = { _, _ -> },
+                _fillTubingMenuState = true,
+                navigateBack = {},
+            )
+        }
+    }
+}
+
+@Preview(showBackground = true)
+@Composable
+internal fun CartridgeActionsDefaultPreviewFillCannula_InsulinStopped() {
+    ControlX2Theme {
+        Surface(modifier = Modifier.fillMaxSize(), color = Color.White) {
+            setUpPreviewState(LocalDataStore.current)
+            LocalDataStore.current.basalStatus.value = BasalStatus.PUMP_SUSPENDED
+            CartridgeActions(
+                sendMessage = { _, _ -> },
+                sendPumpCommands = { _, _ -> },
+                _fillCannulaMenuState = true,
                 navigateBack = {},
             )
         }
