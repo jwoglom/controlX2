@@ -269,6 +269,24 @@ internal fun CartridgeActionsDefaultPreview() {
     }
 }
 
+
+@Preview(showBackground = true)
+@Composable
+internal fun CartridgeActionsDefaultPreviewChangeCartridge_InsulinNotStopped() {
+    ControlX2Theme {
+        Surface(modifier = Modifier.fillMaxSize(), color = Color.White) {
+            setUpPreviewState(LocalDataStore.current)
+            LocalDataStore.current.basalStatus.value = BasalStatus.PUMP_RESUMED
+            CartridgeActions(
+                sendMessage = { _, _ -> },
+                sendPumpCommands = { _, _ -> },
+                _changeCartridgeMenuState = true,
+                navigateBack = {},
+            )
+        }
+    }
+}
+
 @Preview(showBackground = true)
 @Composable
 internal fun CartridgeActionsDefaultPreviewChangeCartridge_InsulinStopped() {
