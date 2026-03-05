@@ -10,13 +10,11 @@ import androidx.compose.runtime.setValue
 import com.jwoglom.controlx2.LocalDataStore
 import com.jwoglom.controlx2.shared.presentation.intervalOf
 import com.jwoglom.controlx2.shared.util.shortTimeAgo
-import timber.log.Timber
 
 @Composable
 fun LastConnectionUpdatedTimestamp() {
     val ds = LocalDataStore.current
 
-    val setupStage = ds.pumpSetupStage.observeAsState()
     val pumpConnected = ds.pumpConnected.observeAsState()
     val pumpLastConnectionTimestamp = ds.pumpLastConnectionTimestamp.observeAsState()
     val pumpLastMessageTimestamp = ds.pumpLastMessageTimestamp.observeAsState()
@@ -29,7 +27,7 @@ fun LastConnectionUpdatedTimestamp() {
         //Timber.d("set pumpLastMessageTimestampRelative=%s", pumpLastMessageTimestampRelative)
     }
 
-    LaunchedEffect (pumpConnected.value, pumpLastMessageTimestamp.value) {
+    LaunchedEffect (pumpLastMessageTimestamp.value) {
         updatePumpLastMessageTsRelative()
     }
 
