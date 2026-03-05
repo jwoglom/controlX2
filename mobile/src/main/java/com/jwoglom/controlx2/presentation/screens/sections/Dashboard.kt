@@ -87,11 +87,6 @@ fun Dashboard(
     val context = LocalContext.current
     val ds = LocalDataStore.current
 
-    val setupStage = ds.pumpSetupStage.observeAsState()
-    val pumpConnected = ds.pumpConnected.observeAsState()
-    val pumpLastConnectionTimestamp = ds.pumpLastConnectionTimestamp.observeAsState()
-    val pumpLastMessageTimestamp = ds.pumpLastMessageTimestamp.observeAsState()
-
     val refreshScope = rememberCoroutineScope()
     var refreshing by remember { mutableStateOf(true) }
 
@@ -170,6 +165,8 @@ fun Dashboard(
                 .padding(horizontal = 8.dp),
             content = {
                 item {
+                    val pumpLastConnectionTimestamp = ds.pumpLastConnectionTimestamp.observeAsState()
+
                     ServiceDisabledMessage(sendMessage = sendMessage)
                     PumpSetupStageProgress(initialSetup = false)
                     PumpSetupStageDescription(initialSetup = false)
