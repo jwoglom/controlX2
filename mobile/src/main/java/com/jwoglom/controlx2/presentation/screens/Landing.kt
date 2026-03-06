@@ -46,6 +46,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.livedata.observeAsState
@@ -125,6 +126,15 @@ fun Landing(
         bottomSheetState = BottomSheetState(bottomScaffoldDisplayState, density=Density(context))
     )
     var bottomScaffoldState by remember { mutableStateOf(_bottomScaffoldState) }
+
+    LaunchedEffect(bottomScaffoldState) {
+        if (bottomScaffoldState != BottomScaffoldState.BOLUS_WINDOW) {
+            resetBolusDataStoreState(ds)
+        }
+        if (bottomScaffoldState != BottomScaffoldState.TEMP_RATE_WINDOW) {
+            resetTempRateDataStoreState(ds)
+        }
+    }
 
     fun showBottomScaffold(): Boolean {
         return displayBottomScaffold.bottomSheetState.isExpanded ||
@@ -208,13 +218,11 @@ fun Landing(
                                         closeWindow = {
                                             coroutineScope.launch {
                                                 displayBottomScaffold.bottomSheetState.collapse()
-                                                resetBolusDataStoreState(dataStore)
+                                                resetBolusDataStoreState(ds)
                                                 bottomScaffoldState = BottomScaffoldState.NONE
                                             }
                                         }
                                     )
-                                } else {
-                                    resetBolusDataStoreState(dataStore)
                                 }
                                 if (bottomScaffoldState == BottomScaffoldState.TEMP_RATE_WINDOW) {
                                     TempRateWindow(
@@ -223,12 +231,10 @@ fun Landing(
                                             coroutineScope.launch {
                                                 displayBottomScaffold.bottomSheetState.collapse()
                                                 bottomScaffoldState = BottomScaffoldState.NONE
-                                                resetTempRateDataStoreState(dataStore)
+                                                resetTempRateDataStoreState(ds)
                                             }
                                         }
                                     )
-                                } else {
-                                    resetTempRateDataStoreState(dataStore)
                                 }
                             }
                             item {
