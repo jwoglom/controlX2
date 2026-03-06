@@ -412,7 +412,7 @@ fun BolusScreen(
             showBolusConditionPrompt = showBolusConditionPrompt,
             onDismiss = { showBolusConditionPrompt = false },
             dataStore = dataStore,
-            recalculate = recalculate,
+            recalculate = ::recalculate,
             onPromptDone = { showBolusConditionPrompt = false }
         )
 
