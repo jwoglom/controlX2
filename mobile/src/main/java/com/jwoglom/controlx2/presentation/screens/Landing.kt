@@ -120,11 +120,13 @@ fun Landing(
     val notificationBundle = ds.notificationBundle.observeAsState()
 
 
-    var selectedItem by remember { mutableStateOf(sectionState) }
+    // Local state owns user-driven tab changes, but must reset when parent route changes.
+    var selectedItem by remember(sectionState) { mutableStateOf(sectionState) }
     val displayBottomScaffold = rememberBottomSheetScaffoldState(
         bottomSheetState = BottomSheetState(bottomScaffoldDisplayState, density=Density(context))
     )
-    var bottomScaffoldState by remember { mutableStateOf(_bottomScaffoldState) }
+    // Local state owns in-screen sheet toggles, while parent can still force a new initial sheet.
+    var bottomScaffoldState by remember(_bottomScaffoldState) { mutableStateOf(_bottomScaffoldState) }
 
     fun showBottomScaffold(): Boolean {
         return displayBottomScaffold.bottomSheetState.isExpanded ||
