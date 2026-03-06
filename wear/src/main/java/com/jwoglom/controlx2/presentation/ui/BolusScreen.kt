@@ -81,6 +81,15 @@ import com.jwoglom.controlx2.presentation.DataStore
 import com.jwoglom.controlx2.presentation.components.LineTextDescription
 import com.jwoglom.controlx2.presentation.ui.components.BolusCarbsAndBgRow
 import com.jwoglom.controlx2.presentation.ui.components.BolusUnitsChip
+import com.jwoglom.controlx2.presentation.ui.components.bolus.BolusApprovedPhase
+import com.jwoglom.controlx2.presentation.ui.components.bolus.BolusCancelledPhase
+import com.jwoglom.controlx2.presentation.ui.components.bolus.BolusCancellingPhase
+import com.jwoglom.controlx2.presentation.ui.components.bolus.BolusConditionsPromptPhase
+import com.jwoglom.controlx2.presentation.ui.components.bolus.BolusConfirmPhase
+import com.jwoglom.controlx2.presentation.ui.components.bolus.BolusInProgressPhase
+import com.jwoglom.controlx2.presentation.ui.components.bolus.BolusInputPhase
+import com.jwoglom.controlx2.presentation.ui.components.bolus.BolusPermissionCheckPhase
+import com.jwoglom.controlx2.presentation.ui.components.bolus.BolusPermissionTransitionPhase
 import com.jwoglom.controlx2.presentation.defaultTheme
 import com.jwoglom.controlx2.shared.enums.GlucoseUnit
 import com.jwoglom.controlx2.shared.util.GlucoseConverter
@@ -365,232 +374,62 @@ fun BolusScreen(
             scalingLazyListState.animateScrollToItem(0)
         }
 
-        ScalingLazyColumn(
-            modifier = modifier.scrollableColumn(focusRequester, scalingLazyListState),
-            state = scalingLazyListState,
-            autoCentering = AutoCenteringParams()
-        ) {
-            item {
-                BolusUnitsChip(
-                    onClickUnits = onClickUnits,
-                    currentUnits = dataStore.bolusCurrentParameters.value?.units,
-                )
-            }
-
-            item {
-                BolusCarbsAndBgRow(
-                    carbsGrams = bolusCarbsGramsUserInput,
-                    unitAbbrev = unitAbbrev,
-                    onClickCarbs = onClickCarbs,
-                    onClickBg = onClickBG,
-                )
-            }
-
-            item {
-                val bolusConditionsPromptAcknowledged = dataStore.bolusConditionsPromptAcknowledged.observeAsState()
-
-                if (bolusConditionsPromptAcknowledged.value != null && bolusConditionsPromptAcknowledged.value!!.size > 0) {
-                    bolusConditionsPromptAcknowledged.value?.forEach {
-                        LineTextDescription(
-                            when {
-                                bolusConditionsExcluded.value?.contains(it) == true -> "${it.prompt?.whenIgnoredNotice}"
-                                else -> "${it.prompt?.whenAcceptedNotice}"
-                            },
-                            textColor = when {
-                                bolusConditionsExcluded.value?.contains(it) == true -> Color.Red
-                                else -> defaultTheme.colors.primary
-                            },
-                            fontSize = 12.sp,
-                            align = Alignment.Center,
-                            height = 28.dp,
-                            onClick = {
-                                Timber.i("bolusConditionsPromptAcknowledged click")
-                                dataStore.bolusConditionsPrompt.value = mutableListOf<BolusCalcCondition>().let {
-                                    it.addAll(bolusConditionsPromptAcknowledged.value!!)
-                                    it
-                                }
-                                dataStore.bolusConditionsPromptAcknowledged.value = mutableListOf()
-                                dataStore.bolusConditionsExcluded.value = mutableSetOf()
-                                showBolusConditionPrompt = true
-                            },
-                            modifier = Modifier
-                                .fillMaxWidth()
-                        )
-                    }
-                } else {
-                    Spacer(modifier = Modifier
-                        .height(0.dp)
-                        .fillMaxWidth()
-                    )
-                }
-            }
-
-            fun performPermissionCheck() {
-                showPermissionCheckDialog = true
-                sendPumpCommands(SendType.BUST_CACHE, listOf(BolusPermissionRequest()))
-            }
-
-            item {
-                Button(
-                    onClick = {
-                        dataStore.bolusFinalConditions.value =
-                            bolusCalcDecision(dataStore.bolusCalculatorBuilder.value, bolusConditionsExcluded.value)?.conditions
-
-                        val pair = bolusCalcParameters(dataStore.bolusCalculatorBuilder.value, bolusConditionsExcluded.value)
-                        dataStore.bolusFinalParameters.value = pair.first
-                        dataStore.bolusFinalCalcUnits.value = pair.second
-                        performPermissionCheck()
-                    },
-                    enabled = true
-                ) {
-                    Row() {
-                        Icon(
-                            imageVector = Icons.Filled.Check,
-                            contentDescription = "continue",
-                            modifier = Modifier
-                                .size(ButtonDefaults.SmallIconSize)
-                                .wrapContentSize(align = Alignment.Center),
-                        )
-                    }
-                }
-            }
-
-            items(5) { index ->
-                val conditions = dataStore.bolusCurrentConditions.observeAsState()
-
-                if (conditions.value == null) {
-                    Spacer(modifier = Modifier.height(0.dp))
-                } else if (index < (conditions.value?.size ?: 0)) {
-                    LineTextDescription(
-                        labelText = firstLetterCapitalized(conditions.value?.get(index)?.msg ?: ""),
-                        fontSize = 12.sp,
-                    )
-                } else {
-                    Spacer(modifier = Modifier.height(0.dp))
-                }
-            }
+        fun performPermissionCheck() {
+            showPermissionCheckDialog = true
+            sendPumpCommands(SendType.BUST_CACHE, listOf(BolusPermissionRequest()))
         }
 
-        val scrollState = rememberScalingLazyListState()
-
-        Dialog(
-            showDialog = showBolusConditionPrompt,
-            onDismissRequest = {
-                showBolusConditionPrompt = false
+        BolusInputPhase(
+            modifier = modifier,
+            scalingLazyListState = scalingLazyListState,
+            focusRequester = focusRequester,
+            dataStore = dataStore,
+            bolusCarbsGramsUserInput = bolusCarbsGramsUserInput,
+            unitAbbrev = unitAbbrev,
+            onClickUnits = onClickUnits,
+            onClickCarbs = onClickCarbs,
+            onClickBG = onClickBG,
+            onContinue = {
+                dataStore.bolusFinalConditions.value =
+                    bolusCalcDecision(dataStore.bolusCalculatorBuilder.value, bolusConditionsExcluded.value)?.conditions
+                val pair = bolusCalcParameters(dataStore.bolusCalculatorBuilder.value, bolusConditionsExcluded.value)
+                dataStore.bolusFinalParameters.value = pair.first
+                dataStore.bolusFinalCalcUnits.value = pair.second
+                performPermissionCheck()
             },
-            scrollState = scrollState
-        ) {
-            val bolusConditionsPrompt = dataStore.bolusConditionsPrompt.observeAsState()
-
-            Alert(
-                title = {
-                    Text(
-                        text = when {
-                            bolusConditionsPrompt.value != null -> "${bolusConditionsPrompt.value?.first()?.msg}"
-                            else -> ""
-                        },
-                        textAlign = TextAlign.Center,
-                        fontSize = 14.sp,
-                        color = MaterialTheme.colors.onBackground
-                    )
-                },
-                negativeButton = {
-                    Button(
-                        onClick = {
-                            bolusConditionsPrompt.value?.let {
-                                if (dataStore.bolusConditionsPromptAcknowledged.value == null) {
-                                    dataStore.bolusConditionsPromptAcknowledged.value = mutableListOf(it.first())
-                                } else {
-                                    dataStore.bolusConditionsPromptAcknowledged.value!!.add(it.first())
-                                }
-
-                                if (dataStore.bolusConditionsExcluded.value == null) {
-                                    dataStore.bolusConditionsExcluded.value = mutableSetOf(it.first())
-                                } else {
-                                    dataStore.bolusConditionsExcluded.value?.add(it.first())
-                                }
-
-                                if (it.size == 1) {
-                                    showBolusConditionPrompt = false
-                                }
-                                dataStore.bolusConditionsPrompt.value?.drop(0)
-                                recalculate()
-                            }
-
-                        },
-                        colors = ButtonDefaults.secondaryButtonColors()
-                    ) {
-                        Icon(
-                            imageVector = Icons.Filled.Clear,
-                            contentDescription = "Do not apply"
-                        )
-                    }
-                },
-                positiveButton = {
-                    Button(
-                        onClick = {
-                            bolusConditionsPrompt.value?.let {
-                                if (dataStore.bolusConditionsPromptAcknowledged.value == null) {
-                                    dataStore.bolusConditionsPromptAcknowledged.value = mutableListOf(it.first())
-                                } else {
-                                    dataStore.bolusConditionsPromptAcknowledged.value!!.add(it.first())
-                                }
-
-                                if (dataStore.bolusConditionsExcluded.value != null) {
-                                    dataStore.bolusConditionsExcluded.value?.remove(it.first())
-                                }
-
-                                if (it.size == 1) {
-                                    showBolusConditionPrompt = false
-                                }
-
-                                dataStore.bolusConditionsPrompt.value?.drop(0)
-                                recalculate()
-                            }
-                        },
-                        colors = ButtonDefaults.primaryButtonColors()
-                    ) {
-                        Icon(
-                            imageVector = Icons.Filled.Check,
-                            contentDescription = "Apply"
-                        )
-                    }
-                },
-                scrollState = scrollState,
-            ) {
-                Text(
-                    text = when {
-                        bolusConditionsPrompt.value != null -> "${bolusConditionsPrompt.value?.first()?.prompt?.promptMessage}"
-                        else -> ""
-                    },
-                    textAlign = TextAlign.Center,
-                    style = MaterialTheme.typography.body2,
-                    color = MaterialTheme.colors.onBackground
-                )
+            onPromptAcknowledgedClick = {
+                dataStore.bolusConditionsPrompt.value = mutableListOf<BolusCalcCondition>().let { list ->
+                    list.addAll(it)
+                    list
+                }
+                dataStore.bolusConditionsPromptAcknowledged.value = mutableListOf()
+                dataStore.bolusConditionsExcluded.value = mutableSetOf()
+                showBolusConditionPrompt = true
             }
-        }
+        )
 
-        Dialog(
-            showDialog = showPermissionCheckDialog,
-            onDismissRequest = {
-                showPermissionCheckDialog = false
-            },
-            scrollState = scrollState
-        ) {
-            val bolusFinalParameters = dataStore.bolusFinalParameters.observeAsState()
+        BolusConditionsPromptPhase(
+            showBolusConditionPrompt = showBolusConditionPrompt,
+            onDismiss = { showBolusConditionPrompt = false },
+            dataStore = dataStore,
+            recalculate = recalculate,
+            onPromptDone = { showBolusConditionPrompt = false }
+        )
 
-            IndeterminateProgressIndicator(text = bolusFinalParameters.value?.units?.let { "Requesting permission" }
-                ?: "Invalid request!")
-        }
+        BolusPermissionCheckPhase(
+            showPermissionCheckDialog = showPermissionCheckDialog,
+            onDismiss = { showPermissionCheckDialog = false },
+            dataStore = dataStore
+        )
 
-        val bolusPermissionResponse = dataStore.bolusPermissionResponse.observeAsState()
-
-        LaunchedEffect(bolusPermissionResponse.value) {
-            if (bolusPermissionResponse.value != null && showPermissionCheckDialog) {
+        BolusPermissionTransitionPhase(
+            showPermissionCheckDialog = showPermissionCheckDialog,
+            onPermissionAccepted = {
                 showConfirmDialog = true
                 showPermissionCheckDialog = false
-            }
-        }
+            },
+            dataStore = dataStore
+        )
 
         fun sendBolusRequestToPhone(bolusParameters: BolusParameters?, unitBreakdown: BolusCalcUnits?, dataSnapshot: BolusCalcDataSnapshotResponse?, timeSinceReset: TimeSinceResetResponse?) {
             if (bolusParameters == null || dataStore.bolusPermissionResponse.value == null || dataStore.bolusCalcDataSnapshot.value == null || unitBreakdown == null || dataSnapshot == null || timeSinceReset == null) {
@@ -604,213 +443,30 @@ fun BolusScreen(
             sendPhoneBolusRequest(bolusId, bolusParameters, unitBreakdown, dataSnapshot, timeSinceReset)
         }
 
-        Dialog(
-            showDialog = showConfirmDialog,
-            onDismissRequest = {
+        BolusConfirmPhase(
+            showConfirmDialog = showConfirmDialog,
+            onDismiss = { showConfirmDialog = false },
+            onReject = {
                 showConfirmDialog = false
+                dataStore.bolusFinalConditions.value = null
+                dataStore.bolusFinalParameters.value = null
             },
-            scrollState = scrollState
-        ) {
-            val bolusFinalParameters = dataStore.bolusFinalParameters.observeAsState()
-
-            Alert(
-                title = {
-                    Text(
-                        text = bolusFinalParameters.value?.units?.let { "${twoDecimalPlaces(it)}u Bolus" }
-                            ?: "",
-                        textAlign = TextAlign.Center,
-                        color = MaterialTheme.colors.onBackground
-                    )
-                },
-                negativeButton = {
-                    Button(
-                        onClick = {
-                            showConfirmDialog = false
-                            dataStore.bolusFinalConditions.value = null
-                            dataStore.bolusFinalParameters.value = null
-                        },
-                        colors = ButtonDefaults.secondaryButtonColors()
-                    ) {
-                        Icon(
-                            imageVector = Icons.Filled.Clear,
-                            contentDescription = "Do not deliver bolus"
-                        )
-                    }
-                },
-                positiveButton = {
-                    bolusFinalParameters.value?.let { finalParameters ->
-                        bolusPermissionResponse.value?.let { permissionResponse ->
-                            if (permissionResponse.isPermissionGranted && finalParameters.units >= 0.05) {
-                                Button(
-                                    onClick = {
-                                        if (permissionResponse.isPermissionGranted && finalParameters.units >= 0.05) {
-                                            showConfirmDialog = false
-                                            showInProgressDialog = true
-                                            sendBolusRequestToPhone(
-                                                dataStore.bolusFinalParameters.value,
-                                                dataStore.bolusFinalCalcUnits.value,
-                                                dataStore.bolusCalcDataSnapshot.value,
-                                                dataStore.timeSinceResetResponse.value,
-                                            )
-                                        }
-                                    },
-                                    colors = ButtonDefaults.primaryButtonColors()
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Filled.Check,
-                                        contentDescription = "Deliver bolus"
-                                    )
-                                }
-                            }
-                        }
-                    }
-                },
-                icon = {
-                    Image(
-                        painterResource(R.drawable.bolus_icon),
-                        "Bolus icon",
-                        Modifier.size(24.dp)
-                    )
-                },
-                scrollState = scrollState,
-            ) {
-                Text(
-                    text = bolusPermissionResponse.value?.let {
-                        when {
-                            bolusFinalParameters.value == null || bolusFinalParameters.value?.units == null -> ""
-                            bolusFinalParameters.value?.units!! < 0.05 -> "Insulin amount too small."
-                            it.status == 0 -> "Do you want to deliver the bolus?"
-                            else -> "Cannot deliver bolus: ${it.nackReason}"
-                        }
-                    } ?: "",
-                    textAlign = TextAlign.Center,
-                    style = MaterialTheme.typography.body2,
-                    color = MaterialTheme.colors.onBackground
+            onConfirm = {
+                showConfirmDialog = false
+                showInProgressDialog = true
+                sendBolusRequestToPhone(
+                    dataStore.bolusFinalParameters.value,
+                    dataStore.bolusFinalCalcUnits.value,
+                    dataStore.bolusCalcDataSnapshot.value,
+                    dataStore.timeSinceResetResponse.value,
                 )
-            }
-        }
-
-        Dialog(
-            showDialog = showCancellingDialog,
-            onDismissRequest = {
-                showCancellingDialog = false
             },
-            scrollState = scrollState
-        ) {
-            val bolusCancelResponse = dataStore.bolusCancelResponse.observeAsState()
-
-            LaunchedEffect(bolusCancelResponse.value) {
-                if (bolusCancelResponse.value != null) {
-                    showCancelledDialog = true
-                }
-            }
-
-            IndeterminateProgressIndicator(text = "The bolus is being cancelled..")
-        }
-
-        Dialog(
-            showDialog = showCancelledDialog,
-            onDismissRequest = {
-                showCancelledDialog = false
-                resetBolusDataStoreState(dataStore)
-                onClickLanding()
-            },
-            scrollState = scrollState
-        ) {
-            val bolusCancelResponse = dataStore.bolusCancelResponse.observeAsState()
-            val bolusInitiateResponse = dataStore.bolusInitiateResponse.observeAsState()
-            val lastBolusStatusResponse = dataStore.lastBolusStatusResponse.observeAsState()
-
-            LaunchedEffect (bolusCancelResponse.value, Unit) {
-                sendPumpCommands(SendType.STANDARD, listOf(LastBolusStatusV2Request()))
-            }
-
-            fun matchesBolusId(): Boolean? {
-                lastBolusStatusResponse.value?.let { last ->
-                    bolusInitiateResponse.value?.let { initiate ->
-                        return (last.bolusId == initiate.bolusId)
-                    }
-                }
-                return null
-            }
-
-            LaunchedEffect (lastBolusStatusResponse.value) {
-                if (matchesBolusId() == false) {
-                    refreshScope.launch {
-                        withContext(Dispatchers.IO) {
-                            Thread.sleep(250)
-                        }
-                        sendPumpCommands(
-                            SendType.STANDARD,
-                            listOf(LastBolusStatusV2Request())
-                        )
-                    }
-                }
-            }
-
-            Alert(
-                title = {
-                    Text(
-                        text = when (bolusCancelResponse.value?.status) {
-                            CancelStatus.SUCCESS ->
-                                "The bolus was cancelled."
-                            CancelStatus.FAILED ->
-                                when (bolusInitiateResponse.value) {
-                                    null -> "A bolus request was not sent to the pump, so there is nothing to cancel."
-                                    else -> "The bolus could not be cancelled: ${
-                                        snakeCaseToSpace(
-                                            bolusCancelResponse.value?.reason.toString()
-                                        )
-                                    }"
-                                }
-                            else -> "Please check your pump to confirm whether the bolus was cancelled."
-                        },
-                        textAlign = TextAlign.Center,
-                        color = MaterialTheme.colors.onBackground
-                    )
-                },
-                content = {
-                    Text(
-                        text = when {
-                            matchesBolusId() == true ->
-                                lastBolusStatusResponse.value?.deliveredVolume?.let {
-                                    if (it == 0L) "A bolus was started and no insulin was delivered." else "${twoDecimalPlaces1000Unit(it)}u was delivered."
-                                } ?: ""
-                            matchesBolusId() == false -> "No insulin was delivered."
-                            else -> "Checking if any insulin was delivered..."
-                        },
-                        textAlign = TextAlign.Center,
-                        color = MaterialTheme.colors.onBackground
-                    )
-                },
-                negativeButton = {
-                    Button(
-                        onClick = {
-                            onClickLanding()
-                            resetBolusDataStoreState(dataStore)
-                        },
-                        colors = ButtonDefaults.secondaryButtonColors(),
-                        modifier = Modifier.fillMaxWidth()
-
-                    ) {
-                        Text("OK")
-                    }
-                },
-                positiveButton = {},
-                icon = {
-                    Image(
-                        painterResource(R.drawable.bolus_icon),
-                        "Bolus icon",
-                        Modifier.size(24.dp)
-                    )
-                },
-                scrollState = scrollState,
-            )
-        }
+            dataStore = dataStore
+        )
 
         fun cancelBolus() {
             fun performCancel() {
-                bolusPermissionResponse.value?.bolusId?.let { bolusId ->
+                dataStore.bolusPermissionResponse.value?.bolusId?.let { bolusId ->
                     sendPumpCommands(SendType.BUST_CACHE, listOf(CancelBolusRequest(bolusId)))
                 }
             }
@@ -836,198 +492,54 @@ fun BolusScreen(
             }
         }
 
-        Dialog(
-            showDialog = showInProgressDialog,
-            onDismissRequest = {
-                showInProgressDialog = false
+        BolusCancellingPhase(
+            showCancellingDialog = showCancellingDialog,
+            onDismiss = { showCancellingDialog = false },
+            onCancelled = { showCancelledDialog = true },
+            dataStore = dataStore
+        )
+
+        BolusCancelledPhase(
+            showCancelledDialog = showCancelledDialog,
+            onDismiss = {
+                showCancelledDialog = false
+                resetBolusDataStoreState(dataStore)
+                onClickLanding()
             },
-            scrollState = scrollState
-        ) {
-            val bolusFinalParameters = dataStore.bolusFinalParameters.observeAsState()
-            val bolusInitiateResponse = dataStore.bolusInitiateResponse.observeAsState()
-            val bolusCancelResponse = dataStore.bolusCancelResponse.observeAsState()
-            val bolusMinNotifyThreshold = dataStore.bolusMinNotifyThreshold.observeAsState()
+            onAcknowledge = {
+                onClickLanding()
+                resetBolusDataStoreState(dataStore)
+            },
+            dataStore = dataStore,
+            refreshScope = refreshScope,
+            sendPumpCommands = sendPumpCommands
+        )
 
-            LaunchedEffect(bolusInitiateResponse.value) {
-                if (bolusInitiateResponse.value != null) {
-                    showApprovedDialog = true
-                }
-            }
+        BolusInProgressPhase(
+            showInProgressDialog = showInProgressDialog,
+            onDismiss = { showInProgressDialog = false },
+            onCancel = { cancelBolus() },
+            onApproved = { showApprovedDialog = true },
+            onCancelled = { showCancelledDialog = true },
+            dataStore = dataStore
+        )
 
-            LaunchedEffect(bolusCancelResponse.value) {
-                if (bolusCancelResponse.value != null) {
-                    showCancelledDialog = true
-                }
-            }
-
-            Alert(
-                title = {
-                    Text(
-                        text = when (bolusFinalParameters.value) {
-                            null -> ""
-                            else -> "${bolusFinalParameters.value?.units}u Bolus"
-                        },
-                        textAlign = TextAlign.Center,
-                        color = MaterialTheme.colors.onBackground
-                    )
-                },
-                negativeButton = {
-                    Button(
-                        onClick = {
-                            cancelBolus()
-                        },
-                        colors = ButtonDefaults.secondaryButtonColors(),
-                        modifier = Modifier.fillMaxWidth()
-
-                    ) {
-                        Text("Cancel")
-                    }
-                },
-                positiveButton = {},
-                scrollState = scrollState,
-                icon = {
-                    Image(
-                        painterResource(R.drawable.bolus_icon),
-                        "Bolus icon",
-                        Modifier.size(24.dp)
-                    )
-                }
-            ) {
-                Text(
-                    text = when {
-                        bolusInitiateResponse.value != null -> "Bolus request received by pump, waiting for response..."
-                        bolusFinalParameters.value != null && bolusMinNotifyThreshold.value != null -> when {
-                            bolusFinalParameters.value!!.units >= bolusMinNotifyThreshold.value!! -> "A notification was sent to approve the request."
-                            else -> "Sending request to pump..."
-                        }
-                        else -> "Sending request to phone..."
-                    },
-                    textAlign = TextAlign.Center,
-                    style = MaterialTheme.typography.body2,
-                    color = MaterialTheme.colors.onBackground
-                )
-            }
-        }
-
-        Dialog(
-            showDialog = showApprovedDialog,
-            onDismissRequest = {
+        BolusApprovedPhase(
+            showApprovedDialog = showApprovedDialog,
+            onDismiss = {
                 showApprovedDialog = false
                 resetBolusDataStoreState(dataStore)
                 resetSavedBolusEnteredState()
                 onClickLanding()
             },
-            scrollState = scrollState
-        ) {
-            val bolusFinalParameters = dataStore.bolusFinalParameters.observeAsState()
-            val bolusInitiateResponse = dataStore.bolusInitiateResponse.observeAsState()
-            val bolusCurrentResponse = dataStore.bolusCurrentResponse.observeAsState()
-
-            Alert(
-                title = {
-                    Text(
-                        text = when {
-                            bolusInitiateResponse.value != null -> when {
-                                bolusInitiateResponse.value!!.wasBolusInitiated() -> "Bolus Initiated"
-                                else -> "Bolus Rejected by Pump"
-                            }
-                            else -> "Fetching Bolus Status..."
-                        },
-                        textAlign = TextAlign.Center,
-                        color = MaterialTheme.colors.onBackground
-                    )
-                },
-                negativeButton = {
-                    Button(
-                        onClick = {
-                            cancelBolus()
-                        },
-                        colors = ButtonDefaults.secondaryButtonColors(),
-                        modifier = Modifier.fillMaxWidth()
-
-                    ) {
-                        Text("Cancel")
-                    }
-                },
-                positiveButton = {},
-                icon = {
-                    Image(
-                        painterResource(R.drawable.bolus_icon),
-                        "Bolus icon",
-                        Modifier.size(24.dp)
-                    )
-                },
-                scrollState = scrollState,
-            ) {
-                LaunchedEffect(Unit) {
-                    sendPumpCommands(SendType.BUST_CACHE, listOf(CurrentBolusStatusRequest()))
-                    refreshScope.launch {
-                        repeat(5) {
-                            Thread.sleep(1000)
-                            sendPumpCommands(
-                                SendType.BUST_CACHE,
-                                listOf(CurrentBolusStatusRequest())
-                            )
-                        }
-                    }
-                }
-
-                // When bolusCurrentResponse is updated, re-request it
-                LaunchedEffect(bolusCurrentResponse.value) {
-                    Timber.i("bolusCurrentResponse: ${bolusCurrentResponse.value}")
-                    // when a bolusId=0 is returned, the current bolus session has ended so the message
-                    // no longer contains any useful data.
-                    if (bolusCurrentResponse.value?.bolusId != 0) {
-                        sendPumpCommands(SendType.BUST_CACHE, listOf(CurrentBolusStatusRequest()))
-                        refreshScope.launch {
-                            repeat(5) {
-                                Thread.sleep(1000)
-                                sendPumpCommands(
-                                    SendType.BUST_CACHE,
-                                    listOf(CurrentBolusStatusRequest())
-                                )
-                            }
-                        }
-                    }
-                }
-
-                Text(
-                    text = when {
-                        bolusInitiateResponse.value != null -> when {
-                            bolusInitiateResponse.value!!.wasBolusInitiated() -> "The ${
-                                bolusFinalParameters.value?.let {
-                                    twoDecimalPlaces(
-                                        it.units
-                                    )
-                                }
-                            }u bolus ${
-                                when (bolusCurrentResponse.value) {
-                                    null -> "was requested."
-                                    else -> when (bolusCurrentResponse.value!!.status) {
-                                        CurrentBolusStatus.REQUESTING -> "is being prepared."
-                                        CurrentBolusStatus.DELIVERING -> "is being delivered."
-                                        else -> "was completed."
-                                    }
-                                }
-                            }"
-                            else -> "The bolus could not be delivered: ${
-                                bolusInitiateResponse.value?.let {
-                                    snakeCaseToSpace(
-                                        it.statusType.toString()
-                                    )
-                                }
-                            }"
-                        }
-                        else -> "The bolus status is unknown. Please check your pump to identify the status of the bolus."
-                    },
-                    textAlign = TextAlign.Center,
-                    style = MaterialTheme.typography.body2,
-                    color = MaterialTheme.colors.onBackground
-                )
-            }
-        }
+            onCancel = { cancelBolus() },
+            dataStore = dataStore,
+            refreshScope = refreshScope,
+            sendPumpCommands = sendPumpCommands
+        )
     }
 }
+
 
 
 fun resetBolusDataStoreState(dataStore: DataStore) {
