@@ -68,11 +68,9 @@ import com.jwoglom.pumpx2.pump.messages.request.control.ChangeControlIQSettingsR
 import com.jwoglom.pumpx2.pump.messages.request.control.SetSleepScheduleRequest
 import com.jwoglom.pumpx2.pump.messages.request.currentStatus.ControlIQSleepScheduleRequest
 import com.jwoglom.pumpx2.pump.messages.response.currentStatus.ControlIQSleepScheduleResponse
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 import timber.log.Timber
 
 @Composable
@@ -130,9 +128,7 @@ fun ControlIQSettingsActions(
                 sinceLastFetchTime = 0
             }
 
-            withContext(Dispatchers.IO) {
-                Thread.sleep(250)
-            }
+            delay(250)
             sinceLastFetchTime += 250
         }
         Timber.i("ControlIQSettingsActions loading done: ${controlIQSettingsFields.map { it.value }}")

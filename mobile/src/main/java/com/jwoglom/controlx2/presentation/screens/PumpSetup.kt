@@ -82,9 +82,8 @@ import com.jwoglom.pumpx2.pump.bluetooth.PumpReadyState
 import com.jwoglom.pumpx2.pump.messages.models.KnownDeviceModel
 import com.jwoglom.pumpx2.pump.messages.models.PairingCodeType
 import com.jwoglom.pumpx2.pump.messages.response.authentication.CentralChallengeResponse
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
+import kotlinx.coroutines.delay
 import timber.log.Timber
 
 @Composable
@@ -118,16 +117,12 @@ fun PumpSetup(
         PumpState.setJpakeServerNonce(context, "")
         PumpState.setSavedBluetoothMAC(context, "")
         coroutineScope.launch {
-            withContext(Dispatchers.IO) {
-                Thread.sleep(500)
-            }
+            delay(500)
             sendMessage(
                 "/to-phone/app-reload",
                 "".toByteArray()
             )
-            withContext(Dispatchers.IO) {
-                Thread.sleep(500)
-            }
+            delay(500)
             navController?.navigate(Screen.PumpSetup.route)
         }
     }
@@ -316,9 +311,7 @@ fun PumpSetup(
                                                 pumpStateStatus =
                                                     "Success, application will reload with new state momentarily..."
                                                 coroutineScope.launch {
-                                                    withContext(Dispatchers.IO) {
-                                                        Thread.sleep(1000)
-                                                    }
+                                                    delay(1000)
                                                     triggerAppReload(context)
                                                 }
 

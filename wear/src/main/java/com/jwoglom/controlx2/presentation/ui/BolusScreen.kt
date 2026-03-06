@@ -100,9 +100,8 @@ import com.jwoglom.controlx2.shared.util.snakeCaseToSpace
 import com.jwoglom.controlx2.shared.util.twoDecimalPlaces
 import com.jwoglom.controlx2.shared.util.twoDecimalPlaces1000Unit
 import com.jwoglom.pumpx2.pump.messages.bluetooth.PumpStateSupplier
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
+import kotlinx.coroutines.delay
 import timber.log.Timber
 
 @OptIn(ExperimentalMaterialApi::class)
@@ -226,16 +225,12 @@ fun BolusScreen(
                 sinceLastFetchTime = 0
             }
 
-            withContext(Dispatchers.IO) {
-                Thread.sleep(250)
-            }
+            delay(250)
             sinceLastFetchTime += 250
         }
         Timber.i("BolusScreen base loading done: ${baseFields.map { it.value }}")
         if (sinceLastFetchTime == 0) {
-            withContext(Dispatchers.IO) {
-                Thread.sleep(250)
-            }
+            delay(250)
         }
         refreshing = false
     }
@@ -478,9 +473,7 @@ fun BolusScreen(
                         performCancel()
                         time = 0
                     }
-                    withContext(Dispatchers.IO) {
-                        Thread.sleep(100)
-                    }
+                    delay(100)
                     time += 100
                 }
                 showCancellingDialog = false

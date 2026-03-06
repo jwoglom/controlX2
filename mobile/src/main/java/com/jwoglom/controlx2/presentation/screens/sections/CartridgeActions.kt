@@ -53,10 +53,9 @@ import com.jwoglom.pumpx2.pump.messages.request.currentStatus.CGMStatusRequest
 import com.jwoglom.pumpx2.pump.messages.request.currentStatus.HomeScreenMirrorRequest
 import com.jwoglom.pumpx2.pump.messages.request.currentStatus.TimeSinceResetRequest
 import com.jwoglom.pumpx2.pump.messages.request.currentStatus.UnknownMobiOpcode20Request
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
+import kotlinx.coroutines.delay
 import timber.log.Timber
 
 private enum class CartridgeSubScreen {
@@ -116,7 +115,7 @@ fun CartridgeActions(
                 fetchDataStoreFields(SendType.CACHED)
                 sinceLastFetchTime = 0
             }
-            withContext(Dispatchers.IO) { Thread.sleep(250) }
+            delay(250)
             sinceLastFetchTime += 250
         }
         refreshing = false

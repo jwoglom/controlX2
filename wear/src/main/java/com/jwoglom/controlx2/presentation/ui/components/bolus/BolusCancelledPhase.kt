@@ -26,9 +26,8 @@ import com.jwoglom.pumpx2.pump.messages.Message
 import com.jwoglom.pumpx2.pump.messages.request.currentStatus.LastBolusStatusV2Request
 import com.jwoglom.pumpx2.pump.messages.response.control.CancelBolusResponse.CancelStatus
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 
 @Composable
 fun BolusCancelledPhase(
@@ -61,9 +60,7 @@ fun BolusCancelledPhase(
         LaunchedEffect(lastBolusStatusResponse.value) {
             if (matchesBolusId() == false) {
                 refreshScope.launch {
-                    withContext(Dispatchers.IO) {
-                        Thread.sleep(250)
-                    }
+                    delay(250)
                     sendPumpCommands(SendType.STANDARD, listOf(LastBolusStatusV2Request()))
                 }
             }

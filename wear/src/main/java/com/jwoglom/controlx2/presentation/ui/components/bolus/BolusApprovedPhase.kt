@@ -26,6 +26,7 @@ import com.jwoglom.pumpx2.pump.messages.Message
 import com.jwoglom.pumpx2.pump.messages.request.currentStatus.CurrentBolusStatusRequest
 import com.jwoglom.pumpx2.pump.messages.response.currentStatus.CurrentBolusStatusResponse.CurrentBolusStatus
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import timber.log.Timber
 
@@ -74,7 +75,7 @@ fun BolusApprovedPhase(
                 sendPumpCommands(SendType.BUST_CACHE, listOf(CurrentBolusStatusRequest()))
                 refreshScope.launch {
                     repeat(5) {
-                        Thread.sleep(1000)
+                        delay(1000)
                         sendPumpCommands(SendType.BUST_CACHE, listOf(CurrentBolusStatusRequest()))
                     }
                 }
@@ -86,7 +87,7 @@ fun BolusApprovedPhase(
                     sendPumpCommands(SendType.BUST_CACHE, listOf(CurrentBolusStatusRequest()))
                     refreshScope.launch {
                         repeat(5) {
-                            Thread.sleep(1000)
+                            delay(1000)
                             sendPumpCommands(SendType.BUST_CACHE, listOf(CurrentBolusStatusRequest()))
                         }
                     }

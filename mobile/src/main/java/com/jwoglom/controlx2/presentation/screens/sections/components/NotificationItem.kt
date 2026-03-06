@@ -38,10 +38,9 @@ import com.jwoglom.pumpx2.pump.messages.response.currentStatus.AlertStatusRespon
 import com.jwoglom.pumpx2.pump.messages.response.currentStatus.CGMAlertStatusResponse
 import com.jwoglom.pumpx2.pump.messages.response.currentStatus.MalfunctionStatusResponse
 import com.jwoglom.pumpx2.pump.messages.response.currentStatus.ReminderStatusResponse
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
+import kotlinx.coroutines.delay
 
 val requiredProgress = 0.5f
 
@@ -107,10 +106,8 @@ fun NotificationItem(
                 }
             }
 
-            withContext(Dispatchers.IO) {
-                Thread.sleep(500)
-                refresh()
-            }
+            delay(500)
+            refresh()
         }
     }
 
