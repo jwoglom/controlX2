@@ -61,6 +61,11 @@ This document summarizes the structure, design, and common workflows inside the 
      ./gradlew testDebugUnitTest --console=plain
      ```
      The `--console=plain` flag avoids spinner output that can overflow execution logs.
+
+- Codex container helper scripts (repo-local, non-root):
+  - `.codex/setup.sh`: installs command-line tools + SDK packages, accepts licenses, writes `local.properties`.
+  - `.codex/build.sh`: runs `./gradlew :wear:compileDebugKotlin --console=plain` with the same repo-local SDK env.
+  - `.codex/test.sh`: runs `./gradlew testDebugUnitTest --console=plain` with the same repo-local SDK env.
 - Compose previews are heavily relied upon for iteration. Use `setUpPreviewState` (mobile) or the preview helpers inside wear UI files to seed fake data—this prevents Compose previews from crashing when new observable fields are introduced.
 - When PumpX2 artifacts change, clear Gradle caches with `./gradlew --stop && ./gradlew clean` or `./gradlew build --refresh-dependencies` before rebuilding so the new protocol definitions flow through to both apps.
 
