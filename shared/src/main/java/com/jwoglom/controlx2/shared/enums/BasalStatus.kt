@@ -2,6 +2,7 @@ package com.jwoglom.controlx2.shared.enums
 
 enum class BasalStatus(val str: String) {
     ON("On"),
+    PUMP_RESUMED("On"),
     ZERO("Zero"),
     TEMP_RATE("Temp Rate"),
     ZERO_TEMP_RATE("Zero Temp Rate"),
