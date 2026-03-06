@@ -16,6 +16,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.livedata.observeAsState
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -41,8 +42,8 @@ fun HistoryLogSyncProgressBar(
     hideWhenComplete: Boolean = false,
     replaceWithPaddingWhenComplete: Boolean = false
 ) {
-    val dataStore = LocalDataStore.current
-    val historyLogStatus by dataStore.historyLogStatus.observeAsState()
+    val ds = LocalDataStore.current
+    val historyLogStatus by ds.historyLogStatus.observeAsState()
 
     historyLogStatus?.let { status ->
         val pumpMaxSeqNum = status.lastSequenceNum
@@ -52,7 +53,10 @@ fun HistoryLogSyncProgressBar(
         val targetMinSeqId = max(pumpMinSeqNum, pumpMaxSeqNum - 5000)
         
         // Get count of logs in DB above this threshold
-        val dbLogCount by historyLogViewModel.getCountAboveSeqId(targetMinSeqId).observeAsState()
+        val countAboveTargetSeqId = remember(historyLogViewModel, targetMinSeqId) {
+            historyLogViewModel.getCountAboveSeqId(targetMinSeqId)
+        }
+        val dbLogCount by countAboveTargetSeqId.observeAsState()
         val syncedLogs = dbLogCount ?: 0L
         
         // Total logs is the count that should exist on the pump in this range
