@@ -4,34 +4,8 @@ package com.jwoglom.controlx2.presentation.screens.sections
 
 import android.os.Handler
 import android.os.Looper
-import androidx.compose.foundation.Image
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.isSystemInDarkTheme
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.material.ExperimentalMaterialApi
-import androidx.compose.material.Icon
-import androidx.compose.material.OutlinedButton
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonColors
-import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.Card
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -40,21 +14,28 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.focus.onFocusChanged
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
-import androidx.compose.ui.res.painterResource
-import androidx.compose.ui.text.SpanStyle
-import androidx.compose.ui.text.buildAnnotatedString
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.tooling.preview.Preview
-import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
+import com.jwoglom.controlx2.LocalDataStore
+import com.jwoglom.controlx2.presentation.DataStore
+import com.jwoglom.controlx2.presentation.components.HeaderLine
+import com.jwoglom.controlx2.presentation.screens.BolusPreview
+import com.jwoglom.controlx2.presentation.screens.sections.components.bolus.ApprovedDialogRegion
+import com.jwoglom.controlx2.presentation.screens.sections.components.bolus.BolusConditionPromptRegion
+import com.jwoglom.controlx2.presentation.screens.sections.components.bolus.BolusDeliverActionRegion
+import com.jwoglom.controlx2.presentation.screens.sections.components.bolus.BolusEntryFormRegion
+import com.jwoglom.controlx2.presentation.screens.sections.components.bolus.BolusPermissionDialogRegion
+import com.jwoglom.controlx2.presentation.screens.sections.components.bolus.CancelledDialogRegion
+import com.jwoglom.controlx2.presentation.screens.sections.components.bolus.CancellingDialogRegion
+import com.jwoglom.controlx2.presentation.screens.sections.components.bolus.InProgressDialogRegion
+import com.jwoglom.controlx2.presentation.util.LifecycleStateObserver
+import com.jwoglom.controlx2.shared.enums.GlucoseUnit
+import com.jwoglom.controlx2.shared.util.GlucoseConverter
+import com.jwoglom.controlx2.shared.util.SendType
+import com.jwoglom.controlx2.shared.util.twoDecimalPlaces
 import com.jwoglom.pumpx2.pump.messages.Message
+import com.jwoglom.pumpx2.pump.messages.bluetooth.PumpStateSupplier
 import com.jwoglom.pumpx2.pump.messages.calculator.BolusCalcCondition
 import com.jwoglom.pumpx2.pump.messages.calculator.BolusCalcDecision
 import com.jwoglom.pumpx2.pump.messages.calculator.BolusCalcUnits
@@ -64,33 +45,12 @@ import com.jwoglom.pumpx2.pump.messages.models.InsulinUnit
 import com.jwoglom.pumpx2.pump.messages.request.control.BolusPermissionRequest
 import com.jwoglom.pumpx2.pump.messages.request.control.CancelBolusRequest
 import com.jwoglom.pumpx2.pump.messages.request.currentStatus.BolusCalcDataSnapshotRequest
-import com.jwoglom.pumpx2.pump.messages.request.currentStatus.CurrentBolusStatusRequest
 import com.jwoglom.pumpx2.pump.messages.request.currentStatus.LastBGRequest
-import com.jwoglom.pumpx2.pump.messages.request.currentStatus.LastBolusStatusV2Request
 import com.jwoglom.pumpx2.pump.messages.request.currentStatus.TimeSinceResetRequest
-import com.jwoglom.pumpx2.pump.messages.response.control.CancelBolusResponse
 import com.jwoglom.pumpx2.pump.messages.response.currentStatus.BolusCalcDataSnapshotResponse
-import com.jwoglom.pumpx2.pump.messages.response.currentStatus.CurrentBolusStatusResponse
 import com.jwoglom.pumpx2.pump.messages.response.currentStatus.LastBGResponse
 import com.jwoglom.pumpx2.pump.messages.response.currentStatus.TimeSinceResetResponse
-import com.jwoglom.controlx2.LocalDataStore
-import com.jwoglom.controlx2.Prefs
-import com.jwoglom.controlx2.R
-import com.jwoglom.controlx2.presentation.DataStore
-import com.jwoglom.controlx2.presentation.components.HeaderLine
-import com.jwoglom.controlx2.presentation.screens.BolusPreview
-import com.jwoglom.controlx2.presentation.screens.sections.components.DecimalOutlinedText
-import com.jwoglom.controlx2.presentation.screens.sections.components.IntegerOutlinedText
-import com.jwoglom.controlx2.presentation.util.LifecycleStateObserver
-import com.jwoglom.controlx2.shared.enums.GlucoseUnit
-import com.jwoglom.controlx2.shared.util.GlucoseConverter
-import com.jwoglom.controlx2.shared.util.SendType
-import com.jwoglom.controlx2.shared.util.snakeCaseToSpace
-import com.jwoglom.controlx2.shared.util.twoDecimalPlaces
-import com.jwoglom.controlx2.shared.util.twoDecimalPlaces1000Unit
-import com.jwoglom.pumpx2.pump.messages.bluetooth.PumpStateSupplier
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import timber.log.Timber
@@ -127,15 +87,11 @@ fun BolusWindow(
 
     var bolusButtonEnabled by remember { mutableStateOf(false) }
 
+    // Intentionally observed at the top-level composable for refresh/recalculate flow coordination.
     val cgmReading = dataStore.cgmReading.observeAsState()
     val bolusCalcDataSnapshot = dataStore.bolusCalcDataSnapshot.observeAsState()
     val bolusCalcLastBG = dataStore.bolusCalcLastBG.observeAsState()
     val bolusConditionsExcluded = dataStore.bolusConditionsExcluded.observeAsState()
-    val bolusCurrentParameters = dataStore.bolusCurrentParameters.observeAsState()
-    val bolusFinalParameters = dataStore.bolusFinalParameters.observeAsState()
-    val bolusPermissionResponse = dataStore.bolusPermissionResponse.observeAsState()
-
-    val bolusConditionsPrompt = dataStore.bolusConditionsPrompt.observeAsState()
 
     var showPermissionCheckDialog by remember { mutableStateOf(false) }
     var showInProgressDialog by remember { mutableStateOf(false) }
@@ -152,11 +108,6 @@ fun BolusWindow(
     val baseFields = listOf(
         dataStore.bolusCalcDataSnapshot,
         dataStore.bolusCalcLastBG
-    )
-
-    val calculatedFields = listOf(
-        dataStore.bolusCalculatorBuilder,
-        dataStore.bolusCurrentParameters
     )
 
     @Synchronized
@@ -320,301 +271,82 @@ fun BolusWindow(
 
     HeaderLine("Bolus")
 
-    Row(
-        modifier = Modifier.fillMaxWidth()
-    ) {
-        Column(Modifier.weight(0.75f)) {}
-        Column(Modifier.weight(1f)) {
-            DecimalOutlinedText(
-                title = unitsSubtitle,
-                value = unitsRawValue.value,
-                onValueChange = {
-                    dataStore.bolusUnitsRawValue.value = it
-                    unitsHumanEntered = if (it == "") null else it.toDoubleOrNull()
-                },
-                modifier = Modifier.onFocusChanged {
-                    unitsHumanFocus = it.isFocused
-                }
-            )
+    BolusEntryFormRegion(
+        unitsSubtitle = unitsSubtitle,
+        carbsSubtitle = carbsSubtitle,
+        glucoseSubtitle = glucoseSubtitle,
+        onUnitsChanged = {
+            dataStore.bolusUnitsRawValue.value = it
+            unitsHumanEntered = if (it == "") null else it.toDoubleOrNull()
+        },
+        onUnitsFocusChanged = { isFocused ->
+            unitsHumanFocus = isFocused
+        },
+        onCarbsChanged = {
+            dataStore.bolusCarbsRawValue.value = it
+        },
+        onGlucoseChanged = {
+            dataStore.bolusGlucoseRawValue.value = it
+            glucoseHumanEntered = if (it == "") null else it.toIntOrNull()
         }
-        Column(Modifier.weight(0.75f)) {}
-    }
-    
-    Row(
-        modifier = Modifier.fillMaxWidth()
-    ) {
-        Column(
-            Modifier
-                .weight(1f)
-                .padding(all = 8.dp)) {
-            IntegerOutlinedText(
-                title = carbsSubtitle,
-                value = carbsRawValue.value,
-                onValueChange = { dataStore.bolusCarbsRawValue.value = it }
-            )
-        }
+    )
 
-        Column(
-            Modifier
-                .weight(1f)
-                .padding(all = 8.dp)) {
-            IntegerOutlinedText(
-                title = glucoseSubtitle,
-                value = glucoseRawValue.value,
-                onValueChange = {
-                    dataStore.bolusGlucoseRawValue.value = it
-                    glucoseHumanEntered = if (it == "") null else it.toIntOrNull()
-                }
-            )
-        }
-    }
+    BolusConditionPromptRegion(
+        recalculate = { recalculate() }
+    )
 
-    fun validBolus(params: BolusParameters?): Boolean {
-        if (params == null) {
-            return false
-        }
-
-        if (params.units < 0.05) {
-            return false
-        }
-
-        if (params.units >= (InsulinUnit.from1000To1(bolusCalcDataSnapshot.value?.maxBolusAmount?.toLong() ?: 25000))) {
-            return false
-        }
-
-        return true
-    }
-
-    bolusConditionsPrompt.value?.forEach {
-        Card(Modifier.fillMaxWidth()) {
-            Column(Modifier.fillMaxWidth()) {
-                Text(buildAnnotatedString {
-                    withStyle(SpanStyle(fontWeight = FontWeight.Bold)) {
-                        append("${it.msg}: ")
-                    }
-                    append(it.prompt?.promptMessage)
-                }, Modifier.padding(8.dp))
-            }
-            Row(
-                modifier = Modifier.fillMaxWidth()
-            ) {
-
-                Column(Modifier.weight(3f)) {}
-
-                Column(Modifier.weight(1f)) {
-                    OutlinedButton(
-                        onClick = {
-                            bolusConditionsPrompt.value?.let {
-                                if (dataStore.bolusConditionsPromptAcknowledged.value == null) {
-                                    dataStore.bolusConditionsPromptAcknowledged.value =
-                                        mutableListOf(it.first())
-                                } else {
-                                    dataStore.bolusConditionsPromptAcknowledged.value!!.add(it.first())
-                                }
-
-                                if (dataStore.bolusConditionsExcluded.value == null) {
-                                    dataStore.bolusConditionsExcluded.value =
-                                        mutableSetOf(it.first())
-                                } else {
-                                    dataStore.bolusConditionsExcluded.value?.add(it.first())
-                                }
-
-                                dataStore.bolusConditionsPrompt.value?.drop(0)
-                                recalculate()
-                            }
-                        },
-                        modifier = Modifier.padding(8.dp)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Filled.Close,
-                            contentDescription = "Reject"
-                        )
-                    }
-                }
-
-
-                Column(Modifier.weight(1f)) {
-                    OutlinedButton(
-                        onClick = {
-                            bolusConditionsPrompt.value?.let {
-                                if (dataStore.bolusConditionsPromptAcknowledged.value == null) {
-                                    dataStore.bolusConditionsPromptAcknowledged.value =
-                                        mutableListOf(it.first())
-                                } else {
-                                    dataStore.bolusConditionsPromptAcknowledged.value!!.add(it.first())
-                                }
-
-                                if (dataStore.bolusConditionsExcluded.value != null) {
-                                    dataStore.bolusConditionsExcluded.value?.remove(it.first())
-                                }
-
-                                dataStore.bolusConditionsPrompt.value?.drop(0)
-                                recalculate()
-                            }
-                        },
-                        modifier = Modifier.padding(8.dp)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Filled.Check,
-                            contentDescription = "Apply"
-                        )
-                    }
-                }
-            }
-        }
-    }
-
-
-    val bolusConditionsPromptAcknowledged = dataStore.bolusConditionsPromptAcknowledged.observeAsState()
-
-    if (bolusConditionsPromptAcknowledged.value != null && bolusConditionsPromptAcknowledged.value!!.size > 0) {
-        bolusConditionsPromptAcknowledged.value?.forEach {
-            Card(
-                Modifier
-                    .fillMaxWidth()
-                    .clickable {
-                        Timber.i("bolusConditionsPromptAcknowledged click")
-                        dataStore.bolusConditionsPrompt.value =
-                            mutableListOf<BolusCalcCondition>().let {
-                                it.addAll(bolusConditionsPromptAcknowledged.value!!)
-                                it
-                            }
-                        dataStore.bolusConditionsPromptAcknowledged.value = mutableListOf()
-                        dataStore.bolusConditionsExcluded.value = mutableSetOf()
-                    }) {
-                Text(buildAnnotatedString {
-                    withStyle(SpanStyle(fontWeight = FontWeight.Bold)) {
-                        append(when {
-                            bolusConditionsExcluded.value?.contains(it) == true -> it.prompt?.whenIgnoredNotice ?: it.msg
-                            else -> it.prompt?.whenAcceptedNotice ?: it.msg
-                        })
-                    }
-                }, Modifier.padding(8.dp))
-            }
-        }
-    }
+    val bolusCurrentParameters = dataStore.bolusCurrentParameters.observeAsState()
 
     LaunchedEffect (bolusCurrentParameters.value) {
-        bolusButtonEnabled = validBolus(bolusCurrentParameters.value)
+        bolusButtonEnabled = validBolus(
+            params = bolusCurrentParameters.value,
+            maxBolusAmount1000 = dataStore.bolusCalcDataSnapshot.value?.maxBolusAmount?.toLong()
+        )
     }
 
-    Box(
-        Modifier
-            .fillMaxSize()
-            .padding(top = 16.dp)) {
-        if (refreshing) {
-            CircularProgressIndicator(Modifier.align(Alignment.Center))
-        } else {
-            fun performPermissionCheck() {
-                showPermissionCheckDialog = true
-                sendPumpCommands(SendType.BUST_CACHE, listOf(BolusPermissionRequest()))
-            }
+    BolusDeliverActionRegion(
+        refreshing = refreshing,
+        bolusButtonEnabled = bolusButtonEnabled,
+        bolusUnits = bolusCurrentParameters.value?.units,
+        onPerformPermissionCheck = {
+            showPermissionCheckDialog = true
+            sendPumpCommands(SendType.BUST_CACHE, listOf(BolusPermissionRequest()))
+        },
+        onPrepareFinalParameters = {
+            dataStore.bolusFinalConditions.value =
+                bolusCalcDecision(dataStore.bolusCalculatorBuilder.value, dataStore.bolusConditionsExcluded.value)?.conditions
 
-            Button(
-                onClick = {
-                    if (validBolus(bolusCurrentParameters.value)) {
-                        dataStore.bolusFinalConditions.value =
-                            bolusCalcDecision(dataStore.bolusCalculatorBuilder.value, bolusConditionsExcluded.value)?.conditions
-
-                        val pair = bolusCalcParameters(dataStore.bolusCalculatorBuilder.value, bolusConditionsExcluded.value)
-                        dataStore.bolusFinalParameters.value = pair.first
-                        dataStore.bolusFinalCalcUnits.value = pair.second
-                        performPermissionCheck()
-                    }
-                },
-                contentPadding = ButtonDefaults.ButtonWithIconContentPadding,
-                enabled = bolusButtonEnabled,
-                colors = if (isSystemInDarkTheme()) ButtonDefaults.filledTonalButtonColors(containerColor = Color.LightGray) else ButtonDefaults.filledTonalButtonColors(),
-                modifier = Modifier.align(Alignment.Center)
-
-            ) {
-                Image(
-                    painterResource(R.drawable.bolus_icon),
-                    "Bolus icon",
-                    Modifier.size(ButtonDefaults.IconSize)
-                )
-                Spacer(Modifier.size(ButtonDefaults.IconSpacing))
-                Text(
-                    "Deliver ${bolusCurrentParameters.value?.units?.let { "${twoDecimalPlaces(it)}u " }}bolus",
-                    fontSize = 18.sp,
-                    color = if (isSystemInDarkTheme()) Color.Black else Color.Unspecified
-                )
-            }
+            val pair = bolusCalcParameters(dataStore.bolusCalculatorBuilder.value, dataStore.bolusConditionsExcluded.value)
+            dataStore.bolusFinalParameters.value = pair.first
+            dataStore.bolusFinalCalcUnits.value = pair.second
+        },
+        isValidBolus = {
+            validBolus(
+                params = bolusCurrentParameters.value,
+                maxBolusAmount1000 = dataStore.bolusCalcDataSnapshot.value?.maxBolusAmount?.toLong()
+            )
         }
-    }
+    )
 
     if (showPermissionCheckDialog) {
-        fun sendBolusRequest(bolusParameters: BolusParameters?, unitBreakdown: BolusCalcUnits?, dataSnapshot: BolusCalcDataSnapshotResponse?, timeSinceReset: TimeSinceResetResponse?) {
-            if (bolusParameters == null || dataStore.bolusPermissionResponse.value == null || dataStore.bolusCalcDataSnapshot.value == null || unitBreakdown == null || dataSnapshot == null || timeSinceReset == null) {
-                Timber.w("sendBolusRequest: null parameters")
-                return
-            }
-
-            val bolusId = dataStore.bolusPermissionResponse.value!!.bolusId
-
-            Timber.i("sendBolusRequest: sending bolus request to phone: bolusId=$bolusId bolusParameters=$bolusParameters unitBreakdown=$unitBreakdown dataSnapshot=$dataSnapshot timeSinceReset=$timeSinceReset")
-            sendServiceBolusRequest(bolusId, bolusParameters, unitBreakdown, dataSnapshot, timeSinceReset)
-        }
-
-        AlertDialog(
-            onDismissRequest = {
+        BolusPermissionDialogRegion(
+            showPermissionCheckDialog = showPermissionCheckDialog,
+            onDismiss = {
                 showPermissionCheckDialog = false
             },
-            title = {
-                Text("Deliver ${bolusCurrentParameters.value?.units?.let { "${twoDecimalPlaces(it)}u " }}bolus?")
+            onShowInProgress = {
+                showPermissionCheckDialog = false
+                showInProgressDialog = true
             },
-            icon = {
-                Image(
-                    if (isSystemInDarkTheme()) painterResource(R.drawable.bolus_icon_secondary)
-                    else painterResource(R.drawable.bolus_icon),
-                    "Bolus icon",
-                    Modifier.size(ButtonDefaults.IconSize)
-                )
-            },
-            dismissButton = {
-                TextButton(
-                    onClick = {
-                        showPermissionCheckDialog = false
-                    },
-                ) {
-                    Text("Cancel")
-                }
-
-            },
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        bolusFinalParameters.value?.let { finalParameters ->
-                            bolusPermissionResponse.value?.let { permissionResponse ->
-                                if (permissionResponse.isPermissionGranted && finalParameters.units >= 0.05) {
-                                    showPermissionCheckDialog = false
-                                    showInProgressDialog = true
-                                    sendBolusRequest(
-                                        dataStore.bolusFinalParameters.value,
-                                        dataStore.bolusFinalCalcUnits.value,
-                                        dataStore.bolusCalcDataSnapshot.value,
-                                        dataStore.timeSinceResetResponse.value,
-                                    )
-                                }
-                            }
-                        }
-                    },
-                    enabled = (
-                        bolusPermissionResponse.value?.isPermissionGranted == true &&
-                        bolusFinalParameters.value?.takeIf { it.units >= 0.05 } != null
-                    )
-                ) {
-                    Text("Deliver")
-                }
-            }
+            sendServiceBolusRequest = sendServiceBolusRequest
         )
     }
 
     fun cancelBolus() {
         Timber.i("cancelBolus()")
         fun performCancel() {
-            Timber.i("cancelBolus performCancel(): ${bolusPermissionResponse.value?.bolusId}")
-            bolusPermissionResponse.value?.bolusId?.let { bolusId ->
+            Timber.i("cancelBolus performCancel(): ${dataStore.bolusPermissionResponse.value?.bolusId}")
+            dataStore.bolusPermissionResponse.value?.bolusId?.let { bolusId ->
                 sendPumpCommands(SendType.BUST_CACHE, listOf(CancelBolusRequest(bolusId)))
             }
         }
@@ -640,326 +372,81 @@ fun BolusWindow(
     }
 
     if (showInProgressDialog) {
-        val bolusInitiateResponse = dataStore.bolusInitiateResponse.observeAsState()
-        val bolusCancelResponse = dataStore.bolusCancelResponse.observeAsState()
-
-        val bolusMinNotifyThreshold = Prefs(context).bolusConfirmationInsulinThreshold()
-
-        LaunchedEffect(bolusInitiateResponse.value) {
-            if (bolusInitiateResponse.value != null) {
+        InProgressDialogRegion(
+            onShowApproved = {
                 showInProgressDialog = false
                 showApprovedDialog = true
-            }
-        }
-
-        LaunchedEffect(bolusCancelResponse.value) {
-            if (bolusCancelResponse.value != null) {
+            },
+            onShowCancelled = {
                 showInProgressDialog = false
                 showCancelledDialog = true
-            }
-        }
-
-        AlertDialog(
-            onDismissRequest = {},
-            icon = {
-                Image(
-                    if (isSystemInDarkTheme()) painterResource(R.drawable.bolus_icon_secondary)
-                    else painterResource(R.drawable.bolus_icon),
-                    "Bolus icon",
-                    Modifier.size(ButtonDefaults.IconSize)
-                )
             },
-            title = {
-                Text("Requesting ${bolusCurrentParameters.value?.units?.let { "${twoDecimalPlaces(it)}u " }}bolus")
+            onCancel = {
+                showInProgressDialog = false
+                cancelBolus()
             },
-            text = {
-                Text(when {
-                    bolusInitiateResponse.value != null -> "Bolus request received by pump, waiting for response..."
-                    bolusFinalParameters.value != null -> when {
-                        bolusFinalParameters.value!!.units >= bolusMinNotifyThreshold -> "A notification was sent to approve the request."
-                        else -> "Sending request to pump..."
-                    }
-                    else -> "Sending request to pump..."
-                })
-            },
-            dismissButton = {
-                TextButton(
-                    onClick = {
-                        showInProgressDialog = false
-                        cancelBolus()
-                    },
-                    modifier = Modifier.padding(top = 16.dp)
-                ) {
-                    Text("Cancel Bolus Delivery")
-                }
-            },
-            confirmButton = {
-            }
+            context = context
         )
     }
 
     if (showApprovedDialog) {
-        val bolusInitiateResponse = dataStore.bolusInitiateResponse.observeAsState()
-        val bolusCurrentResponse = dataStore.bolusCurrentResponse.observeAsState()
-
-        AlertDialog(
-            onDismissRequest = {
+        ApprovedDialogRegion(
+            sendPumpCommands = sendPumpCommands,
+            refreshScopeLaunch = { block -> refreshScope.launch { block() } },
+            onCancel = {
+                showApprovedDialog = false
+                cancelBolus()
+            },
+            onClose = {
                 showCancellingDialog = false
                 resetBolusDataStoreState(dataStore)
                 closeWindow()
-            },
-            icon = {
-                Image(
-                    if (isSystemInDarkTheme()) painterResource(R.drawable.bolus_icon_secondary)
-                    else painterResource(R.drawable.bolus_icon),
-                    "Bolus icon",
-                    Modifier.size(ButtonDefaults.IconSize)
-                )
-            },
-            title = {
-                Text(when {
-                    bolusInitiateResponse.value != null -> when {
-                        bolusInitiateResponse.value!!.wasBolusInitiated() -> "Bolus Initiated"
-                        else -> "Bolus Rejected by Pump"
-                    }
-                    else -> "Fetching Bolus Status..."
-                })
-            },
-            text = {
-                LaunchedEffect(Unit) {
-                    sendPumpCommands(SendType.BUST_CACHE, listOf(CurrentBolusStatusRequest()))
-                    // Start continuous polling
-                    refreshScope.launch {
-                        var requestCount = 0
-                        while (requestCount < 60) { // Poll for up to 60 seconds
-                            delay(1000)
-                            // Check if bolus is still active before requesting
-                            val currentResponse = dataStore.bolusCurrentResponse.value
-                            if (currentResponse?.bolusId == 0) {
-                                Timber.d("BolusWindow: bolusId is 0, stopping status polling")
-                                break
-                            }
-                            sendPumpCommands(
-                                SendType.BUST_CACHE,
-                                listOf(CurrentBolusStatusRequest())
-                            )
-                            requestCount++
-                        }
-                    }
-                }
-
-                // When bolusCurrentResponse is updated, continue polling if bolus is still active
-                LaunchedEffect(bolusCurrentResponse.value) {
-                    Timber.i("bolusCurrentResponse: ${bolusCurrentResponse.value}")
-                    // when a bolusId=0 is returned, the current bolus session has ended
-                    if (bolusCurrentResponse.value?.bolusId != 0) {
-                        refreshScope.launch {
-                            repeat(5) { // Request 5 more times (5 seconds)
-                                delay(1000)
-                                val currentResponse = dataStore.bolusCurrentResponse.value
-                                if (currentResponse?.bolusId == 0) {
-                                    Timber.d("BolusWindow: bolusId is 0, stopping status polling")
-                                    return@launch
-                                }
-                                sendPumpCommands(
-                                    SendType.BUST_CACHE,
-                                    listOf(CurrentBolusStatusRequest())
-                                )
-                            }
-                        }
-                    }
-                }
-
-                Text(
-                    text = when {
-                        bolusInitiateResponse.value != null -> when {
-                            bolusInitiateResponse.value!!.wasBolusInitiated() -> "The ${
-                                bolusFinalParameters.value?.let {
-                                    twoDecimalPlaces(
-                                        it.units
-                                    )
-                                }
-                            }u bolus ${
-                                when (bolusCurrentResponse.value) {
-                                    null -> "was requested."
-                                    else -> when (bolusCurrentResponse.value!!.status) {
-                                        CurrentBolusStatusResponse.CurrentBolusStatus.REQUESTING -> "is being prepared."
-                                        CurrentBolusStatusResponse.CurrentBolusStatus.DELIVERING -> "is being delivered."
-                                        else -> "was completed."
-                                    }
-                                }
-                            }"
-                            else -> "The bolus could not be delivered: ${
-                                bolusInitiateResponse.value?.let {
-                                    snakeCaseToSpace(
-                                        it.statusType.toString()
-                                    )
-                                }
-                            }"
-                        }
-                        else -> "The bolus status is unknown. Please check your pump to identify the status of the bolus."
-                    }
-                )
-            },
-            dismissButton = {
-                TextButton(
-                    onClick = {
-                        showApprovedDialog = false
-                        cancelBolus()
-                    },
-                    modifier = Modifier.padding(top = 16.dp)
-                ) {
-                    Text("Cancel Bolus Delivery")
-                }
-            },
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        showCancellingDialog = false
-                        resetBolusDataStoreState(dataStore)
-                        closeWindow()
-                    },
-                    modifier = Modifier.padding(top = 16.dp)
-                ) {
-                    Text("OK")
-                }
             }
         )
     }
 
     if (showCancellingDialog) {
-        val bolusCancelResponse = dataStore.bolusCancelResponse.observeAsState()
-
-        LaunchedEffect(bolusCancelResponse.value) {
-            if (bolusCancelResponse.value != null) {
+        CancellingDialogRegion(
+            onShowCancelled = {
                 showCancellingDialog = false
                 showCancelledDialog = true
-            }
-        }
-
-        AlertDialog(
-            onDismissRequest = {
+            },
+            onDismiss = {
                 showCancellingDialog = false
                 resetBolusDataStoreState(dataStore)
                 closeWindow()
-            },
-            icon = {
-                Image(
-                    if (isSystemInDarkTheme()) painterResource(R.drawable.bolus_icon_secondary)
-                    else painterResource(R.drawable.bolus_icon),
-                    "Bolus icon",
-                    Modifier.size(ButtonDefaults.IconSize)
-                )
-            },
-            title = {
-                Text("Cancelling..")
-            },
-            text = {
-                Text("The bolus is being cancelled...")
-            },
-            confirmButton = {}
+            }
         )
     }
 
     if (showCancelledDialog) {
-        val bolusCancelResponse = dataStore.bolusCancelResponse.observeAsState()
-        val bolusInitiateResponse = dataStore.bolusInitiateResponse.observeAsState()
-        val lastBolusStatusResponse = dataStore.lastBolusStatusResponse.observeAsState()
-
-        LaunchedEffect (bolusCancelResponse.value, Unit) {
-            Timber.d("showCancelledDialog querying LastBolusStatus")
-            sendPumpCommands(SendType.STANDARD, listOf(LastBolusStatusV2Request()))
-            mainHandler.postDelayed({
-                sendPumpCommands(SendType.STANDARD, listOf(LastBolusStatusV2Request()))
-            }, 500)
-        }
-
-        fun matchesBolusId(): Boolean? {
-            lastBolusStatusResponse.value?.let { last ->
-                bolusInitiateResponse.value?.let { initiate ->
-                    return (last.bolusId == initiate.bolusId)
-                }
-            }
-            return null
-        }
-
-        LaunchedEffect (lastBolusStatusResponse.value) {
-            Timber.d("showCancelledDialog lastBolusStatusResponse effect: ${matchesBolusId()}")
-            if (matchesBolusId() == false) {
-                mainHandler.postDelayed({
-                    Timber.d("showCancelledDialog lastBolusStatus postDelayed")
-                    sendPumpCommands(
-                        SendType.STANDARD,
-                        listOf(LastBolusStatusV2Request())
-                    )
-                }, 500)
-            }
-        }
-
-        AlertDialog(
-            onDismissRequest = {
+        CancelledDialogRegion(
+            mainHandler = mainHandler,
+            sendPumpCommands = sendPumpCommands,
+            onDismiss = {
                 showCancelledDialog = false
                 resetBolusDataStoreState(dataStore)
                 closeWindow()
-            },
-            icon = {
-                Image(
-                    if (isSystemInDarkTheme()) painterResource(R.drawable.bolus_icon_secondary)
-                    else painterResource(R.drawable.bolus_icon),
-                    "Bolus icon",
-                    Modifier.size(ButtonDefaults.IconSize)
-                )
-            },
-            title = {
-                Text(when (bolusCancelResponse.value?.status) {
-                    CancelBolusResponse.CancelStatus.SUCCESS ->
-                        "Bolus Cancelled"
-                    CancelBolusResponse.CancelStatus.FAILED ->
-                        when (bolusInitiateResponse.value) {
-                            null -> "Bolus Cancelled"
-                            else -> "Could Not Be Cancelled"
-                        }
-                    else -> "Bolus Status Unknown"
-                })
-            },
-            text = {
-                Text(
-                    "${when (bolusCancelResponse.value?.status) {
-                    CancelBolusResponse.CancelStatus.SUCCESS ->
-                        "The bolus was cancelled."
-                    CancelBolusResponse.CancelStatus.FAILED ->
-                        when (bolusInitiateResponse.value) {
-                            null -> "A bolus request was not sent to the pump, so there is nothing to cancel."
-                            else -> "The bolus could not be cancelled: ${
-                                snakeCaseToSpace(
-                                    bolusCancelResponse.value?.reason.toString()
-                                )
-                            }"
-                        }
-                    else -> "Please check your pump to confirm whether the bolus was cancelled."
-                    }}\n\n${when {
-                        matchesBolusId() == true ->
-                            lastBolusStatusResponse.value?.deliveredVolume?.let {
-                                if (it == 0L) "A bolus was started and no insulin was delivered." else "${twoDecimalPlaces1000Unit(it)}u was delivered."
-                            } ?: ""
-                        matchesBolusId() == false -> "No insulin was delivered."
-                        else -> "Checking if any insulin was delivered..."
-                    }}"
-                )
-            },
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        showCancelledDialog = false
-                        resetBolusDataStoreState(dataStore)
-                        closeWindow()
-                    },
-                ) {
-                    Text("OK")
-                }
             }
         )
     }
+}
+
+
+private fun validBolus(params: BolusParameters?, maxBolusAmount1000: Long?): Boolean {
+    if (params == null) {
+        return false
+    }
+
+    if (params.units < 0.05) {
+        return false
+    }
+
+    if (params.units >= InsulinUnit.from1000To1(maxBolusAmount1000 ?: 25000)) {
+        return false
+    }
+
+    return true
 }
 
 
