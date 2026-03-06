@@ -494,8 +494,10 @@ fun WearApp(
                 }
 
                 composable(Screen.BolusSelectUnitsScreen.route) {
-                    val currentUnits = LocalDataStore.current.bolusCalculatorBuilder.value?.insulinUnits?.total
-                    val maxBolusAmount = LocalDataStore.current.maxBolusAmount.observeAsState()
+                    val ds = LocalDataStore.current
+                    val bolusCalculatorBuilder = ds.bolusCalculatorBuilder.observeAsState()
+                    val maxBolusAmount = ds.maxBolusAmount.observeAsState()
+                    val currentUnits = bolusCalculatorBuilder.value?.insulinUnits?.total
                     LaunchedEffect(Unit) {
                         sendPumpCommands(SendType.CACHED, listOf(GlobalMaxBolusSettingsRequest()))
                     }
@@ -521,8 +523,10 @@ fun WearApp(
                 }
 
                 composable(Screen.BolusSelectCarbsScreen.route) {
-                    val currentCarbs = LocalDataStore.current.bolusCalculatorBuilder.value?.carbsValueGrams?.orElse(null)
-                    val maxCarbAmount = LocalDataStore.current.maxCarbAmount.observeAsState()
+                    val ds = LocalDataStore.current
+                    val bolusCalculatorBuilder = ds.bolusCalculatorBuilder.observeAsState()
+                    val maxCarbAmount = ds.maxCarbAmount.observeAsState()
+                    val currentCarbs = bolusCalculatorBuilder.value?.carbsValueGrams?.orElse(null)
                     SingleNumberPicker(
                         label = "Carbs",
                         maxNumber = when {
@@ -544,8 +548,11 @@ fun WearApp(
                 }
 
                 composable(Screen.BolusSelectBGScreen.route) {
-                    val currentBG = LocalDataStore.current.bolusCalculatorBuilder.value?.glucoseMgdl?.orElse(null)
-                    val glucoseUnit = LocalDataStore.current.glucoseUnitPreference.value ?: GlucoseUnit.MGDL
+                    val ds = LocalDataStore.current
+                    val bolusCalculatorBuilder = ds.bolusCalculatorBuilder.observeAsState()
+                    val glucoseUnitPreference = ds.glucoseUnitPreference.observeAsState()
+                    val currentBG = bolusCalculatorBuilder.value?.glucoseMgdl?.orElse(null)
+                    val glucoseUnit = glucoseUnitPreference.value ?: GlucoseUnit.MGDL
 
                     SingleNumberPicker(
                         label = "BG (${glucoseUnit.abbreviation})",
