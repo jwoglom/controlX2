@@ -26,6 +26,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
@@ -85,12 +86,13 @@ import com.jwoglom.controlx2.shared.enums.UserMode
 import com.jwoglom.controlx2.shared.util.SendType
 import hu.supercluster.paperwork.Paperwork
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.cancelAndJoin
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.flow.flow
-import kotlinx.coroutines.flow.onEach
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeout
 import timber.log.Timber
@@ -151,31 +153,32 @@ fun LandingScreen(
         sendPumpCommands(type, commands)
     }
 
-    suspend fun waitForLoaded() {
-        flow {
-            var sinceLastFetchTime = 0
-            var nullFields = fields.filter { field -> field.value == null }.toSet()
-            emit(nullFields)
-            while (nullFields.isNotEmpty()) {
-                delay(250)
-                sinceLastFetchTime += 250
+    suspend fun waitForLoaded() = coroutineScope {
+        val readinessFlow = snapshotFlow {
+            fields.filter { field -> field.value == null }.toSet()
+        }.distinctUntilChanged()
 
-                if (sinceLastFetchTime >= 2500) {
+        val retryJob = launch {
+            while (isActive) {
+                delay(2500)
+                val nullFields = fields.filter { field -> field.value == null }.toSet()
+                if (nullFields.isNotEmpty()) {
                     Timber.i("LandingPage loading re-fetching with cache")
                     fetchDataStoreFields(SendType.CACHED)
-                    sinceLastFetchTime = 0
                 }
-
-                nullFields = fields.filter { field -> field.value == null }.toSet()
-                emit(nullFields)
             }
         }
-            .distinctUntilChanged()
-            .onEach { nullFields ->
-                Timber.i("LandingPage loading: remaining ${nullFields.size}: ${fields.map { it.value }}")
-            }
-            .filter { nullFields -> nullFields.isEmpty() }
-            .first()
+
+        try {
+            readinessFlow
+                .filter { nullFields ->
+                    Timber.i("LandingPage loading: remaining ${nullFields.size}: ${fields.map { it.value }}")
+                    nullFields.isEmpty()
+                }
+                .first()
+        } finally {
+            retryJob.cancelAndJoin()
+        }
 
         Timber.i("LandingPage loading done: ${fields.map { it.value }}")
         refreshing = false

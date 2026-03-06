@@ -29,6 +29,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
@@ -91,12 +92,13 @@ import com.jwoglom.controlx2.shared.util.twoDecimalPlaces1000Unit
 import com.jwoglom.pumpx2.pump.messages.bluetooth.PumpStateSupplier
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.cancelAndJoin
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.flow.flow
-import kotlinx.coroutines.flow.onEach
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
@@ -207,32 +209,33 @@ fun BolusScreen(
         dataStore.bolusCurrentParameters
     )
 
-    suspend fun waitForLoaded() {
-        flow {
-            var sinceLastFetchTime = 0
-            var nullBaseFields = baseFields.filter { field -> field.value == null }.toSet()
-            emit(nullBaseFields)
-            while (nullBaseFields.isNotEmpty()) {
-                delay(250)
-                sinceLastFetchTime += 250
+    suspend fun waitForLoaded() = coroutineScope {
+        val readinessFlow = snapshotFlow {
+            baseFields.filter { field -> field.value == null }.toSet()
+        }.distinctUntilChanged()
 
-                if (sinceLastFetchTime >= 2500) {
+        val retryJob = launch {
+            while (isActive) {
+                delay(2500)
+                val nullBaseFields = baseFields.filter { field -> field.value == null }.toSet()
+                if (nullBaseFields.isNotEmpty()) {
                     Timber.i("BolusScreen loading re-fetching")
                     // for safety reasons, NEVER CACHE.
                     sendPumpCommands(SendType.STANDARD, commands)
-                    sinceLastFetchTime = 0
                 }
-
-                nullBaseFields = baseFields.filter { field -> field.value == null }.toSet()
-                emit(nullBaseFields)
             }
         }
-            .distinctUntilChanged()
-            .onEach { nullBaseFields ->
-                Timber.i("BolusScreen loading: remaining ${nullBaseFields.size}: ${baseFields.map { it.value }}")
-            }
-            .filter { nullBaseFields -> nullBaseFields.isEmpty() }
-            .first()
+
+        try {
+            readinessFlow
+                .filter { nullBaseFields ->
+                    Timber.i("BolusScreen loading: remaining ${nullBaseFields.size}: ${baseFields.map { it.value }}")
+                    nullBaseFields.isEmpty()
+                }
+                .first()
+        } finally {
+            retryJob.cancelAndJoin()
+        }
 
         Timber.i("BolusScreen base loading done: ${baseFields.map { it.value }}")
         delay(250)
