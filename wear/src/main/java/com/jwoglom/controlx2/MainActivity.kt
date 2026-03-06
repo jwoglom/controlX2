@@ -460,9 +460,7 @@ class MainActivity : ComponentActivity(), MessageClient.OnMessageReceivedListene
                 UpdateComplication(applicationContext, WearX2Complication.CGM_READING)
             }
             is BolusCalcDataSnapshotResponse -> {
-                if (!cached) {
-                    dataStore.bolusCalcDataSnapshot.value = message
-                }
+                dataStore.bolusCalcDataSnapshot.value = message
                 dataStore.maxCarbAmount.value = (InsulinUnit.from1000To1(message.maxBolusAmount.toLong()) * InsulinUnit.from1000To1(message.carbRatio)).roundToInt()
             }
             is LastBGResponse -> {

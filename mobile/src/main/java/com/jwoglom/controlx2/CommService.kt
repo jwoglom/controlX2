@@ -606,7 +606,7 @@ class CommService : Service() {
                     PumpMessageSerializer.fromBulkBytes(msg.obj as ByteArray).forEach {
                         if (lastResponseMessage.containsKey(Pair(it.characteristic, it.responseOpCode)) && !isBolusCommand(it)) {
                             val response = lastResponseMessage.get(Pair(it.characteristic, it.responseOpCode))
-                            val ageSeconds = Duration.between(Instant.now(), response?.second).seconds
+                            val ageSeconds = Duration.between(response?.second, Instant.now()).seconds
                             if (ageSeconds <= CacheSeconds) {
                                 Timber.i("pumpCommHandler cached hit: $response")
                                 sendWearCommMessage(
