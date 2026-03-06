@@ -64,11 +64,9 @@ import com.jwoglom.pumpx2.pump.messages.request.control.SetMaxBolusLimitRequest
 import com.jwoglom.pumpx2.pump.messages.request.currentStatus.BasalLimitSettingsRequest
 import com.jwoglom.pumpx2.pump.messages.request.currentStatus.GlobalMaxBolusSettingsRequest
 import com.jwoglom.pumpx2.pump.messages.models.InsulinUnit
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 import timber.log.Timber
 
 @Composable
@@ -108,9 +106,7 @@ fun SafetyLimitsActions(
                 sinceLastFetchTime = 0
             }
 
-            withContext(Dispatchers.IO) {
-                Thread.sleep(250)
-            }
+            delay(250)
             sinceLastFetchTime += 250
         }
         Timber.i("SafetyLimitsActions loading done: ${safetyLimitsFields.map { it.value }}")

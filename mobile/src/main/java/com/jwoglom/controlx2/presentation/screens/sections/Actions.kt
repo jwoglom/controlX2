@@ -77,10 +77,9 @@ import com.jwoglom.pumpx2.pump.messages.request.control.StopTempRateRequest
 import com.jwoglom.pumpx2.pump.messages.request.control.SuspendPumpingRequest
 import com.jwoglom.pumpx2.pump.messages.request.currentStatus.HomeScreenMirrorRequest
 import com.jwoglom.pumpx2.pump.messages.request.currentStatus.TempRateRequest
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
+import kotlinx.coroutines.delay
 import timber.log.Timber
 
 @Composable
@@ -129,9 +128,7 @@ fun Actions(
                 sinceLastFetchTime = 0
             }
 
-            withContext(Dispatchers.IO) {
-                Thread.sleep(250)
-            }
+            delay(250)
             sinceLastFetchTime += 250
         }
         Timber.i("Actions loading done: ${actionsFields.map { it.value }}")
@@ -271,7 +268,7 @@ fun Actions(
                                             sendPumpCommands(SendType.BUST_CACHE, listOf(ResumePumpingRequest()))
                                             refreshScope.launch {
                                                 repeat(5) {
-                                                    Thread.sleep(1000)
+                                                    delay(1000)
                                                     sendPumpCommands(
                                                         SendType.BUST_CACHE,
                                                         listOf(HomeScreenMirrorRequest())
@@ -319,7 +316,7 @@ fun Actions(
                                             sendPumpCommands(SendType.BUST_CACHE, listOf(SuspendPumpingRequest()))
                                             refreshScope.launch {
                                                 repeat(5) {
-                                                    Thread.sleep(1000)
+                                                    delay(1000)
                                                     sendPumpCommands(
                                                         SendType.BUST_CACHE,
                                                         listOf(HomeScreenMirrorRequest())
@@ -405,7 +402,7 @@ fun Actions(
                                         // Refresh logic
                                         refreshScope.launch {
                                             repeat(5) {
-                                                Thread.sleep(1000)
+                                                delay(1000)
                                                 sendPumpCommands(
                                                     SendType.BUST_CACHE,
                                                     listOf(ControlIQInfoRequestBuilder.create(apiVersion()))
@@ -484,9 +481,7 @@ fun Actions(
 
                                         // Refresh logic
                                         refreshScope.launch {
-                                            withContext(Dispatchers.IO) {
-                                                Thread.sleep(250)
-                                            }
+                                            delay(250)
                                             sendPumpCommands(
                                                 SendType.BUST_CACHE,
                                                 listOf(ControlIQInfoRequestBuilder.create(apiVersion()))
@@ -576,9 +571,7 @@ fun Actions(
                                             refreshScope.launch {
                                                 showStopTempRateMenu = false
                                                 sendPumpCommands(SendType.BUST_CACHE, listOf(StopTempRateRequest()))
-                                                withContext(Dispatchers.IO) {
-                                                    Thread.sleep(250)
-                                                }
+                                                delay(250)
                                                 sendPumpCommands(
                                                     SendType.BUST_CACHE,
                                                     listOf(TempRateRequest())

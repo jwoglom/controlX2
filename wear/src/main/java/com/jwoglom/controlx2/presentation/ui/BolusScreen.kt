@@ -91,9 +91,8 @@ import com.jwoglom.controlx2.shared.util.snakeCaseToSpace
 import com.jwoglom.controlx2.shared.util.twoDecimalPlaces
 import com.jwoglom.controlx2.shared.util.twoDecimalPlaces1000Unit
 import com.jwoglom.pumpx2.pump.messages.bluetooth.PumpStateSupplier
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
+import kotlinx.coroutines.delay
 import timber.log.Timber
 
 @OptIn(ExperimentalMaterialApi::class)
@@ -217,16 +216,12 @@ fun BolusScreen(
                 sinceLastFetchTime = 0
             }
 
-            withContext(Dispatchers.IO) {
-                Thread.sleep(250)
-            }
+            delay(250)
             sinceLastFetchTime += 250
         }
         Timber.i("BolusScreen base loading done: ${baseFields.map { it.value }}")
         if (sinceLastFetchTime == 0) {
-            withContext(Dispatchers.IO) {
-                Thread.sleep(250)
-            }
+            delay(250)
         }
         refreshing = false
     }
@@ -737,9 +732,7 @@ fun BolusScreen(
             LaunchedEffect (lastBolusStatusResponse.value) {
                 if (matchesBolusId() == false) {
                     refreshScope.launch {
-                        withContext(Dispatchers.IO) {
-                            Thread.sleep(250)
-                        }
+                        delay(250)
                         sendPumpCommands(
                             SendType.STANDARD,
                             listOf(LastBolusStatusV2Request())
@@ -822,9 +815,7 @@ fun BolusScreen(
                         performCancel()
                         time = 0
                     }
-                    withContext(Dispatchers.IO) {
-                        Thread.sleep(100)
-                    }
+                    delay(100)
                     time += 100
                 }
                 showCancellingDialog = false
@@ -963,7 +954,7 @@ fun BolusScreen(
                     sendPumpCommands(SendType.BUST_CACHE, listOf(CurrentBolusStatusRequest()))
                     refreshScope.launch {
                         repeat(5) {
-                            Thread.sleep(1000)
+                            delay(1000)
                             sendPumpCommands(
                                 SendType.BUST_CACHE,
                                 listOf(CurrentBolusStatusRequest())
@@ -981,7 +972,7 @@ fun BolusScreen(
                         sendPumpCommands(SendType.BUST_CACHE, listOf(CurrentBolusStatusRequest()))
                         refreshScope.launch {
                             repeat(5) {
-                                Thread.sleep(1000)
+                                delay(1000)
                                 sendPumpCommands(
                                     SendType.BUST_CACHE,
                                     listOf(CurrentBolusStatusRequest())

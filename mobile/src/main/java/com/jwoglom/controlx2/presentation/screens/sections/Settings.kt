@@ -58,6 +58,7 @@ import com.jwoglom.pumpx2.pump.messages.request.control.PlaySoundRequest
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.delay
 import java.time.Instant
 
 @Composable
@@ -107,9 +108,7 @@ fun Settings(
                         modifier = Modifier.clickable {
                             Prefs(context).setServiceEnabled(false)
                             coroutineScope.launch {
-                                withContext(Dispatchers.IO) {
-                                    Thread.sleep(250)
-                                }
+                                delay(250)
                                 sendMessage("/to-phone/force-reload", "".toByteArray())
                             }
                         }
@@ -127,16 +126,12 @@ fun Settings(
                         modifier = Modifier.clickable {
                             Prefs(context).setServiceEnabled(true)
                             coroutineScope.launch {
-                                withContext(Dispatchers.IO) {
-                                    Thread.sleep(250)
-                                }
+                                delay(250)
                                 // reload service, if running
                                 sendMessage("/to-phone/force-reload", "".toByteArray())
-                                withContext(Dispatchers.IO) {
-                                    Thread.sleep(250)
-                                    // reload main activity as fallback
-                                    sendMessage("/to-phone/app-reload", "".toByteArray())
-                                }
+                                delay(250)
+                                // reload main activity as fallback
+                                sendMessage("/to-phone/app-reload", "".toByteArray())
                             }
                         }
                     )
@@ -158,7 +153,7 @@ fun Settings(
 //                            Prefs(context).setConnectionSharingEnabled(false)
 //                            coroutineScope.launch {
 //                                withContext(Dispatchers.IO) {
-//                                    Thread.sleep(250)
+//                                    delay(250)
 //                                }
 //                                sendMessage("/to-phone/force-reload", "".toByteArray())
 //                            }
@@ -178,7 +173,7 @@ fun Settings(
 //                            Prefs(context).setConnectionSharingEnabled(true)
 //                            coroutineScope.launch {
 //                                withContext(Dispatchers.IO) {
-//                                    Thread.sleep(250)
+//                                    delay(250)
 //                                }
 //                                sendMessage("/to-phone/force-reload", "".toByteArray())
 //                            }

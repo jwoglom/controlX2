@@ -49,9 +49,7 @@ import com.jwoglom.pumpx2.pump.PumpState
 import com.jwoglom.pumpx2.pump.bluetooth.PumpReadyState
 import com.jwoglom.pumpx2.pump.messages.models.KnownDeviceModel
 import com.jwoglom.pumpx2.pump.messages.models.PairingCodeType
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 import timber.log.Timber
 
 const val TroubleshootingStepsThresholdSeconds = 15

@@ -81,10 +81,9 @@ import com.jwoglom.pumpx2.pump.messages.builders.IDPManager
 import com.jwoglom.pumpx2.pump.messages.models.InsulinUnit
 import com.jwoglom.pumpx2.pump.messages.models.KnownDeviceModel
 import com.jwoglom.pumpx2.pump.messages.models.MinsTime
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
+import kotlinx.coroutines.delay
 import timber.log.Timber
 
 @OptIn(ExperimentalComposeUiApi::class)
@@ -132,9 +131,7 @@ fun ProfileActions(
             }
 
             if (ds.idpManager.value == null) {
-                withContext(Dispatchers.IO) {
-                    Thread.sleep(250)
-                }
+                delay(250)
                 continue
             }
 
@@ -158,9 +155,7 @@ fun ProfileActions(
             }
 
 
-            withContext(Dispatchers.IO) {
-                Thread.sleep(250)
-            }
+            delay(250)
             sinceLastFetchTime += 250
         }
         Timber.i("profileActions loading done: ${ds.idpManager}")

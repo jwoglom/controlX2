@@ -46,9 +46,8 @@ import com.jwoglom.controlx2.presentation.navigation.Screen
 import com.jwoglom.controlx2.presentation.theme.ControlX2Theme
 import com.jwoglom.controlx2.shared.enums.GlucoseUnit
 import com.jwoglom.controlx2.shared.util.twoDecimalPlaces
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
+import kotlinx.coroutines.delay
 
 @Composable
 fun AppSetup(
@@ -89,9 +88,7 @@ fun AppSetup(
                 onClick = {
                     Prefs(context).setAppSetupComplete(true)
                     coroutineScope.launch {
-                        withContext(Dispatchers.IO) {
-                            Thread.sleep(250)
-                        }
+                        delay(250)
                         sendMessage(
                             "/to-phone/app-reload",
                             "".toByteArray()
@@ -122,9 +119,7 @@ fun AppSetup(
                             connectionSharingEnabled = it
                             Prefs(context).setConnectionSharingEnabled(it)
                             coroutineScope.launch {
-                                withContext(Dispatchers.IO) {
-                                    Thread.sleep(250)
-                                }
+                                delay(250)
                                 sendMessage(
                                     "/to-phone/app-reload",
                                     "".toByteArray()
@@ -137,9 +132,7 @@ fun AppSetup(
                     connectionSharingEnabled = !connectionSharingEnabled
                     Prefs(context).setConnectionSharingEnabled(connectionSharingEnabled)
                     coroutineScope.launch {
-                        withContext(Dispatchers.IO) {
-                            Thread.sleep(250)
-                        }
+                        delay(250)
                         sendMessage(
                             "/to-phone/app-reload",
                             "".toByteArray()
@@ -167,9 +160,7 @@ fun AppSetup(
                                 insulinDeliveryActions = false
                                 Prefs(context).setInsulinDeliveryActions(false)
                                 coroutineScope.launch {
-                                    withContext(Dispatchers.IO) {
-                                        Thread.sleep(250)
-                                    }
+                                    delay(250)
                                     sendMessage(
                                         "/to-phone/app-reload",
                                         "".toByteArray()
@@ -186,9 +177,7 @@ fun AppSetup(
                         insulinDeliveryActions = false
                         Prefs(context).setInsulinDeliveryActions(false)
                         coroutineScope.launch {
-                            withContext(Dispatchers.IO) {
-                                Thread.sleep(250)
-                            }
+                            delay(250)
                             sendMessage(
                                 "/to-phone/app-reload",
                                 "".toByteArray()
@@ -323,9 +312,7 @@ fun AppSetup(
                                     // Sync glucose unit to wear app and trigger reload
                                     coroutineScope.launch {
                                         sendMessage("/to-wear/glucose-unit", unit.name.toByteArray())
-                                        withContext(Dispatchers.IO) {
-                                            Thread.sleep(250)
-                                        }
+                                        delay(250)
                                         sendMessage("/to-phone/app-reload", "".toByteArray())
                                     }
                                 }
@@ -364,9 +351,7 @@ fun AppSetup(
                     Prefs(context).setInsulinDeliveryActions(true)
                     showInsulinWarningDialog = false
                     coroutineScope.launch {
-                        withContext(Dispatchers.IO) {
-                            Thread.sleep(250)
-                        }
+                        delay(250)
                         sendMessage("/to-phone/app-reload", "".toByteArray())
                     }
                 }) {

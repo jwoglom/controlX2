@@ -137,10 +137,9 @@ import com.jwoglom.controlx2.shared.enums.GlucoseUnit
 import com.jwoglom.controlx2.shared.util.SendType
 import com.jwoglom.controlx2.shared.util.shortTimeAgo
 import com.jwoglom.pumpx2.pump.PumpState
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
-import kotlinx.coroutines.withContext
+import kotlinx.coroutines.delay
 import org.json.JSONArray
 import org.json.JSONObject
 import timber.log.Timber
@@ -551,9 +550,7 @@ fun Debug(
                                 if (dataStore.historyLogStatus.value != null) {
                                     break
                                 }
-                                withContext(Dispatchers.IO) {
-                                    Thread.sleep(100)
-                                }
+                                delay(100)
                             }
 
                             triggerHistoryLogRequestDialog(
@@ -766,9 +763,7 @@ fun Debug(
                             modifier = Modifier.clickable {
                                 Prefs(context).setOnlySnoopBluetoothEnabled(false)
                                 coroutineScope.launch {
-                                    withContext(Dispatchers.IO) {
-                                        Thread.sleep(250)
-                                    }
+                                    delay(250)
                                     sendMessage("/to-phone/force-reload", "".toByteArray())
                                 }
                             }
@@ -786,9 +781,7 @@ fun Debug(
                             modifier = Modifier.clickable {
                                 Prefs(context).setOnlySnoopBluetoothEnabled(true)
                                 coroutineScope.launch {
-                                    withContext(Dispatchers.IO) {
-                                        Thread.sleep(250)
-                                    }
+                                    delay(250)
                                     sendMessage("/to-phone/force-reload", "".toByteArray())
                                 }
                             }

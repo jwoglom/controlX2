@@ -89,10 +89,8 @@ import com.jwoglom.controlx2.shared.util.snakeCaseToSpace
 import com.jwoglom.controlx2.shared.util.twoDecimalPlaces
 import com.jwoglom.controlx2.shared.util.twoDecimalPlaces1000Unit
 import com.jwoglom.pumpx2.pump.messages.bluetooth.PumpStateSupplier
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 import timber.log.Timber
 import java.util.function.Supplier
 
@@ -177,16 +175,12 @@ fun BolusWindow(
                 sinceLastFetchTime = 0
             }
 
-            withContext(Dispatchers.IO) {
-                Thread.sleep(250)
-            }
+            delay(250)
             sinceLastFetchTime += 250
         }
         Timber.i("BolusScreen base loading done: ${baseFields.map { it.value }}")
         if (sinceLastFetchTime == 0) {
-            withContext(Dispatchers.IO) {
-                Thread.sleep(250)
-            }
+            delay(250)
         }
         refreshing = false
     }

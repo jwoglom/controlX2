@@ -53,9 +53,8 @@ import com.jwoglom.pumpx2.pump.messages.Message
 import com.jwoglom.pumpx2.pump.messages.request.control.SetTempRateRequest
 import com.jwoglom.pumpx2.pump.messages.request.currentStatus.HomeScreenMirrorRequest
 import com.jwoglom.pumpx2.pump.messages.request.currentStatus.TempRateRequest
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
+import kotlinx.coroutines.delay
 import timber.log.Timber
 
 @Composable
@@ -116,16 +115,12 @@ fun TempRateWindow(
                 sinceLastFetchTime = 0
             }
 
-            withContext(Dispatchers.IO) {
-                Thread.sleep(250)
-            }
+            delay(250)
             sinceLastFetchTime += 250
         }
         Timber.i("TempRateWindow base loading done: ${baseFields.map { it.value }}")
         if (sinceLastFetchTime == 0) {
-            withContext(Dispatchers.IO) {
-                Thread.sleep(250)
-            }
+            delay(250)
         }
         refreshing = false
     }
@@ -348,9 +343,7 @@ fun TempRateWindow(
                             closeWindow()
                         }
                         refreshScope.launch {
-                            withContext(Dispatchers.IO) {
-                                Thread.sleep(250)
-                            }
+                            delay(250)
                         }
                         refreshScope.launch {
                             sendPumpCommands(

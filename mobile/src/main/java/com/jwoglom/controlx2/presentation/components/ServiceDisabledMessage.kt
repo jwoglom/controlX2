@@ -28,9 +28,8 @@ import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import com.jwoglom.controlx2.LocalDataStore
 import com.jwoglom.controlx2.Prefs
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
+import kotlinx.coroutines.delay
 import org.apache.commons.lang3.text.FormattableUtils.append
 
 @Composable
@@ -56,16 +55,12 @@ fun ServiceDisabledMessage(
                 modifier = Modifier.padding(8.dp).clickable {
                     Prefs(context).setServiceEnabled(true)
                     coroutineScope.launch {
-                        withContext(Dispatchers.IO) {
-                            Thread.sleep(250)
-                        }
+                        delay(250)
                         // reload service, if running
                         sendMessage("/to-phone/force-reload", "".toByteArray())
-                        withContext(Dispatchers.IO) {
-                            Thread.sleep(250)
-                            // reload main activity as fallback
-                            sendMessage("/to-phone/app-reload", "".toByteArray())
-                        }
+                        delay(250)
+                        // reload main activity as fallback
+                        sendMessage("/to-phone/app-reload", "".toByteArray())
                     }
                 }
             ) {

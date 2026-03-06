@@ -73,11 +73,9 @@ import com.jwoglom.pumpx2.pump.messages.request.control.SetPumpSoundsRequest
 import com.jwoglom.pumpx2.pump.messages.request.control.SetQuickBolusSettingsRequest
 import com.jwoglom.pumpx2.pump.messages.request.currentStatus.PumpGlobalsRequest
 import com.jwoglom.pumpx2.pump.messages.response.currentStatus.PumpGlobalsResponse
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 import timber.log.Timber
 
 @Composable
@@ -117,9 +115,7 @@ fun SoundSettingsActions(
                 sinceLastFetchTime = 0
             }
 
-            withContext(Dispatchers.IO) {
-                Thread.sleep(250)
-            }
+            delay(250)
             sinceLastFetchTime += 250
         }
         Timber.i("SoundSettingsActions loading done: ${soundSettingsActionsFields.map { it.value }}")

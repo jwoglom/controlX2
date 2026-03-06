@@ -71,10 +71,9 @@ import com.jwoglom.pumpx2.pump.messages.request.control.StopDexcomCGMSensorSessi
 import com.jwoglom.pumpx2.pump.messages.request.currentStatus.CGMStatusRequest
 import com.jwoglom.pumpx2.pump.messages.request.currentStatus.GetSavedG7PairingCodeRequest
 import com.jwoglom.pumpx2.pump.messages.request.currentStatus.HomeScreenMirrorRequest
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
+import kotlinx.coroutines.delay
 import timber.log.Timber
 
 @Composable
@@ -126,9 +125,7 @@ fun CGMActions(
                 sinceLastFetchTime = 0
             }
 
-            withContext(Dispatchers.IO) {
-                Thread.sleep(250)
-            }
+            delay(250)
             sinceLastFetchTime += 250
         }
         Timber.i("Actions loading done: ${cgmActionsFields.map { it.value }}")
@@ -306,9 +303,7 @@ fun CGMActions(
 
                                                 run repeatBlock@{
                                                     repeat(3) {
-                                                        withContext(Dispatchers.IO) {
-                                                            Thread.sleep(250)
-                                                        }
+                                                        delay(250)
                                                         if (cgmSetupG6SensorCode.value == startG6CgmSessionInProgressTxId) {
                                                             return@repeatBlock
                                                         }
@@ -322,9 +317,7 @@ fun CGMActions(
                                                 ))
 
                                                 showStartG6CgmSessionMenu = false
-                                                withContext(Dispatchers.IO) {
-                                                    Thread.sleep(250)
-                                                }
+                                                delay(250)
                                                 sendPumpCommands(
                                                     SendType.BUST_CACHE,
                                                     listOf(CGMStatusRequest())
@@ -375,7 +368,7 @@ fun CGMActions(
 
                                                 showStopG6CgmSessionMenu = false
                                                 repeat(3) {
-                                                    Thread.sleep(250)
+                                                    delay(250)
                                                     sendPumpCommands(
                                                         SendType.BUST_CACHE,
                                                         listOf(CGMStatusRequest())
@@ -493,9 +486,7 @@ fun CGMActions(
 
                                                 run repeatBlock@{
                                                     repeat(3) {
-                                                        withContext(Dispatchers.IO) {
-                                                            Thread.sleep(250)
-                                                        }
+                                                        delay(250)
                                                         sendPumpCommands(
                                                             SendType.BUST_CACHE, listOf(
                                                                 GetSavedG7PairingCodeRequest()
