@@ -80,7 +80,6 @@ fun PumpSetup(
     val clipboardManager: ClipboardManager = LocalClipboardManager.current
 
     val setupStage = ds.pumpSetupStage.observeAsState()
-    val pumpReadyState = ds.pumpReadyState.observeAsState()
 
     var pairingCodeText by remember { mutableStateOf(when (PumpState.getPairingCode(context)) {
         null -> ""
@@ -90,20 +89,6 @@ fun PumpSetup(
     var showAdvancedPairingSettings by remember { mutableStateOf(false) }
     var pumpStateStatus by remember { mutableStateOf<String?>(null) }
     var pumpStateJson by remember { mutableStateOf(PumpState.exportState(context)) }
-    var pendingMobiPairingCode by remember { mutableStateOf<String?>(null) }
-
-    LaunchedEffect(setupStage.value, pumpReadyState.value, pendingMobiPairingCode) {
-        if (setupStage.value == PumpSetupStage.PUMP_FINDER_MOBI_ENTER_PAIRING_CODE &&
-            pendingMobiPairingCode != null &&
-            pumpReadyState.value?.shouldEnterPinCode() == true
-        ) {
-            val pendingCode = pendingMobiPairingCode!!
-            pendingMobiPairingCode = null
-            Timber.i("auto-enterPairingCode (armed): $pendingCode ${ds.setupPairingCodeType.value} (${PumpState.getPairingCode(context)})")
-            ds.pumpSetupStage.value = setupStage.value!!.nextStage(PumpSetupStage.WAITING_PUMP_FINDER_CLEANUP)
-            sendMessage("/to-phone/set-pairing-code", pendingCode.toByteArray())
-        }
-    }
 
     fun resetPumpFinder(context: Context) {
         Prefs(context).setPumpSetupComplete(false)
@@ -204,19 +189,9 @@ fun PumpSetup(
                             try {
                                 Timber.i("enterPairingCode: $pairingCodeText ${ds.setupPairingCodeType.value} (${PumpState.getPairingCode(context)})")
                                 val code = PumpChallengeRequestBuilder.processPairingCode(pairingCodeText, ds.setupPairingCodeType.value)
-                                if (setupStage.value == PumpSetupStage.PUMP_FINDER_MOBI_ENTER_PAIRING_CODE &&
-                                    ds.pumpReadyState.value?.shouldEnterPinCode() != true
-                                ) {
-                                    pendingMobiPairingCode = code
-                                    Toast.makeText(
-                                        context,
-                                        "Pairing armed. Double-tap the T button now; ControlX2 will send the PIN automatically.",
-                                        Toast.LENGTH_LONG
-                                    ).show()
-                                    return@Button
+                                if (setupStage.value != PumpSetupStage.PUMPX2_WAITING_FOR_PAIRING_CODE) {
+                                    ds.pumpSetupStage.value = setupStage.value!!.nextStage(PumpSetupStage.WAITING_PUMP_FINDER_CLEANUP)
                                 }
-                                pendingMobiPairingCode = null
-                                ds.pumpSetupStage.value = setupStage.value!!.nextStage(PumpSetupStage.WAITING_PUMP_FINDER_CLEANUP)
                                 sendMessage("/to-phone/set-pairing-code", code.toByteArray())
                             } catch (e: Exception) {
                                 Timber.w("pairingCodeInput: $e")
@@ -224,11 +199,7 @@ fun PumpSetup(
                             }
                         }
                     ) {
-                        Text(
-                            if (setupStage.value == PumpSetupStage.PUMP_FINDER_MOBI_ENTER_PAIRING_CODE &&
-                                pendingMobiPairingCode != null
-                            ) "Waiting for Tap..." else "Pair"
-                        )
+                        Text("Pair")
                     }
                 }
                 PumpSetupStage.PUMPX2_INVALID_PAIRING_CODE -> {
@@ -436,9 +407,7 @@ fun PumpSetup(
                                 value = pairingCodeText,
                                 onValueChange = {
                                     pairingCodeText = it
-                                    pendingMobiPairingCode = null
                                     Timber.i("newPairingCode(LONG_16CHAR): $it")
-                                    PumpState.setPairingCode(context, it)
                                 }
                             )
                         }
@@ -447,13 +416,10 @@ fun PumpSetup(
                                 value = pairingCodeText,
                                 onValueChange = {
                                     pairingCodeText = it
-                                    pendingMobiPairingCode = null
                                     Timber.i("newPairingCode(SHORT_6CHAR): $it")
-                                    PumpState.setPairingCode(context, it)
                                 },
                                 onClearSavedPin = {
                                     pairingCodeText = ""
-                                    pendingMobiPairingCode = null
                                     PumpState.setPairingCode(context, "")
                                 }
                             )

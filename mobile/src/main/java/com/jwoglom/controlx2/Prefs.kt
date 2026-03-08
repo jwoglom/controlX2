@@ -48,6 +48,15 @@ class Prefs(val context: Context) {
         prefs().edit().putString("pumpfinder-pairing-code-type", s).commit()
     }
 
+    fun unbondOnNextCommInitMac(): String? {
+        return prefs().getString("unbond-on-next-comm-init-mac", null)
+    }
+
+    fun setUnbondOnNextCommInitMac(mac: String?) {
+        val normalized = mac?.trim()?.uppercase()
+        prefs().edit().putString("unbond-on-next-comm-init-mac", normalized).commit()
+    }
+
     fun connectionSharingEnabled(): Boolean {
         return prefs().getBoolean("connection-sharing-enabled", false)
     }

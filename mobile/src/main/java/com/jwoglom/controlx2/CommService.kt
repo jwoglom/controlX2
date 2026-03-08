@@ -7,6 +7,7 @@ import android.app.PendingIntent
 import android.app.PendingIntent.FLAG_IMMUTABLE
 import android.app.PendingIntent.FLAG_ONE_SHOT
 import android.app.Service
+import android.bluetooth.BluetoothAdapter
 import android.bluetooth.le.ScanResult
 import android.content.BroadcastReceiver
 import android.content.Context
@@ -102,6 +103,7 @@ import java.time.Instant
 import java.util.Collections
 import java.util.UUID
 import java.util.function.Supplier
+import java.util.concurrent.atomic.AtomicBoolean
 
 
 const val CacheSeconds = 30
@@ -118,6 +120,7 @@ class CommService : Service() {
     private var httpDebugApiService: HttpDebugApiService? = null
 
     private var serviceStatusAcknowledged = false
+    private val allowAutoPairingAfterCodeSubmission = AtomicBoolean(false)
     private val serviceStatusTask = object : Runnable {
         override fun run() {
             if (!serviceStatusAcknowledged) {
@@ -150,6 +153,73 @@ class CommService : Service() {
 
         fun getPumpSid(): Int? {
             return if (this::pump.isInitialized) pump.pumpSid else null
+        }
+
+        private fun ensurePumpUnbondedForFreshInit(filterToBluetoothMac: String?): Boolean {
+            val targetMac = (filterToBluetoothMac ?: Prefs(applicationContext).pumpFinderPumpMac().orEmpty())
+                .trim()
+                .uppercase()
+            val prefs = Prefs(applicationContext)
+            val scheduledUnbondMac = prefs.unbondOnNextCommInitMac().orEmpty().trim().uppercase()
+
+            if (scheduledUnbondMac.isEmpty()) {
+                Timber.i("init_pump_comm: skipping unbond (not scheduled for this init)")
+                return true
+            }
+
+            if (targetMac.isEmpty()) {
+                Timber.i("init_pump_comm: skipping unbond (no target MAC)")
+                return true
+            }
+
+            if (scheduledUnbondMac != targetMac) {
+                Timber.i("init_pump_comm: skipping unbond for $targetMac (scheduled for $scheduledUnbondMac)")
+                return true
+            }
+
+            // Consume schedule now so this runs only once per re-pair handoff.
+            prefs.setUnbondOnNextCommInitMac(null)
+
+            val adapter = BluetoothAdapter.getDefaultAdapter()
+            if (adapter == null) {
+                Timber.w("init_pump_comm: cannot unbond $targetMac because BluetoothAdapter is null")
+                return true
+            }
+
+            val bondedDevice = adapter.bondedDevices
+                ?.firstOrNull { it.address.equals(targetMac, ignoreCase = true) }
+            if (bondedDevice == null) {
+                Timber.i("init_pump_comm: target $targetMac not currently bonded")
+                return true
+            }
+
+            try {
+                val removeBondMethod = bondedDevice.javaClass.getMethod("removeBond")
+                val didRequestUnbond = removeBondMethod.invoke(bondedDevice) as? Boolean ?: false
+                Timber.i("init_pump_comm: requested unbond for ${bondedDevice.name} ($targetMac), result=$didRequestUnbond")
+            } catch (e: SecurityException) {
+                Timber.w(e, "init_pump_comm: missing permission while requesting unbond for $targetMac")
+            } catch (e: Exception) {
+                Timber.w(e, "init_pump_comm: failed unbond request for $targetMac")
+            }
+
+            Thread.sleep(500)
+            val stillBonded = adapter.bondedDevices
+                ?.any { it.address.equals(targetMac, ignoreCase = true) } == true
+            if (!stillBonded) {
+                Timber.i("init_pump_comm: target $targetMac unbonded successfully")
+                return true
+            }
+
+            val details = "${bondedDevice.name ?: "Unknown Tandem device"}=$targetMac"
+            Timber.w("init_pump_comm: target is still bonded after unbond attempt: $details")
+            sendWearCommMessage("/from-pump/pump-bonded-needs-manual-unbond", details.toByteArray())
+            Toast.makeText(
+                this@CommService,
+                "Pump is still bonded in Android Bluetooth settings. Unpair it, then retry.",
+                Toast.LENGTH_LONG
+            ).show()
+            return false
         }
 
         private inner class Pump(var tandemConfig: TandemConfig) : TandemPump(applicationContext, tandemConfig) {
@@ -250,6 +320,16 @@ class CommService : Service() {
                 centralChallengeResponse: AbstractCentralChallengeResponse?
             ) {
                 pairingCodeCentralChallenge = centralChallengeResponse
+                if (!allowAutoPairingAfterCodeSubmission.compareAndSet(true, false)) {
+                    val challengeBytes = if (centralChallengeResponse != null) {
+                        PumpMessageSerializer.toBytes(centralChallengeResponse)
+                    } else {
+                        byteArrayOf()
+                    }
+                    Timber.i("onWaitingForPairingCode: awaiting explicit pairing code submission before pairing")
+                    sendWearCommMessage("/from-pump/missing-pairing-code", challengeBytes)
+                    return
+                }
                 performPairing(peripheral, centralChallengeResponse, false)
             }
 
@@ -257,6 +337,7 @@ class CommService : Service() {
                 peripheral: BluetoothPeripheral?,
                 resp: AbstractPumpChallengeResponse?
             ) {
+                allowAutoPairingAfterCodeSubmission.set(false)
                 sendWearCommMessage("/from-pump/invalid-pairing-code", "".toByteArray())
                 super.onInvalidPairingCode(peripheral, resp)
             }
@@ -299,13 +380,6 @@ class CommService : Service() {
                 scanResult: ScanResult?,
                 readyState: PumpReadyState
             ): Boolean {
-                // During setup, skip the bonded-device fast path (scanResult == null) so that
-                // TandemBluetoothHandler falls back to active scanning and direct connect().
-                // This avoids sticky autoConnect behavior during the short Mobi pairing window.
-                if (scanResult == null && !Prefs(applicationContext).pumpSetupComplete()) {
-                    Timber.i("onPumpDiscovered: ignoring bonded/UNKNOWN discovery during setup to force direct scan connect")
-                    return false
-                }
                 sendWearCommMessage(
                     "/from-pump/pump-discovered",
                     "${peripheral?.name.orEmpty()};;${readyState.name}".toByteArray()
@@ -526,6 +600,9 @@ class CommService : Service() {
                             }
                         }
 
+                        if (!ensurePumpUnbondedForFreshInit(filterToBluetoothMac)) {
+                            return
+                        }
                         Timber.i("pumpCommHandler: init_pump_comm: msg.obj=${msg.obj as String} pairingCodeType=$pairingCodeType filterToBluetoothMac=$filterToBluetoothMac")
                         val cfg = TandemConfig()
                             .withFilterToBluetoothMac(filterToBluetoothMac)
@@ -541,18 +618,6 @@ class CommService : Service() {
                         try {
                             Timber.i("pumpCommHandler: Starting scan...")
                             tandemBTHandler.startScan()
-                            if (!Prefs(applicationContext).pumpSetupComplete()) {
-                                // Remove the built-in 1s delay before first connection attempt.
-                                runCatching {
-                                    val immediateConnectMethod = TandemBluetoothHandler::class.java
-                                        .getDeclaredMethod("immediateConnectToPeripheral")
-                                    immediateConnectMethod.isAccessible = true
-                                    immediateConnectMethod.invoke(tandemBTHandler)
-                                    Timber.i("pumpCommHandler: triggered immediateConnectToPeripheral() during setup")
-                                }.onFailure { e ->
-                                    Timber.w(e, "pumpCommHandler: unable to trigger immediateConnectToPeripheral via reflection")
-                                }
-                            }
                             break
                         } catch (e: SecurityException) {
                             Timber.e("pumpCommHandler: Waiting for BT permissions $e")
@@ -572,6 +637,7 @@ class CommService : Service() {
                 }
                 CommServiceCodes.SEND_PUMP_PAIRING_MESSAGE.ordinal -> {
                     if (pumpConnectedPrecondition(checkConnected = false)) {
+                        allowAutoPairingAfterCodeSubmission.set(false)
                         if (pump.lastPeripheral != null && pump.pairingCodeCentralChallenge != null) {
                             Timber.i("sendPumpPairingMessage: running performPairing")
                             pump.performPairing(
@@ -1006,6 +1072,10 @@ class CommService : Service() {
                 Timber.i("force-reload")
                 triggerAppReload(applicationContext)
             }
+            "/to-phone/set-pairing-code" -> {
+                allowAutoPairingAfterCodeSubmission.set(true)
+                Timber.i("set-pairing-code received in service: enabled one-shot auto-pair gate")
+            }
             "/to-phone/stop-pump-finder" -> {
                 Timber.i("stop-pump-finder")
                 sendStopPumpFinderComm()
@@ -1019,6 +1089,7 @@ class CommService : Service() {
                     else
                         PairingCodeType.SHORT_6CHAR
                     Prefs(applicationContext).setPumpFinderServiceEnabled(false)
+                    Prefs(applicationContext).setUnbondOnNextCommInitMac(filterToMac)
                     Timber.i("stop-pump-finder-next: filterToMac=$filterToMac pairingCodeType=$pairingCodeType")
 
                     pumpCommHandler?.postDelayed(periodicUpdateTask, periodicUpdateIntervalMs)
@@ -1029,6 +1100,7 @@ class CommService : Service() {
             }
             "/to-phone/restart-pump-finder" -> {
                 Timber.i("restart-pump-finder")
+                allowAutoPairingAfterCodeSubmission.set(false)
                 sendStopPumpFinderComm()
                 pumpCommHandler = PumpCommHandler(serviceLooper!!)
                 Prefs(applicationContext).setPumpFinderServiceEnabled(true)
