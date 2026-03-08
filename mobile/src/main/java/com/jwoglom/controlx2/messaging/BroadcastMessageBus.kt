@@ -40,7 +40,8 @@ class BroadcastMessageBus(private val context: Context) : MessageBus {
             val data = intent.getByteArrayExtra(EXTRA_DATA) ?: ByteArray(0)
             val sourceNodeId = intent.getStringExtra(EXTRA_SOURCE_NODE_ID) ?: localNode.id
 
-            Timber.i("BroadcastMessageBus.onReceive: $path from $sourceNodeId")
+            // Trace-level: intentionally disabled to reduce per-message log spam.
+            // Timber.v("BroadcastMessageBus.onReceive: $path from $sourceNodeId")
 
             // Deliver to all listeners
             listeners.forEach { listener ->
@@ -54,19 +55,20 @@ class BroadcastMessageBus(private val context: Context) : MessageBus {
     }
 
     init {
-        Timber.d("BroadcastMessageBus initialized for cross-process communication")
+        Timber.v("BroadcastMessageBus initialized for cross-process communication")
         // Register receiver for messages from other processes
         val filter = IntentFilter(ACTION_MESSAGE)
         try {
             context.applicationContext.registerReceiver(receiver, filter, Context.RECEIVER_EXPORTED)
-            Timber.d("BroadcastMessageBus receiver registered")
+            Timber.v("BroadcastMessageBus receiver registered")
         } catch (e: Exception) {
             Timber.e(e, "Failed to register BroadcastMessageBus receiver")
         }
     }
 
     override fun sendMessage(path: String, data: ByteArray, sender: MessageBusSender) {
-        Timber.i("BroadcastMessageBus.sendMessage: $path (sender: $sender)")
+        // Trace-level: intentionally disabled to reduce per-message log spam.
+        // Timber.v("BroadcastMessageBus.sendMessage: $path (sender: $sender)")
 
         try {
             val intent = Intent(ACTION_MESSAGE).apply {
@@ -79,19 +81,20 @@ class BroadcastMessageBus(private val context: Context) : MessageBus {
             }
 
             context.applicationContext.sendBroadcast(intent)
-            Timber.d("BroadcastMessageBus message broadcasted: $path")
+            // Trace-level: intentionally disabled to reduce per-message log spam.
+            // Timber.v("BroadcastMessageBus message broadcasted: $path")
         } catch (e: Exception) {
             Timber.e(e, "Failed to broadcast message: $path")
         }
     }
 
     override fun addMessageListener(listener: MessageListener) {
-        Timber.d("BroadcastMessageBus.addMessageListener: $listener")
+        Timber.v("BroadcastMessageBus.addMessageListener: $listener")
         listeners.add(listener)
     }
 
     override fun removeMessageListener(listener: MessageListener) {
-        Timber.d("BroadcastMessageBus.removeMessageListener: $listener")
+        Timber.v("BroadcastMessageBus.removeMessageListener: $listener")
         listeners.remove(listener)
     }
 
@@ -105,10 +108,10 @@ class BroadcastMessageBus(private val context: Context) : MessageBus {
     }
 
     override fun close() {
-        Timber.d("BroadcastMessageBus.close()")
+        Timber.v("BroadcastMessageBus.close()")
         try {
             context.applicationContext.unregisterReceiver(receiver)
-            Timber.d("BroadcastMessageBus receiver unregistered")
+            Timber.v("BroadcastMessageBus receiver unregistered")
         } catch (e: Exception) {
             Timber.w(e, "Error unregistering BroadcastMessageBus receiver")
         }

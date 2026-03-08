@@ -144,106 +144,118 @@ class DataStore {
 
     val glucoseUnitPreference = MutableLiveData<GlucoseUnit>()
 
+    private fun <T> MutableLiveData<T>.logOnChange(fieldName: String) {
+        var initialized = false
+        var previous: Any? = null
+        observeForever { current ->
+            if (!initialized || previous != current) {
+                Timber.d("DataStore.$fieldName=$current")
+                previous = current
+                initialized = true
+            }
+        }
+    }
+
     init {
-        pumpConnected.observeForever { t -> Timber.i("DataStore.pumpConnected=$t") }
-        pumpLastConnectionTimestamp.observeForever { t -> Timber.i("DataStore.pumpLastConnectionTimestamp=$t") }
-        pumpLastMessageTimestamp.observeForever { t -> Timber.i("DataStore.pumpLastMessageTimestamp=$t") }
-        watchConnected.observeForever { t -> Timber.i("DataStore.watchConnected=$t") }
+        pumpConnected.logOnChange("pumpConnected")
+        pumpLastConnectionTimestamp.logOnChange("pumpLastConnectionTimestamp")
+        pumpLastMessageTimestamp.logOnChange("pumpLastMessageTimestamp")
+        watchConnected.logOnChange("watchConnected")
 
-        pumpSetupStage.observeForever { t -> Timber.i("DataStore.setupStage=$t") }
-        pumpFinderPumps.observeForever { t -> Timber.i("DataStore.pumpFinderPumps=$t") }
-        setupDeviceName.observeForever { t -> Timber.i("DataStore.setupDeviceName=$t") }
-        setupPairingCodeType.observeForever { t -> Timber.i("DataStore.setupPairingCodeType=$t") }
-        pumpSid.observeForever { t -> Timber.i("DataStore.pumpSid=$t") }
-        setupDeviceModel.observeForever { t -> Timber.i("DataStore.setupDeviceModel=$t") }
-        pumpCriticalError.observeForever { t -> Timber.i("DataStore.pumpCriticalError=$t") }
+        pumpSetupStage.logOnChange("setupStage")
+        pumpFinderPumps.logOnChange("pumpFinderPumps")
+        setupDeviceName.logOnChange("setupDeviceName")
+        setupPairingCodeType.logOnChange("setupPairingCodeType")
+        pumpSid.logOnChange("pumpSid")
+        setupDeviceModel.logOnChange("setupDeviceModel")
+        pumpCriticalError.logOnChange("pumpCriticalError")
 
-        notificationBundle.observeForever { t -> Timber.i("DataStore.notificationBundle=$t") }
-        batteryPercent.observeForever { t -> Timber.i("DataStore.batteryPercent=$t") }
-        batteryCharging.observeForever { t -> Timber.i("DataStore.batteryCharging=$t") }
-        iobUnits.observeForever { t -> Timber.i("DataStore.iobUnits=$t") }
-        cartridgeRemainingUnits.observeForever { t -> Timber.i("DataStore.cartridgeRemainingUnits=$t") }
-        cartridgeRemainingEstimate.observeForever { t -> Timber.i("DataStore.cartridgeRemainingEstimate=$t") }
-        lastBolusStatus.observeForever { t -> Timber.i("DataStore.lastBolusStatus=$t") }
-        controlIQStatus.observeForever { t -> Timber.i("DataStore.controlIQStatus=$t") }
-        controlIQMode.observeForever { t -> Timber.i("DataStore.controlIQMode=$t") }
-        controlIQEnabled.observeForever { t -> Timber.i("DataStore.controlIQEnabled=$t") }
-        controlIQWeight.observeForever { t -> Timber.i("DataStore.controlIQWeight=$t") }
-        controlIQWeightUnit.observeForever { t -> Timber.i("DataStore.controlIQWeightUnit=$t") }
-        controlIQTotalDailyInsulin.observeForever { t -> Timber.i("DataStore.controlIQTotalDailyInsulin=$t") }
-        basalRate.observeForever { t -> Timber.i("DataStore.basalRate=$t") }
-        basalStatus.observeForever { t -> Timber.i("DataStore.basalStatus=$t") }
-        tempRateActive.observeForever { t -> Timber.i("DataStore.tempRateActive=$t") }
-        tempRateDetails.observeForever { t -> Timber.i("DataStore.tempRateDetails=$t") }
-        pumpGlobalsResponse.observeForever { t -> Timber.i("DataStore.pumpGlobalsResponse=$t") }
-        controlIQInfoResponse.observeForever { t -> Timber.i("DataStore.controlIQInfoResponse=$t") }
-        controlIQSleepScheduleResponse.observeForever { t -> Timber.i("DataStore.controlIQSleepScheduleResponse=$t") }
-        globalMaxBolusSettingsResponse.observeForever { t -> Timber.i("DataStore.globalMaxBolusSettingsResponse=$t") }
-        basalLimitSettingsResponse.observeForever { t -> Timber.i("DataStore.basalLimitSettingsResponse=$t") }
-        cgmSessionState.observeForever { t -> Timber.i("DataStore.cgmSessionState=$t") }
-        cgmSessionExpireRelative.observeForever { t -> Timber.i("DataStore.cgmSessionExpireRelative=$t") }
-        cgmSessionExpireExact.observeForever { t -> Timber.i("DataStore.cgmSessionExpireExact=$t") }
-        cgmTransmitterStatus.observeForever { t -> Timber.i("DataStore.cgmTransmitterStatus=$t") }
-        cgmReading.observeForever { t -> Timber.i("DataStore.cgmReading=$t") }
-        cgmDelta.observeForever { t -> Timber.i("DataStore.cgmDelta=$t") }
-        cgmStatusText.observeForever { t -> Timber.i("DataStore.cgmStatusText=$t") }
-        cgmHighLowState.observeForever { t -> Timber.i("DataStore.cgmHighLowState=$t") }
-        cgmDeltaArrow.observeForever { t -> Timber.i("DataStore.cgmDeltaArrow=$t") }
-        cgmSetupG6TxId.observeForever { t -> Timber.i("DataStore.cgmSetupG6TxId=$t") }
-        cgmSetupG6SensorCode.observeForever { t -> Timber.i("DataStore.cgmSetupG6SensorId=$t") }
-        cgmSetupG7SensorCode.observeForever { t -> Timber.i("DataStore.cgmSetupG7SensorId=$t") }
-        savedG7PairingCode.observeForever { t -> Timber.i("DataStore.savedG7PairingCode=$t") }
-        idpManager.observeForever { t -> Timber.i("DataStore.idpManager=$t") }
+        notificationBundle.logOnChange("notificationBundle")
+        batteryPercent.logOnChange("batteryPercent")
+        batteryCharging.logOnChange("batteryCharging")
+        iobUnits.logOnChange("iobUnits")
+        cartridgeRemainingUnits.logOnChange("cartridgeRemainingUnits")
+        cartridgeRemainingEstimate.logOnChange("cartridgeRemainingEstimate")
+        lastBolusStatus.logOnChange("lastBolusStatus")
+        controlIQStatus.logOnChange("controlIQStatus")
+        controlIQMode.logOnChange("controlIQMode")
+        controlIQEnabled.logOnChange("controlIQEnabled")
+        controlIQWeight.logOnChange("controlIQWeight")
+        controlIQWeightUnit.logOnChange("controlIQWeightUnit")
+        controlIQTotalDailyInsulin.logOnChange("controlIQTotalDailyInsulin")
+        basalRate.logOnChange("basalRate")
+        basalStatus.logOnChange("basalStatus")
+        tempRateActive.logOnChange("tempRateActive")
+        tempRateDetails.logOnChange("tempRateDetails")
+        pumpGlobalsResponse.logOnChange("pumpGlobalsResponse")
+        controlIQInfoResponse.logOnChange("controlIQInfoResponse")
+        controlIQSleepScheduleResponse.logOnChange("controlIQSleepScheduleResponse")
+        globalMaxBolusSettingsResponse.logOnChange("globalMaxBolusSettingsResponse")
+        basalLimitSettingsResponse.logOnChange("basalLimitSettingsResponse")
+        cgmSessionState.logOnChange("cgmSessionState")
+        cgmSessionExpireRelative.logOnChange("cgmSessionExpireRelative")
+        cgmSessionExpireExact.logOnChange("cgmSessionExpireExact")
+        cgmTransmitterStatus.logOnChange("cgmTransmitterStatus")
+        cgmReading.logOnChange("cgmReading")
+        cgmDelta.logOnChange("cgmDelta")
+        cgmStatusText.logOnChange("cgmStatusText")
+        cgmHighLowState.logOnChange("cgmHighLowState")
+        cgmDeltaArrow.logOnChange("cgmDeltaArrow")
+        cgmSetupG6TxId.logOnChange("cgmSetupG6TxId")
+        cgmSetupG6SensorCode.logOnChange("cgmSetupG6SensorId")
+        cgmSetupG7SensorCode.logOnChange("cgmSetupG7SensorId")
+        savedG7PairingCode.logOnChange("savedG7PairingCode")
+        idpManager.logOnChange("idpManager")
 
 
-        bolusCalcDataSnapshot.observeForever { t -> Timber.i("DataStore.bolusCalcDataSnapshot=$t") }
-        bolusCalcLastBG.observeForever { t -> Timber.i("DataStore.bolusCalcLastBG=$t") }
-        maxBolusAmount.observeForever { t -> Timber.i("DataStore.maxBolusAmount=$t") }
+        bolusCalcDataSnapshot.logOnChange("bolusCalcDataSnapshot")
+        bolusCalcLastBG.logOnChange("bolusCalcLastBG")
+        maxBolusAmount.logOnChange("maxBolusAmount")
 
-        landingBasalDisplayedText.observeForever { t -> Timber.i("DataStore.landingBasalDisplayedText=$t") }
-        landingControlIQDisplayedText.observeForever { t -> Timber.i("DataStore.landingControlIQDisplayedText=$t") }
+        landingBasalDisplayedText.logOnChange("landingBasalDisplayedText")
+        landingControlIQDisplayedText.logOnChange("landingControlIQDisplayedText")
 
-        bolusCalculatorBuilder.observeForever { t -> Timber.i("DataStore.bolusCalculatorBuilder=$t") }
-        bolusCurrentParameters.observeForever { t -> Timber.i("DataStore.bolusCurrentParameters=$t") }
-        bolusCurrentConditions.observeForever { t -> Timber.i("DataStore.bolusCurrentConditions=$t") }
-        bolusConditionsPrompt.observeForever { t -> Timber.i("DataStore.bolusConditionsPrompt=$t") }
-        bolusConditionsPromptAcknowledged.observeForever { t -> Timber.i("DataStore.bolusConditionsPromptAcknowledged=$t") }
-        bolusConditionsExcluded.observeForever { t -> Timber.i("DataStore.bolusConditionsExcluded=$t") }
-        bolusFinalParameters.observeForever { t -> Timber.i("DataStore.bolusFinalParameters=$t") }
-        bolusFinalCalcUnits.observeForever { t -> Timber.i("DataStore.bolusFinalCalcUnits=$t") }
-        bolusFinalConditions.observeForever { t -> Timber.i("DataStore.bolusFinalConditions=$t") }
+        bolusCalculatorBuilder.logOnChange("bolusCalculatorBuilder")
+        bolusCurrentParameters.logOnChange("bolusCurrentParameters")
+        bolusCurrentConditions.logOnChange("bolusCurrentConditions")
+        bolusConditionsPrompt.logOnChange("bolusConditionsPrompt")
+        bolusConditionsPromptAcknowledged.logOnChange("bolusConditionsPromptAcknowledged")
+        bolusConditionsExcluded.logOnChange("bolusConditionsExcluded")
+        bolusFinalParameters.logOnChange("bolusFinalParameters")
+        bolusFinalCalcUnits.logOnChange("bolusFinalCalcUnits")
+        bolusFinalConditions.logOnChange("bolusFinalConditions")
 
-        bolusUnitsRawValue.observeForever { t -> Timber.i("DataStore.bolusUnitsRawValue=$t") }
-        bolusCarbsRawValue.observeForever { t -> Timber.i("DataStore.bolusCarbsRawValue=$t") }
-        bolusGlucoseRawValue.observeForever { t -> Timber.i("DataStore.bolusGlucoseRawValue=$t") }
+        bolusUnitsRawValue.logOnChange("bolusUnitsRawValue")
+        bolusCarbsRawValue.logOnChange("bolusCarbsRawValue")
+        bolusGlucoseRawValue.logOnChange("bolusGlucoseRawValue")
 
-        tempRatePercentRawValue.observeForever { t -> Timber.i("DataStore.tempRatePercentRawValue=$t") }
-        tempRateMinutesRawValue.observeForever { t -> Timber.i("DataStore.tempRateMinutesRawValue=$t") }
-        tempRateHoursRawValue.observeForever { t -> Timber.i("DataStore.tempRateHoursRawValue=$t") }
+        tempRatePercentRawValue.logOnChange("tempRatePercentRawValue")
+        tempRateMinutesRawValue.logOnChange("tempRateMinutesRawValue")
+        tempRateHoursRawValue.logOnChange("tempRateHoursRawValue")
 
-        timeSinceResetResponse.observeForever { t -> Timber.i("DataStore.timeSinceResetResponse=$t") }
-        bolusPermissionResponse.observeForever { t -> Timber.i("DataStore.bolusPermissionResponse=$t") }
-        bolusCarbEntryResponse.observeForever { t -> Timber.i("DataStore.bolusCarbEntryResponse=$t") }
-        bolusInitiateResponse.observeForever { t -> Timber.i("DataStore.bolusInitiateResponse=$t") }
-        bolusCancelResponse.observeForever { t -> Timber.i("DataStore.bolusCancelResponse=$t") }
-        bolusCurrentResponse.observeForever { t -> Timber.i("DataStore.bolusCurrentResponse=$t") }
+        timeSinceResetResponse.logOnChange("timeSinceResetResponse")
+        bolusPermissionResponse.logOnChange("bolusPermissionResponse")
+        bolusCarbEntryResponse.logOnChange("bolusCarbEntryResponse")
+        bolusInitiateResponse.logOnChange("bolusInitiateResponse")
+        bolusCancelResponse.logOnChange("bolusCancelResponse")
+        bolusCurrentResponse.logOnChange("bolusCurrentResponse")
 
-        inChangeCartridgeMode.observeForever { t -> Timber.i("DataStore.inChangeCartridgeMode=$t") }
-        inFillTubingMode.observeForever { t -> Timber.i("DataStore.inFillTubingMode=$t") }
-        enterChangeCartridgeState.observeForever { t -> Timber.i("DataStore.enterChangeCartridgeState=$t") }
-        detectingCartridgeState.observeForever { t -> Timber.i("DataStore.detectingCartridgeState=$t") }
-        fillTubingState.observeForever { t -> Timber.i("DataStore.fillTubingState=$t") }
-        exitFillTubingState.observeForever { t -> Timber.i("DataStore.exitFillTubingState=$t") }
-        fillCannulaState.observeForever { t -> Timber.i("DataStore.fillCannulaState=$t") }
-        pumpingState.observeForever { t -> Timber.i("DataStore.pumpingState=$t") }
+        inChangeCartridgeMode.logOnChange("inChangeCartridgeMode")
+        inFillTubingMode.logOnChange("inFillTubingMode")
+        enterChangeCartridgeState.logOnChange("enterChangeCartridgeState")
+        detectingCartridgeState.logOnChange("detectingCartridgeState")
+        fillTubingState.logOnChange("fillTubingState")
+        exitFillTubingState.logOnChange("exitFillTubingState")
+        fillCannulaState.logOnChange("fillCannulaState")
+        pumpingState.logOnChange("pumpingState")
 
-        historyLogStatus.observeForever { t -> Timber.i("DataStore.historyLogStatus=$t") }
+        historyLogStatus.logOnChange("historyLogStatus")
 
-        historyLogCache.observeForever { t -> Timber.i("DataStore.historyLogCache=$t") }
-        debugMessageCache.observeForever { t -> Timber.i("DataStore.debugMessageCache=$t") }
-        debugPromptAwaitingResponses.observeForever { t -> Timber.i("DataStore.debugPromptAwaitingResponses=$t") }
+        historyLogCache.logOnChange("historyLogCache")
+        debugMessageCache.logOnChange("debugMessageCache")
+        debugPromptAwaitingResponses.logOnChange("debugPromptAwaitingResponses")
 
-        glucoseUnitPreference.observeForever { t -> Timber.i("DataStore.glucoseUnitPreference=$t") }
+        glucoseUnitPreference.logOnChange("glucoseUnitPreference")
     }
 
 

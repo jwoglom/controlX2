@@ -299,6 +299,13 @@ class CommService : Service() {
                 scanResult: ScanResult?,
                 readyState: PumpReadyState
             ): Boolean {
+                // During setup, skip the bonded-device fast path (scanResult == null) so that
+                // TandemBluetoothHandler falls back to active scanning and direct connect().
+                // This avoids sticky autoConnect behavior during the short Mobi pairing window.
+                if (scanResult == null && !Prefs(applicationContext).pumpSetupComplete()) {
+                    Timber.i("onPumpDiscovered: ignoring bonded/UNKNOWN discovery during setup to force direct scan connect")
+                    return false
+                }
                 sendWearCommMessage(
                     "/from-pump/pump-discovered",
                     "${peripheral?.name.orEmpty()};;${readyState.name}".toByteArray()
@@ -534,6 +541,18 @@ class CommService : Service() {
                         try {
                             Timber.i("pumpCommHandler: Starting scan...")
                             tandemBTHandler.startScan()
+                            if (!Prefs(applicationContext).pumpSetupComplete()) {
+                                // Remove the built-in 1s delay before first connection attempt.
+                                runCatching {
+                                    val immediateConnectMethod = TandemBluetoothHandler::class.java
+                                        .getDeclaredMethod("immediateConnectToPeripheral")
+                                    immediateConnectMethod.isAccessible = true
+                                    immediateConnectMethod.invoke(tandemBTHandler)
+                                    Timber.i("pumpCommHandler: triggered immediateConnectToPeripheral() during setup")
+                                }.onFailure { e ->
+                                    Timber.w(e, "pumpCommHandler: unable to trigger immediateConnectToPeripheral via reflection")
+                                }
+                            }
                             break
                         } catch (e: SecurityException) {
                             Timber.e("pumpCommHandler: Waiting for BT permissions $e")
@@ -739,7 +758,7 @@ class CommService : Service() {
         private var pumpFinderActive = false
         private var foundPumps = mutableListOf<String>()
 
-        private inner class PumpFinder() : TandemPumpFinder(applicationContext) {
+        private inner class PumpFinder() : TandemPumpFinder(applicationContext, null) {
             init {
                 Timber.i("PumpFinder init")
             }
@@ -977,7 +996,10 @@ class CommService : Service() {
     override fun onBind(intent: Intent?) = null
 
     private fun handleMessageReceived(path: String, data: ByteArray, sourceNodeId: String) {
-        Timber.i("service messageReceived: $path ${String(data)} from $sourceNodeId")
+        // Ignore noisy loopback logs for pump-originated broadcasts.
+        if (!path.startsWith("/from-pump/")) {
+            Timber.d("service messageReceived: $path ${String(data)} from $sourceNodeId")
+        }
         httpDebugApiService?.onMessagingReceived(path, data, sourceNodeId)
         when (path) {
             "/to-phone/force-reload" -> {
@@ -988,12 +1010,21 @@ class CommService : Service() {
                 Timber.i("stop-pump-finder")
                 sendStopPumpFinderComm()
                 if (String(data) == "init_comm") {
+                    pumpFinderCommHandler = null
                     pumpCommHandler = PumpCommHandler(serviceLooper!!)
                     val filterToMac = Prefs(applicationContext).pumpFinderPumpMac().orEmpty()
+                    val pairingCodeType = Prefs(applicationContext).pumpFinderPairingCodeType().orEmpty()
+                    val pairingCodeTypeEnum = if (pairingCodeType.isNotEmpty())
+                        PairingCodeType.fromLabel(pairingCodeType)
+                    else
+                        PairingCodeType.SHORT_6CHAR
                     Prefs(applicationContext).setPumpFinderServiceEnabled(false)
-                    Timber.i("stop-pump-finder-next: filterToMac=$filterToMac")
-                    triggerAppReload(applicationContext)
-                    //sendInitPumpComm()
+                    Timber.i("stop-pump-finder-next: filterToMac=$filterToMac pairingCodeType=$pairingCodeType")
+
+                    pumpCommHandler?.postDelayed(periodicUpdateTask, periodicUpdateIntervalMs)
+                    pumpCommHandler?.postDelayed(checkForUpdatesTask, checkForUpdatesDelayMs)
+                    sendInitPumpComm(pairingCodeTypeEnum, filterToMac)
+                    sendWearCommMessage("/to-phone/comm-started", "".toByteArray())
                 }
             }
             "/to-phone/restart-pump-finder" -> {

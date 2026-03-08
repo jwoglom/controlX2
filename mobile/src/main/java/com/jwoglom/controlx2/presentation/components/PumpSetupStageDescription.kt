@@ -1,24 +1,12 @@
 @file:OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3Api::class)
 package com.jwoglom.controlx2.presentation.components
 
-import android.content.Context
-import android.content.Intent
-import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.wrapContentSize
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material3.Button
 import androidx.compose.material3.Divider
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextField
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -27,29 +15,22 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.ClipboardManager
-import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.window.Popup
 import com.jwoglom.controlx2.LocalDataStore
 import com.jwoglom.controlx2.Prefs
 import com.jwoglom.controlx2.presentation.screens.PumpSetupStage
 import com.jwoglom.controlx2.shared.presentation.intervalOf
 import com.jwoglom.controlx2.shared.util.shortTimeAgo
 import com.jwoglom.controlx2.util.determinePumpModel
-import com.jwoglom.pumpx2.pump.PumpState
-import com.jwoglom.pumpx2.pump.bluetooth.PumpReadyState
 import com.jwoglom.pumpx2.pump.messages.models.KnownDeviceModel
 import com.jwoglom.pumpx2.pump.messages.models.PairingCodeType
-import kotlinx.coroutines.launch
 import timber.log.Timber
 
 const val TroubleshootingStepsThresholdSeconds = 15
@@ -146,7 +127,11 @@ fun PumpSetupStageDescription(
                 Button(
                     onClick = {
                         Prefs(context).setPumpFinderPumpMac(it.second)
-                        ds.pumpSetupStage.value = ds.pumpSetupStage.value?.nextStage(PumpSetupStage.PUMP_FINDER_CHOOSE_PAIRING_CODE_TYPE)
+                        val nextStage = when (determinePumpModel(it.first)) {
+                            KnownDeviceModel.MOBI -> PumpSetupStage.PUMP_FINDER_MOBI_PLACE_ON_CHARGING_PAD
+                            else -> PumpSetupStage.PUMP_FINDER_TSLIM_CHOOSE_PAIRING_CODE_TYPE
+                        }
+                        ds.pumpSetupStage.value = ds.pumpSetupStage.value?.nextStage(nextStage)
                         ds.setupDeviceName.value = it.first
                     }
                 ) {
@@ -156,33 +141,30 @@ fun PumpSetupStageDescription(
             }
             Line("")
         }
-        PumpSetupStage.PUMP_FINDER_CHOOSE_PAIRING_CODE_TYPE -> {
-
-            if (ds.setupDeviceName.value?.let { determinePumpModel(it) } == KnownDeviceModel.TSLIM_X2) {
-                Line("Choose the correct pairing code type:")
-                Line("")
-                Button(
-                    onClick = {
-                        Prefs(context).setPumpFinderPairingCodeType(PairingCodeType.LONG_16CHAR.label)
-                        ds.setupPairingCodeType.value = PairingCodeType.LONG_16CHAR
-                        ds.pumpSetupStage.value =
-                            ds.pumpSetupStage.value?.nextStage(PumpSetupStage.PUMP_FINDER_ENTER_PAIRING_CODE)
-                    }
-                ) {
-                    Text("LONG: 16 alphanumeric characters")
+        PumpSetupStage.PUMP_FINDER_TSLIM_CHOOSE_PAIRING_CODE_TYPE -> {
+            Line("Choose the correct pairing code type:")
+            Line("")
+            Button(
+                onClick = {
+                    Prefs(context).setPumpFinderPairingCodeType(PairingCodeType.LONG_16CHAR.label)
+                    ds.setupPairingCodeType.value = PairingCodeType.LONG_16CHAR
+                    ds.pumpSetupStage.value =
+                        ds.pumpSetupStage.value?.nextStage(PumpSetupStage.PUMP_FINDER_TSLIM_ENTER_PAIRING_CODE)
                 }
+            ) {
+                Text("LONG: 16 alphanumeric characters")
+            }
 
-                Line("")
+            Line("")
 
-                Button(
-                    onClick = {
-                        Prefs(context).setPumpFinderPairingCodeType(PairingCodeType.SHORT_6CHAR.label)
-                        ds.setupPairingCodeType.value = PairingCodeType.SHORT_6CHAR
-                        ds.pumpSetupStage.value = ds.pumpSetupStage.value?.nextStage(PumpSetupStage.PUMP_FINDER_ENTER_PAIRING_CODE)
-                    }
-                ) {
-                    Text("SHORT: 6 numbers")
+            Button(
+                onClick = {
+                    Prefs(context).setPumpFinderPairingCodeType(PairingCodeType.SHORT_6CHAR.label)
+                    ds.setupPairingCodeType.value = PairingCodeType.SHORT_6CHAR
+                    ds.pumpSetupStage.value = ds.pumpSetupStage.value?.nextStage(PumpSetupStage.PUMP_FINDER_TSLIM_ENTER_PAIRING_CODE)
                 }
+            ) {
+                Text("SHORT: 6 numbers")
             }
 
             Line("")
@@ -199,34 +181,67 @@ fun PumpSetupStageDescription(
                         append("Open the pairing code generated under Bluetooth Settings > Pairing Code on your pump now.")
                     })
                 }
-                KnownDeviceModel.MOBI -> {
-                    Line(buildAnnotatedString {
-                        withStyle(
-                            style = SpanStyle(
-                                fontWeight = FontWeight.Bold
-                            )
-                        ) {
-                            append("For Mobi: ")
-                        }
-                        append("Take the pump off of its charger now.")
-                    })
-                }
                 else -> {}
             }
+        }
+        PumpSetupStage.PUMP_FINDER_MOBI_PLACE_ON_CHARGING_PAD -> {
+            Line(buildAnnotatedString {
+                withStyle(
+                    style = SpanStyle(
+                        fontWeight = FontWeight.Bold
+                    )
+                ) {
+                    append("For Mobi: ")
+                }
+                append("Place your Mobi on the charging pad.")
+            })
+            Line("Ensure it is turned on and charging.")
 
             LaunchedEffect(pumpReadyState.value) {
-                when (pumpReadyState.value) {
-                    PumpReadyState.PICKED_UP, PumpReadyState.PICKED_UP_WITH_TAP -> {
+                when {
+                    pumpReadyState.value?.shouldPickUpAndTap() == true -> {
+                        ds.pumpSetupStage.value = ds.pumpSetupStage.value?.nextStage(PumpSetupStage.PUMP_FINDER_MOBI_PICK_UP_AND_TAP)
+                    }
+                    pumpReadyState.value?.shouldEnterPinCode() == true -> {
                         Prefs(context).setPumpFinderPairingCodeType(PairingCodeType.SHORT_6CHAR.label)
                         ds.setupPairingCodeType.value = PairingCodeType.SHORT_6CHAR
-                        ds.pumpSetupStage.value = ds.pumpSetupStage.value?.nextStage(PumpSetupStage.PUMP_FINDER_ENTER_PAIRING_CODE)
+                        ds.pumpSetupStage.value = ds.pumpSetupStage.value?.nextStage(PumpSetupStage.PUMP_FINDER_MOBI_ENTER_PAIRING_CODE)
                     }
-
                     else -> {}
                 }
             }
         }
-        PumpSetupStage.PUMP_FINDER_ENTER_PAIRING_CODE, PumpSetupStage.PUMPX2_WAITING_FOR_PAIRING_CODE, PumpSetupStage.PUMPX2_INVALID_PAIRING_CODE -> {
+        PumpSetupStage.PUMP_FINDER_MOBI_PICK_UP_AND_TAP -> {
+            Line(buildAnnotatedString {
+                withStyle(
+                    style = SpanStyle(
+                        fontWeight = FontWeight.Bold
+                    )
+                ) {
+                    append("For Mobi: ")
+                }
+                append("Your pump was detected.")
+            })
+            Line("Pick up the pump, wait a second, then double-tap the T button.")
+
+            LaunchedEffect(pumpReadyState.value) {
+                when {
+                    pumpReadyState.value?.shouldPlaceOnChargingPad() == true -> {
+                        ds.pumpSetupStage.value = ds.pumpSetupStage.value?.nextStage(PumpSetupStage.PUMP_FINDER_MOBI_PLACE_ON_CHARGING_PAD)
+                    }
+                    pumpReadyState.value?.shouldEnterPinCode() == true -> {
+                        Prefs(context).setPumpFinderPairingCodeType(PairingCodeType.SHORT_6CHAR.label)
+                        ds.setupPairingCodeType.value = PairingCodeType.SHORT_6CHAR
+                        ds.pumpSetupStage.value = ds.pumpSetupStage.value?.nextStage(PumpSetupStage.PUMP_FINDER_MOBI_ENTER_PAIRING_CODE)
+                    }
+                    else -> {}
+                }
+            }
+        }
+        PumpSetupStage.PUMP_FINDER_TSLIM_ENTER_PAIRING_CODE,
+        PumpSetupStage.PUMP_FINDER_MOBI_ENTER_PAIRING_CODE,
+        PumpSetupStage.PUMPX2_WAITING_FOR_PAIRING_CODE,
+        PumpSetupStage.PUMPX2_INVALID_PAIRING_CODE -> {
             if (initialSetup) {
                 pairingCodeStage()
             } else {

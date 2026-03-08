@@ -30,11 +30,12 @@ class LocalMessageBus(private val context: Context) : MessageBus {
     )
 
     init {
-        Timber.d("LocalMessageBus initialized for phone-only mode")
+        Timber.v("LocalMessageBus initialized for phone-only mode")
     }
 
     override fun sendMessage(path: String, data: ByteArray, sender: MessageBusSender) {
-        Timber.i("LocalMessageBus.sendMessage: $path ${String(data)} (sender: $sender)")
+        // Trace-level: intentionally disabled to reduce per-message log spam.
+        // Timber.v("LocalMessageBus.sendMessage: $path ${String(data)} (sender: $sender)")
 
         // Deliver message to all listeners immediately (in-process)
         listeners.forEach { listener ->
@@ -47,12 +48,12 @@ class LocalMessageBus(private val context: Context) : MessageBus {
     }
 
     override fun addMessageListener(listener: MessageListener) {
-        Timber.d("LocalMessageBus.addMessageListener: $listener")
+        Timber.v("LocalMessageBus.addMessageListener: $listener")
         listeners.add(listener)
     }
 
     override fun removeMessageListener(listener: MessageListener) {
-        Timber.d("LocalMessageBus.removeMessageListener: $listener")
+        Timber.v("LocalMessageBus.removeMessageListener: $listener")
         listeners.remove(listener)
     }
 
@@ -66,7 +67,7 @@ class LocalMessageBus(private val context: Context) : MessageBus {
     }
 
     override fun close() {
-        Timber.d("LocalMessageBus.close()")
+        Timber.v("LocalMessageBus.close()")
         listeners.clear()
     }
 }

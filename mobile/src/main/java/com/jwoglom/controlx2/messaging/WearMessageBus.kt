@@ -29,18 +29,20 @@ class WearMessageBus(private val context: Context) : MessageBus, MessageClient.O
     private val _connectionState = MutableStateFlow<ConnectionState>(ConnectionState.Connecting)
 
     init {
-        Timber.d("WearMessageBus initialized with Wearable Data Layer")
+        Timber.v("WearMessageBus initialized with Wearable Data Layer")
         messageClient.addListener(this)
         updateConnectionState()
     }
 
     override fun sendMessage(path: String, data: ByteArray, sender: MessageBusSender) {
-        Timber.i("WearMessageBus.sendMessage: $path ${String(data)} (sender: $sender)")
+        // Trace-level: intentionally disabled to reduce per-message log spam.
+        // Timber.v("WearMessageBus.sendMessage: $path ${String(data)} (sender: $sender)")
 
         fun sendToNode(node: Node) {
             messageClient.sendMessage(node.id, path, data)
                 .addOnSuccessListener {
-                    Timber.d("WearMessageBus message sent: $path to ${node.displayName}")
+                    // Trace-level: intentionally disabled to reduce per-message log spam.
+                    // Timber.v("WearMessageBus message sent: $path to ${node.displayName}")
                 }
                 .addOnFailureListener { e ->
                     Timber.w(e, "WearMessageBus sendMessage failed: $path to ${node.displayName}")
@@ -64,7 +66,8 @@ class WearMessageBus(private val context: Context) : MessageBus, MessageClient.O
     }
 
     override fun onMessageReceived(messageEvent: MessageEvent) {
-        Timber.i("WearMessageBus.onMessageReceived: ${messageEvent.path} from ${messageEvent.sourceNodeId}")
+        // Trace-level: intentionally disabled to reduce per-message log spam.
+        // Timber.v("WearMessageBus.onMessageReceived: ${messageEvent.path} from ${messageEvent.sourceNodeId}")
 
         listeners.forEach { listener ->
             try {
@@ -80,12 +83,12 @@ class WearMessageBus(private val context: Context) : MessageBus, MessageClient.O
     }
 
     override fun addMessageListener(listener: MessageListener) {
-        Timber.d("WearMessageBus.addMessageListener: $listener")
+        Timber.v("WearMessageBus.addMessageListener: $listener")
         listeners.add(listener)
     }
 
     override fun removeMessageListener(listener: MessageListener) {
-        Timber.d("WearMessageBus.removeMessageListener: $listener")
+        Timber.v("WearMessageBus.removeMessageListener: $listener")
         listeners.remove(listener)
     }
 
@@ -141,7 +144,7 @@ class WearMessageBus(private val context: Context) : MessageBus, MessageClient.O
     }
 
     override fun close() {
-        Timber.d("WearMessageBus.close()")
+        Timber.v("WearMessageBus.close()")
         messageClient.removeListener(this)
         listeners.clear()
     }

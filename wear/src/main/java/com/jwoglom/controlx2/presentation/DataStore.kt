@@ -75,57 +75,69 @@ class DataStore {
     val lastBolusStatusResponse = MutableLiveData<LastBolusStatusAbstractResponse>()
     val bolusCurrentResponse = MutableLiveData<CurrentBolusStatusResponse>()
 
+    private fun <T> MutableLiveData<T>.logOnChange(fieldName: String) {
+        var initialized = false
+        var previous: Any? = null
+        observeForever { current ->
+            if (!initialized || previous != current) {
+                Timber.i("DataStore.$fieldName=$current")
+                previous = current
+                initialized = true
+            }
+        }
+    }
+
     init {
-        connectionStatus.observeForever { t -> Timber.i("DataStore.connectionStatus=$t") }
+        connectionStatus.logOnChange("connectionStatus")
 
-        batteryPercent.observeForever { t -> Timber.i("DataStore.batteryPercent=$t") }
-        iobUnits.observeForever { t -> Timber.i("DataStore.iobUnits=$t") }
-        cartridgeRemainingUnits.observeForever { t -> Timber.i("DataStore.cartridgeRemainingUnits=$t") }
-        cartridgeRemainingEstimate.observeForever { t -> Timber.i("DataStore.cartridgeRemainingEstimate=$t") }
-        lastBolusStatus.observeForever { t -> Timber.i("DataStore.lastBolusStatus=$t") }
-        controlIQStatus.observeForever { t -> Timber.i("DataStore.controlIQStatus=$t") }
-        controlIQMode.observeForever { t -> Timber.i("DataStore.controlIQMode=$t") }
-        basalRate.observeForever { t -> Timber.i("DataStore.basalRate=$t") }
-        basalStatus.observeForever { t -> Timber.i("DataStore.basalStatus=$t") }
-        cgmSessionState.observeForever { t -> Timber.i("DataStore.cgmSessionState=$t") }
-        cgmSessionExpireExact.observeForever { t -> Timber.i("DataStore.cgmSessionExpireExact=$t") }
-        cgmSessionExpireRelative.observeForever { t -> Timber.i("DataStore.cgmSessionExpireRelative=$t") }
-        cgmTransmitterStatus.observeForever { t -> Timber.i("DataStore.cgmTransmitterStatus=$t") }
-        cgmReading.observeForever { t -> Timber.i("DataStore.cgmLastReading=$t") }
-        cgmDelta.observeForever { t -> Timber.i("DataStore.cgmDelta=$t") }
-        cgmStatusText.observeForever { t -> Timber.i("DataStore.cgmStatusText=$t") }
-        cgmHighLowState.observeForever { t -> Timber.i("DataStore.cgmHighLowState=$t") }
-        cgmDeltaArrow.observeForever { t -> Timber.i("DataStore.cgmDeltaArrow=$t") }
-        bolusCalcDataSnapshot.observeForever { t -> Timber.i("DataStore.bolusCalcDataSnapshot=$t") }
-        bolusCalcLastBG.observeForever { t -> Timber.i("DataStore.bolusCalcLastBG=$t") }
-        maxBolusAmount.observeForever { t -> Timber.i("DataStore.maxBolusAmount=$t") }
-        maxCarbAmount.observeForever { t -> Timber.i("DataStore.maxCarbAmount=$t") }
-        idpManager.observeForever { t -> Timber.i("DataStore.idpManager=$t") }
+        batteryPercent.logOnChange("batteryPercent")
+        iobUnits.logOnChange("iobUnits")
+        cartridgeRemainingUnits.logOnChange("cartridgeRemainingUnits")
+        cartridgeRemainingEstimate.logOnChange("cartridgeRemainingEstimate")
+        lastBolusStatus.logOnChange("lastBolusStatus")
+        controlIQStatus.logOnChange("controlIQStatus")
+        controlIQMode.logOnChange("controlIQMode")
+        basalRate.logOnChange("basalRate")
+        basalStatus.logOnChange("basalStatus")
+        cgmSessionState.logOnChange("cgmSessionState")
+        cgmSessionExpireExact.logOnChange("cgmSessionExpireExact")
+        cgmSessionExpireRelative.logOnChange("cgmSessionExpireRelative")
+        cgmTransmitterStatus.logOnChange("cgmTransmitterStatus")
+        cgmReading.logOnChange("cgmLastReading")
+        cgmDelta.logOnChange("cgmDelta")
+        cgmStatusText.logOnChange("cgmStatusText")
+        cgmHighLowState.logOnChange("cgmHighLowState")
+        cgmDeltaArrow.logOnChange("cgmDeltaArrow")
+        bolusCalcDataSnapshot.logOnChange("bolusCalcDataSnapshot")
+        bolusCalcLastBG.logOnChange("bolusCalcLastBG")
+        maxBolusAmount.logOnChange("maxBolusAmount")
+        maxCarbAmount.logOnChange("maxCarbAmount")
+        idpManager.logOnChange("idpManager")
 
-        landingBasalDisplayedText.observeForever { t -> Timber.i("DataStore.landingBasalDisplayedText=$t") }
-        landingControlIQDisplayedText.observeForever { t -> Timber.i("DataStore.landingControlIQDisplayedText=$t") }
+        landingBasalDisplayedText.logOnChange("landingBasalDisplayedText")
+        landingControlIQDisplayedText.logOnChange("landingControlIQDisplayedText")
 
-        bolusUnitsDisplayedText.observeForever { t -> Timber.i("DataStore.bolusUnitsDisplayedText=$t") }
-        bolusUnitsDisplayedSubtitle.observeForever { t -> Timber.i("DataStore.bolusUnitsDisplayedSubtitle=$t") }
-        bolusBGDisplayedText.observeForever { t -> Timber.i("DataStore.bolusBGDisplayedText=$t") }
-        bolusBGDisplayedSubtitle.observeForever { t -> Timber.i("DataStore.bolusBGDisplayedSubtitle=$t") }
+        bolusUnitsDisplayedText.logOnChange("bolusUnitsDisplayedText")
+        bolusUnitsDisplayedSubtitle.logOnChange("bolusUnitsDisplayedSubtitle")
+        bolusBGDisplayedText.logOnChange("bolusBGDisplayedText")
+        bolusBGDisplayedSubtitle.logOnChange("bolusBGDisplayedSubtitle")
 
-        bolusCalculatorBuilder.observeForever { t -> Timber.i("DataStore.bolusCalculatorBuilder=$t") }
-        bolusCurrentParameters.observeForever { t -> Timber.i("DataStore.bolusCurrentParameters=$t") }
-        bolusCurrentConditions.observeForever { t -> Timber.i("DataStore.bolusCurrentConditions=$t") }
-        bolusConditionsPrompt.observeForever { t -> Timber.i("DataStore.bolusConditionsPrompt=$t") }
-        bolusConditionsPromptAcknowledged.observeForever { t -> Timber.i("DataStore.bolusConditionsPromptAcknowledged=$t") }
-        bolusConditionsExcluded.observeForever { t -> Timber.i("DataStore.bolusConditionsExcluded=$t") }
-        bolusFinalParameters.observeForever { t -> Timber.i("DataStore.bolusFinalParameters=$t") }
-        bolusFinalCalcUnits.observeForever { t -> Timber.i("DataStore.bolusFinalCalcUnits=$t") }
-        bolusFinalConditions.observeForever { t -> Timber.i("DataStore.bolusFinalConditions=$t") }
-        bolusMinNotifyThreshold.observeForever { t -> Timber.i("DataStore.bolusMinNotifyThreshold=$t") }
+        bolusCalculatorBuilder.logOnChange("bolusCalculatorBuilder")
+        bolusCurrentParameters.logOnChange("bolusCurrentParameters")
+        bolusCurrentConditions.logOnChange("bolusCurrentConditions")
+        bolusConditionsPrompt.logOnChange("bolusConditionsPrompt")
+        bolusConditionsPromptAcknowledged.logOnChange("bolusConditionsPromptAcknowledged")
+        bolusConditionsExcluded.logOnChange("bolusConditionsExcluded")
+        bolusFinalParameters.logOnChange("bolusFinalParameters")
+        bolusFinalCalcUnits.logOnChange("bolusFinalCalcUnits")
+        bolusFinalConditions.logOnChange("bolusFinalConditions")
+        bolusMinNotifyThreshold.logOnChange("bolusMinNotifyThreshold")
 
-        timeSinceResetResponse.observeForever { t -> Timber.i("DataStore.timeSinceResetResponse=$t") }
-        bolusPermissionResponse.observeForever { t -> Timber.i("DataStore.bolusPermissionResponse=$t") }
-        bolusCarbEntryResponse.observeForever { t -> Timber.i("DataStore.bolusCarbEntryResponse=$t") }
-        bolusInitiateResponse.observeForever { t -> Timber.i("DataStore.bolusInitiateResponse=$t") }
-        bolusCancelResponse.observeForever { t -> Timber.i("DataStore.bolusCancelResponse=$t") }
-        bolusCurrentResponse.observeForever { t -> Timber.i("DataStore.bolusCurrentResponse=$t") }
+        timeSinceResetResponse.logOnChange("timeSinceResetResponse")
+        bolusPermissionResponse.logOnChange("bolusPermissionResponse")
+        bolusCarbEntryResponse.logOnChange("bolusCarbEntryResponse")
+        bolusInitiateResponse.logOnChange("bolusInitiateResponse")
+        bolusCancelResponse.logOnChange("bolusCancelResponse")
+        bolusCurrentResponse.logOnChange("bolusCurrentResponse")
     }
 }
