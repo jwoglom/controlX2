@@ -52,7 +52,7 @@ import com.jwoglom.pumpx2.pump.messages.Message
 import com.jwoglom.pumpx2.pump.messages.request.currentStatus.CGMStatusRequest
 import com.jwoglom.pumpx2.pump.messages.request.currentStatus.HomeScreenMirrorRequest
 import com.jwoglom.pumpx2.pump.messages.request.currentStatus.TimeSinceResetRequest
-import com.jwoglom.pumpx2.pump.messages.request.currentStatus.UnknownMobiOpcode20Request
+import com.jwoglom.pumpx2.pump.messages.request.currentStatus.LoadStatusRequest
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.delay
@@ -250,7 +250,7 @@ val cartridgeActionsCommands = listOf(
     HomeScreenMirrorRequest(),
     CGMStatusRequest(),
     TimeSinceResetRequest(),
-    UnknownMobiOpcode20Request()
+    LoadStatusRequest()
 )
 
 val cartridgeActionsFields = listOf(

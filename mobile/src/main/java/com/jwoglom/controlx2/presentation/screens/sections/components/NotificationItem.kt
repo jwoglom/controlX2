@@ -36,7 +36,7 @@ import com.jwoglom.pumpx2.pump.messages.request.control.DismissNotificationReque
 import com.jwoglom.pumpx2.pump.messages.response.currentStatus.AlarmStatusResponse
 import com.jwoglom.pumpx2.pump.messages.response.currentStatus.AlertStatusResponse
 import com.jwoglom.pumpx2.pump.messages.response.currentStatus.CGMAlertStatusResponse
-import com.jwoglom.pumpx2.pump.messages.response.currentStatus.MalfunctionStatusResponse
+import com.jwoglom.pumpx2.pump.messages.response.currentStatus.HighestAamResponse
 import com.jwoglom.pumpx2.pump.messages.response.currentStatus.ReminderStatusResponse
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
@@ -137,7 +137,7 @@ fun NotificationItem(
                             is ReminderStatusResponse.ReminderType -> "Reminder: ${notification.name}"
                             is AlarmStatusResponse.AlarmResponseType -> "Alarm: ${notification.name}"
                             is CGMAlertStatusResponse.CGMAlert -> "CGM Alert: ${notification.name}"
-                            is MalfunctionStatusResponse -> "MALFUNCTION: ${notification.errorString}"
+                            is HighestAamResponse -> "MALFUNCTION: ${notification.errorString}"
                             else -> "$notification"
                         }
                     )
@@ -152,7 +152,7 @@ fun NotificationItem(
                             notification.description ?: ""
                         )
 
-                        is MalfunctionStatusResponse -> Text("This alert cannot be cleared and DIY app developers cannot assist you with this problem.\nFor further instructions please contact Tandem technical support and reference the above code.")
+                        is HighestAamResponse -> Text("This alert cannot be cleared and DIY app developers cannot assist you with this problem.\nFor further instructions please contact Tandem technical support and reference the above code.")
                         else -> {}
                     }
                 },
@@ -178,7 +178,7 @@ fun NotificationItem(
                             contentDescription = "CGM Alert"
                         )
 
-                        is MalfunctionStatusResponse -> Icon(
+                        is HighestAamResponse -> Icon(
                             Icons.Filled.Warning,
                             contentDescription = "Malfunction"
                         )
