@@ -103,7 +103,6 @@ import java.time.Instant
 import java.util.Collections
 import java.util.UUID
 import java.util.function.Supplier
-import java.util.concurrent.atomic.AtomicBoolean
 
 
 const val CacheSeconds = 30
@@ -120,7 +119,6 @@ class CommService : Service() {
     private var httpDebugApiService: HttpDebugApiService? = null
 
     private var serviceStatusAcknowledged = false
-    private val allowAutoPairingAfterCodeSubmission = AtomicBoolean(false)
     private val serviceStatusTask = object : Runnable {
         override fun run() {
             if (!serviceStatusAcknowledged) {
@@ -252,7 +250,12 @@ class CommService : Service() {
                 peripheral: BluetoothPeripheral?,
                 message: com.jwoglom.pumpx2.pump.messages.Message?
             ) {
-                message?.let { lastResponseMessage.put(Pair(it.characteristic, it.opCode()), Pair(it, Instant.now())) }
+                message?.let {
+                    lastResponseMessage.put(Pair(it.characteristic, it.opCode()), Pair(it, Instant.now()))
+                    // Propagate to HttpDebugApiService first so API callbacks/streams are not
+                    // blocked by downstream UI-side handling (e.g. debug popup flow).
+                    httpDebugApiService?.onPumpMessageReceived(it)
+                }
                 sendWearCommMessage("/from-pump/receive-message", PumpMessageSerializer.toBytes(message))
 
                 message?.let {
@@ -295,7 +298,6 @@ class CommService : Service() {
                     }
                 }
                 message?.let { updateNotificationWithPumpData(it) }
-                message?.let { httpDebugApiService?.onPumpMessageReceived(it) }
             }
 
             override fun onReceiveQualifyingEvent(
@@ -320,16 +322,18 @@ class CommService : Service() {
                 centralChallengeResponse: AbstractCentralChallengeResponse?
             ) {
                 pairingCodeCentralChallenge = centralChallengeResponse
-                if (!allowAutoPairingAfterCodeSubmission.compareAndSet(true, false)) {
+                val hasSavedPairingCode = !PumpState.getPairingCode(context).isNullOrBlank()
+                if (!hasSavedPairingCode) {
                     val challengeBytes = if (centralChallengeResponse != null) {
                         PumpMessageSerializer.toBytes(centralChallengeResponse)
                     } else {
                         byteArrayOf()
                     }
-                    Timber.i("onWaitingForPairingCode: awaiting explicit pairing code submission before pairing")
+                    Timber.i("onWaitingForPairingCode: no saved pairing code, waiting for user input")
                     sendWearCommMessage("/from-pump/missing-pairing-code", challengeBytes)
                     return
                 }
+                Timber.i("onWaitingForPairingCode: saved pairing code found, auto-pairing")
                 performPairing(peripheral, centralChallengeResponse, false)
             }
 
@@ -337,7 +341,6 @@ class CommService : Service() {
                 peripheral: BluetoothPeripheral?,
                 resp: AbstractPumpChallengeResponse?
             ) {
-                allowAutoPairingAfterCodeSubmission.set(false)
                 sendWearCommMessage("/from-pump/invalid-pairing-code", "".toByteArray())
                 super.onInvalidPairingCode(peripheral, resp)
             }
@@ -489,12 +492,12 @@ class CommService : Service() {
             override fun onPumpCriticalError(peripheral: BluetoothPeripheral?, reason: TandemError?) {
                 super.onPumpCriticalError(peripheral, reason)
                 Timber.w("onPumpCriticalError $reason")
+                // Complete HttpDebugApiService request callbacks before UI notification side effects.
+                reason?.let { httpDebugApiService?.onPumpCriticalError(it) }
                 Toast.makeText(this@CommService, "${reason?.name}: ${reason?.message}", Toast.LENGTH_LONG).show()
                 sendWearCommMessage("/from-pump/pump-critical-error",
                     reason?.message!!.toByteArray()
                 );
-
-                reason?.let { httpDebugApiService?.onPumpCriticalError(it) }
             }
 
             @Synchronized
@@ -637,7 +640,6 @@ class CommService : Service() {
                 }
                 CommServiceCodes.SEND_PUMP_PAIRING_MESSAGE.ordinal -> {
                     if (pumpConnectedPrecondition(checkConnected = false)) {
-                        allowAutoPairingAfterCodeSubmission.set(false)
                         if (pump.lastPeripheral != null && pump.pairingCodeCentralChallenge != null) {
                             Timber.i("sendPumpPairingMessage: running performPairing")
                             pump.performPairing(
@@ -1073,8 +1075,7 @@ class CommService : Service() {
                 triggerAppReload(applicationContext)
             }
             "/to-phone/set-pairing-code" -> {
-                allowAutoPairingAfterCodeSubmission.set(true)
-                Timber.i("set-pairing-code received in service: enabled one-shot auto-pair gate")
+                Timber.i("set-pairing-code received in service")
             }
             "/to-phone/stop-pump-finder" -> {
                 Timber.i("stop-pump-finder")
@@ -1100,7 +1101,6 @@ class CommService : Service() {
             }
             "/to-phone/restart-pump-finder" -> {
                 Timber.i("restart-pump-finder")
-                allowAutoPairingAfterCodeSubmission.set(false)
                 sendStopPumpFinderComm()
                 pumpCommHandler = PumpCommHandler(serviceLooper!!)
                 Prefs(applicationContext).setPumpFinderServiceEnabled(true)

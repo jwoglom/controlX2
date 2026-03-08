@@ -87,13 +87,9 @@ fun AppSetup(
             Button(
                 onClick = {
                     Prefs(context).setAppSetupComplete(true)
-                    coroutineScope.launch {
-                        delay(250)
-                        sendMessage(
-                            "/to-phone/app-reload",
-                            "".toByteArray()
-                        )
-                    }
+                    // Do not restart the app at the end of setup; restarting here can race pump
+                    // bootstrap and leave CommService in a null-peripheral startup loop.
+                    sendMessage("/to-phone/request-service-status", "".toByteArray())
                     navController?.navigate(Screen.Landing.route)
                 }
             ) {
@@ -104,44 +100,44 @@ fun AppSetup(
         item {
             ServiceDisabledMessage(sendMessage = sendMessage)
         }
-        item {
-            ListItem(
-                headlineContent = {
-                    Text("Connection Sharing")
-                },
-                supportingContent = {
-                    Text("Enable t:connect app connection sharing. Enables workarounds to run ControlX2 and the t:connect app at the same time.")
-                },
-                trailingContent = {
-                    Switch(
-                        checked = connectionSharingEnabled,
-                        onCheckedChange = {
-                            connectionSharingEnabled = it
-                            Prefs(context).setConnectionSharingEnabled(it)
-                            coroutineScope.launch {
-                                delay(250)
-                                sendMessage(
-                                    "/to-phone/app-reload",
-                                    "".toByteArray()
-                                )
-                            }
-                        }
-                    )
-                },
-                modifier = Modifier.clickable {
-                    connectionSharingEnabled = !connectionSharingEnabled
-                    Prefs(context).setConnectionSharingEnabled(connectionSharingEnabled)
-                    coroutineScope.launch {
-                        delay(250)
-                        sendMessage(
-                            "/to-phone/app-reload",
-                            "".toByteArray()
-                        )
-                    }
-                }
-            )
-            Divider()
-        }
+//        item {
+//            ListItem(
+//                headlineContent = {
+//                    Text("Connection Sharing")
+//                },
+//                supportingContent = {
+//                    Text("Enable t:connect app connection sharing. Enables workarounds to run ControlX2 and the t:connect app at the same time.")
+//                },
+//                trailingContent = {
+//                    Switch(
+//                        checked = connectionSharingEnabled,
+//                        onCheckedChange = {
+//                            connectionSharingEnabled = it
+//                            Prefs(context).setConnectionSharingEnabled(it)
+//                            coroutineScope.launch {
+//                                delay(250)
+//                                sendMessage(
+//                                    "/to-phone/app-reload",
+//                                    "".toByteArray()
+//                                )
+//                            }
+//                        }
+//                    )
+//                },
+//                modifier = Modifier.clickable {
+//                    connectionSharingEnabled = !connectionSharingEnabled
+//                    Prefs(context).setConnectionSharingEnabled(connectionSharingEnabled)
+//                    coroutineScope.launch {
+//                        delay(250)
+//                        sendMessage(
+//                            "/to-phone/app-reload",
+//                            "".toByteArray()
+//                        )
+//                    }
+//                }
+//            )
+//            Divider()
+//        }
         item {
             ListItem(
                 headlineContent = {

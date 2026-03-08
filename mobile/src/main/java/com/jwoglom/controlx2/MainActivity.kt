@@ -435,6 +435,7 @@ class MainActivity : ComponentActivity() {
     // Message received from Wear or CommService via MessageBus
     private fun handleMessageReceived(path: String, data: ByteArray, sourceNodeId: String) {
         Timber.i("phone messageReceived: $path: ${String(data)} from $sourceNodeId")
+        val inInitialSetupFlow = !Prefs(applicationContext).pumpSetupComplete() || !Prefs(applicationContext).appSetupComplete()
         when (path) {
             "/to-phone/start-comm" -> {
                 when (String(data)) {
@@ -464,7 +465,11 @@ class MainActivity : ComponentActivity() {
             }
 
             "/to-phone/comm-started" -> {
-                dataStore.pumpSetupStage.value = dataStore.pumpSetupStage.value?.nextStage(PumpSetupStage.PUMPX2_SEARCHING_FOR_PUMP)
+                if (inInitialSetupFlow) {
+                    dataStore.pumpSetupStage.value = dataStore.pumpSetupStage.value?.nextStage(PumpSetupStage.PUMPX2_SEARCHING_FOR_PUMP)
+                } else {
+                    Timber.i("comm-started: setup complete, skipping setup-stage transition")
+                }
                 // Acknowledge receipt to stop periodic sender
                 sendMessage("/to-phone/service-status-acknowledged", "".toByteArray())
             }
@@ -497,7 +502,11 @@ class MainActivity : ComponentActivity() {
             }
 
             "/to-phone/pump-finder-started" -> {
-                dataStore.pumpSetupStage.value = dataStore.pumpSetupStage.value?.nextStage(PumpSetupStage.PUMP_FINDER_SEARCHING_FOR_PUMPS)
+                if (inInitialSetupFlow) {
+                    dataStore.pumpSetupStage.value = dataStore.pumpSetupStage.value?.nextStage(PumpSetupStage.PUMP_FINDER_SEARCHING_FOR_PUMPS)
+                } else {
+                    Timber.i("pump-finder-started: setup complete, skipping setup-stage transition")
+                }
                 // Acknowledge receipt to stop periodic sender
                 sendMessage("/to-phone/service-status-acknowledged", "".toByteArray())
             }

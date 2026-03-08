@@ -125,6 +125,21 @@ class HttpDebugApiService(private val context: Context, private val port: Int = 
     }
 
     fun onPumpCriticalError(reason: TandemError) {
+        // Some pump errors are surfaced via onPumpCriticalError instead of onPumpMessageReceived.
+        // Mirror ErrorResponse objects into the pump stream so /api/pump/messages subscribers
+        // see the same responses produced by debug send-message flows.
+        if (reason == TandemError.ERROR_RESPONSE && reason.errorResponse != null) {
+            try {
+                val jsonString = JSONObject(reason.errorResponse.jsonToString()).toString()
+                if (pumpMessageStreamClients.isNotEmpty()) {
+                    Timber.d("Broadcasting pump critical ErrorResponse to ${pumpMessageStreamClients.size} clients")
+                    broadcastToPumpMessageClients(jsonString)
+                }
+            } catch (e: Exception) {
+                Timber.w(e, "Failed to stream ErrorResponse from onPumpCriticalError")
+            }
+        }
+
         if (reason == TandemError.ERROR_RESPONSE) {
             if (reason.initiatingMessage != null && reason.errorResponse != null) {
                 pendingPumpRequests.forEach { (pair, future) ->
