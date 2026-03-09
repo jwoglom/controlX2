@@ -1,5 +1,6 @@
 package com.jwoglom.controlx2
 
+import android.Manifest
 import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
@@ -14,8 +15,10 @@ import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
 import android.content.SharedPreferences
+import android.content.pm.PackageManager
 import android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_CONNECTED_DEVICE
 import android.media.RingtoneManager
+import android.os.Build
 import android.os.Handler
 import android.os.HandlerThread
 import android.os.Looper
@@ -183,6 +186,11 @@ class CommService : Service() {
             val adapter = BluetoothAdapter.getDefaultAdapter()
             if (adapter == null) {
                 Timber.w("init_pump_comm: cannot unbond $targetMac because BluetoothAdapter is null")
+                return true
+            }
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S &&
+                checkSelfPermission(Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED) {
+                Timber.w("init_pump_comm: cannot unbond $targetMac without BLUETOOTH_CONNECT permission")
                 return true
             }
 
