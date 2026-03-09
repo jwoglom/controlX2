@@ -5,6 +5,7 @@ import android.util.LruCache
 import com.jwoglom.controlx2.CommService
 import com.jwoglom.controlx2.Prefs
 import com.jwoglom.controlx2.db.historylog.HistoryLogItem
+import com.jwoglom.controlx2.db.historylog.HistoryLogRepo
 import com.jwoglom.pumpx2.pump.bluetooth.TandemPump
 import com.jwoglom.pumpx2.pump.messages.request.currentStatus.HistoryLogRequest
 import com.jwoglom.pumpx2.pump.messages.response.currentStatus.HistoryLogStatusResponse
@@ -12,6 +13,7 @@ import com.jwoglom.pumpx2.pump.messages.response.historyLog.HistoryLog
 import com.welie.blessed.BluetoothPeripheral
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
@@ -26,18 +28,33 @@ import java.time.ZoneId
 const val InitialHistoryLogCount = 5000
 const val FetchGroupTimeoutMs = 2500
 
-val triggerRangeMutex = Mutex()
-val statusResponseLock = Mutex()
-val streamResponseLock = Mutex()
-
-class HistoryLogFetcher(val context: Context, val pump: TandemPump, val peripheral: BluetoothPeripheral, val pumpSid: Int) {
+class HistoryLogFetcher(
+    private val historyLogRepo: HistoryLogRepo,
+    val pumpSid: Int,
+    private val commandSender: (startSeqId: Long, count: Int) -> Unit,
+    private val autoFetchEnabled: () -> Boolean = { true },
+    private val broadcastCallback: ((HistoryLogItem) -> Unit)? = null,
+    private val requestDelayMs: Long = 500,
+    private val pollIntervalMs: Long = 250,
+    private val fetchGroupTimeoutMs: Long = FetchGroupTimeoutMs.toLong()
+) {
     private var recentSeqIds = LruCache<Long, Long>(256)
     private var latestSeqId: Long = 0
 
-    private val historyLogRepo by lazy { (context as CommService).historyLogRepo }
+    private val triggerRangeMutex = Mutex()
+    private val statusResponseLock = Mutex()
+    private val streamResponseLock = Mutex()
+
+    constructor(context: Context, pump: TandemPump, peripheral: BluetoothPeripheral, pumpSid: Int) : this(
+        historyLogRepo = (context as CommService).historyLogRepo,
+        pumpSid = pumpSid,
+        commandSender = { start, count -> pump.sendCommand(peripheral, HistoryLogRequest(start, count)) },
+        autoFetchEnabled = { Prefs(context).autoFetchHistoryLogs() },
+        broadcastCallback = { item -> (context as? CommService)?.broadcastHistoryLogItem(item) }
+    )
 
     private fun request(start: Long, count: Int) {
-        pump.sendCommand(peripheral, HistoryLogRequest(start, count))
+        commandSender(start, count)
     }
 
     private suspend fun triggerRange(startLog: Long, endLog: Long) {
@@ -60,7 +77,6 @@ class HistoryLogFetcher(val context: Context, val pump: TandemPump, val peripher
             totalNums++
         }
 
-        // Iterate backwards from endLog to startLog to fetch newest chunks first
         var i = endLog
         while (i >= startLog) {
             val count = min(chunkSize.toLong(), i - startLog + 1).toInt()
@@ -71,22 +87,18 @@ class HistoryLogFetcher(val context: Context, val pump: TandemPump, val peripher
             // so we request from the END of the range to get all items in [startI, i]
             request(i, count)
 
-            withContext(Dispatchers.IO) {
-                Thread.sleep(500)
-            }
+            delay(requestDelayMs)
 
-            var waitTimeMs = 0
+            var waitTimeMs = 0L
             while (true) {
-                withContext(Dispatchers.IO) {
-                    Thread.sleep(250)
-                }
-                waitTimeMs += 250
+                delay(pollIntervalMs)
+                waitTimeMs += pollIntervalMs
                 val dbCount = historyLogRepo.getCount(pumpSid, startI, i).firstOrNull() ?: 0
                 Timber.d("HistoryLogFetcher dbCount=${dbCount} / count=$count")
                 if (dbCount >= count) {
                     break
                 }
-                if (waitTimeMs >= FetchGroupTimeoutMs) {
+                if (waitTimeMs >= fetchGroupTimeoutMs) {
                     Timber.i("HistoryLogFetcher subset $startI - $i timed out: latest=$latestSeqId waitTime=$waitTimeMs")
                     break
                 }
@@ -97,7 +109,7 @@ class HistoryLogFetcher(val context: Context, val pump: TandemPump, val peripher
         }
     }
     suspend fun onStatusResponse(message: HistoryLogStatusResponse, scope: CoroutineScope) {
-        if (!Prefs(context).autoFetchHistoryLogs()) return;
+        if (!autoFetchEnabled()) return;
         statusResponseLock.withLock {
             Timber.i("HistoryLogFetcher.onStatusResponse<lock>")
             onStatusResponseInternal(message, scope)
@@ -168,7 +180,7 @@ class HistoryLogFetcher(val context: Context, val pump: TandemPump, val peripher
             historyLogRepo.insert(item)
             latestSeqId = max(latestSeqId, log.sequenceNum)
             recentSeqIds.put(log.sequenceNum, log.sequenceNum)
-            (context as? CommService)?.broadcastHistoryLogItem(item)
+            broadcastCallback?.invoke(item)
         }
     }
 }
