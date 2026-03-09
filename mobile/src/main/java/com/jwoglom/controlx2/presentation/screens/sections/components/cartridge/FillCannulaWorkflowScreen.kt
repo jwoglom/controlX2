@@ -161,7 +161,7 @@ fun FillCannulaWorkflowScreen(
                         Button(
                             onClick = { showResumeConfirm = true },
                             enabled = !loadingResume,
-                            modifier = Modifier.weight(1f).height(56.dp),
+                            modifier = Modifier.weight(1.5f).height(56.dp),
                         ) {
                             Text(if (loadingResume) "Working..." else "Resume Insulin Delivery")
                         }

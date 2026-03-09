@@ -786,7 +786,7 @@ private fun resolveResumeInsulinGuidance(
         )
         LoadStatusResponse.LoadState.LOAD_CARTRIDGE -> ResumeInsulinGuidance(
             canResume = false,
-            message = "Complete loading a cartridge first.",
+            message = "Complete Fill Tubing first, then try Resume insulin again.",
         )
         LoadStatusResponse.LoadState.PRIME_TUBING -> {
             val nextAction = when (loadStatus.getPrimeTubingStatus()) {

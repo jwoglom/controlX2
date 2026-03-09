@@ -124,7 +124,7 @@ fun FillTubingWorkflowScreen(
                 FillTubingStep.FILLING -> {
                     Text("Press and hold the button on your pump to fill tubing.", style = MaterialTheme.typography.bodyLarge)
                     Spacer(modifier = Modifier.height(12.dp))
-                    Text("Release the button when you see insulin at the tubing tip.", style = MaterialTheme.typography.bodyLarge)
+                    Text("Release the button when you see insulin at the end of the tubing.", style = MaterialTheme.typography.bodyLarge)
                     Spacer(modifier = Modifier.height(12.dp))
                     when (fillTubingButtonDown) {
                         true -> {

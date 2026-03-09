@@ -410,8 +410,8 @@ private fun resolveRequiredCartridgeSubScreen(
     }
 
     when (resolvedLoadState) {
-        LoadStatusResponse.LoadState.CHANGE_CARTRIDGE,
-        LoadStatusResponse.LoadState.LOAD_CARTRIDGE -> return CartridgeSubScreen.CHANGE_CARTRIDGE
+        LoadStatusResponse.LoadState.CHANGE_CARTRIDGE -> return CartridgeSubScreen.CHANGE_CARTRIDGE
+        LoadStatusResponse.LoadState.LOAD_CARTRIDGE -> return CartridgeSubScreen.FILL_TUBING
         LoadStatusResponse.LoadState.PRIME_TUBING -> return CartridgeSubScreen.FILL_TUBING
         LoadStatusResponse.LoadState.PRIME_CANNULA,
         LoadStatusResponse.LoadState.PRIME_NUDGE -> return CartridgeSubScreen.FILL_CANNULA
