@@ -99,6 +99,7 @@ import com.jwoglom.pumpx2.pump.messages.response.currentStatus.HomeScreenMirrorR
 import com.jwoglom.pumpx2.pump.messages.response.currentStatus.InsulinStatusResponse
 import com.jwoglom.pumpx2.pump.messages.response.currentStatus.LastBGResponse
 import com.jwoglom.pumpx2.pump.messages.response.currentStatus.LastBolusStatusAbstractResponse
+import com.jwoglom.pumpx2.pump.messages.response.currentStatus.LoadStatusResponse
 import com.jwoglom.pumpx2.pump.messages.response.currentStatus.PumpGlobalsResponse
 import com.jwoglom.pumpx2.pump.messages.response.currentStatus.TempRateResponse
 import com.jwoglom.pumpx2.pump.messages.response.currentStatus.TimeSinceResetResponse
@@ -886,6 +887,9 @@ class MainActivity : ComponentActivity() {
             }
             is TimeSinceResetResponse -> {
                 dataStore.timeSinceResetResponse.value = message
+            }
+            is LoadStatusResponse -> {
+                dataStore.loadStatusResponse.value = message
             }
 
             is EnterChangeCartridgeModeStateStreamResponse -> {

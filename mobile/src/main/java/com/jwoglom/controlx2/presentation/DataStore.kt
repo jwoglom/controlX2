@@ -17,6 +17,7 @@ import com.jwoglom.pumpx2.pump.messages.response.currentStatus.CurrentBolusStatu
 import com.jwoglom.pumpx2.pump.messages.response.currentStatus.HistoryLogStatusResponse
 import com.jwoglom.pumpx2.pump.messages.response.currentStatus.LastBGResponse
 import com.jwoglom.pumpx2.pump.messages.response.currentStatus.LastBolusStatusAbstractResponse
+import com.jwoglom.pumpx2.pump.messages.response.currentStatus.LoadStatusResponse
 import com.jwoglom.pumpx2.pump.messages.response.currentStatus.TimeSinceResetResponse
 import com.jwoglom.pumpx2.pump.messages.response.historyLog.HistoryLog
 import com.jwoglom.controlx2.presentation.screens.PumpSetupStage
@@ -120,6 +121,7 @@ class DataStore {
     val tempRateHoursRawValue = MutableLiveData<String?>()
 
     val timeSinceResetResponse = MutableLiveData<TimeSinceResetResponse>()
+    val loadStatusResponse = MutableLiveData<LoadStatusResponse>()
     val bolusPermissionResponse = MutableLiveData<BolusPermissionResponse>()
     val bolusCarbEntryResponse = MutableLiveData<RemoteCarbEntryResponse>()
     val bolusInitiateResponse = MutableLiveData<InitiateBolusResponse>()
@@ -234,6 +236,7 @@ class DataStore {
         tempRateHoursRawValue.logOnChange("tempRateHoursRawValue")
 
         timeSinceResetResponse.logOnChange("timeSinceResetResponse")
+        loadStatusResponse.logOnChange("loadStatusResponse")
         bolusPermissionResponse.logOnChange("bolusPermissionResponse")
         bolusCarbEntryResponse.logOnChange("bolusCarbEntryResponse")
         bolusInitiateResponse.logOnChange("bolusInitiateResponse")

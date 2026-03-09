@@ -76,7 +76,9 @@ import com.jwoglom.pumpx2.pump.messages.request.control.SetModesRequest
 import com.jwoglom.pumpx2.pump.messages.request.control.StopTempRateRequest
 import com.jwoglom.pumpx2.pump.messages.request.control.SuspendPumpingRequest
 import com.jwoglom.pumpx2.pump.messages.request.currentStatus.HomeScreenMirrorRequest
+import com.jwoglom.pumpx2.pump.messages.request.currentStatus.LoadStatusRequest
 import com.jwoglom.pumpx2.pump.messages.request.currentStatus.TempRateRequest
+import com.jwoglom.pumpx2.pump.messages.response.currentStatus.LoadStatusResponse
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.delay
@@ -107,6 +109,18 @@ fun Actions(
 
     val refreshScope = rememberCoroutineScope()
     var refreshing by remember { mutableStateOf(true) }
+    var checkingResumeLoadStatus by remember { mutableStateOf(false) }
+
+    val loadStatusResponse = ds.loadStatusResponse.observeAsState()
+    val resumeGuidance = remember(loadStatusResponse.value, checkingResumeLoadStatus) {
+        resolveResumeInsulinGuidance(loadStatusResponse.value, checkingResumeLoadStatus)
+    }
+
+    fun requestResumeLoadStatusCheck() {
+        checkingResumeLoadStatus = true
+        ds.loadStatusResponse.value = null
+        sendPumpCommands(SendType.BUST_CACHE, listOf(LoadStatusRequest()))
+    }
 
     fun fetchDataStoreFields(type: SendType) {
         sendPumpCommands(type, actionsCommands)
@@ -160,6 +174,12 @@ fun Actions(
 
     LaunchedEffect(refreshing) {
         waitForLoaded()
+    }
+
+    LaunchedEffect(loadStatusResponse.value) {
+        if (loadStatusResponse.value != null) {
+            checkingResumeLoadStatus = false
+        }
     }
 
     Box(
@@ -232,7 +252,10 @@ fun Actions(
                             modifier = Modifier.clickable {
                                 when (basalStatus.value) {
                                     BasalStatus.UNKNOWN, null -> {}
-                                    BasalStatus.PUMP_SUSPENDED -> {showResumeInsulinMenu = true}
+                                    BasalStatus.PUMP_SUSPENDED -> {
+                                        requestResumeLoadStatusCheck()
+                                        showResumeInsulinMenu = true
+                                    }
                                     else -> {showSuspendInsulinMenu = true}
                                 }
                             }
@@ -249,12 +272,13 @@ fun Actions(
                                     Text("Resume insulin")
                                 },
                                 text = {
-                                    Text("Resume all insulin deliveries?")
+                                    Text(resumeGuidance.message)
                                 },
                                 dismissButton = {
                                     TextButton(
                                         onClick = {
                                             showResumeInsulinMenu = false
+                                            checkingResumeLoadStatus = false
                                         },
                                         modifier = Modifier.padding(top = 16.dp)
                                     ) {
@@ -263,16 +287,20 @@ fun Actions(
                                 },
                                 confirmButton = {
                                     TextButton(
+                                        enabled = resumeGuidance.canResume,
                                         onClick = {
                                             showResumeInsulinMenu = false
-                                            sendPumpCommands(SendType.BUST_CACHE, listOf(ResumePumpingRequest()))
-                                            refreshScope.launch {
-                                                repeat(5) {
-                                                    delay(1000)
-                                                    sendPumpCommands(
-                                                        SendType.BUST_CACHE,
-                                                        listOf(HomeScreenMirrorRequest())
-                                                    )
+                                            checkingResumeLoadStatus = false
+                                            if (resumeGuidance.canResume) {
+                                                sendPumpCommands(SendType.BUST_CACHE, listOf(ResumePumpingRequest()))
+                                                refreshScope.launch {
+                                                    repeat(5) {
+                                                        delay(1000)
+                                                        sendPumpCommands(
+                                                            SendType.BUST_CACHE,
+                                                            listOf(HomeScreenMirrorRequest())
+                                                        )
+                                                    }
                                                 }
                                             }
                                         },
@@ -728,6 +756,78 @@ fun Actions(
         )
     }
 }
+
+private data class ResumeInsulinGuidance(
+    val canResume: Boolean,
+    val message: String,
+)
+
+private fun resolveResumeInsulinGuidance(
+    loadStatus: LoadStatusResponse?,
+    checking: Boolean,
+): ResumeInsulinGuidance {
+    if (checking && loadStatus == null) {
+        return ResumeInsulinGuidance(
+            canResume = false,
+            message = "Checking pump load state...",
+        )
+    }
+    if (loadStatus == null) {
+        return ResumeInsulinGuidance(
+            canResume = false,
+            message = "Couldn't read load state from pump. Try again.",
+        )
+    }
+
+    return when (loadStatus.getLoadState()) {
+        LoadStatusResponse.LoadState.CHANGE_CARTRIDGE -> ResumeInsulinGuidance(
+            canResume = false,
+            message = "Finish Change Cartridge first.",
+        )
+        LoadStatusResponse.LoadState.LOAD_CARTRIDGE -> ResumeInsulinGuidance(
+            canResume = false,
+            message = "Complete loading a cartridge first.",
+        )
+        LoadStatusResponse.LoadState.PRIME_TUBING -> {
+            val nextAction = when (loadStatus.getPrimeTubingStatus()) {
+                LoadStatusResponse.PrimeTubingStatus.ENTERED_CANNOT_EXIT -> "Hold the pump button to fill tubing, then exit Fill Tubing mode."
+                LoadStatusResponse.PrimeTubingStatus.ENTERED_CAN_EXIT -> "Exit Fill Tubing mode on the pump."
+                LoadStatusResponse.PrimeTubingStatus.SUSPENDED -> "Resume and complete Fill Tubing, then exit the mode."
+                else -> "Complete Fill Tubing and exit Fill Tubing mode."
+            }
+            ResumeInsulinGuidance(
+                canResume = false,
+                message = "$nextAction Then try Resume insulin again.",
+            )
+        }
+        LoadStatusResponse.LoadState.PRIME_NUDGE -> ResumeInsulinGuidance(
+            canResume = false,
+            message = "Fill cannula first, then try Resume insulin again.",
+        )
+        LoadStatusResponse.LoadState.PRIME_CANNULA -> {
+            if (loadStatus.getIsLoadingActive()) {
+                ResumeInsulinGuidance(
+                    canResume = false,
+                    message = "Complete Fill Cannula first, then try Resume insulin again.",
+                )
+            } else {
+                ResumeInsulinGuidance(
+                    canResume = true,
+                    message = "Resume all insulin deliveries?",
+                )
+            }
+        }
+        LoadStatusResponse.LoadState.INVALID -> ResumeInsulinGuidance(
+            canResume = false,
+            message = "Pump load state is invalid. Complete cartridge loading steps on the pump first.",
+        )
+        LoadStatusResponse.LoadState.UNKNOWN -> ResumeInsulinGuidance(
+            canResume = false,
+            message = "Pump load state is unknown. Complete any pending load steps on the pump first.",
+        )
+    }
+}
+
 val actionsCommands = listOf(
     HomeScreenMirrorRequest(),
     ControlIQInfoRequestBuilder.create(apiVersion()),
