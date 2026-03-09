@@ -173,15 +173,15 @@ class MainActivity : ComponentActivity() {
             dataStore.glucoseUnitPreference.value = GlucoseUnit.MGDL
         }
 
-        // Initialize MessageBus and register as listener
-        if (checkPlayServicesAndInitialize()) {
-            messageBus = MessageBusFactory.createMessageBus(this)
-            messageBus.addMessageListener(object : MessageListener {
-                override fun onMessageReceived(path: String, data: ByteArray, sourceNodeId: String) {
-                    handleMessageReceived(path, data, sourceNodeId)
-                }
-            })
-        }
+        // Always initialize MessageBus (factory handles Play Services fallback internally)
+        messageBus = MessageBusFactory.createMessageBus(this)
+        messageBus.addMessageListener(object : MessageListener {
+            override fun onMessageReceived(path: String, data: ByteArray, sourceNodeId: String) {
+                handleMessageReceived(path, data, sourceNodeId)
+            }
+        })
+        // Show warning dialog if Play Services missing (non-blocking)
+        checkPlayServicesAndInitialize()
         checkNotificationPermissions()
 
 
