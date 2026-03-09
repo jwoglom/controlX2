@@ -4,5 +4,5 @@ enum class SendType(val slug: String) {
     STANDARD("commands"),
     BUST_CACHE("commands-bust-cache"),
     CACHED("cached-commands"),
-    DEBUG_PROMPT("commands"),
+    DEBUG_PROMPT("debug-commands"),
 }

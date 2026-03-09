@@ -36,6 +36,7 @@ import com.jwoglom.controlx2.shared.PumpQualifyingEventsSerializer
 import com.jwoglom.controlx2.shared.messaging.MessageBus
 import com.jwoglom.controlx2.shared.messaging.MessageBusSender
 import com.jwoglom.controlx2.shared.messaging.MessageListener
+import com.jwoglom.controlx2.shared.util.SendType
 import com.jwoglom.controlx2.shared.util.setupTimber
 import com.jwoglom.controlx2.shared.util.shortTime
 import com.jwoglom.controlx2.shared.util.twoDecimalPlaces
@@ -136,6 +137,7 @@ class CommService : Service() {
     }
 
     private var lastResponseMessage: MutableMap<Pair<Characteristic, Byte>, Pair<com.jwoglom.pumpx2.pump.messages.Message, Instant>> = Collections.synchronizedMap(mutableMapOf())
+    private var debugPromptResponseCounts: MutableMap<Pair<Characteristic, Byte>, Int> = Collections.synchronizedMap(mutableMapOf())
     private var historyLogCache: MutableMap<Long, HistoryLog> = Collections.synchronizedMap(mutableMapOf())
     private var lastTimeSinceReset: TimeSinceResetResponse? = null
 
@@ -252,9 +254,14 @@ class CommService : Service() {
             ) {
                 message?.let {
                     lastResponseMessage.put(Pair(it.characteristic, it.opCode()), Pair(it, Instant.now()))
+                    val source = if (consumeDebugPromptResponse(it.characteristic, it.opCode())) {
+                        SendType.DEBUG_PROMPT
+                    } else {
+                        SendType.STANDARD
+                    }
                     // Propagate to HttpDebugApiService first so API callbacks/streams are not
                     // blocked by downstream UI-side handling (e.g. debug popup flow).
-                    httpDebugApiService?.onPumpMessageReceived(it)
+                    httpDebugApiService?.onPumpMessageReceived(it, source = source)
                 }
                 sendWearCommMessage("/from-pump/receive-message", PumpMessageSerializer.toBytes(message))
 
@@ -479,6 +486,7 @@ class CommService : Service() {
                 historyLogSyncWorker?.stop()
                 historyLogSyncWorker = null
                 lastTimeSinceReset = null
+                debugPromptResponseCounts.clear()
                 isConnected = false
                 sendWearCommMessage("/from-pump/pump-disconnected",
                     peripheral?.name!!.toByteArray()
@@ -493,7 +501,14 @@ class CommService : Service() {
                 super.onPumpCriticalError(peripheral, reason)
                 Timber.w("onPumpCriticalError $reason")
                 // Complete HttpDebugApiService request callbacks before UI notification side effects.
-                reason?.let { httpDebugApiService?.onPumpCriticalError(it) }
+                val source = reason?.initiatingMessage?.let {
+                    if (consumeDebugPromptResponse(it.characteristic, it.responseOpCode)) {
+                        SendType.DEBUG_PROMPT
+                    } else {
+                        SendType.STANDARD
+                    }
+                } ?: SendType.STANDARD
+                reason?.let { httpDebugApiService?.onPumpCriticalError(it, source = source) }
                 Toast.makeText(this@CommService, "${reason?.name}: ${reason?.message}", Toast.LENGTH_LONG).show()
                 sendWearCommMessage("/from-pump/pump-critical-error",
                     reason?.message!!.toByteArray()
@@ -1179,6 +1194,9 @@ class CommService : Service() {
             "/to-pump/commands" -> {
                 sendPumpCommMessages(data)
             }
+            "/to-pump/debug-commands" -> {
+                sendPumpCommDebugMessages(data)
+            }
             "/to-pump/commands-bust-cache" -> {
                 sendPumpCommMessagesBustCache(data)
             }
@@ -1369,6 +1387,21 @@ class CommService : Service() {
             pumpCommHandler?.sendMessage(msg)
         }
     }
+    private fun sendPumpCommDebugMessages(pumpMsgBytes: ByteArray) {
+        try {
+            val messages = PumpMessageSerializer.fromBulkBytes(pumpMsgBytes)
+            synchronized(debugPromptResponseCounts) {
+                messages.forEach {
+                    val key = Pair(it.characteristic, it.responseOpCode)
+                    debugPromptResponseCounts[key] = (debugPromptResponseCounts[key] ?: 0) + 1
+                }
+            }
+            Timber.i("Registered ${messages.size} debug-prompt request(s) for stream tagging")
+        } catch (e: Exception) {
+            Timber.w(e, "Failed to register debug-prompt requests")
+        }
+        sendPumpCommMessages(pumpMsgBytes)
+    }
     private fun sendPumpCommMessagesBustCache(pumpMsgBytes: ByteArray) {
         pumpCommHandler?.obtainMessage()?.also { msg ->
             msg.what = CommServiceCodes.SEND_PUMP_COMMANDS_BUST_CACHE_BULK.ordinal
@@ -1381,6 +1414,19 @@ class CommService : Service() {
             msg.what = CommServiceCodes.CACHED_PUMP_COMMANDS_BULK.ordinal
             msg.obj = rawBytes
             pumpCommHandler?.sendMessage(msg)
+        }
+    }
+
+    private fun consumeDebugPromptResponse(characteristic: Characteristic, opCode: Byte): Boolean {
+        val key = Pair(characteristic, opCode)
+        synchronized(debugPromptResponseCounts) {
+            val current = debugPromptResponseCounts[key] ?: return false
+            if (current <= 1) {
+                debugPromptResponseCounts.remove(key)
+            } else {
+                debugPromptResponseCounts[key] = current - 1
+            }
+            return true
         }
     }
     private fun sendPumpCommBolusMessage(initiateConfirmedBolusBytes: ByteArray) {

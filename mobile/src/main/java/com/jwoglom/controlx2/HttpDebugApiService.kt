@@ -7,6 +7,7 @@ import com.jwoglom.controlx2.db.historylog.HistoryLogItem
 import com.jwoglom.controlx2.db.historylog.HistoryLogRepo
 import com.jwoglom.controlx2.db.historylog.HistoryLogTypeStats
 import com.jwoglom.controlx2.shared.PumpMessageSerializer
+import com.jwoglom.controlx2.shared.util.SendType
 import com.jwoglom.controlx2.util.AppVersionInfo
 import com.jwoglom.pumpx2.pump.TandemError
 import com.jwoglom.pumpx2.pump.messages.Message
@@ -41,8 +42,10 @@ class HttpDebugApiService(private val context: Context, private val port: Int = 
     private val historyLogDb by lazy { HistoryLogDatabase.getDatabase(context) }
     private val historyLogRepo by lazy { HistoryLogRepo(historyLogDb.historyLogDao()) }
 
+    private data class PumpMessageStreamClient(val writer: PrintWriter, val debugMessagesOnly: Boolean)
+
     // Streaming clients for /api/pump/messages
-    private val pumpMessageStreamClients = CopyOnWriteArrayList<PrintWriter>()
+    private val pumpMessageStreamClients = CopyOnWriteArrayList<PumpMessageStreamClient>()
 
     private data class HistoryLogStreamClient(val writer: PrintWriter, val format: String, val pumpSid: Int?)
 
@@ -110,13 +113,13 @@ class HttpDebugApiService(private val context: Context, private val port: Int = 
     /**
      * Called when a pump message is received (from CommService.PumpCommHandler.Pump.onReceiveMessage)
      */
-    fun onPumpMessageReceived(message: Message) {
+    fun onPumpMessageReceived(message: Message, source: SendType = SendType.STANDARD) {
         Timber.d("onPumpMessageReceived: $message")
         // parse+decode to force as a single line
         val jsonString = JSONObject(message.jsonToString()).toString()
         if (pumpMessageStreamClients.isNotEmpty()) {
-            Timber.d("Broadcasting pump message to ${pumpMessageStreamClients.size} clients")
-            broadcastToPumpMessageClients(jsonString)
+            Timber.d("Broadcasting pump message to ${pumpMessageStreamClients.size} clients (source=$source)")
+            broadcastToPumpMessageClients(jsonString, source)
         }
 
         // Check if this message is a response to a pending request
@@ -124,7 +127,7 @@ class HttpDebugApiService(private val context: Context, private val port: Int = 
         pendingPumpRequests[key]?.complete(message)
     }
 
-    fun onPumpCriticalError(reason: TandemError) {
+    fun onPumpCriticalError(reason: TandemError, source: SendType = SendType.STANDARD) {
         // Some pump errors are surfaced via onPumpCriticalError instead of onPumpMessageReceived.
         // Mirror ErrorResponse objects into the pump stream so /api/pump/messages subscribers
         // see the same responses produced by debug send-message flows.
@@ -132,8 +135,8 @@ class HttpDebugApiService(private val context: Context, private val port: Int = 
             try {
                 val jsonString = JSONObject(reason.errorResponse.jsonToString()).toString()
                 if (pumpMessageStreamClients.isNotEmpty()) {
-                    Timber.d("Broadcasting pump critical ErrorResponse to ${pumpMessageStreamClients.size} clients")
-                    broadcastToPumpMessageClients(jsonString)
+                    Timber.d("Broadcasting pump critical ErrorResponse to ${pumpMessageStreamClients.size} clients (source=$source)")
+                    broadcastToPumpMessageClients(jsonString, source)
                 }
             } catch (e: Exception) {
                 Timber.w(e, "Failed to stream ErrorResponse from onPumpCriticalError")
@@ -184,19 +187,22 @@ class HttpDebugApiService(private val context: Context, private val port: Int = 
         broadcastToHistoryLogClients(item)
     }
 
-    private fun broadcastToPumpMessageClients(message: String) {
-        val toRemove = mutableListOf<PrintWriter>()
-        pumpMessageStreamClients.forEach { writer ->
+    private fun broadcastToPumpMessageClients(message: String, source: SendType) {
+        val toRemove = mutableListOf<PumpMessageStreamClient>()
+        pumpMessageStreamClients.forEach { client ->
+            if (client.debugMessagesOnly && source != SendType.DEBUG_PROMPT) {
+                return@forEach
+            }
             try {
-                writer.println(message)
-                writer.flush()
-                if (writer.checkError()) {
+                client.writer.println(message)
+                client.writer.flush()
+                if (client.writer.checkError()) {
                     Timber.w("Error writing to pump message stream client (checkError)")
-                    toRemove.add(writer)
+                    toRemove.add(client)
                 }
             } catch (e: Exception) {
                 Timber.w(e, "Error writing to pump message stream client (exception)")
-                toRemove.add(writer)
+                toRemove.add(client)
             }
         }
         pumpMessageStreamClients.removeAll(toRemove)
@@ -414,14 +420,17 @@ class HttpDebugApiService(private val context: Context, private val port: Int = 
         }
 
         private fun handlePumpMessagesStream(session: IHTTPSession): Response {
+            val debugMessagesOnly =
+                session.parameters["debugMessagesOnly"]?.firstOrNull()?.equals("true", ignoreCase = true) == true
             val inputStream = object : java.io.InputStream() {
                 private val buffer = java.io.PipedOutputStream()
                 private val input = java.io.PipedInputStream(buffer, 8192)  // Larger buffer
                 private val writer = PrintWriter(buffer, true)
+                private val client = PumpMessageStreamClient(writer, debugMessagesOnly)
 
                 init {
-                    pumpMessageStreamClients.add(writer)
-                    Timber.i("New pump messages stream client connected")
+                    pumpMessageStreamClients.add(client)
+                    Timber.i("New pump messages stream client connected (debugMessagesOnly=$debugMessagesOnly)")
 
                     // Send initial comment to prime the stream
                     writer.println("\n")
@@ -441,7 +450,7 @@ class HttpDebugApiService(private val context: Context, private val port: Int = 
                 }
 
                 override fun close() {
-                    pumpMessageStreamClients.remove(writer)
+                    pumpMessageStreamClients.remove(client)
                     buffer.close()
                     input.close()
                     Timber.i("Pump messages stream client disconnected")

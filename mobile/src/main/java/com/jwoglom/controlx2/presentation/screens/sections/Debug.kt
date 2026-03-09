@@ -144,6 +144,7 @@ import org.json.JSONArray
 import org.json.JSONObject
 import timber.log.Timber
 import java.io.File
+import java.lang.reflect.Constructor
 import java.lang.reflect.InvocationTargetException
 import java.time.Instant
 import java.util.stream.Collectors
@@ -385,20 +386,19 @@ fun Debug(
                                             return@DropdownMenuItem
                                         }
                                         val clazz = Class.forName(className)
-                                        Timber.i("Instantiated %s: %s", className, clazz)
-                                        sendPumpCommands(
-                                            SendType.DEBUG_PROMPT,
-                                            listOf(
-                                                clazz.newInstance() as Message
-                                            )
+                                        if (!Message::class.java.isAssignableFrom(clazz)) {
+                                            throw IllegalArgumentException("Class is not a Message: $className")
+                                        }
+                                        Timber.i("Selected %s: %s", className, clazz)
+                                        triggerGenericPumpMessageDialog(
+                                            context,
+                                            sendPumpCommands,
+                                            clazz.asSubclass(Message::class.java)
                                         )
                                     } catch (e: ClassNotFoundException) {
                                         Timber.e(e)
                                         e.printStackTrace()
-                                    } catch (e: IllegalAccessException) {
-                                        Timber.e(e)
-                                        e.printStackTrace()
-                                    } catch (e: InstantiationException) {
+                                    } catch (e: IllegalArgumentException) {
                                         Timber.e(e)
                                         e.printStackTrace()
                                     }
@@ -1317,32 +1317,252 @@ fun triggerMessageWithBolusIdParameter(
             Timber.e("Not sending message because no bolus ID entered.")
             return@OnClickListener
         }
-        val bolusId = bolusIdStr.toInt()
-        val constructorType = arrayOf<Class<*>?>(
-            Long::class.javaPrimitiveType
-        )
-        val message: Message
-        message = try {
-            messageClass.getConstructor(*constructorType).newInstance(bolusId)
-        } catch (e: IllegalAccessException) {
-            Timber.e(e)
-            return@OnClickListener
-        } catch (e: InstantiationException) {
-            Timber.e(e)
-            return@OnClickListener
-        } catch (e: InvocationTargetException) {
-            Timber.e(e)
-            return@OnClickListener
-        } catch (e: NoSuchMethodException) {
-            Timber.e(e)
+        val bolusId = bolusIdStr.toLong()
+        val constructor = messageClass.constructors
+            .filterIsInstance<Constructor<out Message>>()
+            .filter { java.lang.reflect.Modifier.isPublic(it.modifiers) && it.parameterCount == 1 }
+            .firstOrNull { ctor ->
+                val type = ctor.parameterTypes[0]
+                type == Int::class.javaPrimitiveType || type == Int::class.java ||
+                    type == Long::class.javaPrimitiveType || type == Long::class.java
+            }
+        if (constructor == null) {
+            Timber.e("No constructor with numeric bolus ID parameter found for %s", messageClass.name)
+            Toast.makeText(context, "No bolus ID constructor available for ${messageClass.simpleName}", Toast.LENGTH_SHORT).show()
             return@OnClickListener
         }
-        sendPumpCommands(SendType.DEBUG_PROMPT, listOf(message))
+        try {
+            val paramType = constructor.parameterTypes[0]
+            val message = if (paramType == Int::class.javaPrimitiveType || paramType == Int::class.java) {
+                constructor.newInstance(bolusId.toInt())
+            } else {
+                constructor.newInstance(bolusId)
+            }
+            sendPumpCommands(SendType.DEBUG_PROMPT, listOf(message))
+        } catch (e: IllegalAccessException) {
+            Timber.e(e)
+        } catch (e: InstantiationException) {
+            Timber.e(e)
+        } catch (e: InvocationTargetException) {
+            Timber.e(e)
+        }
     })
     builder.setNegativeButton(
         "Cancel"
     ) { dialog, which -> dialog.cancel() }
     builder.show()
+}
+
+fun triggerGenericPumpMessageDialog(
+    context: Context,
+    sendPumpCommands: (SendType, List<Message>) -> Unit,
+    messageClass: Class<out Message>,
+) {
+    val constructors = messageClass.constructors
+        .filterIsInstance<Constructor<out Message>>()
+        .filter { java.lang.reflect.Modifier.isPublic(it.modifiers) }
+
+    val noArgConstructor = constructors.firstOrNull { it.parameterCount == 0 }
+    val argumentConstructors = constructors
+        .filter { it.parameterCount > 0 }
+        .filter { ctor -> ctor.parameterTypes.none { it == ByteArray::class.java } }
+        .filter { ctor -> ctor.parameterTypes.all { isSupportedDebugConstructorType(it) } }
+        .sortedBy { it.parameterCount }
+
+    if (argumentConstructors.isEmpty()) {
+        if (noArgConstructor == null) {
+            Toast.makeText(context, "No usable constructor found for ${messageClass.simpleName}", Toast.LENGTH_SHORT).show()
+            return
+        }
+        sendConstructedPumpMessage(context, sendPumpCommands, noArgConstructor, emptyList())
+        return
+    }
+
+    val options = mutableListOf<String>()
+    val optionConstructors = mutableListOf<Constructor<out Message>?>()
+    if (noArgConstructor != null) {
+        options.add("No arguments")
+        optionConstructors.add(noArgConstructor)
+    }
+    argumentConstructors.forEach {
+        options.add(formatDebugConstructorSignature(messageClass, it))
+        optionConstructors.add(it)
+    }
+
+    if (optionConstructors.size == 1) {
+        val onlyConstructor = optionConstructors.first()
+        if (onlyConstructor == null || onlyConstructor.parameterCount == 0) {
+            sendConstructedPumpMessage(context, sendPumpCommands, noArgConstructor, emptyList())
+        } else {
+            triggerConstructorArgumentDialog(context, sendPumpCommands, messageClass, onlyConstructor)
+        }
+        return
+    }
+
+    AlertDialog.Builder(context)
+        .setTitle("${messageClass.simpleName}: Constructor")
+        .setItems(options.toTypedArray()) { dialog, which ->
+            val selected = optionConstructors[which]
+            if (selected == null || selected.parameterCount == 0) {
+                sendConstructedPumpMessage(context, sendPumpCommands, noArgConstructor, emptyList())
+            } else {
+                triggerConstructorArgumentDialog(context, sendPumpCommands, messageClass, selected)
+            }
+        }
+        .setNegativeButton("Cancel") { dialog, _ -> dialog.cancel() }
+        .show()
+}
+
+fun triggerConstructorArgumentDialog(
+    context: Context,
+    sendPumpCommands: (SendType, List<Message>) -> Unit,
+    messageClass: Class<out Message>,
+    constructor: Constructor<out Message>,
+) {
+    val layout = LinearLayout(context)
+    layout.orientation = LinearLayout.VERTICAL
+    val inputs = mutableListOf<EditText>()
+    constructor.parameterTypes.forEachIndexed { index, paramType ->
+        val input = EditText(context)
+        input.hint = "arg${index + 1}: ${debugTypeHint(paramType)}"
+        input.inputType = debugInputType(paramType)
+        layout.addView(input)
+        inputs.add(input)
+    }
+
+    AlertDialog.Builder(context)
+        .setTitle(formatDebugConstructorSignature(messageClass, constructor))
+        .setView(layout)
+        .setPositiveButton("Send") { dialog, _ ->
+            val args = mutableListOf<Any>()
+            for ((index, paramType) in constructor.parameterTypes.withIndex()) {
+                val raw = inputs[index].text.toString().trim()
+                if (raw.isBlank()) {
+                    Toast.makeText(context, "Argument ${index + 1} is required", Toast.LENGTH_SHORT).show()
+                    return@setPositiveButton
+                }
+                try {
+                    args.add(parseDebugConstructorArg(raw, paramType))
+                } catch (e: Exception) {
+                    Timber.e(e)
+                    Toast.makeText(
+                        context,
+                        "Invalid value for argument ${index + 1} (${debugTypeHint(paramType)})",
+                        Toast.LENGTH_SHORT
+                    ).show()
+                    return@setPositiveButton
+                }
+            }
+            sendConstructedPumpMessage(context, sendPumpCommands, constructor, args)
+            dialog.dismiss()
+        }
+        .setNegativeButton("Cancel") { dialog, _ -> dialog.cancel() }
+        .show()
+}
+
+fun sendConstructedPumpMessage(
+    context: Context,
+    sendPumpCommands: (SendType, List<Message>) -> Unit,
+    constructor: Constructor<out Message>?,
+    args: List<Any>,
+) {
+    if (constructor == null) {
+        Toast.makeText(context, "No constructor available", Toast.LENGTH_SHORT).show()
+        return
+    }
+    try {
+        val message = constructor.newInstance(*args.toTypedArray())
+        sendPumpCommands(SendType.DEBUG_PROMPT, listOf(message))
+    } catch (e: IllegalAccessException) {
+        Timber.e(e)
+        Toast.makeText(context, "Unable to access constructor", Toast.LENGTH_SHORT).show()
+    } catch (e: InstantiationException) {
+        Timber.e(e)
+        Toast.makeText(context, "Unable to create message", Toast.LENGTH_SHORT).show()
+    } catch (e: InvocationTargetException) {
+        Timber.e(e)
+        Toast.makeText(context, "Message constructor failed", Toast.LENGTH_SHORT).show()
+    }
+}
+
+fun formatDebugConstructorSignature(
+    messageClass: Class<out Message>,
+    constructor: Constructor<out Message>,
+): String {
+    return "${messageClass.simpleName}(" + constructor.parameterTypes.joinToString(", ") { it.simpleName } + ")"
+}
+
+fun isSupportedDebugConstructorType(type: Class<*>): Boolean {
+    if (type == ByteArray::class.java) {
+        return false
+    }
+    if (type.isEnum) {
+        return true
+    }
+    return type == String::class.java ||
+        type == Instant::class.java ||
+        type == Int::class.javaPrimitiveType || type == Int::class.java ||
+        type == Long::class.javaPrimitiveType || type == Long::class.java ||
+        type == Boolean::class.javaPrimitiveType || type == Boolean::class.java ||
+        type == Float::class.javaPrimitiveType || type == Float::class.java ||
+        type == Double::class.javaPrimitiveType || type == Double::class.java ||
+        type == Short::class.javaPrimitiveType || type == Short::class.java ||
+        type == Byte::class.javaPrimitiveType || type == Byte::class.java
+}
+
+fun debugTypeHint(type: Class<*>): String {
+    if (type == Instant::class.java) {
+        return "Instant (epoch seconds or ISO-8601)"
+    }
+    if (type.isEnum) {
+        val values = type.enumConstants
+            ?.map { (it as Enum<*>).name }
+            ?.joinToString("|")
+            ?: ""
+        return "${type.simpleName} [$values]"
+    }
+    return type.simpleName
+}
+
+fun debugInputType(type: Class<*>): Int {
+    return when {
+        type == Int::class.javaPrimitiveType || type == Int::class.java ||
+            type == Long::class.javaPrimitiveType || type == Long::class.java ||
+            type == Short::class.javaPrimitiveType || type == Short::class.java ||
+            type == Byte::class.javaPrimitiveType || type == Byte::class.java ->
+            InputType.TYPE_CLASS_NUMBER or InputType.TYPE_NUMBER_FLAG_SIGNED
+
+        type == Float::class.javaPrimitiveType || type == Float::class.java ||
+            type == Double::class.javaPrimitiveType || type == Double::class.java ->
+            InputType.TYPE_CLASS_NUMBER or InputType.TYPE_NUMBER_FLAG_DECIMAL or InputType.TYPE_NUMBER_FLAG_SIGNED
+
+        else -> InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_NORMAL
+    }
+}
+
+fun parseDebugConstructorArg(raw: String, type: Class<*>): Any {
+    return when {
+        type == String::class.java -> raw
+        type == Int::class.javaPrimitiveType || type == Int::class.java -> raw.toInt()
+        type == Long::class.javaPrimitiveType || type == Long::class.java -> raw.toLong()
+        type == Boolean::class.javaPrimitiveType || type == Boolean::class.java -> parseBoolInput(raw)
+        type == Float::class.javaPrimitiveType || type == Float::class.java -> raw.toFloat()
+        type == Double::class.javaPrimitiveType || type == Double::class.java -> raw.toDouble()
+        type == Short::class.javaPrimitiveType || type == Short::class.java -> raw.toShort()
+        type == Byte::class.javaPrimitiveType || type == Byte::class.java -> raw.toByte()
+        type == Instant::class.java -> if (raw.matches(Regex("^-?\\d+$"))) Instant.ofEpochSecond(raw.toLong()) else Instant.parse(raw)
+        type.isEnum -> {
+            val enumValue = type.enumConstants?.firstOrNull {
+                (it as Enum<*>).name.equals(raw, ignoreCase = true)
+            }
+            if (enumValue != null) {
+                enumValue
+            } else {
+                throw IllegalArgumentException("Invalid enum value '$raw' for ${type.name}")
+            }
+        }
+        else -> throw IllegalArgumentException("Unsupported parameter type: ${type.name}")
+    }
 }
 
 

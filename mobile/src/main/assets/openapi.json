@@ -248,6 +248,18 @@
       "get": {
         "summary": "Stream pump messages",
         "description": "Streaming endpoint that returns newline-delimited JSON (jsonlines) of pump messages as they are received",
+        "parameters": [
+          {
+            "name": "debugMessagesOnly",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false
+            },
+            "description": "When true, only emit responses produced by the in-app Debug screen Send Pump Message flow"
+          }
+        ],
         "responses": {
           "200": {
             "description": "Stream of pump messages",
