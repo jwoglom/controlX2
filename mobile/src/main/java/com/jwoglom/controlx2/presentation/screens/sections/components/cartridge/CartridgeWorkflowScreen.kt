@@ -3,6 +3,7 @@ package com.jwoglom.controlx2.presentation.screens.sections.components.cartridge
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -12,6 +13,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Divider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -30,11 +32,12 @@ import com.jwoglom.controlx2.presentation.theme.ControlX2Theme
 @Composable
 fun CartridgeWorkflowScreen(
     title: String,
+    innerPadding: PaddingValues = PaddingValues(),
     onBack: () -> Unit,
     body: @Composable ColumnScope.() -> Unit,
     actions: @Composable ColumnScope.() -> Unit,
 ) {
-    Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
+    Column(modifier = Modifier.fillMaxSize().padding(innerPadding).padding(16.dp)) {
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
@@ -64,6 +67,12 @@ fun PrimaryActionButton(
     Button(
         onClick = onClick,
         enabled = enabled,
+        colors = ButtonDefaults.buttonColors(
+            containerColor = MaterialTheme.colorScheme.primary,
+            contentColor = MaterialTheme.colorScheme.onPrimary,
+            disabledContainerColor = MaterialTheme.colorScheme.surfaceVariant,
+            disabledContentColor = MaterialTheme.colorScheme.onSurfaceVariant
+        ),
         modifier = Modifier.fillMaxWidth().height(56.dp),
     ) {
         Text(text)

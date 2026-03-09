@@ -188,6 +188,7 @@ fun CartridgeActions(
             )
 
             CartridgeSubScreen.CHANGE_CARTRIDGE -> ChangeCartridgeWorkflowScreen(
+                innerPadding = innerPadding,
                 basalStatus = basalStatus.value,
                 inChangeCartridgeMode = inChangeCartridgeMode.value == true,
                 enterChangeCartridgeState = enterChangeCartridgeState.value,
@@ -199,6 +200,7 @@ fun CartridgeActions(
             )
 
             CartridgeSubScreen.FILL_TUBING -> FillTubingWorkflowScreen(
+                innerPadding = innerPadding,
                 basalStatus = basalStatus.value,
                 inFillTubingMode = inFillTubingMode.value == true,
                 fillTubingButtonDown = fillTubingState.value?.buttonDown,
@@ -219,6 +221,7 @@ fun CartridgeActions(
             )
 
             CartridgeSubScreen.FILL_CANNULA -> FillCannulaWorkflowScreen(
+                innerPadding = innerPadding,
                 basalStatus = basalStatus.value,
                 fillCannulaState = fillCannulaState.value,
                 cannulaFillAmount = cannulaFillAmount,

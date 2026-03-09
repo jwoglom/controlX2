@@ -263,9 +263,11 @@ fun Debug(
                     ) {
                         val requestMessages = MessageHelpers.getAllPumpRequestMessages()
                             .stream().filter { m: String ->
-                                !m.startsWith("authentication.") && !m.startsWith(
-                                    "historyLog."
-                                )
+                                !m.startsWith("authentication.") &&
+                                    !m.startsWith("historyLog.") &&
+                                    !m.contains("FactoryResetRequest") &&
+                                    !m.contains("FactoryResetBRequest") &&
+                                    !m.contains("Nonexistent", ignoreCase = true)
                             }.collect(Collectors.toList())
 
                         requestMessages.forEach { message ->

@@ -1,6 +1,7 @@
 package com.jwoglom.controlx2.presentation.screens.sections.components.cartridge
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -22,6 +23,7 @@ import com.jwoglom.pumpx2.pump.messages.response.controlStream.ExitFillTubingMod
 
 @Composable
 fun FillTubingWorkflowScreen(
+    innerPadding: PaddingValues = PaddingValues(),
     basalStatus: BasalStatus?,
     inFillTubingMode: Boolean,
     fillTubingButtonDown: Boolean?,
@@ -33,7 +35,7 @@ fun FillTubingWorkflowScreen(
     onRestartFill: () -> Unit,
     onDone: () -> Unit,
 ) {
-    CartridgeWorkflowScreen(title = "Fill Tubing", onBack = onBack,
+    CartridgeWorkflowScreen(title = "Fill Tubing", innerPadding = innerPadding, onBack = onBack,
         body = {
             when {
                 exitFillTubingState != null -> {

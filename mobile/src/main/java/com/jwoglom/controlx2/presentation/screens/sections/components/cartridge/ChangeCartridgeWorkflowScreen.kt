@@ -1,6 +1,7 @@
 package com.jwoglom.controlx2.presentation.screens.sections.components.cartridge
 
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.height
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -18,6 +19,7 @@ import com.jwoglom.pumpx2.pump.messages.response.controlStream.EnterChangeCartri
 
 @Composable
 fun ChangeCartridgeWorkflowScreen(
+    innerPadding: PaddingValues = PaddingValues(),
     basalStatus: BasalStatus?,
     inChangeCartridgeMode: Boolean,
     enterChangeCartridgeState: EnterChangeCartridgeModeStateStreamResponse?,
@@ -27,7 +29,7 @@ fun ChangeCartridgeWorkflowScreen(
     onExit: () -> Unit,
     onDone: () -> Unit,
 ) {
-    CartridgeWorkflowScreen(title = "Change Cartridge", onBack = onBack,
+    CartridgeWorkflowScreen(title = "Change Cartridge", innerPadding = innerPadding, onBack = onBack,
         body = {
             when {
                 detectingCartridgeState != null -> {

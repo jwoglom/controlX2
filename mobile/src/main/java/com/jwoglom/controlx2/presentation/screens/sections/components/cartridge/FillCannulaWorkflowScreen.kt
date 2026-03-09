@@ -1,6 +1,7 @@
 package com.jwoglom.controlx2.presentation.screens.sections.components.cartridge
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -23,6 +24,7 @@ import com.jwoglom.pumpx2.pump.messages.response.controlStream.FillCannulaStateS
 
 @Composable
 fun FillCannulaWorkflowScreen(
+    innerPadding: PaddingValues = PaddingValues(),
     basalStatus: BasalStatus?,
     fillCannulaState: FillCannulaStateStreamResponse?,
     cannulaFillAmount: Double?,
@@ -33,7 +35,7 @@ fun FillCannulaWorkflowScreen(
     onCannulaAmountChange: (String?, Double?) -> Unit,
     onSendFillRequest: () -> Unit,
 ) {
-    CartridgeWorkflowScreen(title = "Fill Cannula", onBack = onBack,
+    CartridgeWorkflowScreen(title = "Fill Cannula", innerPadding = innerPadding, onBack = onBack,
         body = {
             when {
                 fillCannulaState != null -> {
