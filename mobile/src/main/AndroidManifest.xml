@@ -48,6 +48,12 @@
                     android:pathPrefix="/" />
             </intent-filter>
 
+            <intent-filter>
+                <action android:name="com.jwoglom.controlx2.action.OPEN_BOLUS" />
+                <action android:name="com.jwoglom.controlx2.action.OPEN_TEMP_RATE" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+
             <meta-data
                 android:name="android.app.lib_name"
                 android:value="" />
@@ -88,6 +94,10 @@
                 android:name="android.support.FILE_PROVIDER_PATHS"
                 android:resource="@xml/provider_paths" />
         </provider>
+
+        <meta-data
+            android:name="android.app.shortcuts"
+            android:resource="@xml/shortcuts" />
     </application>
 
 </manifest>

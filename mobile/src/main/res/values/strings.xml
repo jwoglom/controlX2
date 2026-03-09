@@ -1,4 +1,8 @@
 <resources>
     <string name="app_name">ControlX2</string>
     <string name="title_activity_uiactivity">UIActivity</string>
+    <string name="shortcut_bolus_short">Bolus Entry</string>
+    <string name="shortcut_bolus_long">Open bolus entry</string>
+    <string name="shortcut_temp_rate_short">Temp Rate</string>
+    <string name="shortcut_temp_rate_long">Open temp rate entry</string>
 </resources>

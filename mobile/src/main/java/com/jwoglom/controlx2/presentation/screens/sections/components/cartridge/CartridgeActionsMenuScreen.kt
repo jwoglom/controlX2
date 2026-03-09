@@ -11,10 +11,12 @@ import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Divider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.ListItem
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
@@ -28,6 +30,12 @@ import com.jwoglom.pumpx2.pump.messages.models.KnownDeviceModel
 fun CartridgeActionsMenuScreen(
     innerPadding: PaddingValues,
     deviceName: String,
+    changeCartridgeEnabled: Boolean = true,
+    changeCartridgeDisabledReason: String? = null,
+    fillTubingEnabled: Boolean = true,
+    fillTubingDisabledReason: String? = null,
+    fillCannulaEnabled: Boolean = true,
+    fillCannulaDisabledReason: String? = null,
     onChangeCartridge: () -> Unit,
     onFillTubing: () -> Unit,
     onFillCannula: () -> Unit,
@@ -50,26 +58,29 @@ fun CartridgeActionsMenuScreen(
         }
 
         item {
-            ListItem(
-                headlineContent = { Text("Change Cartridge") },
-                leadingContent = { Icon(Icons.Filled.Settings, contentDescription = null) },
-                modifier = Modifier.clickable(onClick = onChangeCartridge),
+            MenuActionItem(
+                title = "Change Cartridge",
+                enabled = changeCartridgeEnabled,
+                disabledReason = changeCartridgeDisabledReason,
+                onClick = onChangeCartridge,
             )
         }
 
         item {
-            ListItem(
-                headlineContent = { Text("Fill Tubing") },
-                leadingContent = { Icon(Icons.Filled.Settings, contentDescription = null) },
-                modifier = Modifier.clickable(onClick = onFillTubing),
+            MenuActionItem(
+                title = "Fill Tubing",
+                enabled = fillTubingEnabled,
+                disabledReason = fillTubingDisabledReason,
+                onClick = onFillTubing,
             )
         }
 
         item {
-            ListItem(
-                headlineContent = { Text("Fill Cannula") },
-                leadingContent = { Icon(Icons.Filled.Settings, contentDescription = null) },
-                modifier = Modifier.clickable(onClick = onFillCannula),
+            MenuActionItem(
+                title = "Fill Cannula",
+                enabled = fillCannulaEnabled,
+                disabledReason = fillCannulaDisabledReason,
+                onClick = onFillCannula,
             )
         }
 
@@ -81,6 +92,34 @@ fun CartridgeActionsMenuScreen(
             )
         }
     }
+}
+
+@Composable
+private fun MenuActionItem(
+    title: String,
+    enabled: Boolean,
+    disabledReason: String?,
+    onClick: () -> Unit,
+) {
+    val alpha = if (enabled) 1f else 0.45f
+    val textColor = if (enabled) {
+        MaterialTheme.colorScheme.onSurface
+    } else {
+        MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+    }
+
+    ListItem(
+        headlineContent = { Text(title, color = textColor) },
+        supportingContent = {
+            if (!enabled && !disabledReason.isNullOrBlank()) {
+                Text(disabledReason, color = textColor)
+            }
+        },
+        leadingContent = { Icon(Icons.Filled.Settings, contentDescription = null, tint = textColor) },
+        modifier = Modifier
+            .alpha(alpha)
+            .clickable(enabled = enabled, onClick = onClick),
+    )
 }
 
 @Preview(showBackground = true)

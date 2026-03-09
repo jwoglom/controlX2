@@ -24,6 +24,7 @@ import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
 import androidx.compose.runtime.compositionLocalOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.core.app.ActivityCompat
 import com.google.android.gms.common.ConnectionResult
 import com.google.android.gms.common.GoogleApiAvailability
@@ -38,7 +39,11 @@ import com.jwoglom.controlx2.db.historylog.HistoryLogViewModel
 import com.jwoglom.controlx2.db.historylog.HistoryLogViewModelFactory
 import com.jwoglom.controlx2.presentation.DataStore
 import com.jwoglom.controlx2.presentation.MobileApp
+import com.jwoglom.controlx2.presentation.navigation.BolusInputPrefill
 import com.jwoglom.controlx2.presentation.navigation.Screen
+import com.jwoglom.controlx2.presentation.navigation.SheetLaunchRequest
+import com.jwoglom.controlx2.presentation.navigation.SheetLaunchTarget
+import com.jwoglom.controlx2.presentation.navigation.TempRateInputPrefill
 import com.jwoglom.controlx2.presentation.screens.PumpSetupStage
 import com.jwoglom.controlx2.presentation.screens.sections.messagePairToJson
 import com.jwoglom.controlx2.presentation.screens.sections.verbosePumpMessage
@@ -118,7 +123,21 @@ var dataStore = DataStore()
 val LocalDataStore = compositionLocalOf { dataStore }
 
 class MainActivity : ComponentActivity() {
+    companion object {
+        const val ACTION_OPEN_BOLUS = "com.jwoglom.controlx2.action.OPEN_BOLUS"
+        const val ACTION_OPEN_TEMP_RATE = "com.jwoglom.controlx2.action.OPEN_TEMP_RATE"
+        const val EXTRA_OPEN_BOLUS = "open_bolus"
+        const val EXTRA_OPEN_TEMP_RATE = "open_temp_rate"
+        const val EXTRA_BOLUS_UNITS = "units"
+        const val EXTRA_BOLUS_CARBS = "carbs"
+        const val EXTRA_BOLUS_BG = "bg"
+        const val EXTRA_TEMP_RATE_PERCENT = "percent"
+        const val EXTRA_TEMP_RATE_HOURS = "hours"
+        const val EXTRA_TEMP_RATE_MINUTES = "minutes"
+    }
+
     private lateinit var messageBus: MessageBus
+    private val sheetLaunchRequestState = mutableStateOf<SheetLaunchRequest?>(null)
 
     private val applicationScope = CoroutineScope(SupervisorJob())
     private val historyLogDb by lazy { HistoryLogDatabase.getDatabase(this) }
@@ -140,6 +159,10 @@ class MainActivity : ComponentActivity() {
         )
         val startDestination = determineStartDestination()
         Timber.d("startDestination=%s", startDestination)
+        logIncomingIntent("onCreate", intent)
+        if (startDestination == Screen.Landing.route) {
+            sheetLaunchRequestState.value = parseSheetLaunchRequest(intent, "onCreate")
+        }
 
         setContent {
             MobileApp(
@@ -161,7 +184,13 @@ class MainActivity : ComponentActivity() {
                         "".toByteArray()
                     )
                 },
-                historyLogViewModel = historyLogViewModel
+                historyLogViewModel = historyLogViewModel,
+                sheetLaunchRequest = sheetLaunchRequestState.value,
+                onSheetLaunchHandled = { handledRequestId ->
+                    if (sheetLaunchRequestState.value?.requestId == handledRequestId) {
+                        sheetLaunchRequestState.value = null
+                    }
+                }
             )
         }
 
@@ -210,6 +239,21 @@ class MainActivity : ComponentActivity() {
 
     private val writeCharacteristicFailedCallback: (String) -> Unit = { uuid ->
         sendMessage("/to-phone/write-characteristic-failed-callback", uuid.toByteArray())
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        logIncomingIntent("onNewIntent", intent)
+
+        if (determineStartDestination() != Screen.Landing.route) {
+            Timber.i("Ignoring sheet launch while app is not in Landing flow")
+            return
+        }
+
+        parseSheetLaunchRequest(intent, "onNewIntent")?.let {
+            sheetLaunchRequestState.value = it
+        }
     }
 
     override fun onResume() {
@@ -1154,6 +1198,164 @@ class MainActivity : ComponentActivity() {
         } catch (e: ActivityNotFoundException) {
             startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://play.google.com/store/apps/details?id=$pkg")))
         }
+    }
+
+    private fun parseSheetLaunchRequest(intent: Intent?, source: String): SheetLaunchRequest? {
+        if (intent == null) {
+            Timber.i("parseSheetLaunchRequest[$source]: null intent")
+            return null
+        }
+
+        val uri = intent.data
+        val path = uri?.path?.trim('/')?.lowercase()
+
+        val openBolus =
+            intent.action == ACTION_OPEN_BOLUS ||
+                intent.getBooleanExtra(EXTRA_OPEN_BOLUS, false) ||
+                path == "bolus"
+
+        val openTempRate =
+            intent.action == ACTION_OPEN_TEMP_RATE ||
+                intent.getBooleanExtra(EXTRA_OPEN_TEMP_RATE, false) ||
+                path == "temp-rate" ||
+                path == "temp_rate" ||
+                path == "temprate"
+
+        Timber.i("parseSheetLaunchRequest[%s]: action=%s uri=%s path=%s openBolus=%s openTempRate=%s",
+            source, intent.action, uri, path, openBolus, openTempRate)
+
+        if (openBolus == openTempRate) {
+            Timber.i("parseSheetLaunchRequest[%s]: no unique target selected", source)
+            return null
+        }
+
+        return when {
+            openBolus -> {
+                val prefill = parseBolusInputPrefill(intent, uri)
+                val target = SheetLaunchTarget.Bolus(
+                    prefill = prefill
+                )
+                SheetLaunchRequest(target = target).also {
+                    Timber.i("Parsed bolus sheet launch request [%s] id=%s prefill=%s",
+                        source, it.requestId, prefill)
+                }
+            }
+            openTempRate -> {
+                val prefill = parseTempRateInputPrefill(intent, uri)
+                val target = SheetLaunchTarget.TempRate(
+                    prefill = prefill
+                )
+                SheetLaunchRequest(target = target).also {
+                    Timber.i("Parsed temp rate sheet launch request [%s] id=%s prefill=%s",
+                        source, it.requestId, prefill)
+                }
+            }
+            else -> null
+        }
+    }
+
+    private fun logIncomingIntent(source: String, intent: Intent?) {
+        if (intent == null) {
+            Timber.i("Incoming intent [%s]: null", source)
+            return
+        }
+        val extras = intent.extras
+        val extrasSummary = if (extras == null) {
+            "none"
+        } else {
+            extras.keySet().joinToString(prefix = "{", postfix = "}") { key ->
+                "$key=${extras.get(key)}"
+            }
+        }
+
+        Timber.i(
+            "Incoming intent [%s]: action=%s data=%s scheme=%s host=%s path=%s query=%s extras=%s",
+            source,
+            intent.action,
+            intent.dataString,
+            intent.data?.scheme,
+            intent.data?.host,
+            intent.data?.path,
+            intent.data?.query,
+            extrasSummary
+        )
+    }
+
+    private fun parseBolusInputPrefill(intent: Intent, uri: Uri?): BolusInputPrefill? {
+        val unitsRawValue = sanitizeDecimalValue(readLaunchValue(intent, uri, EXTRA_BOLUS_UNITS))
+        val carbsRawValue = sanitizeIntegerValue(readLaunchValue(intent, uri, EXTRA_BOLUS_CARBS))
+        val glucoseRawValue = sanitizeIntegerValue(readLaunchValue(intent, uri, EXTRA_BOLUS_BG))
+
+        if (unitsRawValue == null && carbsRawValue == null && glucoseRawValue == null) {
+            return null
+        }
+        return BolusInputPrefill(
+            unitsRawValue = unitsRawValue,
+            carbsRawValue = carbsRawValue,
+            glucoseRawValue = glucoseRawValue
+        )
+    }
+
+    private fun parseTempRateInputPrefill(intent: Intent, uri: Uri?): TempRateInputPrefill? {
+        val percentRawValue = sanitizeIntegerValue(readLaunchValue(intent, uri, EXTRA_TEMP_RATE_PERCENT))
+        val hoursRawValue = sanitizeIntegerValue(readLaunchValue(intent, uri, EXTRA_TEMP_RATE_HOURS))
+        val minutesRawValue = sanitizeIntegerValue(readLaunchValue(intent, uri, EXTRA_TEMP_RATE_MINUTES))
+
+        if (percentRawValue == null && hoursRawValue == null && minutesRawValue == null) {
+            return null
+        }
+        return TempRateInputPrefill(
+            percentRawValue = percentRawValue,
+            hoursRawValue = hoursRawValue,
+            minutesRawValue = minutesRawValue
+        )
+    }
+
+    private fun readLaunchValue(intent: Intent, uri: Uri?, key: String): String? {
+        val fromExtras = intent.extras?.get(key)?.toString()?.trim()?.takeIf { it.isNotEmpty() }
+        if (fromExtras != null) {
+            return fromExtras
+        }
+        return uri?.getQueryParameter(key)?.trim()?.takeIf { it.isNotEmpty() }
+    }
+
+    private fun sanitizeIntegerValue(raw: String?): String? {
+        val filtered = raw?.filter { it.isDigit() } ?: return null
+        if (filtered.isEmpty()) {
+            return null
+        }
+        return filtered.trimStart('0').ifEmpty { "0" }
+    }
+
+    private fun sanitizeDecimalValue(raw: String?): String? {
+        if (raw == null) {
+            return null
+        }
+
+        var filtered = raw.filter { it.isDigit() || it == '.' }
+        if (filtered.isEmpty()) {
+            return null
+        }
+
+        val firstDot = filtered.indexOf('.')
+        if (firstDot >= 0) {
+            val integral = filtered.substring(0, firstDot + 1)
+            val fractional = filtered.substring(firstDot + 1).replace(".", "")
+            filtered = integral + fractional
+            if (filtered.length - firstDot > 3) {
+                filtered = filtered.substring(0, firstDot + 3)
+            }
+        }
+
+        if (filtered == ".") {
+            return null
+        }
+
+        val parsed = filtered.toDoubleOrNull() ?: return null
+        if (parsed < 0) {
+            return null
+        }
+        return filtered
     }
 
     private fun determineStartDestination(): String {

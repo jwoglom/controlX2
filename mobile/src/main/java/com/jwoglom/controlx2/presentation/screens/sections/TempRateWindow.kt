@@ -33,7 +33,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.onFocusChanged
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.res.painterResource
@@ -44,6 +43,7 @@ import com.jwoglom.controlx2.LocalDataStore
 import com.jwoglom.controlx2.R
 import com.jwoglom.controlx2.presentation.DataStore
 import com.jwoglom.controlx2.presentation.components.HeaderLine
+import com.jwoglom.controlx2.presentation.navigation.TempRateInputPrefill
 import com.jwoglom.controlx2.presentation.screens.TempRatePreview
 import com.jwoglom.controlx2.presentation.screens.sections.components.IntegerOutlinedText
 import com.jwoglom.controlx2.presentation.util.LifecycleStateObserver
@@ -60,6 +60,8 @@ import timber.log.Timber
 @Composable
 fun TempRateWindow(
     sendPumpCommands: (SendType, List<Message>) -> Unit,
+    prefill: TempRateInputPrefill? = null,
+    onPrefillConsumed: () -> Unit = {},
     closeWindow: () -> Unit,
 ) {
     val mainHandler = Handler(Looper.getMainLooper())
@@ -85,6 +87,7 @@ fun TempRateWindow(
 
     var tempRateButtonEnabled by remember { mutableStateOf(false) }
     var tempRate by remember { mutableStateOf<SetTempRateRequest?>(null) }
+    var pendingPrefill by remember(prefill) { mutableStateOf(prefill) }
 
     var showPermissionCheckDialog by remember { mutableStateOf(false) }
 
@@ -131,6 +134,15 @@ fun TempRateWindow(
         sendPumpCommands(SendType.BUST_CACHE, commands)
     }
 
+    fun applyPrefill(prefillValues: TempRateInputPrefill) {
+        dataStore.tempRatePercentRawValue.value = prefillValues.percentRawValue
+        dataStore.tempRateHoursRawValue.value = prefillValues.hoursRawValue
+        dataStore.tempRateMinutesRawValue.value = prefillValues.minutesRawValue
+        percentHumanEntered = prefillValues.percentRawValue?.toIntOrNull()
+        hoursHumanEntered = prefillValues.hoursRawValue?.toIntOrNull()
+        minutesHumanEntered = prefillValues.minutesRawValue?.toIntOrNull()
+    }
+
     LifecycleStateObserver(
         lifecycleOwner = LocalLifecycleOwner.current,
         onStop = {
@@ -138,6 +150,11 @@ fun TempRateWindow(
         }
     ) {
         resetTempRateDataStoreState(dataStore)
+        pendingPrefill?.let {
+            applyPrefill(it)
+            pendingPrefill = null
+            onPrefillConsumed()
+        }
         refresh()
     }
 
@@ -246,7 +263,7 @@ fun TempRateWindow(
                 value = minutesRawValue.value,
                 onValueChange = {
                     dataStore.tempRateMinutesRawValue.value = it
-                    hoursHumanEntered = if (it == "") null else it.toIntOrNull()
+                    minutesHumanEntered = if (it == "") null else it.toIntOrNull()
                 }
             )
         }
@@ -273,7 +290,7 @@ fun TempRateWindow(
                 },
                 contentPadding = ButtonDefaults.ButtonWithIconContentPadding,
                 enabled = tempRateButtonEnabled,
-                colors = if (isSystemInDarkTheme()) ButtonDefaults.filledTonalButtonColors(containerColor = Color.LightGray) else ButtonDefaults.filledTonalButtonColors(),
+                colors = ButtonDefaults.filledTonalButtonColors(),
                 modifier = Modifier.align(Alignment.Center)
 
             ) {
@@ -285,8 +302,7 @@ fun TempRateWindow(
                 Spacer(Modifier.size(ButtonDefaults.IconSpacing))
                 Text(
                     "Set temp rate",
-                    fontSize = 18.sp,
-                    color = if (isSystemInDarkTheme()) Color.Black else Color.Unspecified
+                    fontSize = 18.sp
                 )
             }
         }

@@ -5,7 +5,6 @@
 package com.jwoglom.controlx2.presentation.screens
 
 import androidx.compose.foundation.Image
-import androidx.compose.foundation.background
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -19,7 +18,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.BottomSheetScaffold
-import androidx.compose.material.BottomSheetState
 import androidx.compose.material.BottomSheetValue
 import androidx.compose.material.ExperimentalMaterialApi
 import androidx.compose.material.icons.Icons
@@ -30,6 +28,7 @@ import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Warning
+import androidx.compose.material.rememberBottomSheetState
 import androidx.compose.material.rememberBottomSheetScaffoldState
 import androidx.compose.material3.Badge
 import androidx.compose.material3.BadgedBox
@@ -60,7 +59,6 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.tooling.preview.Preview
-import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavHostController
 import com.jwoglom.pumpx2.pump.messages.Message
@@ -74,6 +72,7 @@ import com.jwoglom.controlx2.R
 import com.jwoglom.controlx2.dataStore
 import com.jwoglom.controlx2.db.historylog.HistoryLogViewModel
 import com.jwoglom.controlx2.presentation.DataStore
+import com.jwoglom.controlx2.presentation.navigation.BolusInputPrefill
 import com.jwoglom.controlx2.presentation.screens.sections.Actions
 import com.jwoglom.controlx2.presentation.screens.sections.BolusWindow
 import com.jwoglom.controlx2.presentation.screens.sections.CGMActions
@@ -92,12 +91,17 @@ import com.jwoglom.controlx2.presentation.screens.sections.dashboardCommands
 import com.jwoglom.controlx2.presentation.screens.sections.dashboardFields
 import com.jwoglom.controlx2.presentation.screens.sections.resetBolusDataStoreState
 import com.jwoglom.controlx2.presentation.screens.sections.resetTempRateDataStoreState
+import com.jwoglom.controlx2.presentation.navigation.SheetLaunchRequest
+import com.jwoglom.controlx2.presentation.navigation.SheetLaunchTarget
+import com.jwoglom.controlx2.presentation.navigation.TempRateInputPrefill
 import com.jwoglom.controlx2.presentation.theme.Colors
 import com.jwoglom.controlx2.presentation.theme.ControlX2Theme
 import com.jwoglom.controlx2.shared.enums.BasalStatus
 import com.jwoglom.controlx2.shared.enums.UserMode
 import com.jwoglom.controlx2.shared.util.SendType
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import timber.log.Timber
 import java.time.Instant
 
 @Composable
@@ -111,6 +115,8 @@ fun Landing(
     bottomScaffoldDisplayState: BottomSheetValue = BottomSheetValue.Collapsed,
     _bottomScaffoldState: BottomScaffoldState = BottomScaffoldState.NONE,
     historyLogViewModel: HistoryLogViewModel? = null,
+    sheetLaunchRequest: SheetLaunchRequest? = null,
+    onSheetLaunchHandled: (Long) -> Unit = {},
 ) {
     val context = LocalContext.current
     val ds = LocalDataStore.current
@@ -123,11 +129,14 @@ fun Landing(
 
     // Local state owns user-driven tab changes, but must reset when parent route changes.
     var selectedItem by remember(sectionState) { mutableStateOf(sectionState) }
+    val bottomSheetState = rememberBottomSheetState(initialValue = bottomScaffoldDisplayState)
     val displayBottomScaffold = rememberBottomSheetScaffoldState(
-        bottomSheetState = BottomSheetState(bottomScaffoldDisplayState, density=Density(context))
+        bottomSheetState = bottomSheetState
     )
     // Local state owns in-screen sheet toggles, while parent can still force a new initial sheet.
     var bottomScaffoldState by remember(_bottomScaffoldState) { mutableStateOf(_bottomScaffoldState) }
+    var bolusPrefill by remember { mutableStateOf<BolusInputPrefill?>(null) }
+    var tempRatePrefill by remember { mutableStateOf<TempRateInputPrefill?>(null) }
 
     LaunchedEffect(bottomScaffoldState) {
         if (bottomScaffoldState != BottomScaffoldState.BOLUS_WINDOW) {
@@ -136,6 +145,64 @@ fun Landing(
         if (bottomScaffoldState != BottomScaffoldState.TEMP_RATE_WINDOW) {
             resetTempRateDataStoreState(ds)
         }
+    }
+
+    LaunchedEffect(
+        bottomScaffoldState,
+        displayBottomScaffold.bottomSheetState.currentValue,
+        displayBottomScaffold.bottomSheetState.targetValue
+    ) {
+        Timber.i(
+            "Landing: sheet state update current=%s target=%s local=%s expanded=%s",
+            displayBottomScaffold.bottomSheetState.currentValue,
+            displayBottomScaffold.bottomSheetState.targetValue,
+            bottomScaffoldState,
+            displayBottomScaffold.bottomSheetState.isExpanded
+        )
+    }
+
+    LaunchedEffect(sheetLaunchRequest?.requestId) {
+        val request = sheetLaunchRequest ?: return@LaunchedEffect
+        suspend fun expandSheetWithRetry() {
+            runCatching {
+                displayBottomScaffold.bottomSheetState.expand()
+            }.onFailure {
+                Timber.w(it, "Landing: initial bottom sheet expand failed")
+            }
+            if (!displayBottomScaffold.bottomSheetState.isExpanded) {
+                delay(150)
+                runCatching {
+                    displayBottomScaffold.bottomSheetState.expand()
+                }.onFailure {
+                    Timber.w(it, "Landing: retry bottom sheet expand failed")
+                }
+            }
+        }
+
+        Timber.i("Landing: handling sheet launch request id=%s target=%s", request.requestId, request.target)
+        when (val target = request.target) {
+            is SheetLaunchTarget.Bolus -> {
+                selectedItem = LandingSection.DASHBOARD
+                bolusPrefill = target.prefill
+                tempRatePrefill = null
+                bottomScaffoldState = BottomScaffoldState.BOLUS_WINDOW
+                expandSheetWithRetry()
+            }
+            is SheetLaunchTarget.TempRate -> {
+                selectedItem = LandingSection.ACTIONS
+                tempRatePrefill = target.prefill
+                bolusPrefill = null
+                bottomScaffoldState = BottomScaffoldState.TEMP_RATE_WINDOW
+                expandSheetWithRetry()
+            }
+        }
+        Timber.i(
+            "Landing: sheet launch handled id=%s expanded=%s state=%s",
+            request.requestId,
+            displayBottomScaffold.bottomSheetState.isExpanded,
+            bottomScaffoldState
+        )
+        onSheetLaunchHandled(request.requestId)
     }
 
     fun showBottomScaffold(): Boolean {
@@ -198,13 +265,7 @@ fun Landing(
                         modifier = Modifier
                             .padding(horizontal = 16.dp)
                             .fillMaxWidth()
-                            .fillMaxHeight(0.7F)
-                            .let {
-                                if (isSystemInDarkTheme()) {
-                                    it.background(MaterialTheme.colorScheme.onBackground)
-                                }
-                                it
-                            },
+                            .fillMaxHeight(0.7F),
                         content = {
                             item {
                                 // Fix for Android Studio preview which renders the scaffold at the
@@ -217,6 +278,8 @@ fun Landing(
                                         sendPumpCommands = sendPumpCommands,
                                         sendServiceBolusRequest = sendServiceBolusRequest,
                                         sendServiceBolusCancel = sendServiceBolusCancel,
+                                        prefill = bolusPrefill,
+                                        onPrefillConsumed = { bolusPrefill = null },
                                         closeWindow = {
                                             coroutineScope.launch {
                                                 displayBottomScaffold.bottomSheetState.collapse()
@@ -229,6 +292,8 @@ fun Landing(
                                 if (bottomScaffoldState == BottomScaffoldState.TEMP_RATE_WINDOW) {
                                     TempRateWindow(
                                         sendPumpCommands = sendPumpCommands,
+                                        prefill = tempRatePrefill,
+                                        onPrefillConsumed = { tempRatePrefill = null },
                                         closeWindow = {
                                             coroutineScope.launch {
                                                 displayBottomScaffold.bottomSheetState.collapse()
@@ -250,6 +315,8 @@ fun Landing(
                     )
                 },
                 sheetPeekHeight = 0.dp,
+                sheetBackgroundColor = MaterialTheme.colorScheme.surface,
+                sheetContentColor = MaterialTheme.colorScheme.onSurface,
                 backgroundColor = MaterialTheme.colorScheme.background,
             ) {
                 Box(Modifier.fillMaxHeight()) {
@@ -283,6 +350,7 @@ fun Landing(
                                 historyLogViewModel = historyLogViewModel,
                                 openTempRateWindow = {
                                     coroutineScope.launch {
+                                        tempRatePrefill = null
                                         bottomScaffoldState = BottomScaffoldState.TEMP_RATE_WINDOW
                                         displayBottomScaffold.bottomSheetState.expand()
                                     }
@@ -403,6 +471,7 @@ fun Landing(
                             onClick = {
                                 coroutineScope.launch {
                                     if (displayBottomScaffold.bottomSheetState.isCollapsed) {
+                                        bolusPrefill = null
                                         bottomScaffoldState = BottomScaffoldState.BOLUS_WINDOW
                                         displayBottomScaffold.bottomSheetState.expand()
 

@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<shortcuts xmlns:android="http://schemas.android.com/apk/res/android">
+    <shortcut
+        android:enabled="true"
+        android:icon="@drawable/bolus_icon"
+        android:shortcutId="open_bolus_entry"
+        android:shortcutLongLabel="@string/shortcut_bolus_long"
+        android:shortcutShortLabel="@string/shortcut_bolus_short">
+        <intent
+            android:action="android.intent.action.VIEW"
+            android:data="com_jwoglom_controlx2://controlx2/bolus"
+            android:targetClass="com.jwoglom.controlx2.MainActivity"
+            android:targetPackage="com.jwoglom.controlx2" />
+    </shortcut>
+
+    <shortcut
+        android:enabled="true"
+        android:icon="@drawable/bolus_icon_secondary"
+        android:shortcutId="open_temp_rate"
+        android:shortcutLongLabel="@string/shortcut_temp_rate_long"
+        android:shortcutShortLabel="@string/shortcut_temp_rate_short">
+        <intent
+            android:action="android.intent.action.VIEW"
+            android:data="com_jwoglom_controlx2://controlx2/temp-rate"
+            android:targetClass="com.jwoglom.controlx2.MainActivity"
+            android:targetPackage="com.jwoglom.controlx2" />
+    </shortcut>
+</shortcuts>

@@ -20,6 +20,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import com.jwoglom.controlx2.LocalDataStore
 import com.jwoglom.controlx2.presentation.DataStore
 import com.jwoglom.controlx2.presentation.components.HeaderLine
+import com.jwoglom.controlx2.presentation.navigation.BolusInputPrefill
 import com.jwoglom.controlx2.presentation.screens.BolusPreview
 import com.jwoglom.controlx2.presentation.screens.sections.components.bolus.ApprovedDialogRegion
 import com.jwoglom.controlx2.presentation.screens.sections.components.bolus.BolusConditionPromptRegion
@@ -60,6 +61,8 @@ fun BolusWindow(
     sendPumpCommands: (SendType, List<Message>) -> Unit,
     sendServiceBolusRequest: (Int, BolusParameters, BolusCalcUnits, BolusCalcDataSnapshotResponse, TimeSinceResetResponse) -> Unit,
     sendServiceBolusCancel: () -> Unit,
+    prefill: BolusInputPrefill? = null,
+    onPrefillConsumed: () -> Unit = {},
     closeWindow: () -> Unit,
 ) {
     val mainHandler = Handler(Looper.getMainLooper())
@@ -97,6 +100,7 @@ fun BolusWindow(
     var showApprovedDialog by remember { mutableStateOf(false) }
     var showCancellingDialog by remember { mutableStateOf(false) }
     var showCancelledDialog by remember { mutableStateOf(false) }
+    var pendingPrefill by remember(prefill) { mutableStateOf(prefill) }
 
     val commands = listOf(
         BolusCalcDataSnapshotRequest(),
@@ -143,6 +147,14 @@ fun BolusWindow(
         sendPumpCommands(SendType.BUST_CACHE, commands)
     }
 
+    fun applyPrefill(prefillValues: BolusInputPrefill) {
+        dataStore.bolusUnitsRawValue.value = prefillValues.unitsRawValue
+        dataStore.bolusCarbsRawValue.value = prefillValues.carbsRawValue
+        dataStore.bolusGlucoseRawValue.value = prefillValues.glucoseRawValue
+        unitsHumanEntered = prefillValues.unitsRawValue?.toDoubleOrNull()
+        glucoseHumanEntered = prefillValues.glucoseRawValue?.toIntOrNull()
+    }
+
     LifecycleStateObserver(
         lifecycleOwner = LocalLifecycleOwner.current,
         onStop = {
@@ -150,11 +162,25 @@ fun BolusWindow(
         }
     ) {
         resetBolusDataStoreState(dataStore)
+        pendingPrefill?.let {
+            applyPrefill(it)
+            pendingPrefill = null
+            onPrefillConsumed()
+        }
         refresh()
     }
 
     LaunchedEffect (refreshing, Unit) {
         waitForLoaded()
+    }
+
+    LaunchedEffect(Unit) {
+        Timber.i(
+            "BolusWindow: composed prefillApplied units=%s carbs=%s bg=%s",
+            dataStore.bolusUnitsRawValue.value,
+            dataStore.bolusCarbsRawValue.value,
+            dataStore.bolusGlucoseRawValue.value
+        )
     }
 
     fun recalculate() {

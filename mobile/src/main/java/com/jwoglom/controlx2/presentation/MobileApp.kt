@@ -4,7 +4,6 @@ package com.jwoglom.controlx2.presentation
 
 import androidx.compose.material.ExperimentalMaterialApi
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
@@ -17,6 +16,7 @@ import com.jwoglom.pumpx2.pump.messages.calculator.BolusParameters
 import com.jwoglom.pumpx2.pump.messages.response.currentStatus.BolusCalcDataSnapshotResponse
 import com.jwoglom.pumpx2.pump.messages.response.currentStatus.TimeSinceResetResponse
 import com.jwoglom.controlx2.presentation.navigation.Screen
+import com.jwoglom.controlx2.presentation.navigation.SheetLaunchRequest
 import com.jwoglom.controlx2.presentation.screens.AppSetup
 import com.jwoglom.controlx2.presentation.screens.FirstLaunch
 import com.jwoglom.controlx2.presentation.screens.Landing
@@ -33,6 +33,8 @@ fun MobileApp(
     sendServiceBolusRequest: (Int, BolusParameters, BolusCalcUnits, BolusCalcDataSnapshotResponse, TimeSinceResetResponse) -> Unit,
     sendServiceBolusCancel: () -> Unit,
     historyLogViewModel: HistoryLogViewModel? = null,
+    sheetLaunchRequest: SheetLaunchRequest? = null,
+    onSheetLaunchHandled: (Long) -> Unit = {},
 ) {
     ControlX2Theme {
         NavHost(
@@ -68,13 +70,12 @@ fun MobileApp(
                     sendServiceBolusRequest = sendServiceBolusRequest,
                     sendServiceBolusCancel = sendServiceBolusCancel,
                     historyLogViewModel = historyLogViewModel,
+                    sheetLaunchRequest = sheetLaunchRequest,
+                    onSheetLaunchHandled = onSheetLaunchHandled,
                 )
             }
         }
 
-        LaunchedEffect (Unit) {
-            navController.navigate(startDestination)
-        }
     }
 }
 
@@ -87,5 +88,6 @@ fun DefaultPreview() {
         sendPumpCommands = {_, _ -> },
         sendServiceBolusRequest = {_, _, _, _, _ -> },
         sendServiceBolusCancel = {},
+        onSheetLaunchHandled = {},
     )
 }

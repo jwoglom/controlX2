@@ -18,6 +18,7 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 
@@ -25,6 +26,19 @@ import kotlin.Pair;
 import timber.log.Timber;
 
 public class PumpMessageSerializer {
+    private static final String MESSAGE_PACKAGE_PREFIX = "com.jwoglom.pumpx2.pump.messages.";
+    private static volatile Map<String, List<MessageLookup>> MESSAGE_NAME_TO_LOOKUP = null;
+
+    private static final class MessageLookup {
+        private final int opCode;
+        private final Characteristic characteristic;
+
+        private MessageLookup(int opCode, Characteristic characteristic) {
+            this.opCode = opCode;
+            this.characteristic = characteristic;
+        }
+    }
+
     public static byte[] toBytes(Message msg) {
         JSONObject json = new JSONObject();
         try {
@@ -42,14 +56,127 @@ public class PumpMessageSerializer {
         JSONObject json = null;
         try {
             json = new JSONObject(new String(bytes));
-            int opCode = json.getInt("opCode");
-            Characteristic characteristic = Characteristic.valueOf(json.getString("characteristic"));
+
+            Characteristic characteristic = null;
+            if (json.has("characteristic") && !json.isNull("characteristic")) {
+                characteristic = Characteristic.valueOf(json.getString("characteristic"));
+            }
+
+            Integer opCode = json.has("opCode") ? json.getInt("opCode") : null;
+            if (json.has("name")) {
+                Pair<Integer, Characteristic> inferred = inferOpCodeFromMessageName(
+                        json.getString("name"),
+                        characteristic
+                );
+                if (inferred != null) {
+                    if (opCode == null) {
+                        opCode = inferred.getFirst();
+                    }
+                    if (characteristic == null) {
+                        characteristic = inferred.getSecond();
+                    }
+                }
+            }
+
+            if (characteristic == null && opCode != null) {
+                characteristic = inferCharacteristicFromOpCode(opCode);
+            }
+
+            if (opCode == null || characteristic == null) {
+                throw new JSONException("Missing opCode/characteristic and unable to infer from name");
+            }
+
             byte[] cargo = Hex.decodeHex(json.getString("cargo"));
             return Messages.parse(cargo, opCode, characteristic);
         } catch (JSONException | DecoderException e) {
             Timber.e(e);
             return null;
         }
+    }
+
+    private static Pair<Integer, Characteristic> inferOpCodeFromMessageName(String name, Characteristic providedCharacteristic) {
+        if (name == null) {
+            return null;
+        }
+        String key = normalizeMessageName(name);
+        List<MessageLookup> candidates = getMessageNameToLookup().get(key);
+        if (candidates == null || candidates.isEmpty()) {
+            return null;
+        }
+
+        List<MessageLookup> filtered = new ArrayList<>();
+        for (MessageLookup candidate : candidates) {
+            if (providedCharacteristic == null || candidate.characteristic == providedCharacteristic) {
+                addLookupIfAbsent(filtered, candidate);
+            }
+        }
+
+        if (filtered.size() == 1) {
+            MessageLookup result = filtered.get(0);
+            return new Pair<>(result.opCode, result.characteristic);
+        }
+
+        return null;
+    }
+
+    private static Characteristic inferCharacteristicFromOpCode(int opCode) {
+        java.util.Set<Characteristic> characteristics = Messages.findPossibleCharacteristicsForOpcode(opCode);
+        if (characteristics.size() == 1) {
+            return characteristics.iterator().next();
+        }
+        return null;
+    }
+
+    private static Map<String, List<MessageLookup>> getMessageNameToLookup() {
+        if (MESSAGE_NAME_TO_LOOKUP == null) {
+            synchronized (PumpMessageSerializer.class) {
+                if (MESSAGE_NAME_TO_LOOKUP == null) {
+                    Map<String, List<MessageLookup>> map = new HashMap<>();
+                    for (Messages m : Messages.values()) {
+                        addMessageNameMapping(map, m.name(), m.requestOpCode(), m.requestProps().characteristic());
+                        addMessageClassMappings(map, m.requestClass(), m.requestOpCode(), m.requestProps().characteristic());
+                        addMessageClassMappings(map, m.responseClass(), m.responseOpCode(), m.responseProps().characteristic());
+                    }
+                    MESSAGE_NAME_TO_LOOKUP = map;
+                }
+            }
+        }
+        return MESSAGE_NAME_TO_LOOKUP;
+    }
+
+    private static void addMessageClassMappings(Map<String, List<MessageLookup>> map, Class<? extends Message> cls, int opCode, Characteristic characteristic) {
+        if (cls == null) {
+            return;
+        }
+        addMessageNameMapping(map, cls.getSimpleName(), opCode, characteristic);
+
+        String canonicalName = cls.getName();
+        addMessageNameMapping(map, canonicalName, opCode, characteristic);
+        if (canonicalName.startsWith(MESSAGE_PACKAGE_PREFIX)) {
+            addMessageNameMapping(map, canonicalName.substring(MESSAGE_PACKAGE_PREFIX.length()), opCode, characteristic);
+        }
+    }
+
+    private static void addMessageNameMapping(Map<String, List<MessageLookup>> map, String name, int opCode, Characteristic characteristic) {
+        if (name == null) {
+            return;
+        }
+        String key = normalizeMessageName(name);
+        List<MessageLookup> lookups = map.computeIfAbsent(key, k -> new ArrayList<>());
+        addLookupIfAbsent(lookups, new MessageLookup(opCode, characteristic));
+    }
+
+    private static void addLookupIfAbsent(List<MessageLookup> lookups, MessageLookup candidate) {
+        for (MessageLookup current : lookups) {
+            if (current.opCode == candidate.opCode && current.characteristic == candidate.characteristic) {
+                return;
+            }
+        }
+        lookups.add(candidate);
+    }
+
+    private static String normalizeMessageName(String name) {
+        return name.trim().toLowerCase(Locale.US);
     }
 
     public static byte[] toBulkBytes(List<Message> msgsList) {

@@ -56,7 +56,10 @@ import com.jwoglom.pumpx2.pump.messages.request.currentStatus.CGMStatusRequest
 import com.jwoglom.pumpx2.pump.messages.request.currentStatus.HomeScreenMirrorRequest
 import com.jwoglom.pumpx2.pump.messages.request.currentStatus.TimeSinceResetRequest
 import com.jwoglom.pumpx2.pump.messages.request.currentStatus.LoadStatusRequest
+import com.jwoglom.pumpx2.pump.messages.response.controlStream.DetectingCartridgeStateStreamResponse
+import com.jwoglom.pumpx2.pump.messages.response.controlStream.EnterChangeCartridgeModeStateStreamResponse
 import com.jwoglom.pumpx2.pump.messages.response.controlStream.ExitFillTubingModeStateStreamResponse
+import com.jwoglom.pumpx2.pump.messages.response.currentStatus.LoadStatusResponse
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.delay
@@ -121,6 +124,16 @@ fun CartridgeActions(
         }
     }
 
+    fun refreshWorkflowState(type: SendType = SendType.BUST_CACHE) {
+        sendPumpCommands(
+            type,
+            listOf(
+                HomeScreenMirrorRequest(),
+                LoadStatusRequest(),
+            ),
+        )
+    }
+
     fun waitForLoaded() = refreshScope.launch {
         if (!Prefs(context).serviceEnabled()) return@launch
         var sinceLastFetchTime = 0
@@ -172,12 +185,51 @@ fun CartridgeActions(
     val fillTubingState = ds.fillTubingState.observeAsState()
     val exitFillTubingState = ds.exitFillTubingState.observeAsState()
     val fillCannulaState = ds.fillCannulaState.observeAsState()
+    val loadStatusResponse = ds.loadStatusResponse.observeAsState()
     val notificationBundle = ds.notificationBundle.observeAsState()
     val activeNotifications = notificationBundle.value?.get() ?: emptyList()
+    val requiredSubScreen = resolveRequiredCartridgeSubScreen(
+        loadStatus = loadStatusResponse.value,
+        inChangeCartridgeMode = inChangeCartridgeMode.value == true,
+        enterChangeCartridgeState = enterChangeCartridgeState.value,
+        detectingCartridgeState = detectingCartridgeState.value,
+        inFillTubingMode = inFillTubingMode.value == true,
+        exitFillTubingState = exitFillTubingState.value,
+    )
+    val menuAvailability = resolveCartridgeMenuAvailability(requiredSubScreen)
 
     LaunchedEffect(exitFillTubingState.value?.state) {
         if (exitFillTubingState.value?.state == ExitFillTubingModeStateStreamResponse.ExitFillTubingModeState.TUBING_FILLED) {
             tubingExitRequested = false
+        }
+    }
+
+    // Force a fresh load-status read when the Cartridge Actions screen is opened.
+    LaunchedEffect(Unit) {
+        refreshWorkflowState(SendType.BUST_CACHE)
+    }
+
+    LaunchedEffect(subScreen) {
+        if (subScreen != CartridgeSubScreen.MENU) {
+            refreshWorkflowState(SendType.BUST_CACHE)
+        }
+    }
+
+    LaunchedEffect(
+        subScreen,
+        loadStatusResponse.value,
+        inChangeCartridgeMode.value,
+        enterChangeCartridgeState.value,
+        detectingCartridgeState.value,
+        inFillTubingMode.value,
+        fillTubingState.value,
+        exitFillTubingState.value,
+        fillCannulaState.value,
+    ) {
+        if (subScreen == CartridgeSubScreen.MENU) return@LaunchedEffect
+        val syncedScreen = requiredSubScreen
+        if (syncedScreen != null && syncedScreen != subScreen) {
+            subScreen = syncedScreen
         }
     }
 
@@ -188,31 +240,43 @@ fun CartridgeActions(
             CartridgeSubScreen.MENU -> CartridgeActionsMenuScreen(
                 innerPadding = innerPadding,
                 deviceName = deviceName.value ?: "",
+                changeCartridgeEnabled = menuAvailability.canChangeCartridge,
+                changeCartridgeDisabledReason = menuAvailability.changeCartridgeDisabledReason,
+                fillTubingEnabled = menuAvailability.canFillTubing,
+                fillTubingDisabledReason = menuAvailability.fillTubingDisabledReason,
+                fillCannulaEnabled = menuAvailability.canFillCannula,
+                fillCannulaDisabledReason = menuAvailability.fillCannulaDisabledReason,
                 onChangeCartridge = {
+                    if (!menuAvailability.canChangeCartridge) {
+                        return@CartridgeActionsMenuScreen
+                    }
                     refreshScope.launch {
-                        ds.enterChangeCartridgeState.value = null
-                        ds.detectingCartridgeState.value = null
                         sendPumpCommands(SendType.BUST_CACHE, listOf(TimeSinceResetRequest()))
+                        refreshWorkflowState(SendType.BUST_CACHE)
                         refreshNotifications()
                         subScreen = CartridgeSubScreen.CHANGE_CARTRIDGE
                     }
                 },
                 onFillTubing = {
+                    if (!menuAvailability.canFillTubing) {
+                        return@CartridgeActionsMenuScreen
+                    }
                     refreshScope.launch {
-                        ds.fillTubingState.value = null
-                        ds.exitFillTubingState.value = null
-                        ds.inFillTubingMode.value = false
                         tubingExitRequested = false
                         sendPumpCommands(SendType.BUST_CACHE, listOf(TimeSinceResetRequest()))
+                        refreshWorkflowState(SendType.BUST_CACHE)
                         refreshNotifications()
                         subScreen = CartridgeSubScreen.FILL_TUBING
                     }
                 },
                 onFillCannula = {
+                    if (!menuAvailability.canFillCannula) {
+                        return@CartridgeActionsMenuScreen
+                    }
                     refreshScope.launch {
-                        ds.fillCannulaState.value = null
                         cannulaPrimeAmount = 0.3
                         sendPumpCommands(SendType.BUST_CACHE, listOf(TimeSinceResetRequest()))
+                        refreshWorkflowState(SendType.BUST_CACHE)
                         subScreen = CartridgeSubScreen.FILL_CANNULA
                     }
                 },
@@ -314,6 +378,134 @@ val cartridgeNotificationCommands = listOf(
 val cartridgeActionsFields = listOf(
     dataStore.cgmSessionState
 )
+
+private data class CartridgeMenuAvailability(
+    val canChangeCartridge: Boolean,
+    val canFillTubing: Boolean,
+    val canFillCannula: Boolean,
+    val changeCartridgeDisabledReason: String?,
+    val fillTubingDisabledReason: String?,
+    val fillCannulaDisabledReason: String?,
+)
+
+private fun resolveRequiredCartridgeSubScreen(
+    loadStatus: LoadStatusResponse?,
+    inChangeCartridgeMode: Boolean,
+    enterChangeCartridgeState: EnterChangeCartridgeModeStateStreamResponse?,
+    detectingCartridgeState: DetectingCartridgeStateStreamResponse?,
+    inFillTubingMode: Boolean,
+    exitFillTubingState: ExitFillTubingModeStateStreamResponse?,
+): CartridgeSubScreen? {
+    val resolvedLoadState = resolveLoadState(loadStatus)
+
+    // PRIME_NUDGE/PRIME_CANNULA with loading inactive indicates the prior flow completed,
+    // so don't force a specific entry point from the menu.
+    if (
+        loadStatus != null &&
+        !loadStatus.getIsLoadingActive() &&
+        (resolvedLoadState == LoadStatusResponse.LoadState.PRIME_NUDGE ||
+            resolvedLoadState == LoadStatusResponse.LoadState.PRIME_CANNULA)
+    ) {
+        return null
+    }
+
+    when (resolvedLoadState) {
+        LoadStatusResponse.LoadState.CHANGE_CARTRIDGE,
+        LoadStatusResponse.LoadState.LOAD_CARTRIDGE -> return CartridgeSubScreen.CHANGE_CARTRIDGE
+        LoadStatusResponse.LoadState.PRIME_TUBING -> return CartridgeSubScreen.FILL_TUBING
+        LoadStatusResponse.LoadState.PRIME_CANNULA,
+        LoadStatusResponse.LoadState.PRIME_NUDGE -> return CartridgeSubScreen.FILL_CANNULA
+        LoadStatusResponse.LoadState.INVALID,
+        LoadStatusResponse.LoadState.UNKNOWN,
+        null -> {}
+    }
+    if (inFillTubingMode) {
+        return CartridgeSubScreen.FILL_TUBING
+    }
+    if (exitFillTubingState?.state == ExitFillTubingModeStateStreamResponse.ExitFillTubingModeState.NOT_COMPLETE) {
+        return CartridgeSubScreen.FILL_TUBING
+    }
+    if (inChangeCartridgeMode || enterChangeCartridgeState != null || detectingCartridgeState != null) {
+        return CartridgeSubScreen.CHANGE_CARTRIDGE
+    }
+    return null
+}
+
+private fun resolveLoadState(loadStatus: LoadStatusResponse?): LoadStatusResponse.LoadState? {
+    if (loadStatus == null) {
+        return null
+    }
+    val direct = loadStatus.getLoadState()
+    if (direct != null && direct != LoadStatusResponse.LoadState.UNKNOWN) {
+        return direct
+    }
+
+    val fromId = when (loadStatus.getLoadStateId()) {
+        0 -> LoadStatusResponse.LoadState.CHANGE_CARTRIDGE
+        1 -> LoadStatusResponse.LoadState.LOAD_CARTRIDGE
+        2 -> LoadStatusResponse.LoadState.PRIME_TUBING
+        3 -> LoadStatusResponse.LoadState.PRIME_CANNULA
+        4 -> LoadStatusResponse.LoadState.PRIME_NUDGE
+        5 -> LoadStatusResponse.LoadState.INVALID
+        6 -> LoadStatusResponse.LoadState.UNKNOWN
+        else -> null
+    }
+    if (fromId != null && fromId != LoadStatusResponse.LoadState.UNKNOWN) {
+        return fromId
+    }
+
+    val cargo = loadStatus.getCargo()
+    if (cargo != null && cargo.size >= 2) {
+        val cargoLoadStateId = cargo[1].toInt() and 0xFF
+        return when (cargoLoadStateId) {
+            0 -> LoadStatusResponse.LoadState.CHANGE_CARTRIDGE
+            1 -> LoadStatusResponse.LoadState.LOAD_CARTRIDGE
+            2 -> LoadStatusResponse.LoadState.PRIME_TUBING
+            3 -> LoadStatusResponse.LoadState.PRIME_CANNULA
+            4 -> LoadStatusResponse.LoadState.PRIME_NUDGE
+            5 -> LoadStatusResponse.LoadState.INVALID
+            else -> null
+        }
+    }
+    return null
+}
+
+private fun resolveCartridgeMenuAvailability(requiredSubScreen: CartridgeSubScreen?): CartridgeMenuAvailability {
+    if (requiredSubScreen == null) {
+        return CartridgeMenuAvailability(
+            canChangeCartridge = true,
+            canFillTubing = true,
+            canFillCannula = true,
+            changeCartridgeDisabledReason = null,
+            fillTubingDisabledReason = null,
+            fillCannulaDisabledReason = null,
+        )
+    }
+
+    return CartridgeMenuAvailability(
+        canChangeCartridge = requiredSubScreen == CartridgeSubScreen.CHANGE_CARTRIDGE,
+        canFillTubing = requiredSubScreen == CartridgeSubScreen.FILL_TUBING,
+        canFillCannula = requiredSubScreen == CartridgeSubScreen.FILL_CANNULA,
+        changeCartridgeDisabledReason = disabledReasonForCartridgeMenuAction(requiredSubScreen, CartridgeSubScreen.CHANGE_CARTRIDGE),
+        fillTubingDisabledReason = disabledReasonForCartridgeMenuAction(requiredSubScreen, CartridgeSubScreen.FILL_TUBING),
+        fillCannulaDisabledReason = disabledReasonForCartridgeMenuAction(requiredSubScreen, CartridgeSubScreen.FILL_CANNULA),
+    )
+}
+
+private fun disabledReasonForCartridgeMenuAction(
+    requiredSubScreen: CartridgeSubScreen,
+    targetSubScreen: CartridgeSubScreen,
+): String? {
+    if (requiredSubScreen == targetSubScreen) {
+        return null
+    }
+    return when (requiredSubScreen) {
+        CartridgeSubScreen.CHANGE_CARTRIDGE -> "Complete Change Cartridge first."
+        CartridgeSubScreen.FILL_TUBING -> "Complete Fill Tubing first."
+        CartridgeSubScreen.FILL_CANNULA -> "Complete Fill Cannula first."
+        CartridgeSubScreen.MENU -> null
+    }
+}
 
 @Preview(showBackground = true)
 @Composable
