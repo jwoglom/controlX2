@@ -11,9 +11,9 @@ import com.jwoglom.controlx2.shared.enums.UserMode
 @OptIn(ExperimentalWearMaterialApi::class)
 @Composable
 fun LandingControlIQRow() {
-    val store = LocalDataStore.current
-    val status = store.controlIQStatus.observeAsState().value
-    val mode = store.controlIQMode.observeAsState().value
+    val ds = LocalDataStore.current
+    val status = ds.controlIQStatus.observeAsState().value
+    val mode = ds.controlIQMode.observeAsState().value
     val text = when (mode) {
         UserMode.SLEEP, UserMode.EXERCISE -> "$mode"
         else -> status?.toString() ?: "?"
