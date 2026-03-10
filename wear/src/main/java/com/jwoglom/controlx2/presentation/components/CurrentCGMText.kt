@@ -20,6 +20,8 @@ import com.jwoglom.controlx2.presentation.redTheme
 import com.jwoglom.controlx2.shared.enums.GlucoseUnit
 import com.jwoglom.controlx2.shared.util.GlucoseConverter
 
+private fun cgmStatusOrEmpty(cgmStatusText: String?): String = cgmStatusText ?: ""
+
 @Composable
 fun CurrentCGMText(
     cgmSessionState: String?,
@@ -31,9 +33,9 @@ fun CurrentCGMText(
     textStyle: TextStyle? = null,
 ) {
     val displayText = when (cgmSessionState) {
-        "Starting", "Stopped", "Stopping", "Unknown" -> cgmStatusText!!
+        "Starting", "Stopped", "Stopping", "Unknown" -> cgmStatusOrEmpty(cgmStatusText)
         else -> when {
-            !Strings.isNullOrEmpty(cgmStatusText) -> cgmStatusText!!
+            !Strings.isNullOrEmpty(cgmStatusText) -> cgmStatusOrEmpty(cgmStatusText)
             else -> when {
                 cgmReading != null && cgmDeltaArrow != null -> "${GlucoseConverter.format(cgmReading, glucoseUnit)} ${cgmDeltaArrow}"
                 cgmReading != null -> GlucoseConverter.format(cgmReading, glucoseUnit)
