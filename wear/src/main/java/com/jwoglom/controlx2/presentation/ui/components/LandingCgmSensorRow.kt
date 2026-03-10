@@ -23,11 +23,11 @@ data class CgmSensorRowModel(
 @Composable
 fun LandingCgmSensorRow() {
     var showExact by remember { mutableStateOf(false) }
-    val store = LocalDataStore.current
+    val ds = LocalDataStore.current
     val model = CgmSensorRowModel(
-        sessionState = store.cgmSessionState.observeAsState().value,
-        expireRelative = store.cgmSessionExpireRelative.observeAsState().value,
-        expireExact = store.cgmSessionExpireExact.observeAsState().value,
+        sessionState = ds.cgmSessionState.observeAsState().value,
+        expireRelative = ds.cgmSessionExpireRelative.observeAsState().value,
+        expireExact = ds.cgmSessionExpireExact.observeAsState().value,
     )
 
     val text = when (model.sessionState) {

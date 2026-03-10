@@ -18,10 +18,10 @@ data class BasalRowModel(
 @OptIn(ExperimentalWearMaterialApi::class)
 @Composable
 fun LandingBasalRow() {
-    val store = LocalDataStore.current
+    val ds = LocalDataStore.current
     val model = BasalRowModel(
-        basalRate = store.basalRate.observeAsState().value,
-        basalStatus = store.basalStatus.observeAsState().value,
+        basalRate = ds.basalRate.observeAsState().value,
+        basalStatus = ds.basalStatus.observeAsState().value,
     )
     val text = when (model.basalStatus) {
         BasalStatus.ON,

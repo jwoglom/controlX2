@@ -24,7 +24,8 @@ import androidx.compose.material.icons.filled.KingBed
 
 @Composable
 fun LandingModeActionsRow(onExerciseClick: () -> Unit, onSleepClick: () -> Unit) {
-    val controlIQMode = LocalDataStore.current.controlIQMode.observeAsState().value
+    val ds = LocalDataStore.current
+    val controlIQMode = ds.controlIQMode.observeAsState().value
     LazyRow {
         item {
             Chip(

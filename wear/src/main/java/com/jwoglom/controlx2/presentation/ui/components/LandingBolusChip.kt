@@ -12,7 +12,8 @@ import com.jwoglom.controlx2.LocalDataStore
 
 @Composable
 fun LandingBolusChip(onClick: () -> Unit) {
-    val lastBolusStatus = LocalDataStore.current.lastBolusStatus.observeAsState().value
+    val ds = LocalDataStore.current
+    val lastBolusStatus = ds.lastBolusStatus.observeAsState().value
     Chip(
         onClick = onClick,
         label = { Text("Bolus", maxLines = 1, overflow = TextOverflow.Ellipsis) },

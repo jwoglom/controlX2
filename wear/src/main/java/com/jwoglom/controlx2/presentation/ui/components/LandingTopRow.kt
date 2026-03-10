@@ -21,12 +21,12 @@ data class LandingTopRowModel(
 
 @Composable
 fun LandingTopRow() {
-    val store = LocalDataStore.current
+    val ds = LocalDataStore.current
     val model = LandingTopRowModel(
-        batteryPercent = store.batteryPercent.observeAsState().value,
-        iobUnits = store.iobUnits.observeAsState().value,
-        cartridgeRemainingUnits = store.cartridgeRemainingUnits.observeAsState().value,
-        cartridgeRemainingEstimate = store.cartridgeRemainingEstimate.observeAsState().value,
+        batteryPercent = ds.batteryPercent.observeAsState().value,
+        iobUnits = ds.iobUnits.observeAsState().value,
+        cartridgeRemainingUnits = ds.cartridgeRemainingUnits.observeAsState().value,
+        cartridgeRemainingEstimate = ds.cartridgeRemainingEstimate.observeAsState().value,
     )
 
     FlowRow {

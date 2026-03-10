@@ -10,7 +10,8 @@ import com.jwoglom.controlx2.presentation.components.LineInfoChip
 @OptIn(ExperimentalWearMaterialApi::class)
 @Composable
 fun LandingCgmBatteryRow() {
-    val status = LocalDataStore.current.cgmTransmitterStatus.observeAsState().value
+    val ds = LocalDataStore.current
+    val status = ds.cgmTransmitterStatus.observeAsState().value
     LineInfoChip("CGM Battery", status?.toString() ?: "?")
 }
 
