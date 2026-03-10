@@ -25,7 +25,7 @@ if [[ ! -x "$SDKMANAGER" ]]; then
     exit 1
   fi
 
-  python - <<PY
+  python3 - <<PY
 import shutil
 shutil.rmtree(r"$SDK_ROOT/cmdline-tools", ignore_errors=True)
 PY
