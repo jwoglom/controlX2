@@ -40,7 +40,18 @@ class HistoryLogItem(
         itemLruCache[Pair(seqId, pumpSid)]?.let {
             return it
         }
-        val cachedObj = HistoryLogParser.parse(cargo)
+        val cachedObj = try {
+            val historyLogClass = HistoryLogParser.LOG_MESSAGE_IDS[typeId]
+            if (historyLogClass != null) {
+                val historyLog = historyLogClass.getDeclaredConstructor().newInstance()
+                historyLog.parse(cargo)
+                historyLog
+            } else {
+                HistoryLogParser.parse(cargo)
+            }
+        } catch (_: Exception) {
+            HistoryLogParser.parse(cargo)
+        }
         itemLruCache.put(Pair(seqId, pumpSid), cachedObj)
         return cachedObj
     }

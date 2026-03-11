@@ -2,12 +2,6 @@ package com.jwoglom.controlx2.presentation.screens.sections.components
 
 /**
  * CGM Chart using Vico charting library.
- * 
- * NOTE: This uses a fork of Vico (https://github.com/jwoglom/vico) which includes a fix
- * for NaN handling in LineCartesianLayer.updateMarkerTargets. The upstream Vico library
- * crashes when trying to round NaN values during marker position calculations.
- * 
- * The fork adds null-safety checks before rounding y-values in updateMarkerTargets.
  */
 
 import android.graphics.Typeface
@@ -88,13 +82,19 @@ import com.patrykandpatrick.vico.compose.common.component.rememberShapeComponent
 import com.patrykandpatrick.vico.compose.common.fill
 import com.patrykandpatrick.vico.compose.common.shape.toVicoShape
 import com.patrykandpatrick.vico.core.cartesian.Scroll
+import com.patrykandpatrick.vico.core.cartesian.CartesianDrawingContext
+import com.patrykandpatrick.vico.core.cartesian.CartesianMeasuringContext
+import com.patrykandpatrick.vico.core.cartesian.data.CartesianChartModel
 import com.patrykandpatrick.vico.core.cartesian.data.CartesianChartModelProducer
 import com.patrykandpatrick.vico.core.cartesian.data.CartesianLayerRangeProvider
 import com.patrykandpatrick.vico.core.cartesian.data.lineSeries
 import com.patrykandpatrick.vico.core.cartesian.marker.DefaultCartesianMarker
+import com.patrykandpatrick.vico.core.cartesian.marker.CartesianMarker
 import com.patrykandpatrick.vico.core.cartesian.marker.LineCartesianLayerMarkerTarget
 import com.patrykandpatrick.vico.core.cartesian.CartesianChart
 import com.patrykandpatrick.vico.core.cartesian.CartesianChart.PersistentMarkerScope
+import com.patrykandpatrick.vico.core.cartesian.layer.CartesianLayerDimensions
+import com.patrykandpatrick.vico.core.cartesian.layer.CartesianLayerMargins
 import com.patrykandpatrick.vico.core.common.Insets
 import com.patrykandpatrick.vico.core.common.component.Component
 import com.patrykandpatrick.vico.core.common.component.TextComponent
@@ -104,6 +104,8 @@ import java.util.Locale
 import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.roundToInt
+import kotlin.math.roundToLong
+import timber.log.Timber
 
 // Data models
 data class CgmDataPoint(
@@ -140,11 +142,35 @@ internal fun formatChartTimestamp(timestampSeconds: Long, timeFormat: SimpleDate
     return timeFormat.format(Date(timestampSeconds * 1000L))
 }
 
+private fun formatDebugTimestamp(timestampSeconds: Long): String {
+    return SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.US).format(Date(timestampSeconds * 1000L))
+}
+
+internal fun snapTimestampToBucket(
+    timestampSeconds: Long,
+    startTimeSeconds: Long,
+    bucketSeconds: Long,
+    bucketCount: Int
+): Long {
+    val bucketIndex = ((timestampSeconds - startTimeSeconds).toDouble() / bucketSeconds.toDouble())
+        .roundToLong()
+        .coerceIn(0L, (bucketCount - 1).toLong())
+    return startTimeSeconds + (bucketIndex * bucketSeconds)
+}
+
 data class BolusEvent(
     val timestamp: Long,       // Pump time in seconds
     val units: Float,          // Insulin units delivered
     val isAutomated: Boolean,  // True if Control-IQ auto-bolus
     val bolusType: String      // Type identifier
+)
+
+private data class BolusChartData(
+    val events: List<BolusEvent>,
+    val rawLogCount: Int,
+    val zeroUnitCount: Int,
+    val parseFailureCount: Int,
+    val sampleFailureSeqIds: List<Long>
 )
 
 data class BasalDataPoint(
@@ -212,12 +238,12 @@ private const val BASAL_DISPLAY_RANGE = 60.0
 private const val MIN_BASAL_RATE_UNITS_PER_HOUR = 3f
 
 private data class BolusMarkerPoint(
-    val timestamp: Long,  // X position (timestamp in seconds)
+    val markerTimestamp: Long,  // Snapped chart X position (timestamp in seconds)
     val event: BolusEvent
 )
 
 private data class CarbMarkerPoint(
-    val timestamp: Long,  // X position (timestamp in seconds)
+    val markerTimestamp: Long,  // Snapped chart X position (timestamp in seconds)
     val event: CarbEvent
 )
 
@@ -280,14 +306,10 @@ private fun createBolusMarker(
     indicatorComponent: Component,
     labelText: String
 ): DefaultCartesianMarker {
-    val formatter = DefaultCartesianMarker.ValueFormatter { _, _ -> labelText }
-    return DefaultCartesianMarker(
+    return IndicatorOnlyPersistentMarker(
         label = labelComponent,
-        valueFormatter = formatter,
-        labelPosition = DefaultCartesianMarker.LabelPosition.Top,
         indicator = { indicatorComponent },
-        indicatorSizeDp = BOLUS_MARKER_DIAMETER_DP,
-        guideline = null
+        indicatorSizeDp = BOLUS_MARKER_DIAMETER_DP
     )
 }
 
@@ -296,15 +318,52 @@ private fun createCarbMarker(
     indicatorComponent: Component,
     labelText: String
 ): DefaultCartesianMarker {
-    val formatter = DefaultCartesianMarker.ValueFormatter { _, _ -> labelText }
-    return DefaultCartesianMarker(
+    return IndicatorOnlyPersistentMarker(
         label = labelComponent,
-        valueFormatter = formatter,
-        labelPosition = DefaultCartesianMarker.LabelPosition.Top,
         indicator = { indicatorComponent },
-        indicatorSizeDp = CARB_MARKER_SIZE_DP,
-        guideline = null
+        indicatorSizeDp = CARB_MARKER_SIZE_DP
     )
+}
+
+private class IndicatorOnlyPersistentMarker(
+    label: TextComponent,
+    indicator: (Int) -> Component,
+    indicatorSizeDp: Float
+) : DefaultCartesianMarker(
+    label = label,
+    valueFormatter = DefaultCartesianMarker.ValueFormatter { _, _ -> "" },
+    labelPosition = LabelPosition.Top,
+    indicator = indicator,
+    indicatorSizeDp = indicatorSizeDp,
+    guideline = null
+) {
+    override fun drawOverLayers(
+        context: CartesianDrawingContext,
+        targets: List<CartesianMarker.Target>
+    ) {
+        with(context) {
+            val halfIndicatorSize = dpToPx(indicatorSizeDp) / 2f
+            targets.forEach { target ->
+                when (target) {
+                    is LineCartesianLayerMarkerTarget -> {
+                        // The chart has CGM and basal line series at the same X. Anchor event dots
+                        // to the topmost point only so a bolus/carb doesn't also render on basal.
+                        val point = target.points.minByOrNull { it.canvasY } ?: return@forEach
+                        drawIndicator(target.canvasX, point.canvasY, point.color, halfIndicatorSize)
+                    }
+                }
+            }
+        }
+    }
+
+    override fun updateLayerMargins(
+        context: CartesianMeasuringContext,
+        layerMargins: CartesianLayerMargins,
+        layerDimensions: CartesianLayerDimensions,
+        model: CartesianChartModel
+    ) {
+        // Indicator-only persistent markers should not reserve label space.
+    }
 }
 
 // Helper function to fetch and convert Bolus data
@@ -312,44 +371,95 @@ private fun createCarbMarker(
 private fun rememberBolusData(
     historyLogViewModel: HistoryLogViewModel?,
     timeRange: TimeRange
-): List<BolusEvent> {
+): BolusChartData {
     val bolusHistoryLogs = historyLogViewModel?.latestItemsForTypes(
         listOf(BolusDeliveryHistoryLog::class.java),
         // Estimate: ~10-30 boluses per day, get enough for time range
         (timeRange.hours * 2) + 10
     )?.observeAsState()
 
-    return remember(bolusHistoryLogs?.value, timeRange) {
-        bolusHistoryLogs?.value?.mapNotNull { dao ->
+    val bolusChartData = remember(bolusHistoryLogs?.value, timeRange) {
+        val rawLogs = bolusHistoryLogs?.value ?: emptyList()
+        val events = mutableListOf<BolusEvent>()
+        var zeroUnitCount = 0
+        var parseFailureCount = 0
+        val sampleFailureSeqIds = mutableListOf<Long>()
+
+        rawLogs.forEach { dao ->
             try {
                 val parsed = dao.parse()
                 if (parsed is BolusDeliveryHistoryLog) {
-                    // Extract insulin units delivered (in 0.01U precision)
-                    val units = parsed.deliveredTotal / 100f
-
-                    // Determine if automated bolus
-                    val bolusSource = parsed.bolusSource
-                    val isAutomated = bolusSource == BolusDeliveryHistoryLog.BolusSource.CONTROL_IQ_AUTO_BOLUS
-
-                    // Get bolus type as string representation
-                    val bolusType = parsed.bolusTypes.toString()
-
-                    val timestamp = parsed.toChartTimestampSeconds()
-
-                    if (units > 0) {
-                        BolusEvent(
+                    val units = parsed.deliveredTotal / 1000f
+                    if (units > 0f) {
+                        val bolusSource = parsed.bolusSource
+                        val isAutomated = bolusSource == BolusDeliveryHistoryLog.BolusSource.CONTROL_IQ_AUTO_BOLUS
+                        val bolusType = parsed.bolusTypes.toString()
+                        val timestamp = parsed.toChartTimestampSeconds()
+                        events += BolusEvent(
                             timestamp = timestamp,
                             units = units,
                             isAutomated = isAutomated,
                             bolusType = bolusType
                         )
-                    } else null
-                } else null
+                    } else {
+                        zeroUnitCount++
+                    }
+                } else {
+                    parseFailureCount++
+                    if (sampleFailureSeqIds.size < 5) sampleFailureSeqIds += dao.seqId
+                }
             } catch (e: Exception) {
-                null
+                parseFailureCount++
+                if (sampleFailureSeqIds.size < 5) sampleFailureSeqIds += dao.seqId
             }
-        }?.reversed() ?: emptyList()  // Reverse to get chronological order
+        }
+
+        BolusChartData(
+            events = events.reversed(),
+            rawLogCount = rawLogs.size,
+            zeroUnitCount = zeroUnitCount,
+            parseFailureCount = parseFailureCount,
+            sampleFailureSeqIds = sampleFailureSeqIds
+        )
     }
+
+    val sourceLogSignature = remember(bolusChartData, timeRange) {
+        listOf(
+            timeRange.label,
+            bolusChartData.rawLogCount,
+            bolusChartData.events.size,
+            bolusChartData.zeroUnitCount,
+            bolusChartData.parseFailureCount,
+            bolusChartData.sampleFailureSeqIds.joinToString(",")
+        ).joinToString("|")
+    }
+    var lastSourceLogSignature by remember { mutableStateOf<String?>(null) }
+    LaunchedEffect(sourceLogSignature) {
+        if (lastSourceLogSignature == sourceLogSignature) return@LaunchedEffect
+        lastSourceLogSignature = sourceLogSignature
+        Timber.i(
+            "VicoCgmChart bolus source: range=%s rawLogs=%d parsedEvents=%d zeroUnits=%d parseFailures=%d sampleFailureSeqIds=%s",
+            timeRange.label,
+            bolusChartData.rawLogCount,
+            bolusChartData.events.size,
+            bolusChartData.zeroUnitCount,
+            bolusChartData.parseFailureCount,
+            bolusChartData.sampleFailureSeqIds
+        )
+        bolusChartData.events.take(5).forEachIndexed { index, event ->
+            Timber.i(
+                "VicoCgmChart bolus event[%d]: ts=%d (%s) units=%.3f auto=%s type=%s",
+                index,
+                event.timestamp,
+                formatDebugTimestamp(event.timestamp),
+                event.units,
+                event.isAutomated,
+                event.bolusType
+            )
+        }
+    }
+
+    return bolusChartData
 }
 
 // Helper function to fetch and convert Basal data
@@ -593,7 +703,18 @@ fun VicoCgmChart(
 
     // Fetch all chart data
     val cgmDataPoints = previewData?.cgmDataPoints ?: rememberCgmChartData(historyLogViewModel, timeRange)
-    val bolusEvents = previewData?.bolusEvents ?: rememberBolusData(historyLogViewModel, timeRange)
+    val bolusChartData = if (previewData != null) {
+        BolusChartData(
+            events = previewData.bolusEvents,
+            rawLogCount = previewData.bolusEvents.size,
+            zeroUnitCount = 0,
+            parseFailureCount = 0,
+            sampleFailureSeqIds = emptyList()
+        )
+    } else {
+        rememberBolusData(historyLogViewModel, timeRange)
+    }
+    val bolusEvents = bolusChartData.events
     val basalDataPoints = previewData?.basalDataPoints ?: rememberBasalData(historyLogViewModel, timeRange)
     val carbEvents = previewData?.carbEvents ?: rememberCarbData(historyLogViewModel, timeRange)
     val modeEvents = previewData?.modeEvents ?: rememberModeData(historyLogViewModel, timeRange)
@@ -875,13 +996,71 @@ fun VicoCgmChart(
                     // Only include boluses within the time range
                     if (bolus.timestamp in startTimeSeconds..currentTimeSeconds) {
                         BolusMarkerPoint(
-                            timestamp = bolus.timestamp,
+                            markerTimestamp = snapTimestampToBucket(
+                                timestampSeconds = bolus.timestamp,
+                                startTimeSeconds = startTimeSeconds,
+                                bucketSeconds = bucketSeconds,
+                                bucketCount = bucketCount
+                            ),
                             event = bolus
                         )
                     } else {
                         null
                     }
                 }
+            }
+        }
+        val renderLogSignature = remember(
+            bolusMarkerPoints,
+            bolusEvents,
+            startTimeSeconds,
+            currentTimeSeconds,
+            hasValidCgmData,
+            timeRange
+        ) {
+            buildString {
+                append(timeRange.label)
+                append('|')
+                append(hasValidCgmData)
+                append('|')
+                append(startTimeSeconds)
+                append('|')
+                append(currentTimeSeconds)
+                append('|')
+                append(bolusEvents.size)
+                append('|')
+                append(bolusMarkerPoints.size)
+                append('|')
+                append(bolusMarkerPoints.take(5).joinToString(";") {
+                    "${it.event.timestamp}->${it.markerTimestamp}:${it.event.units}"
+                })
+            }
+        }
+        var lastRenderLogSignature by remember { mutableStateOf<String?>(null) }
+        LaunchedEffect(renderLogSignature) {
+            if (lastRenderLogSignature == renderLogSignature) return@LaunchedEffect
+            lastRenderLogSignature = renderLogSignature
+            Timber.i(
+                "VicoCgmChart bolus render: range=%s hasValidCgmData=%s window=%d..%d totalEvents=%d visibleMarkers=%d",
+                timeRange.label,
+                hasValidCgmData,
+                startTimeSeconds,
+                currentTimeSeconds,
+                bolusEvents.size,
+                bolusMarkerPoints.size
+            )
+            bolusMarkerPoints.take(5).forEachIndexed { index, markerPoint ->
+                Timber.i(
+                    "VicoCgmChart bolus marker[%d]: eventTs=%d (%s) markerTs=%d (%s) units=%.3f auto=%s type=%s",
+                    index,
+                    markerPoint.event.timestamp,
+                    formatDebugTimestamp(markerPoint.event.timestamp),
+                    markerPoint.markerTimestamp,
+                    formatDebugTimestamp(markerPoint.markerTimestamp),
+                    markerPoint.event.units,
+                    markerPoint.event.isAutomated,
+                    markerPoint.event.bolusType
+                )
             }
         }
         
@@ -939,7 +1118,7 @@ fun VicoCgmChart(
                         markerPoint.event.timestamp
                     )
                 )
-                markerPoint.timestamp.toFloat() to marker
+                markerPoint.markerTimestamp.toDouble() to marker
             }
         }
 
@@ -951,7 +1130,12 @@ fun VicoCgmChart(
                 carbEvents.mapNotNull { carb ->
                     if (carb.timestamp in startTimeSeconds..currentTimeSeconds) {
                         CarbMarkerPoint(
-                            timestamp = carb.timestamp,
+                            markerTimestamp = snapTimestampToBucket(
+                                timestampSeconds = carb.timestamp,
+                                startTimeSeconds = startTimeSeconds,
+                                bucketSeconds = bucketSeconds,
+                                bucketCount = bucketCount
+                            ),
                             event = carb
                         )
                     } else {
@@ -972,7 +1156,7 @@ fun VicoCgmChart(
                     indicatorComponent = carbIndicatorComponent,
                     labelText = formatCarbTooltip(markerPoint.event.grams, markerPoint.event.timestamp)
                 )
-                markerPoint.timestamp.toFloat() to marker
+                markerPoint.markerTimestamp.toDouble() to marker
             }
         }
 

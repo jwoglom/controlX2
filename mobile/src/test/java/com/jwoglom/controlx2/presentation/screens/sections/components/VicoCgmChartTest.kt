@@ -1,8 +1,10 @@
 package com.jwoglom.controlx2.presentation.screens.sections.components
 
 import com.jwoglom.controlx2.db.historylog.HistoryLogItem
+import com.jwoglom.controlx2.db.historylog.itemLruCache
 import com.jwoglom.pumpx2.pump.messages.response.historyLog.DexcomG6CGMHistoryLog
 import org.junit.Assert.assertEquals
+import org.junit.Before
 import org.junit.Test
 import java.text.SimpleDateFormat
 import java.time.Duration
@@ -13,6 +15,11 @@ import java.util.Locale
 import java.util.TimeZone
 
 class VicoCgmChartTest {
+    @Before
+    fun clearHistoryLogCache() {
+        itemLruCache.evictAll()
+    }
+
     @Test
     fun toCgmDataPoint_appliesPumpLocalTimezoneCorrection() {
         val originalTimeZone = TimeZone.getDefault()
@@ -25,7 +32,7 @@ class VicoCgmChartTest {
 
             val message = DexcomG6CGMHistoryLog(
                 pumpTimeSec,
-                42L,
+                9_042L,
                 0,
                 1,
                 -2,
@@ -55,5 +62,27 @@ class VicoCgmChartTest {
         }
 
         assertEquals("10:13 PM", formatChartTimestamp(1_700_000_000L, formatter))
+    }
+
+    @Test
+    fun snapTimestampToBucket_roundsToNearestBucket() {
+        assertEquals(
+            1_000_000_300L,
+            snapTimestampToBucket(
+                timestampSeconds = 1_000_000_389L,
+                startTimeSeconds = 1_000_000_000L,
+                bucketSeconds = 300L,
+                bucketCount = 13
+            )
+        )
+        assertEquals(
+            1_000_000_600L,
+            snapTimestampToBucket(
+                timestampSeconds = 1_000_000_451L,
+                startTimeSeconds = 1_000_000_000L,
+                bucketSeconds = 300L,
+                bucketCount = 13
+            )
+        )
     }
 }
