@@ -224,8 +224,7 @@ fun Dashboard(
                 // CGM Chart with Vico - shows glucose, boluses, basal, carbs
                 item {
                     VicoCgmChartCard(
-                        historyLogViewModel = historyLogViewModel,
-                        showLegend = true
+                        historyLogViewModel = historyLogViewModel
                     )
                 }
 

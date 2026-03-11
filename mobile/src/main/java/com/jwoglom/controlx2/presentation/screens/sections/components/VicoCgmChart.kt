@@ -1472,8 +1472,7 @@ fun ChartTimeRangeSelector(
 fun VicoCgmChartCard(
     historyLogViewModel: HistoryLogViewModel?,
     modifier: Modifier = Modifier,
-    previewData: ChartPreviewData? = null,
-    showLegend: Boolean = true
+    previewData: ChartPreviewData? = null
 ) {
     var selectedTimeRange by remember { mutableStateOf(TimeRange.SIX_HOURS) }
 
@@ -1511,14 +1510,6 @@ fun VicoCgmChartCard(
                 previewData = previewData
             )
 
-            // Chart legend
-            if (showLegend) {
-                Spacer(Modifier.height(Spacing.Small))
-                ChartLegend(
-                    showCarbs = previewData?.carbEvents?.isNotEmpty() == true,
-                    showBasal = previewData?.basalDataPoints?.isNotEmpty() == true
-                )
-            }
         }
     }
 }
