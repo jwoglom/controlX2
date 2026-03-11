@@ -554,12 +554,7 @@ class CommService : Service() {
                 }
 
                 Timber.i("Pump send command: $message")
-                val session = currentSession
-                if (session != null) {
-                    session.sendCommand(message!!)
-                } else {
-                    sendCommand(lastPeripheral, message)
-                }
+                currentSession!!.sendCommand(message!!)
             }
 
             override fun toString(): String {
