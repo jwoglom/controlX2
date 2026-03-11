@@ -6,6 +6,7 @@ import com.jwoglom.pumpx2.pump.messages.response.historyLog.BasalRateChangeHisto
 import com.jwoglom.pumpx2.pump.messages.response.historyLog.DexcomG6CGMHistoryLog
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Before
 import org.junit.Test
 import java.text.SimpleDateFormat
@@ -116,6 +117,62 @@ class VicoCgmChartTest {
         val point = activeBasalAtTimestamp(basalPoints, 1_100L)
 
         assertEquals(1.2f, point?.rate)
+    }
+
+    @Test
+    fun activeBasalAtTimestamp_fallsBackToEarliestKnownBasalBeforeFirstPoint() {
+        val basalPoints = listOf(
+            BasalDataPoint(timestamp = 1_200L, rate = 1.4f, isTemp = false, duration = null),
+            BasalDataPoint(timestamp = 1_400L, rate = 1.6f, isTemp = false, duration = null)
+        )
+
+        val point = activeBasalAtTimestamp(basalPoints, 1_000L)
+
+        assertNull(point)
+    }
+
+    @Test
+    fun buildBasalIntervals_doesNotBackfillWithoutPreWindowBasalPoint() {
+        val intervals = buildBasalIntervals(
+            startTimeSeconds = 1_000L,
+            currentTimeSeconds = 1_600L,
+            basalDataPoints = listOf(
+                BasalDataPoint(timestamp = 1_200L, rate = 1.4f, isTemp = false, duration = null),
+                BasalDataPoint(timestamp = 1_400L, rate = 1.6f, isTemp = false, duration = null)
+            )
+        )
+
+        assertEquals(2, intervals.size)
+        assertEquals(1_200L, intervals[0].startTimestamp)
+        assertEquals(1_400L, intervals[0].endTimestamp)
+        assertEquals(1.4f, intervals[0].rate)
+        assertEquals(1_400L, intervals[1].startTimestamp)
+        assertEquals(1_600L, intervals[1].endTimestamp)
+        assertEquals(1.6f, intervals[1].rate)
+    }
+
+    @Test
+    fun buildBasalIntervals_backfillsFromChartStartWhenLeadInBasalPointExists() {
+        val intervals = buildBasalIntervals(
+            startTimeSeconds = 1_000L,
+            currentTimeSeconds = 1_600L,
+            basalDataPoints = listOf(
+                BasalDataPoint(timestamp = 900L, rate = 1.2f, isTemp = false, duration = null),
+                BasalDataPoint(timestamp = 1_200L, rate = 1.4f, isTemp = false, duration = null),
+                BasalDataPoint(timestamp = 1_400L, rate = 1.6f, isTemp = false, duration = null)
+            )
+        )
+
+        assertEquals(3, intervals.size)
+        assertEquals(1_000L, intervals[0].startTimestamp)
+        assertEquals(1_200L, intervals[0].endTimestamp)
+        assertEquals(1.2f, intervals[0].rate)
+        assertEquals(1_200L, intervals[1].startTimestamp)
+        assertEquals(1_400L, intervals[1].endTimestamp)
+        assertEquals(1.4f, intervals[1].rate)
+        assertEquals(1_400L, intervals[2].startTimestamp)
+        assertEquals(1_600L, intervals[2].endTimestamp)
+        assertEquals(1.6f, intervals[2].rate)
     }
 
     @Test

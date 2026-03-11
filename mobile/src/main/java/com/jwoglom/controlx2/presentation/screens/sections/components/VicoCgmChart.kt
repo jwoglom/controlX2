@@ -78,10 +78,12 @@ import com.jwoglom.pumpx2.pump.messages.response.historyLog.CgmDataGxHistoryLog
 import com.jwoglom.pumpx2.pump.messages.response.historyLog.HistoryLog
 import com.jwoglom.pumpx2.pump.messages.response.historyLog.HistoryLogParser
 import com.patrykandpatrick.vico.compose.cartesian.CartesianChartHost
+import com.patrykandpatrick.vico.compose.cartesian.layer.rememberColumnCartesianLayer
 import com.patrykandpatrick.vico.compose.cartesian.layer.rememberLineCartesianLayer
 import com.patrykandpatrick.vico.compose.cartesian.marker.rememberDefaultCartesianMarker
 import com.patrykandpatrick.vico.compose.cartesian.rememberCartesianChart
 import com.patrykandpatrick.vico.compose.cartesian.rememberVicoScrollState
+import com.patrykandpatrick.vico.compose.common.component.rememberLineComponent
 import com.patrykandpatrick.vico.compose.common.component.rememberShapeComponent
 import com.patrykandpatrick.vico.compose.common.fill
 import com.patrykandpatrick.vico.compose.common.shape.toVicoShape
@@ -92,6 +94,7 @@ import com.patrykandpatrick.vico.core.cartesian.data.CartesianChartModel
 import com.patrykandpatrick.vico.core.cartesian.data.CartesianChartModelProducer
 import com.patrykandpatrick.vico.core.cartesian.data.CartesianLayerRangeProvider
 import com.patrykandpatrick.vico.core.cartesian.data.lineSeries
+import com.patrykandpatrick.vico.core.cartesian.data.columnSeries
 import com.patrykandpatrick.vico.core.cartesian.marker.DefaultCartesianMarker
 import com.patrykandpatrick.vico.core.cartesian.marker.CartesianMarker
 import com.patrykandpatrick.vico.core.cartesian.marker.CartesianMarkerVisibilityListener
@@ -154,6 +157,8 @@ private fun formatDebugTimestamp(timestampSeconds: Long): String {
 private fun formatBasalAxisLabel(unitsPerHour: Double): String {
     return "${String.format(Locale.US, "%.1f", unitsPerHour).trimEnd('0').trimEnd('.')}u"
 }
+
+private const val BASAL_LOOKBACK_SECONDS = 30L * 60L
 
 internal fun snapTimestampToBucket(
     timestampSeconds: Long,
@@ -372,6 +377,13 @@ private data class BasalSeriesResult(
     val series: ChartSeries?
 )
 
+internal data class BasalInterval(
+    val startTimestamp: Long,
+    val endTimestamp: Long,
+    val rate: Float,
+    val isTemp: Boolean
+)
+
 enum class TimeRange(val label: String, val hours: Int) {
     THREE_HOURS("3h", 3),
     SIX_HOURS("6h", 6),
@@ -586,7 +598,9 @@ private fun rememberBolusData(
 @Composable
 private fun rememberBasalData(
     historyLogViewModel: HistoryLogViewModel?,
-    timeRange: TimeRange
+    timeRange: TimeRange,
+    startTimeSeconds: Long,
+    currentTimeSeconds: Long
 ): BasalChartData {
     // Use all basal-related history log types so logging and charting reflect actual delivery records.
     val basalClasses = listOf(
@@ -603,13 +617,15 @@ private fun rememberBasalData(
 
     val basalHistoryLogs = historyLogViewModel?.latestItemsForTypes(
         basalClasses,
-        // Basal delivery can be emitted roughly every 5 minutes, so load enough entries
-        // to cover the full selected window plus some lead-in state before the left edge.
-        (timeRange.hours * 12) + 24
+        // Basal delivery can be emitted roughly every 5 minutes. Over-fetch enough rows to
+        // cover the selected range, 30 minutes of lead-in before the left edge, and extra
+        // transition records from other basal-related history-log types.
+        (timeRange.hours * 12) + 36
     )?.observeAsState()
 
-    val basalChartData = remember(basalHistoryLogs?.value, timeRange) {
+    val basalChartData = remember(basalHistoryLogs?.value, timeRange, startTimeSeconds, currentTimeSeconds) {
         val rawLogs = basalHistoryLogs?.value ?: emptyList()
+        val lookbackStartTimeSeconds = startTimeSeconds - BASAL_LOOKBACK_SECONDS
         val events = mutableListOf<BasalDataPoint>()
         val rawEntries = mutableListOf<BasalHistoryDebugEntry>()
         var parseFailureCount = 0
@@ -621,20 +637,26 @@ private fun rememberBasalData(
 
                 when (parsed) {
                     is com.jwoglom.pumpx2.pump.messages.response.historyLog.BasalDeliveryHistoryLog -> {
+                        val timestamp = parsed.toChartTimestampSeconds()
                         rawEntries += BasalHistoryDebugEntry(
                             seqId = dao.seqId,
-                            timestamp = parsed.toChartTimestampSeconds(),
+                            timestamp = timestamp,
                             details = "type=BasalDeliveryHistoryLog commandedRateSource=${parsed.commandedRateSource} commandedRate=${parsed.commandedRate} profileBasalRate=${parsed.profileBasalRate} algorithmRate=${parsed.algorithmRate} tempRate=${parsed.tempRate}"
                         )
-                        parsed.toBasalDataPoint()?.let(events::add)
+                        parsed.toBasalDataPoint()
+                            ?.takeIf { it.timestamp in lookbackStartTimeSeconds..currentTimeSeconds }
+                            ?.let(events::add)
                     }
                     is com.jwoglom.pumpx2.pump.messages.response.historyLog.BasalRateChangeHistoryLog -> {
+                        val timestamp = parsed.toChartTimestampSeconds()
                         rawEntries += BasalHistoryDebugEntry(
                             seqId = dao.seqId,
-                            timestamp = parsed.toChartTimestampSeconds(),
+                            timestamp = timestamp,
                             details = "type=BasalRateChangeHistoryLog changeType=${parsed.changeType} changeTypeId=${parsed.changeTypeId} commandBasalRate=${parsed.commandBasalRate} baseBasalRate=${parsed.baseBasalRate} maxBasalRate=${parsed.maxBasalRate} insulinDeliveryProfile=${parsed.insulinDeliveryProfile}"
                         )
-                        parsed.toBasalDataPoint()?.let(events::add)
+                        parsed.toBasalDataPoint()
+                            ?.takeIf { it.timestamp in lookbackStartTimeSeconds..currentTimeSeconds }
+                            ?.let(events::add)
                     }
                     is com.jwoglom.pumpx2.pump.messages.response.historyLog.TempRateActivatedHistoryLog -> {
                         rawEntries += BasalHistoryDebugEntry(
@@ -707,11 +729,16 @@ private fun rememberBasalData(
         }
 
         BasalChartData(
-            events = events.reversed(),
+            events = events
+                .filter { it.timestamp in lookbackStartTimeSeconds..currentTimeSeconds }
+                .distinctBy { Triple(it.timestamp, it.rate, it.isTemp) }
+                .sortedBy { it.timestamp },
             rawLogCount = rawLogs.size,
             parseFailureCount = parseFailureCount,
             sampleFailureSeqIds = sampleFailureSeqIds,
-            rawEntries = rawEntries.reversed()
+            rawEntries = rawEntries
+                .filter { it.timestamp in lookbackStartTimeSeconds..currentTimeSeconds }
+                .sortedBy { it.timestamp }
         )
     }
 
@@ -729,8 +756,9 @@ private fun rememberBasalData(
         if (lastSourceLogSignature == sourceLogSignature) return@LaunchedEffect
         lastSourceLogSignature = sourceLogSignature
         Timber.i(
-            "VicoCgmChart basal source: range=%s rawLogs=%d parsedEvents=%d parseFailures=%d sampleFailureSeqIds=%s",
+            "VicoCgmChart basal source: range=%s leadInSeconds=%d rawLogs=%d parsedEvents=%d parseFailures=%d sampleFailureSeqIds=%s",
             timeRange.label,
+            BASAL_LOOKBACK_SECONDS,
             basalChartData.rawLogCount,
             basalChartData.events.size,
             basalChartData.parseFailureCount,
@@ -879,55 +907,63 @@ fun calculateCarbsOnBoard(
 }
 
 private fun buildBasalSeries(
-    startTimeSeconds: Long,
-    currentTimeSeconds: Long,
+    bucketTimes: List<Long>,
     basalDataPoints: List<BasalDataPoint>
 ): BasalSeriesResult {
-    if (basalDataPoints.isEmpty()) {
+    if (bucketTimes.isEmpty() || basalDataPoints.isEmpty()) {
         return BasalSeriesResult(null)
     }
 
-    val sortedPoints = basalDataPoints.sortedBy { it.timestamp }
-    val seedPoint = sortedPoints.lastOrNull { it.timestamp <= startTimeSeconds }
-    val inWindowPoints = sortedPoints.filter { it.timestamp in startTimeSeconds..currentTimeSeconds }
-    val initialPoint = (seedPoint ?: inWindowPoints.firstOrNull()) ?: return BasalSeriesResult(null)
-
     val xValues = mutableListOf<Long>()
     val yValues = mutableListOf<Double>()
-    var activePoint = initialPoint
 
-    if (seedPoint != null) {
-        xValues += startTimeSeconds
-        yValues += seedPoint.rate.toDouble()
-    } else {
-        xValues += initialPoint.timestamp
-        yValues += initialPoint.rate.toDouble()
+    bucketTimes.forEach { bucketTime ->
+        val activeBasal = activeBasalAtTimestamp(basalDataPoints, bucketTime) ?: return@forEach
+        xValues += bucketTime
+        yValues += activeBasal.rate.toDouble()
     }
+
+    return BasalSeriesResult(series = if (xValues.isNotEmpty()) ChartSeries(xValues, yValues) else null)
+}
+
+internal fun buildBasalIntervals(
+    startTimeSeconds: Long,
+    currentTimeSeconds: Long,
+    basalDataPoints: List<BasalDataPoint>
+): List<BasalInterval> {
+    if (basalDataPoints.isEmpty()) return emptyList()
+
+    val sortedPoints = basalDataPoints.sortedBy { it.timestamp }
+    val inWindowPoints = sortedPoints.filter { it.timestamp in startTimeSeconds..currentTimeSeconds }
+    if (inWindowPoints.isEmpty()) return emptyList()
+
+    var activePoint = sortedPoints.lastOrNull { it.timestamp <= startTimeSeconds }
+    var intervalStart = startTimeSeconds
+    val intervals = mutableListOf<BasalInterval>()
 
     inWindowPoints.forEach { point ->
-        if (point.timestamp <= activePoint.timestamp) {
-            activePoint = point
-            return@forEach
+        if (activePoint != null && point.timestamp > intervalStart) {
+            intervals += BasalInterval(
+                startTimestamp = intervalStart,
+                endTimestamp = point.timestamp,
+                rate = activePoint!!.rate,
+                isTemp = activePoint!!.isTemp
+            )
         }
-        // Hold the old rate exactly until the change timestamp, then step vertically.
-        xValues += point.timestamp
-        yValues += activePoint.rate.toDouble()
-        xValues += point.timestamp
-        yValues += point.rate.toDouble()
         activePoint = point
+        intervalStart = max(point.timestamp, startTimeSeconds)
     }
 
-    return BasalSeriesResult(
-        series = if (xValues.isNotEmpty()) {
-            if (currentTimeSeconds >= xValues.last()) {
-                xValues += currentTimeSeconds
-                yValues += activePoint.rate.toDouble()
-            }
-            ChartSeries(xValues, yValues)
-        } else {
-            null
-        }
-    )
+    if (activePoint != null && intervalStart < currentTimeSeconds) {
+        intervals += BasalInterval(
+            startTimestamp = intervalStart,
+            endTimestamp = currentTimeSeconds,
+            rate = activePoint!!.rate,
+            isTemp = activePoint!!.isTemp
+        )
+    }
+
+    return intervals
 }
 
 
@@ -943,6 +979,12 @@ fun VicoCgmChart(
     val basalLimitSettings by dataStore.basalLimitSettingsResponse.observeAsState()
 
     // Fetch all chart data
+    val currentTimeSeconds = remember(timeRange) {
+        previewData?.currentTimeSeconds ?: Instant.now().epochSecond
+    }
+    val rangeSeconds = timeRange.hours * 3600L
+    val startTimeSeconds = currentTimeSeconds - rangeSeconds
+
     val cgmDataPoints = previewData?.cgmDataPoints ?: rememberCgmChartData(historyLogViewModel, timeRange)
     val bolusChartData = if (previewData != null) {
         BolusChartData(
@@ -965,24 +1007,24 @@ fun VicoCgmChart(
             rawEntries = emptyList()
         )
     } else {
-        rememberBasalData(historyLogViewModel, timeRange)
+        rememberBasalData(
+            historyLogViewModel = historyLogViewModel,
+            timeRange = timeRange,
+            startTimeSeconds = startTimeSeconds,
+            currentTimeSeconds = currentTimeSeconds
+        )
     }
     val basalDataPoints = basalChartData.events
     val carbEvents = previewData?.carbEvents ?: rememberCarbData(historyLogViewModel, timeRange)
     val modeEvents = previewData?.modeEvents ?: rememberModeData(historyLogViewModel, timeRange)
 
-    val currentTimeSeconds = remember(timeRange) {
-        previewData?.currentTimeSeconds ?: Instant.now().epochSecond
-    }
     val fixedGlucoseRange = Pair(30f, 410f)
     val fixedMaxGlucose = fixedGlucoseRange.second
     val fixedMinGlucose = fixedGlucoseRange.first
     val fixedGlucoseSpan = fixedMaxGlucose - fixedMinGlucose
 
-    val rangeSeconds = timeRange.hours * 3600L
     val bucketSeconds = 5L * 60L
     val bucketCount = max(1, (rangeSeconds / bucketSeconds).toInt() + 1)
-    val startTimeSeconds = currentTimeSeconds - rangeSeconds
     val bucketTimes = List(bucketCount) { startTimeSeconds + it * bucketSeconds }
 
     val chartBuckets = remember(cgmDataPoints, currentTimeSeconds, timeRange) {
@@ -1061,8 +1103,8 @@ fun VicoCgmChart(
         val configuredMax = basalLimitSettings?.let { InsulinUnit.from1000To1(it.basalLimit).toDouble() }
         (configuredMax ?: 5.0).coerceAtLeast(1.0)
     }
-    val basalSeriesResult = remember(startTimeSeconds, currentTimeSeconds, basalDataPoints) {
-        buildBasalSeries(startTimeSeconds, currentTimeSeconds, basalDataPoints)
+    val basalSeriesResult = remember(bucketTimes, basalDataPoints) {
+        buildBasalSeries(bucketTimes, basalDataPoints)
     }
     val visibleBasalHistoryEntries = remember(
         basalChartData.rawEntries,
@@ -1073,9 +1115,13 @@ fun VicoCgmChart(
     }
     val hasBasalSeries = basalSeriesResult.series != null
     var hoveredChartTimestamp by remember { mutableStateOf<Long?>(null) }
+    var hoveredChartCanvasX by remember { mutableStateOf<Float?>(null) }
     var hoverDrivenByBasal by remember { mutableStateOf(false) }
     val hoveredBasalDataPoint = remember(hoveredChartTimestamp, basalDataPoints) {
         hoveredChartTimestamp?.let { activeBasalAtTimestamp(basalDataPoints, it) }
+    }
+    val basalIntervals = remember(startTimeSeconds, currentTimeSeconds, basalDataPoints) {
+        buildBasalIntervals(startTimeSeconds, currentTimeSeconds, basalDataPoints)
     }
     val hoveredGlucoseLabel = remember(hoveredChartTimestamp, glucoseValueByTimestamp, glucoseUnit) {
         hoveredChartTimestamp?.let { timestamp ->
@@ -1123,7 +1169,7 @@ fun VicoCgmChart(
         if (lastBasalRenderLogSignature == basalRenderLogSignature) return@LaunchedEffect
         lastBasalRenderLogSignature = basalRenderLogSignature
         Timber.i(
-            "VicoCgmChart basal render: range=%s window=%d..%d totalEvents=%d stepPoints=%d",
+            "VicoCgmChart basal render: range=%s window=%d..%d totalEvents=%d columnPoints=%d",
             timeRange.label,
             startTimeSeconds,
             currentTimeSeconds,
@@ -1143,7 +1189,7 @@ fun VicoCgmChart(
         }
         basalSeriesResult.series?.xValues?.zip(basalSeriesResult.series.yValues)?.take(8)?.forEachIndexed { index, (ts, rate) ->
             Timber.i(
-                "VicoCgmChart basal stepPoint[%d]: ts=%d (%s) rate=%.3f",
+                "VicoCgmChart basal columnPoint[%d]: ts=%d (%s) rate=%.3f",
                 index,
                 ts,
                 formatDebugTimestamp(ts),
@@ -1314,16 +1360,19 @@ fun VicoCgmChart(
             override fun onShown(marker: CartesianMarker, targets: List<CartesianMarker.Target>) {
                 hoverDrivenByBasal = false
                 hoveredChartTimestamp = hoveredChartTimestampFromTargets(targets)
+                hoveredChartCanvasX = targets.firstOrNull()?.canvasX
             }
 
             override fun onUpdated(marker: CartesianMarker, targets: List<CartesianMarker.Target>) {
                 hoverDrivenByBasal = false
                 hoveredChartTimestamp = hoveredChartTimestampFromTargets(targets)
+                hoveredChartCanvasX = targets.firstOrNull()?.canvasX
             }
 
             override fun onHidden(marker: CartesianMarker) {
                 hoverDrivenByBasal = false
                 hoveredChartTimestamp = null
+                hoveredChartCanvasX = null
             }
         }
     }
@@ -1349,7 +1398,7 @@ fun VicoCgmChart(
     LaunchedEffect(basalSeriesResult, hasBasalSeries) {
         if (hasBasalSeries) {
             basalModelProducer.runTransaction {
-                lineSeries {
+                columnSeries {
                     basalSeriesResult.series?.let { basalSeries ->
                         series(basalSeries.xValues, basalSeries.yValues)
                     }
@@ -1600,7 +1649,14 @@ fun VicoCgmChart(
         val cgmLineLayer = rememberLineCartesianLayer(
             rangeProvider = cgmLineRangeProvider
         )
-        val basalLineLayer = rememberLineCartesianLayer(
+        val basalColumnLayer = rememberColumnCartesianLayer(
+            columnProvider = com.patrykandpatrick.vico.core.cartesian.layer.ColumnCartesianLayer.ColumnProvider.series(
+                rememberLineComponent(
+                    fill(InsulinColors.Basal),
+                    thickness = 28.dp
+                )
+            ),
+            columnCollectionSpacing = 0.dp,
             rangeProvider = basalLineRangeProvider
         )
         val cgmScrollState = rememberVicoScrollState(
@@ -1688,19 +1744,7 @@ fun VicoCgmChart(
                     val hoveredCgmOffset = hoveredBasalRatio?.let { ratio ->
                         (maxWidth * ratio) - 26.dp
                     }
-
-                    if (hoverDrivenByBasal && hoveredGlucoseLabel != null) {
-                        Text(
-                            text = hoveredGlucoseLabel,
-                            modifier = Modifier
-                                .align(Alignment.TopStart)
-                                .offset(x = (hoveredCgmOffset ?: 0.dp).coerceAtLeast(0.dp))
-                                .padding(top = 4.dp),
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurface,
-                            textAlign = TextAlign.Center
-                        )
-                    }
+                    val guidelineColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.45f)
 
                     CartesianChartHost(
                         chart = rememberCartesianChart(
@@ -1714,6 +1758,31 @@ fun VicoCgmChart(
                         modelProducer = cgmModelProducer,
                         modifier = Modifier.fillMaxSize()
                     )
+
+                    if (hoveredBasalRatio != null) {
+                        Canvas(modifier = Modifier.fillMaxSize()) {
+                            val x = size.width * hoveredBasalRatio
+                            drawLine(
+                                color = guidelineColor,
+                                start = androidx.compose.ui.geometry.Offset(x, 0f),
+                                end = androidx.compose.ui.geometry.Offset(x, size.height),
+                                strokeWidth = 1.dp.toPx()
+                            )
+                        }
+                    }
+
+                    if (hoverDrivenByBasal && hoveredGlucoseLabel != null) {
+                        Text(
+                            text = hoveredGlucoseLabel,
+                            modifier = Modifier
+                                .align(Alignment.TopStart)
+                                .offset(x = (hoveredCgmOffset ?: 0.dp).coerceAtLeast(0.dp))
+                                .padding(top = 4.dp),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurface,
+                            textAlign = TextAlign.Center
+                        )
+                    }
                 }
             }
         }
@@ -1782,6 +1851,43 @@ fun VicoCgmChart(
                 val hoveredBasalOffset = hoveredBasalRatio?.let { ratio ->
                     (maxWidth * ratio) - 18.dp
                 }
+                val guidelineColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.45f)
+
+                Canvas(modifier = Modifier.fillMaxSize()) {
+                    val chartWidth = size.width
+                    val chartHeight = size.height
+                    val rangeSpan = (currentTimeSeconds - startTimeSeconds).toFloat().coerceAtLeast(1f)
+
+                    basalIntervals.forEach { interval ->
+                        val startRatio = ((interval.startTimestamp - startTimeSeconds).toFloat() / rangeSpan).coerceIn(0f, 1f)
+                        val endRatio = ((interval.endTimestamp - startTimeSeconds).toFloat() / rangeSpan).coerceIn(0f, 1f)
+                        val left = startRatio * chartWidth
+                        val right = endRatio * chartWidth
+                        val normalizedRate = (interval.rate / basalMaxUnitsPerHour.toFloat()).coerceIn(0f, 1f)
+                        val top = chartHeight * (1f - normalizedRate)
+
+                        if (right > left) {
+                            drawRect(
+                                color = if (interval.isTemp) InsulinColors.TempBasal else InsulinColors.Basal,
+                                topLeft = androidx.compose.ui.geometry.Offset(left, top),
+                                size = androidx.compose.ui.geometry.Size(right - left, chartHeight - top)
+                            )
+                        }
+                    }
+                }
+
+                if (hoveredBasalRatio != null) {
+                    Canvas(modifier = Modifier.fillMaxSize()) {
+                        val x = size.width * hoveredBasalRatio
+                        drawLine(
+                            color = guidelineColor,
+                            start = androidx.compose.ui.geometry.Offset(x, 0f),
+                            end = androidx.compose.ui.geometry.Offset(x, size.height),
+                            strokeWidth = 1.dp.toPx()
+                        )
+                    }
+                }
+
                 if (hoveredBasalDataPoint != null) {
                     Text(
                         text = formatBasalRate(hoveredBasalDataPoint.rate),
@@ -1793,16 +1899,6 @@ fun VicoCgmChart(
                         color = MaterialTheme.colorScheme.onSurface
                     )
                 }
-
-                CartesianChartHost(
-                    chart = rememberCartesianChart(
-                        basalLineLayer
-                    ),
-                    scrollState = basalScrollState,
-                    consumeMoveEvents = false,
-                    modelProducer = basalModelProducer,
-                    modifier = Modifier.fillMaxSize()
-                )
             }
         }
 
