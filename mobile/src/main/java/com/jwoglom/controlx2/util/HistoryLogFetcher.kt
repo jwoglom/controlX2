@@ -1,16 +1,12 @@
 package com.jwoglom.controlx2.util
 
-import android.content.Context
 import android.util.LruCache
-import com.jwoglom.controlx2.CommService
-import com.jwoglom.controlx2.Prefs
 import com.jwoglom.controlx2.db.historylog.HistoryLogItem
 import com.jwoglom.controlx2.db.historylog.HistoryLogRepo
-import com.jwoglom.pumpx2.pump.bluetooth.TandemPump
-import com.jwoglom.pumpx2.pump.messages.request.currentStatus.HistoryLogRequest
+import com.jwoglom.controlx2.pump.PumpSession
+import com.jwoglom.controlx2.shared.PumpSessionToken
 import com.jwoglom.pumpx2.pump.messages.response.currentStatus.HistoryLogStatusResponse
 import com.jwoglom.pumpx2.pump.messages.response.historyLog.HistoryLog
-import com.welie.blessed.BluetoothPeripheral
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -48,13 +44,20 @@ class HistoryLogFetcher(
     @Volatile
     private var cancelled = false
 
-    constructor(context: Context, pump: TandemPump, peripheral: BluetoothPeripheral, pumpSid: Int) : this(
-        historyLogRepo = (context as CommService).historyLogRepo,
+    constructor(
+        historyLogRepo: HistoryLogRepo,
+        pumpSid: Int,
+        pumpSession: PumpSession,
+        sessionToken: PumpSessionToken,
+        autoFetchEnabled: () -> Boolean = { true },
+        broadcastCallback: ((HistoryLogItem) -> Unit)? = null
+    ) : this(
+        historyLogRepo = historyLogRepo,
         pumpSid = pumpSid,
-        commandSender = { start, count -> pump.sendCommand(peripheral, HistoryLogRequest(start, count)) },
-        autoFetchEnabled = { Prefs(context).autoFetchHistoryLogs() },
-        canRequest = { (context as? CommService)?.isPumpReadyForHistoryFetch() ?: true },
-        broadcastCallback = { item -> (context as? CommService)?.broadcastHistoryLogItem(item) }
+        commandSender = { start, count -> pumpSession.sendHistoryLogRequest(sessionToken, start, count) },
+        autoFetchEnabled = autoFetchEnabled,
+        canRequest = { pumpSession.isActive(sessionToken) },
+        broadcastCallback = broadcastCallback
     )
 
     fun cancel() {
