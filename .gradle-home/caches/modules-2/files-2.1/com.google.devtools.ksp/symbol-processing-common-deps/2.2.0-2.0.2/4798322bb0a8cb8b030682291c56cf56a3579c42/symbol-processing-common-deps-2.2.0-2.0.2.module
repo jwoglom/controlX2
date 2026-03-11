@@ -1,0 +1,82 @@
+{
+  "formatVersion": "1.1",
+  "component": {
+    "group": "com.google.devtools.ksp",
+    "module": "symbol-processing-common-deps",
+    "version": "2.2.0-2.0.2",
+    "attributes": {
+      "org.gradle.status": "release"
+    }
+  },
+  "createdBy": {
+    "gradle": {
+      "version": "8.14"
+    }
+  },
+  "variants": [
+    {
+      "name": "apiElements",
+      "attributes": {
+        "org.gradle.category": "library",
+        "org.gradle.dependency.bundling": "external",
+        "org.gradle.jvm.environment": "standard-jvm",
+        "org.gradle.jvm.version": 8,
+        "org.gradle.libraryelements": "jar",
+        "org.gradle.usage": "java-api",
+        "org.jetbrains.kotlin.platform.type": "jvm"
+      },
+      "dependencies": [
+        {
+          "group": "org.jetbrains.kotlin",
+          "module": "kotlin-stdlib",
+          "version": {
+            "requires": "2.1.20"
+          }
+        }
+      ],
+      "files": [
+        {
+          "name": "symbol-processing-common-deps-2.2.0-2.0.2.jar",
+          "url": "symbol-processing-common-deps-2.2.0-2.0.2.jar",
+          "size": 118608,
+          "sha512": "ee70c4a7287a269bbc4e9e4179387d883c6dd0ef423f938b48fb5fe652dda890fe62465466a6c5c45f65d105c6aaa5e48e3dad91d0c72bbb8ef84c58df6b8cf2",
+          "sha256": "3d642180be184646ece9c6e7184900d92f84f8080dab838a6db69c0f8acdd6e9",
+          "sha1": "c15826465823bce080cc1693daef699366be0951",
+          "md5": "870bd39b0d0b8294ae3e4ec7a4a91761"
+        }
+      ]
+    },
+    {
+      "name": "runtimeElements",
+      "attributes": {
+        "org.gradle.category": "library",
+        "org.gradle.dependency.bundling": "external",
+        "org.gradle.jvm.environment": "standard-jvm",
+        "org.gradle.jvm.version": 8,
+        "org.gradle.libraryelements": "jar",
+        "org.gradle.usage": "java-runtime",
+        "org.jetbrains.kotlin.platform.type": "jvm"
+      },
+      "dependencies": [
+        {
+          "group": "org.jetbrains.kotlin",
+          "module": "kotlin-stdlib",
+          "version": {
+            "requires": "2.1.20"
+          }
+        }
+      ],
+      "files": [
+        {
+          "name": "symbol-processing-common-deps-2.2.0-2.0.2.jar",
+          "url": "symbol-processing-common-deps-2.2.0-2.0.2.jar",
+          "size": 118608,
+          "sha512": "ee70c4a7287a269bbc4e9e4179387d883c6dd0ef423f938b48fb5fe652dda890fe62465466a6c5c45f65d105c6aaa5e48e3dad91d0c72bbb8ef84c58df6b8cf2",
+          "sha256": "3d642180be184646ece9c6e7184900d92f84f8080dab838a6db69c0f8acdd6e9",
+          "sha1": "c15826465823bce080cc1693daef699366be0951",
+          "md5": "870bd39b0d0b8294ae3e4ec7a4a91761"
+        }
+      ]
+    }
+  ]
+}

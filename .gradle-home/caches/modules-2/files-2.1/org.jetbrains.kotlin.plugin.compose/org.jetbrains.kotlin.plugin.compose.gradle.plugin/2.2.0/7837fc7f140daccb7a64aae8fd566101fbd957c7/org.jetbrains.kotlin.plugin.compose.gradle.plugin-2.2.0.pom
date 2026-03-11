@@ -1,0 +1,14 @@
+<project xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns="http://maven.apache.org/POM/4.0.0">
+      <modelVersion>4.0.0</modelVersion>
+      <groupId>org.jetbrains.kotlin.plugin.compose</groupId>
+      <artifactId>org.jetbrains.kotlin.plugin.compose.gradle.plugin</artifactId>
+      <version>2.2.0</version>
+      <packaging>pom</packaging>
+      <dependencies>
+        <dependency>
+          <groupId>org.jetbrains.kotlin</groupId>
+          <artifactId>compose-compiler-gradle-plugin</artifactId>
+          <version>2.2.0</version>
+        </dependency>
+      </dependencies>
+    </project>

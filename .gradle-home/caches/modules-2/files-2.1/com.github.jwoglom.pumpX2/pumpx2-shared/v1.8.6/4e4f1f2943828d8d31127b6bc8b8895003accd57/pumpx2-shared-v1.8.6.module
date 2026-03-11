@@ -1,0 +1,66 @@
+{
+  "formatVersion" : "1.1",
+  "component" : {
+    "group" : "com.github.jwoglom",
+    "module" : "pumpX2",
+    "version" : "v1.8.6",
+    "attributes" : {
+      "org.gradle.status" : "release"
+    }
+  },
+  "createdBy" : {
+    "gradle" : {
+      "version" : "9.2.1"
+    }
+  },
+  "variants" : [ {
+    "name" : "apiElements",
+    "attributes" : {
+      "org.gradle.category" : "library",
+      "org.gradle.dependency.bundling" : "external",
+      "org.gradle.jvm.version" : "8",
+      "org.gradle.libraryelements" : "jar",
+      "org.gradle.usage" : "java-api"
+    },
+    "files" : [ {
+      "name" : "pumpx2-shared-v1.8.6.jar",
+      "url" : "pumpx2-shared-v1.8.6.jar",
+      "size" : 8640,
+      "sha512" : "ffb31072884af12620c0ae86a22e565682e6fea372a8d08d6f20f8489d8a4dd30333142661004f5fccf2fe961928cae712500430902614d5adaa6d415f976a25",
+      "sha256" : "9a39078421f606c6a8aac02badda513c4200658a354396a428097d63f5e78305",
+      "sha1" : "f25c955c652c8614b069aa1c51b93ef619ac4e7a",
+      "md5" : "529c7d744c0d1f68d4414d300052fe75"
+    } ]
+  }, {
+    "name" : "runtimeElements",
+    "attributes" : {
+      "org.gradle.category" : "library",
+      "org.gradle.dependency.bundling" : "external",
+      "org.gradle.jvm.version" : "8",
+      "org.gradle.libraryelements" : "jar",
+      "org.gradle.usage" : "java-runtime"
+    },
+    "dependencies" : [ {
+      "group" : "commons-codec",
+      "module" : "commons-codec",
+      "version" : {
+        "requires" : "1.18.0"
+      }
+    }, {
+      "group" : "org.apache.commons",
+      "module" : "commons-lang3",
+      "version" : {
+        "requires" : "3.17.0"
+      }
+    } ],
+    "files" : [ {
+      "name" : "pumpx2-shared-v1.8.6.jar",
+      "url" : "pumpx2-shared-v1.8.6.jar",
+      "size" : 8640,
+      "sha512" : "ffb31072884af12620c0ae86a22e565682e6fea372a8d08d6f20f8489d8a4dd30333142661004f5fccf2fe961928cae712500430902614d5adaa6d415f976a25",
+      "sha256" : "9a39078421f606c6a8aac02badda513c4200658a354396a428097d63f5e78305",
+      "sha1" : "f25c955c652c8614b069aa1c51b93ef619ac4e7a",
+      "md5" : "529c7d744c0d1f68d4414d300052fe75"
+    } ]
+  } ]
+}

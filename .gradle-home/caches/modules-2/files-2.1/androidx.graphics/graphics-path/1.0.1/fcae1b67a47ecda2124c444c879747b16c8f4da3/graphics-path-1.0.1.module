@@ -1,0 +1,122 @@
+{
+  "formatVersion": "1.1",
+  "component": {
+    "group": "androidx.graphics",
+    "module": "graphics-path",
+    "version": "1.0.1",
+    "attributes": {
+      "org.gradle.status": "release"
+    }
+  },
+  "createdBy": {
+    "gradle": {
+      "version": "8.6-rc-1"
+    }
+  },
+  "variants": [
+    {
+      "name": "releaseVariantReleaseApiPublication",
+      "attributes": {
+        "org.gradle.category": "library",
+        "org.gradle.dependency.bundling": "external",
+        "org.gradle.libraryelements": "aar",
+        "org.gradle.usage": "java-api"
+      },
+      "dependencies": [
+        {
+          "group": "org.jetbrains.kotlin",
+          "module": "kotlin-stdlib",
+          "version": {
+            "requires": "1.8.22"
+          }
+        }
+      ],
+      "files": [
+        {
+          "name": "graphics-path-1.0.1.aar",
+          "url": "graphics-path-1.0.1.aar",
+          "size": 39380,
+          "sha512": "65a8801477c8a10a1e3742f89d3c68f6c7f117e5e166f1937441510cb2a4ef1bdcbbada03f28951b72f955dc51ca9ad9a06038e72fba16aac1683fc6e8ef4d3b",
+          "sha256": "8ca4032b6d79b351f0b59ad4b580eddbb9423e1652f7c958830687f1eee2ec03",
+          "sha1": "7e243033abd313c7202428422a01d48691378e33",
+          "md5": "11d0630ddca468256f45a234ced30698"
+        }
+      ]
+    },
+    {
+      "name": "releaseVariantReleaseRuntimePublication",
+      "attributes": {
+        "org.gradle.category": "library",
+        "org.gradle.dependency.bundling": "external",
+        "org.gradle.libraryelements": "aar",
+        "org.gradle.usage": "java-runtime"
+      },
+      "dependencies": [
+        {
+          "group": "androidx.core",
+          "module": "core",
+          "version": {
+            "requires": "1.12.0"
+          }
+        },
+        {
+          "group": "org.jetbrains.kotlin",
+          "module": "kotlin-stdlib",
+          "version": {
+            "requires": "1.8.22"
+          }
+        }
+      ],
+      "files": [
+        {
+          "name": "graphics-path-1.0.1.aar",
+          "url": "graphics-path-1.0.1.aar",
+          "size": 39380,
+          "sha512": "65a8801477c8a10a1e3742f89d3c68f6c7f117e5e166f1937441510cb2a4ef1bdcbbada03f28951b72f955dc51ca9ad9a06038e72fba16aac1683fc6e8ef4d3b",
+          "sha256": "8ca4032b6d79b351f0b59ad4b580eddbb9423e1652f7c958830687f1eee2ec03",
+          "sha1": "7e243033abd313c7202428422a01d48691378e33",
+          "md5": "11d0630ddca468256f45a234ced30698"
+        }
+      ]
+    },
+    {
+      "name": "sourcesElements",
+      "attributes": {
+        "org.gradle.category": "documentation",
+        "org.gradle.dependency.bundling": "external",
+        "org.gradle.docstype": "sources",
+        "org.gradle.usage": "java-runtime"
+      },
+      "files": [
+        {
+          "name": "graphics-path-1.0.1-sources.jar",
+          "url": "graphics-path-1.0.1-sources.jar",
+          "size": 9908,
+          "sha512": "ec4d488440a04fa468399dfaa45e30b231b056f68822c4f5e4949ad9feda64217a64c7f011e634ce65c5ef265cc5c7253a00cbf777cc92a2d3553a163e70d48c",
+          "sha256": "9f1b5995b9577a8876525c3411ebb2a49f9ef0e875f6aec3059e807596dc6ca6",
+          "sha1": "575be7388d6165b01341d2da738a1bb5edde1358",
+          "md5": "2c50f43cbe60496541870bf5e513a1b7"
+        }
+      ]
+    },
+    {
+      "name": "libraryVersionMetadata",
+      "attributes": {
+        "org.gradle.category": "documentation",
+        "org.gradle.dependency.bundling": "external",
+        "org.gradle.usage": "library-version-metadata"
+      },
+      "files": [
+        {
+          "name": "graphics-path-1.0.1-versionMetadata.json",
+          "url": "graphics-path-1.0.1-versionMetadata.json",
+          "size": 2032,
+          "sha512": "58b03a68573b9b0542ee48461fd09798a3d415abe8f4cc2ec64689b482e3cf806b18da2ffb91228ead3cf37bf6e477d864eb60d2e2e7c0e03386a3ff8aa5d8a3",
+          "sha256": "6f54e010c759a56cfe1a2eeb1a0edfd494184791e7b5f370b3ce064e293c2ce1",
+          "sha1": "e2902f0fa73b5f901f00abd0951e83762c8b7571",
+          "md5": "0d86d11539807b051736289e69f0c0ec"
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,1756 @@
+{
+  "formatVersion": "1.1",
+  "component": {
+    "group": "org.jetbrains.kotlin",
+    "module": "fus-statistics-gradle-plugin",
+    "version": "2.2.0",
+    "attributes": {
+      "org.gradle.status": "release"
+    }
+  },
+  "createdBy": {
+    "gradle": {
+      "version": "8.14"
+    }
+  },
+  "variants": [
+    {
+      "name": "sourcesElements",
+      "attributes": {
+        "org.gradle.category": "documentation",
+        "org.gradle.dependency.bundling": "external",
+        "org.gradle.docstype": "sources",
+        "org.gradle.usage": "java-runtime"
+      },
+      "files": [
+        {
+          "name": "fus-statistics-gradle-plugin-2.2.0-sources.jar",
+          "url": "fus-statistics-gradle-plugin-2.2.0-sources.jar",
+          "size": 14137,
+          "sha512": "26934375064fb6d1ff225fa138f144c7f7a93c0fcdc18ae9dd5841fbcd5777868ecb0213939721a00cc5f385d7061aaefc6fd01f76d2cc75c3c8ee3e31e21b17",
+          "sha256": "13da02633df6ab93754c49459b282fd8f3a2c44c0e8f5f3d32432ee3b9248453",
+          "sha1": "64eb311f64fb2b1dd5884019b24151060a4ff2da",
+          "md5": "8e2e8ec6ff4c2f23d23ab519578468bf"
+        }
+      ]
+    },
+    {
+      "name": "javadocElements",
+      "attributes": {
+        "org.gradle.category": "documentation",
+        "org.gradle.dependency.bundling": "external",
+        "org.gradle.docstype": "javadoc",
+        "org.gradle.usage": "java-runtime"
+      },
+      "files": [
+        {
+          "name": "fus-statistics-gradle-plugin-2.2.0-javadoc.jar",
+          "url": "fus-statistics-gradle-plugin-2.2.0-javadoc.jar",
+          "size": 261,
+          "sha512": "1487e5a20c9e4d74f298e07c42e96a61be11b7a768c3fbc199ee138cd68e1fc2267d1cfe3f11f288acc05df755315344d052cc5f6f751f126ab4fe1caa5125ea",
+          "sha256": "c6deada2fac53b8ea6523dbda77597b128006674616f140f04df23264c6d1aa3",
+          "sha1": "2ad14aed781c4a73ed4dbb421966d408a0a06686",
+          "md5": "f43436d6bec321290f6af228ad602604"
+        }
+      ]
+    },
+    {
+      "name": "runtimeElementsWithFixedAttribute",
+      "attributes": {
+        "org.gradle.category": "library",
+        "org.gradle.dependency.bundling": "external",
+        "org.gradle.jvm.environment": "standard-jvm",
+        "org.gradle.jvm.version": 8,
+        "org.gradle.libraryelements": "jar",
+        "org.gradle.usage": "java-runtime"
+      },
+      "dependencies": [
+        {
+          "group": "org.jetbrains.kotlin",
+          "module": "kotlin-gradle-plugin-api",
+          "version": {
+            "requires": "2.2.0"
+          },
+          "excludes": [
+            {
+              "group": "org.jetbrains.kotlin",
+              "module": "kotlin-reflect"
+            },
+            {
+              "group": "org.jetbrains.kotlin",
+              "module": "kotlin-stdlib-jdk8"
+            },
+            {
+              "group": "org.jetbrains.kotlin",
+              "module": "kotlin-stdlib-jdk7"
+            },
+            {
+              "group": "org.jetbrains.kotlin",
+              "module": "kotlin-stdlib"
+            },
+            {
+              "group": "org.jetbrains.kotlin",
+              "module": "kotlin-script-runtime"
+            },
+            {
+              "group": "org.jetbrains.kotlin",
+              "module": "kotlin-stdlib-common"
+            }
+          ]
+        }
+      ],
+      "files": [
+        {
+          "name": "fus-statistics-gradle-plugin-2.2.0.jar",
+          "url": "fus-statistics-gradle-plugin-2.2.0.jar",
+          "size": 77462,
+          "sha512": "6dadb0b69392f6f4755a7845a81b6bbd4cf0c8828dbf253b671fa57a83fb7d5713c98ae66db6aadd4818e8b3f6838d77ba978bd6b5e711331a606517dd11610d",
+          "sha256": "d0cf9ff23ad38c210eed0cc25a51315a384e61fdc15a53feb86c00bee691aae8",
+          "sha1": "b278a6f702f07ca5c63d5268c1f723726fdb2511",
+          "md5": "709abb72d7053da05ae778853b6966e0"
+        }
+      ]
+    },
+    {
+      "name": "apiElementsWithFixedAttribute",
+      "attributes": {
+        "org.gradle.category": "library",
+        "org.gradle.dependency.bundling": "external",
+        "org.gradle.jvm.environment": "standard-jvm",
+        "org.gradle.jvm.version": 8,
+        "org.gradle.libraryelements": "jar",
+        "org.gradle.usage": "java-api"
+      },
+      "dependencies": [
+        {
+          "group": "org.jetbrains.kotlin",
+          "module": "kotlin-gradle-plugin-api",
+          "version": {
+            "requires": "2.2.0"
+          },
+          "excludes": [
+            {
+              "group": "org.jetbrains.kotlin",
+              "module": "kotlin-reflect"
+            },
+            {
+              "group": "org.jetbrains.kotlin",
+              "module": "kotlin-stdlib-jdk8"
+            },
+            {
+              "group": "org.jetbrains.kotlin",
+              "module": "kotlin-stdlib-jdk7"
+            },
+            {
+              "group": "org.jetbrains.kotlin",
+              "module": "kotlin-stdlib"
+            },
+            {
+              "group": "org.jetbrains.kotlin",
+              "module": "kotlin-script-runtime"
+            },
+            {
+              "group": "org.jetbrains.kotlin",
+              "module": "kotlin-stdlib-common"
+            }
+          ]
+        }
+      ],
+      "files": [
+        {
+          "name": "fus-statistics-gradle-plugin-2.2.0.jar",
+          "url": "fus-statistics-gradle-plugin-2.2.0.jar",
+          "size": 77462,
+          "sha512": "6dadb0b69392f6f4755a7845a81b6bbd4cf0c8828dbf253b671fa57a83fb7d5713c98ae66db6aadd4818e8b3f6838d77ba978bd6b5e711331a606517dd11610d",
+          "sha256": "d0cf9ff23ad38c210eed0cc25a51315a384e61fdc15a53feb86c00bee691aae8",
+          "sha1": "b278a6f702f07ca5c63d5268c1f723726fdb2511",
+          "md5": "709abb72d7053da05ae778853b6966e0"
+        }
+      ]
+    },
+    {
+      "name": "gradle80JavadocElements",
+      "attributes": {
+        "org.gradle.category": "documentation",
+        "org.gradle.dependency.bundling": "external",
+        "org.gradle.docstype": "javadoc",
+        "org.gradle.plugin.api-version": "8.0",
+        "org.gradle.usage": "java-runtime"
+      },
+      "files": [
+        {
+          "name": "fus-statistics-gradle-plugin-2.2.0-gradle80-javadoc.jar",
+          "url": "fus-statistics-gradle-plugin-2.2.0-gradle80-javadoc.jar",
+          "size": 261,
+          "sha512": "1487e5a20c9e4d74f298e07c42e96a61be11b7a768c3fbc199ee138cd68e1fc2267d1cfe3f11f288acc05df755315344d052cc5f6f751f126ab4fe1caa5125ea",
+          "sha256": "c6deada2fac53b8ea6523dbda77597b128006674616f140f04df23264c6d1aa3",
+          "sha1": "2ad14aed781c4a73ed4dbb421966d408a0a06686",
+          "md5": "f43436d6bec321290f6af228ad602604"
+        }
+      ],
+      "capabilities": [
+        {
+          "group": "org.jetbrains.kotlin",
+          "name": "fus-statistics-gradle-plugin",
+          "version": "2.2.0"
+        }
+      ]
+    },
+    {
+      "name": "gradle80SourcesElements",
+      "attributes": {
+        "org.gradle.category": "documentation",
+        "org.gradle.dependency.bundling": "external",
+        "org.gradle.docstype": "sources",
+        "org.gradle.plugin.api-version": "8.0",
+        "org.gradle.usage": "java-runtime"
+      },
+      "files": [
+        {
+          "name": "fus-statistics-gradle-plugin-2.2.0-gradle80-sources.jar",
+          "url": "fus-statistics-gradle-plugin-2.2.0-gradle80-sources.jar",
+          "size": 14137,
+          "sha512": "26934375064fb6d1ff225fa138f144c7f7a93c0fcdc18ae9dd5841fbcd5777868ecb0213939721a00cc5f385d7061aaefc6fd01f76d2cc75c3c8ee3e31e21b17",
+          "sha256": "13da02633df6ab93754c49459b282fd8f3a2c44c0e8f5f3d32432ee3b9248453",
+          "sha1": "64eb311f64fb2b1dd5884019b24151060a4ff2da",
+          "md5": "8e2e8ec6ff4c2f23d23ab519578468bf"
+        }
+      ],
+      "capabilities": [
+        {
+          "group": "org.jetbrains.kotlin",
+          "name": "fus-statistics-gradle-plugin",
+          "version": "2.2.0"
+        }
+      ]
+    },
+    {
+      "name": "gradle80ApiElements",
+      "attributes": {
+        "org.gradle.category": "library",
+        "org.gradle.dependency.bundling": "external",
+        "org.gradle.jvm.environment": "standard-jvm",
+        "org.gradle.jvm.version": 8,
+        "org.gradle.libraryelements": "jar",
+        "org.gradle.plugin.api-version": "8.0",
+        "org.gradle.usage": "java-api"
+      },
+      "dependencies": [
+        {
+          "group": "org.jetbrains.kotlin",
+          "module": "kotlin-gradle-plugin-api",
+          "version": {
+            "requires": "2.2.0"
+          },
+          "excludes": [
+            {
+              "group": "org.jetbrains.kotlin",
+              "module": "kotlin-reflect"
+            },
+            {
+              "group": "org.jetbrains.kotlin",
+              "module": "kotlin-stdlib-jdk8"
+            },
+            {
+              "group": "org.jetbrains.kotlin",
+              "module": "kotlin-stdlib-jdk7"
+            },
+            {
+              "group": "org.jetbrains.kotlin",
+              "module": "kotlin-stdlib"
+            },
+            {
+              "group": "org.jetbrains.kotlin",
+              "module": "kotlin-script-runtime"
+            },
+            {
+              "group": "org.jetbrains.kotlin",
+              "module": "kotlin-stdlib-common"
+            }
+          ],
+          "requestedCapabilities": [
+            {
+              "group": "org.jetbrains.kotlin",
+              "name": "kotlin-gradle-plugin-api-gradle80"
+            }
+          ]
+        }
+      ],
+      "files": [
+        {
+          "name": "fus-statistics-gradle-plugin-2.2.0-gradle80.jar",
+          "url": "fus-statistics-gradle-plugin-2.2.0-gradle80.jar",
+          "size": 77462,
+          "sha512": "6dadb0b69392f6f4755a7845a81b6bbd4cf0c8828dbf253b671fa57a83fb7d5713c98ae66db6aadd4818e8b3f6838d77ba978bd6b5e711331a606517dd11610d",
+          "sha256": "d0cf9ff23ad38c210eed0cc25a51315a384e61fdc15a53feb86c00bee691aae8",
+          "sha1": "b278a6f702f07ca5c63d5268c1f723726fdb2511",
+          "md5": "709abb72d7053da05ae778853b6966e0"
+        }
+      ],
+      "capabilities": [
+        {
+          "group": "org.jetbrains.kotlin",
+          "name": "fus-statistics-gradle-plugin",
+          "version": "2.2.0"
+        }
+      ]
+    },
+    {
+      "name": "gradle80RuntimeElements",
+      "attributes": {
+        "org.gradle.category": "library",
+        "org.gradle.dependency.bundling": "external",
+        "org.gradle.jvm.environment": "standard-jvm",
+        "org.gradle.jvm.version": 8,
+        "org.gradle.libraryelements": "jar",
+        "org.gradle.plugin.api-version": "8.0",
+        "org.gradle.usage": "java-runtime"
+      },
+      "dependencies": [
+        {
+          "group": "org.jetbrains.kotlin",
+          "module": "kotlin-gradle-plugin-api",
+          "version": {
+            "requires": "2.2.0"
+          },
+          "excludes": [
+            {
+              "group": "org.jetbrains.kotlin",
+              "module": "kotlin-reflect"
+            },
+            {
+              "group": "org.jetbrains.kotlin",
+              "module": "kotlin-stdlib-jdk8"
+            },
+            {
+              "group": "org.jetbrains.kotlin",
+              "module": "kotlin-stdlib-jdk7"
+            },
+            {
+              "group": "org.jetbrains.kotlin",
+              "module": "kotlin-stdlib"
+            },
+            {
+              "group": "org.jetbrains.kotlin",
+              "module": "kotlin-script-runtime"
+            },
+            {
+              "group": "org.jetbrains.kotlin",
+              "module": "kotlin-stdlib-common"
+            }
+          ],
+          "requestedCapabilities": [
+            {
+              "group": "org.jetbrains.kotlin",
+              "name": "kotlin-gradle-plugin-api-gradle80"
+            }
+          ]
+        }
+      ],
+      "files": [
+        {
+          "name": "fus-statistics-gradle-plugin-2.2.0-gradle80.jar",
+          "url": "fus-statistics-gradle-plugin-2.2.0-gradle80.jar",
+          "size": 77462,
+          "sha512": "6dadb0b69392f6f4755a7845a81b6bbd4cf0c8828dbf253b671fa57a83fb7d5713c98ae66db6aadd4818e8b3f6838d77ba978bd6b5e711331a606517dd11610d",
+          "sha256": "d0cf9ff23ad38c210eed0cc25a51315a384e61fdc15a53feb86c00bee691aae8",
+          "sha1": "b278a6f702f07ca5c63d5268c1f723726fdb2511",
+          "md5": "709abb72d7053da05ae778853b6966e0"
+        }
+      ],
+      "capabilities": [
+        {
+          "group": "org.jetbrains.kotlin",
+          "name": "fus-statistics-gradle-plugin",
+          "version": "2.2.0"
+        }
+      ]
+    },
+    {
+      "name": "gradle81JavadocElements",
+      "attributes": {
+        "org.gradle.category": "documentation",
+        "org.gradle.dependency.bundling": "external",
+        "org.gradle.docstype": "javadoc",
+        "org.gradle.plugin.api-version": "8.1",
+        "org.gradle.usage": "java-runtime"
+      },
+      "files": [
+        {
+          "name": "fus-statistics-gradle-plugin-2.2.0-gradle81-javadoc.jar",
+          "url": "fus-statistics-gradle-plugin-2.2.0-gradle81-javadoc.jar",
+          "size": 261,
+          "sha512": "1487e5a20c9e4d74f298e07c42e96a61be11b7a768c3fbc199ee138cd68e1fc2267d1cfe3f11f288acc05df755315344d052cc5f6f751f126ab4fe1caa5125ea",
+          "sha256": "c6deada2fac53b8ea6523dbda77597b128006674616f140f04df23264c6d1aa3",
+          "sha1": "2ad14aed781c4a73ed4dbb421966d408a0a06686",
+          "md5": "f43436d6bec321290f6af228ad602604"
+        }
+      ],
+      "capabilities": [
+        {
+          "group": "org.jetbrains.kotlin",
+          "name": "fus-statistics-gradle-plugin",
+          "version": "2.2.0"
+        }
+      ]
+    },
+    {
+      "name": "gradle81SourcesElements",
+      "attributes": {
+        "org.gradle.category": "documentation",
+        "org.gradle.dependency.bundling": "external",
+        "org.gradle.docstype": "sources",
+        "org.gradle.plugin.api-version": "8.1",
+        "org.gradle.usage": "java-runtime"
+      },
+      "files": [
+        {
+          "name": "fus-statistics-gradle-plugin-2.2.0-gradle81-sources.jar",
+          "url": "fus-statistics-gradle-plugin-2.2.0-gradle81-sources.jar",
+          "size": 14137,
+          "sha512": "26934375064fb6d1ff225fa138f144c7f7a93c0fcdc18ae9dd5841fbcd5777868ecb0213939721a00cc5f385d7061aaefc6fd01f76d2cc75c3c8ee3e31e21b17",
+          "sha256": "13da02633df6ab93754c49459b282fd8f3a2c44c0e8f5f3d32432ee3b9248453",
+          "sha1": "64eb311f64fb2b1dd5884019b24151060a4ff2da",
+          "md5": "8e2e8ec6ff4c2f23d23ab519578468bf"
+        }
+      ],
+      "capabilities": [
+        {
+          "group": "org.jetbrains.kotlin",
+          "name": "fus-statistics-gradle-plugin",
+          "version": "2.2.0"
+        }
+      ]
+    },
+    {
+      "name": "gradle81ApiElements",
+      "attributes": {
+        "org.gradle.category": "library",
+        "org.gradle.dependency.bundling": "external",
+        "org.gradle.jvm.environment": "standard-jvm",
+        "org.gradle.jvm.version": 8,
+        "org.gradle.libraryelements": "jar",
+        "org.gradle.plugin.api-version": "8.1",
+        "org.gradle.usage": "java-api"
+      },
+      "dependencies": [
+        {
+          "group": "org.jetbrains.kotlin",
+          "module": "kotlin-gradle-plugin-api",
+          "version": {
+            "requires": "2.2.0"
+          },
+          "excludes": [
+            {
+              "group": "org.jetbrains.kotlin",
+              "module": "kotlin-reflect"
+            },
+            {
+              "group": "org.jetbrains.kotlin",
+              "module": "kotlin-stdlib-jdk8"
+            },
+            {
+              "group": "org.jetbrains.kotlin",
+              "module": "kotlin-stdlib-jdk7"
+            },
+            {
+              "group": "org.jetbrains.kotlin",
+              "module": "kotlin-stdlib"
+            },
+            {
+              "group": "org.jetbrains.kotlin",
+              "module": "kotlin-script-runtime"
+            },
+            {
+              "group": "org.jetbrains.kotlin",
+              "module": "kotlin-stdlib-common"
+            }
+          ],
+          "requestedCapabilities": [
+            {
+              "group": "org.jetbrains.kotlin",
+              "name": "kotlin-gradle-plugin-api-gradle81"
+            }
+          ]
+        }
+      ],
+      "files": [
+        {
+          "name": "fus-statistics-gradle-plugin-2.2.0-gradle81.jar",
+          "url": "fus-statistics-gradle-plugin-2.2.0-gradle81.jar",
+          "size": 77462,
+          "sha512": "6dadb0b69392f6f4755a7845a81b6bbd4cf0c8828dbf253b671fa57a83fb7d5713c98ae66db6aadd4818e8b3f6838d77ba978bd6b5e711331a606517dd11610d",
+          "sha256": "d0cf9ff23ad38c210eed0cc25a51315a384e61fdc15a53feb86c00bee691aae8",
+          "sha1": "b278a6f702f07ca5c63d5268c1f723726fdb2511",
+          "md5": "709abb72d7053da05ae778853b6966e0"
+        }
+      ],
+      "capabilities": [
+        {
+          "group": "org.jetbrains.kotlin",
+          "name": "fus-statistics-gradle-plugin",
+          "version": "2.2.0"
+        }
+      ]
+    },
+    {
+      "name": "gradle81RuntimeElements",
+      "attributes": {
+        "org.gradle.category": "library",
+        "org.gradle.dependency.bundling": "external",
+        "org.gradle.jvm.environment": "standard-jvm",
+        "org.gradle.jvm.version": 8,
+        "org.gradle.libraryelements": "jar",
+        "org.gradle.plugin.api-version": "8.1",
+        "org.gradle.usage": "java-runtime"
+      },
+      "dependencies": [
+        {
+          "group": "org.jetbrains.kotlin",
+          "module": "kotlin-gradle-plugin-api",
+          "version": {
+            "requires": "2.2.0"
+          },
+          "excludes": [
+            {
+              "group": "org.jetbrains.kotlin",
+              "module": "kotlin-reflect"
+            },
+            {
+              "group": "org.jetbrains.kotlin",
+              "module": "kotlin-stdlib-jdk8"
+            },
+            {
+              "group": "org.jetbrains.kotlin",
+              "module": "kotlin-stdlib-jdk7"
+            },
+            {
+              "group": "org.jetbrains.kotlin",
+              "module": "kotlin-stdlib"
+            },
+            {
+              "group": "org.jetbrains.kotlin",
+              "module": "kotlin-script-runtime"
+            },
+            {
+              "group": "org.jetbrains.kotlin",
+              "module": "kotlin-stdlib-common"
+            }
+          ],
+          "requestedCapabilities": [
+            {
+              "group": "org.jetbrains.kotlin",
+              "name": "kotlin-gradle-plugin-api-gradle81"
+            }
+          ]
+        }
+      ],
+      "files": [
+        {
+          "name": "fus-statistics-gradle-plugin-2.2.0-gradle81.jar",
+          "url": "fus-statistics-gradle-plugin-2.2.0-gradle81.jar",
+          "size": 77462,
+          "sha512": "6dadb0b69392f6f4755a7845a81b6bbd4cf0c8828dbf253b671fa57a83fb7d5713c98ae66db6aadd4818e8b3f6838d77ba978bd6b5e711331a606517dd11610d",
+          "sha256": "d0cf9ff23ad38c210eed0cc25a51315a384e61fdc15a53feb86c00bee691aae8",
+          "sha1": "b278a6f702f07ca5c63d5268c1f723726fdb2511",
+          "md5": "709abb72d7053da05ae778853b6966e0"
+        }
+      ],
+      "capabilities": [
+        {
+          "group": "org.jetbrains.kotlin",
+          "name": "fus-statistics-gradle-plugin",
+          "version": "2.2.0"
+        }
+      ]
+    },
+    {
+      "name": "gradle82JavadocElements",
+      "attributes": {
+        "org.gradle.category": "documentation",
+        "org.gradle.dependency.bundling": "external",
+        "org.gradle.docstype": "javadoc",
+        "org.gradle.plugin.api-version": "8.2",
+        "org.gradle.usage": "java-runtime"
+      },
+      "files": [
+        {
+          "name": "fus-statistics-gradle-plugin-2.2.0-gradle82-javadoc.jar",
+          "url": "fus-statistics-gradle-plugin-2.2.0-gradle82-javadoc.jar",
+          "size": 261,
+          "sha512": "1487e5a20c9e4d74f298e07c42e96a61be11b7a768c3fbc199ee138cd68e1fc2267d1cfe3f11f288acc05df755315344d052cc5f6f751f126ab4fe1caa5125ea",
+          "sha256": "c6deada2fac53b8ea6523dbda77597b128006674616f140f04df23264c6d1aa3",
+          "sha1": "2ad14aed781c4a73ed4dbb421966d408a0a06686",
+          "md5": "f43436d6bec321290f6af228ad602604"
+        }
+      ],
+      "capabilities": [
+        {
+          "group": "org.jetbrains.kotlin",
+          "name": "fus-statistics-gradle-plugin",
+          "version": "2.2.0"
+        }
+      ]
+    },
+    {
+      "name": "gradle82SourcesElements",
+      "attributes": {
+        "org.gradle.category": "documentation",
+        "org.gradle.dependency.bundling": "external",
+        "org.gradle.docstype": "sources",
+        "org.gradle.plugin.api-version": "8.2",
+        "org.gradle.usage": "java-runtime"
+      },
+      "files": [
+        {
+          "name": "fus-statistics-gradle-plugin-2.2.0-gradle82-sources.jar",
+          "url": "fus-statistics-gradle-plugin-2.2.0-gradle82-sources.jar",
+          "size": 14137,
+          "sha512": "26934375064fb6d1ff225fa138f144c7f7a93c0fcdc18ae9dd5841fbcd5777868ecb0213939721a00cc5f385d7061aaefc6fd01f76d2cc75c3c8ee3e31e21b17",
+          "sha256": "13da02633df6ab93754c49459b282fd8f3a2c44c0e8f5f3d32432ee3b9248453",
+          "sha1": "64eb311f64fb2b1dd5884019b24151060a4ff2da",
+          "md5": "8e2e8ec6ff4c2f23d23ab519578468bf"
+        }
+      ],
+      "capabilities": [
+        {
+          "group": "org.jetbrains.kotlin",
+          "name": "fus-statistics-gradle-plugin",
+          "version": "2.2.0"
+        }
+      ]
+    },
+    {
+      "name": "gradle82ApiElements",
+      "attributes": {
+        "org.gradle.category": "library",
+        "org.gradle.dependency.bundling": "external",
+        "org.gradle.jvm.environment": "standard-jvm",
+        "org.gradle.jvm.version": 8,
+        "org.gradle.libraryelements": "jar",
+        "org.gradle.plugin.api-version": "8.2",
+        "org.gradle.usage": "java-api"
+      },
+      "dependencies": [
+        {
+          "group": "org.jetbrains.kotlin",
+          "module": "kotlin-gradle-plugin-api",
+          "version": {
+            "requires": "2.2.0"
+          },
+          "excludes": [
+            {
+              "group": "org.jetbrains.kotlin",
+              "module": "kotlin-reflect"
+            },
+            {
+              "group": "org.jetbrains.kotlin",
+              "module": "kotlin-stdlib-jdk8"
+            },
+            {
+              "group": "org.jetbrains.kotlin",
+              "module": "kotlin-stdlib-jdk7"
+            },
+            {
+              "group": "org.jetbrains.kotlin",
+              "module": "kotlin-stdlib"
+            },
+            {
+              "group": "org.jetbrains.kotlin",
+              "module": "kotlin-script-runtime"
+            },
+            {
+              "group": "org.jetbrains.kotlin",
+              "module": "kotlin-stdlib-common"
+            }
+          ],
+          "requestedCapabilities": [
+            {
+              "group": "org.jetbrains.kotlin",
+              "name": "kotlin-gradle-plugin-api-gradle82"
+            }
+          ]
+        }
+      ],
+      "files": [
+        {
+          "name": "fus-statistics-gradle-plugin-2.2.0-gradle82.jar",
+          "url": "fus-statistics-gradle-plugin-2.2.0-gradle82.jar",
+          "size": 77462,
+          "sha512": "6dadb0b69392f6f4755a7845a81b6bbd4cf0c8828dbf253b671fa57a83fb7d5713c98ae66db6aadd4818e8b3f6838d77ba978bd6b5e711331a606517dd11610d",
+          "sha256": "d0cf9ff23ad38c210eed0cc25a51315a384e61fdc15a53feb86c00bee691aae8",
+          "sha1": "b278a6f702f07ca5c63d5268c1f723726fdb2511",
+          "md5": "709abb72d7053da05ae778853b6966e0"
+        }
+      ],
+      "capabilities": [
+        {
+          "group": "org.jetbrains.kotlin",
+          "name": "fus-statistics-gradle-plugin",
+          "version": "2.2.0"
+        }
+      ]
+    },
+    {
+      "name": "gradle82RuntimeElements",
+      "attributes": {
+        "org.gradle.category": "library",
+        "org.gradle.dependency.bundling": "external",
+        "org.gradle.jvm.environment": "standard-jvm",
+        "org.gradle.jvm.version": 8,
+        "org.gradle.libraryelements": "jar",
+        "org.gradle.plugin.api-version": "8.2",
+        "org.gradle.usage": "java-runtime"
+      },
+      "dependencies": [
+        {
+          "group": "org.jetbrains.kotlin",
+          "module": "kotlin-gradle-plugin-api",
+          "version": {
+            "requires": "2.2.0"
+          },
+          "excludes": [
+            {
+              "group": "org.jetbrains.kotlin",
+              "module": "kotlin-reflect"
+            },
+            {
+              "group": "org.jetbrains.kotlin",
+              "module": "kotlin-stdlib-jdk8"
+            },
+            {
+              "group": "org.jetbrains.kotlin",
+              "module": "kotlin-stdlib-jdk7"
+            },
+            {
+              "group": "org.jetbrains.kotlin",
+              "module": "kotlin-stdlib"
+            },
+            {
+              "group": "org.jetbrains.kotlin",
+              "module": "kotlin-script-runtime"
+            },
+            {
+              "group": "org.jetbrains.kotlin",
+              "module": "kotlin-stdlib-common"
+            }
+          ],
+          "requestedCapabilities": [
+            {
+              "group": "org.jetbrains.kotlin",
+              "name": "kotlin-gradle-plugin-api-gradle82"
+            }
+          ]
+        }
+      ],
+      "files": [
+        {
+          "name": "fus-statistics-gradle-plugin-2.2.0-gradle82.jar",
+          "url": "fus-statistics-gradle-plugin-2.2.0-gradle82.jar",
+          "size": 77462,
+          "sha512": "6dadb0b69392f6f4755a7845a81b6bbd4cf0c8828dbf253b671fa57a83fb7d5713c98ae66db6aadd4818e8b3f6838d77ba978bd6b5e711331a606517dd11610d",
+          "sha256": "d0cf9ff23ad38c210eed0cc25a51315a384e61fdc15a53feb86c00bee691aae8",
+          "sha1": "b278a6f702f07ca5c63d5268c1f723726fdb2511",
+          "md5": "709abb72d7053da05ae778853b6966e0"
+        }
+      ],
+      "capabilities": [
+        {
+          "group": "org.jetbrains.kotlin",
+          "name": "fus-statistics-gradle-plugin",
+          "version": "2.2.0"
+        }
+      ]
+    },
+    {
+      "name": "gradle85JavadocElements",
+      "attributes": {
+        "org.gradle.category": "documentation",
+        "org.gradle.dependency.bundling": "external",
+        "org.gradle.docstype": "javadoc",
+        "org.gradle.plugin.api-version": "8.5",
+        "org.gradle.usage": "java-runtime"
+      },
+      "files": [
+        {
+          "name": "fus-statistics-gradle-plugin-2.2.0-gradle85-javadoc.jar",
+          "url": "fus-statistics-gradle-plugin-2.2.0-gradle85-javadoc.jar",
+          "size": 261,
+          "sha512": "1487e5a20c9e4d74f298e07c42e96a61be11b7a768c3fbc199ee138cd68e1fc2267d1cfe3f11f288acc05df755315344d052cc5f6f751f126ab4fe1caa5125ea",
+          "sha256": "c6deada2fac53b8ea6523dbda77597b128006674616f140f04df23264c6d1aa3",
+          "sha1": "2ad14aed781c4a73ed4dbb421966d408a0a06686",
+          "md5": "f43436d6bec321290f6af228ad602604"
+        }
+      ],
+      "capabilities": [
+        {
+          "group": "org.jetbrains.kotlin",
+          "name": "fus-statistics-gradle-plugin",
+          "version": "2.2.0"
+        }
+      ]
+    },
+    {
+      "name": "gradle85SourcesElements",
+      "attributes": {
+        "org.gradle.category": "documentation",
+        "org.gradle.dependency.bundling": "external",
+        "org.gradle.docstype": "sources",
+        "org.gradle.plugin.api-version": "8.5",
+        "org.gradle.usage": "java-runtime"
+      },
+      "files": [
+        {
+          "name": "fus-statistics-gradle-plugin-2.2.0-gradle85-sources.jar",
+          "url": "fus-statistics-gradle-plugin-2.2.0-gradle85-sources.jar",
+          "size": 14137,
+          "sha512": "26934375064fb6d1ff225fa138f144c7f7a93c0fcdc18ae9dd5841fbcd5777868ecb0213939721a00cc5f385d7061aaefc6fd01f76d2cc75c3c8ee3e31e21b17",
+          "sha256": "13da02633df6ab93754c49459b282fd8f3a2c44c0e8f5f3d32432ee3b9248453",
+          "sha1": "64eb311f64fb2b1dd5884019b24151060a4ff2da",
+          "md5": "8e2e8ec6ff4c2f23d23ab519578468bf"
+        }
+      ],
+      "capabilities": [
+        {
+          "group": "org.jetbrains.kotlin",
+          "name": "fus-statistics-gradle-plugin",
+          "version": "2.2.0"
+        }
+      ]
+    },
+    {
+      "name": "gradle85ApiElements",
+      "attributes": {
+        "org.gradle.category": "library",
+        "org.gradle.dependency.bundling": "external",
+        "org.gradle.jvm.environment": "standard-jvm",
+        "org.gradle.jvm.version": 8,
+        "org.gradle.libraryelements": "jar",
+        "org.gradle.plugin.api-version": "8.5",
+        "org.gradle.usage": "java-api"
+      },
+      "dependencies": [
+        {
+          "group": "org.jetbrains.kotlin",
+          "module": "kotlin-gradle-plugin-api",
+          "version": {
+            "requires": "2.2.0"
+          },
+          "excludes": [
+            {
+              "group": "org.jetbrains.kotlin",
+              "module": "kotlin-reflect"
+            },
+            {
+              "group": "org.jetbrains.kotlin",
+              "module": "kotlin-stdlib-jdk8"
+            },
+            {
+              "group": "org.jetbrains.kotlin",
+              "module": "kotlin-stdlib-jdk7"
+            },
+            {
+              "group": "org.jetbrains.kotlin",
+              "module": "kotlin-stdlib"
+            },
+            {
+              "group": "org.jetbrains.kotlin",
+              "module": "kotlin-script-runtime"
+            },
+            {
+              "group": "org.jetbrains.kotlin",
+              "module": "kotlin-stdlib-common"
+            }
+          ],
+          "requestedCapabilities": [
+            {
+              "group": "org.jetbrains.kotlin",
+              "name": "kotlin-gradle-plugin-api-gradle85"
+            }
+          ]
+        }
+      ],
+      "files": [
+        {
+          "name": "fus-statistics-gradle-plugin-2.2.0-gradle85.jar",
+          "url": "fus-statistics-gradle-plugin-2.2.0-gradle85.jar",
+          "size": 77462,
+          "sha512": "6dadb0b69392f6f4755a7845a81b6bbd4cf0c8828dbf253b671fa57a83fb7d5713c98ae66db6aadd4818e8b3f6838d77ba978bd6b5e711331a606517dd11610d",
+          "sha256": "d0cf9ff23ad38c210eed0cc25a51315a384e61fdc15a53feb86c00bee691aae8",
+          "sha1": "b278a6f702f07ca5c63d5268c1f723726fdb2511",
+          "md5": "709abb72d7053da05ae778853b6966e0"
+        }
+      ],
+      "capabilities": [
+        {
+          "group": "org.jetbrains.kotlin",
+          "name": "fus-statistics-gradle-plugin",
+          "version": "2.2.0"
+        }
+      ]
+    },
+    {
+      "name": "gradle85RuntimeElements",
+      "attributes": {
+        "org.gradle.category": "library",
+        "org.gradle.dependency.bundling": "external",
+        "org.gradle.jvm.environment": "standard-jvm",
+        "org.gradle.jvm.version": 8,
+        "org.gradle.libraryelements": "jar",
+        "org.gradle.plugin.api-version": "8.5",
+        "org.gradle.usage": "java-runtime"
+      },
+      "dependencies": [
+        {
+          "group": "org.jetbrains.kotlin",
+          "module": "kotlin-gradle-plugin-api",
+          "version": {
+            "requires": "2.2.0"
+          },
+          "excludes": [
+            {
+              "group": "org.jetbrains.kotlin",
+              "module": "kotlin-reflect"
+            },
+            {
+              "group": "org.jetbrains.kotlin",
+              "module": "kotlin-stdlib-jdk8"
+            },
+            {
+              "group": "org.jetbrains.kotlin",
+              "module": "kotlin-stdlib-jdk7"
+            },
+            {
+              "group": "org.jetbrains.kotlin",
+              "module": "kotlin-stdlib"
+            },
+            {
+              "group": "org.jetbrains.kotlin",
+              "module": "kotlin-script-runtime"
+            },
+            {
+              "group": "org.jetbrains.kotlin",
+              "module": "kotlin-stdlib-common"
+            }
+          ],
+          "requestedCapabilities": [
+            {
+              "group": "org.jetbrains.kotlin",
+              "name": "kotlin-gradle-plugin-api-gradle85"
+            }
+          ]
+        }
+      ],
+      "files": [
+        {
+          "name": "fus-statistics-gradle-plugin-2.2.0-gradle85.jar",
+          "url": "fus-statistics-gradle-plugin-2.2.0-gradle85.jar",
+          "size": 77462,
+          "sha512": "6dadb0b69392f6f4755a7845a81b6bbd4cf0c8828dbf253b671fa57a83fb7d5713c98ae66db6aadd4818e8b3f6838d77ba978bd6b5e711331a606517dd11610d",
+          "sha256": "d0cf9ff23ad38c210eed0cc25a51315a384e61fdc15a53feb86c00bee691aae8",
+          "sha1": "b278a6f702f07ca5c63d5268c1f723726fdb2511",
+          "md5": "709abb72d7053da05ae778853b6966e0"
+        }
+      ],
+      "capabilities": [
+        {
+          "group": "org.jetbrains.kotlin",
+          "name": "fus-statistics-gradle-plugin",
+          "version": "2.2.0"
+        }
+      ]
+    },
+    {
+      "name": "gradle86JavadocElements",
+      "attributes": {
+        "org.gradle.category": "documentation",
+        "org.gradle.dependency.bundling": "external",
+        "org.gradle.docstype": "javadoc",
+        "org.gradle.plugin.api-version": "8.6",
+        "org.gradle.usage": "java-runtime"
+      },
+      "files": [
+        {
+          "name": "fus-statistics-gradle-plugin-2.2.0-gradle86-javadoc.jar",
+          "url": "fus-statistics-gradle-plugin-2.2.0-gradle86-javadoc.jar",
+          "size": 261,
+          "sha512": "1487e5a20c9e4d74f298e07c42e96a61be11b7a768c3fbc199ee138cd68e1fc2267d1cfe3f11f288acc05df755315344d052cc5f6f751f126ab4fe1caa5125ea",
+          "sha256": "c6deada2fac53b8ea6523dbda77597b128006674616f140f04df23264c6d1aa3",
+          "sha1": "2ad14aed781c4a73ed4dbb421966d408a0a06686",
+          "md5": "f43436d6bec321290f6af228ad602604"
+        }
+      ],
+      "capabilities": [
+        {
+          "group": "org.jetbrains.kotlin",
+          "name": "fus-statistics-gradle-plugin",
+          "version": "2.2.0"
+        }
+      ]
+    },
+    {
+      "name": "gradle86SourcesElements",
+      "attributes": {
+        "org.gradle.category": "documentation",
+        "org.gradle.dependency.bundling": "external",
+        "org.gradle.docstype": "sources",
+        "org.gradle.plugin.api-version": "8.6",
+        "org.gradle.usage": "java-runtime"
+      },
+      "files": [
+        {
+          "name": "fus-statistics-gradle-plugin-2.2.0-gradle86-sources.jar",
+          "url": "fus-statistics-gradle-plugin-2.2.0-gradle86-sources.jar",
+          "size": 14137,
+          "sha512": "26934375064fb6d1ff225fa138f144c7f7a93c0fcdc18ae9dd5841fbcd5777868ecb0213939721a00cc5f385d7061aaefc6fd01f76d2cc75c3c8ee3e31e21b17",
+          "sha256": "13da02633df6ab93754c49459b282fd8f3a2c44c0e8f5f3d32432ee3b9248453",
+          "sha1": "64eb311f64fb2b1dd5884019b24151060a4ff2da",
+          "md5": "8e2e8ec6ff4c2f23d23ab519578468bf"
+        }
+      ],
+      "capabilities": [
+        {
+          "group": "org.jetbrains.kotlin",
+          "name": "fus-statistics-gradle-plugin",
+          "version": "2.2.0"
+        }
+      ]
+    },
+    {
+      "name": "gradle86ApiElements",
+      "attributes": {
+        "org.gradle.category": "library",
+        "org.gradle.dependency.bundling": "external",
+        "org.gradle.jvm.environment": "standard-jvm",
+        "org.gradle.jvm.version": 8,
+        "org.gradle.libraryelements": "jar",
+        "org.gradle.plugin.api-version": "8.6",
+        "org.gradle.usage": "java-api"
+      },
+      "dependencies": [
+        {
+          "group": "org.jetbrains.kotlin",
+          "module": "kotlin-gradle-plugin-api",
+          "version": {
+            "requires": "2.2.0"
+          },
+          "excludes": [
+            {
+              "group": "org.jetbrains.kotlin",
+              "module": "kotlin-reflect"
+            },
+            {
+              "group": "org.jetbrains.kotlin",
+              "module": "kotlin-stdlib-jdk8"
+            },
+            {
+              "group": "org.jetbrains.kotlin",
+              "module": "kotlin-stdlib-jdk7"
+            },
+            {
+              "group": "org.jetbrains.kotlin",
+              "module": "kotlin-stdlib"
+            },
+            {
+              "group": "org.jetbrains.kotlin",
+              "module": "kotlin-script-runtime"
+            },
+            {
+              "group": "org.jetbrains.kotlin",
+              "module": "kotlin-stdlib-common"
+            }
+          ],
+          "requestedCapabilities": [
+            {
+              "group": "org.jetbrains.kotlin",
+              "name": "kotlin-gradle-plugin-api-gradle86"
+            }
+          ]
+        }
+      ],
+      "files": [
+        {
+          "name": "fus-statistics-gradle-plugin-2.2.0-gradle86.jar",
+          "url": "fus-statistics-gradle-plugin-2.2.0-gradle86.jar",
+          "size": 77462,
+          "sha512": "6dadb0b69392f6f4755a7845a81b6bbd4cf0c8828dbf253b671fa57a83fb7d5713c98ae66db6aadd4818e8b3f6838d77ba978bd6b5e711331a606517dd11610d",
+          "sha256": "d0cf9ff23ad38c210eed0cc25a51315a384e61fdc15a53feb86c00bee691aae8",
+          "sha1": "b278a6f702f07ca5c63d5268c1f723726fdb2511",
+          "md5": "709abb72d7053da05ae778853b6966e0"
+        }
+      ],
+      "capabilities": [
+        {
+          "group": "org.jetbrains.kotlin",
+          "name": "fus-statistics-gradle-plugin",
+          "version": "2.2.0"
+        }
+      ]
+    },
+    {
+      "name": "gradle86RuntimeElements",
+      "attributes": {
+        "org.gradle.category": "library",
+        "org.gradle.dependency.bundling": "external",
+        "org.gradle.jvm.environment": "standard-jvm",
+        "org.gradle.jvm.version": 8,
+        "org.gradle.libraryelements": "jar",
+        "org.gradle.plugin.api-version": "8.6",
+        "org.gradle.usage": "java-runtime"
+      },
+      "dependencies": [
+        {
+          "group": "org.jetbrains.kotlin",
+          "module": "kotlin-gradle-plugin-api",
+          "version": {
+            "requires": "2.2.0"
+          },
+          "excludes": [
+            {
+              "group": "org.jetbrains.kotlin",
+              "module": "kotlin-reflect"
+            },
+            {
+              "group": "org.jetbrains.kotlin",
+              "module": "kotlin-stdlib-jdk8"
+            },
+            {
+              "group": "org.jetbrains.kotlin",
+              "module": "kotlin-stdlib-jdk7"
+            },
+            {
+              "group": "org.jetbrains.kotlin",
+              "module": "kotlin-stdlib"
+            },
+            {
+              "group": "org.jetbrains.kotlin",
+              "module": "kotlin-script-runtime"
+            },
+            {
+              "group": "org.jetbrains.kotlin",
+              "module": "kotlin-stdlib-common"
+            }
+          ],
+          "requestedCapabilities": [
+            {
+              "group": "org.jetbrains.kotlin",
+              "name": "kotlin-gradle-plugin-api-gradle86"
+            }
+          ]
+        }
+      ],
+      "files": [
+        {
+          "name": "fus-statistics-gradle-plugin-2.2.0-gradle86.jar",
+          "url": "fus-statistics-gradle-plugin-2.2.0-gradle86.jar",
+          "size": 77462,
+          "sha512": "6dadb0b69392f6f4755a7845a81b6bbd4cf0c8828dbf253b671fa57a83fb7d5713c98ae66db6aadd4818e8b3f6838d77ba978bd6b5e711331a606517dd11610d",
+          "sha256": "d0cf9ff23ad38c210eed0cc25a51315a384e61fdc15a53feb86c00bee691aae8",
+          "sha1": "b278a6f702f07ca5c63d5268c1f723726fdb2511",
+          "md5": "709abb72d7053da05ae778853b6966e0"
+        }
+      ],
+      "capabilities": [
+        {
+          "group": "org.jetbrains.kotlin",
+          "name": "fus-statistics-gradle-plugin",
+          "version": "2.2.0"
+        }
+      ]
+    },
+    {
+      "name": "gradle88JavadocElements",
+      "attributes": {
+        "org.gradle.category": "documentation",
+        "org.gradle.dependency.bundling": "external",
+        "org.gradle.docstype": "javadoc",
+        "org.gradle.plugin.api-version": "8.8",
+        "org.gradle.usage": "java-runtime"
+      },
+      "files": [
+        {
+          "name": "fus-statistics-gradle-plugin-2.2.0-gradle88-javadoc.jar",
+          "url": "fus-statistics-gradle-plugin-2.2.0-gradle88-javadoc.jar",
+          "size": 261,
+          "sha512": "1487e5a20c9e4d74f298e07c42e96a61be11b7a768c3fbc199ee138cd68e1fc2267d1cfe3f11f288acc05df755315344d052cc5f6f751f126ab4fe1caa5125ea",
+          "sha256": "c6deada2fac53b8ea6523dbda77597b128006674616f140f04df23264c6d1aa3",
+          "sha1": "2ad14aed781c4a73ed4dbb421966d408a0a06686",
+          "md5": "f43436d6bec321290f6af228ad602604"
+        }
+      ],
+      "capabilities": [
+        {
+          "group": "org.jetbrains.kotlin",
+          "name": "fus-statistics-gradle-plugin",
+          "version": "2.2.0"
+        }
+      ]
+    },
+    {
+      "name": "gradle88SourcesElements",
+      "attributes": {
+        "org.gradle.category": "documentation",
+        "org.gradle.dependency.bundling": "external",
+        "org.gradle.docstype": "sources",
+        "org.gradle.plugin.api-version": "8.8",
+        "org.gradle.usage": "java-runtime"
+      },
+      "files": [
+        {
+          "name": "fus-statistics-gradle-plugin-2.2.0-gradle88-sources.jar",
+          "url": "fus-statistics-gradle-plugin-2.2.0-gradle88-sources.jar",
+          "size": 14137,
+          "sha512": "26934375064fb6d1ff225fa138f144c7f7a93c0fcdc18ae9dd5841fbcd5777868ecb0213939721a00cc5f385d7061aaefc6fd01f76d2cc75c3c8ee3e31e21b17",
+          "sha256": "13da02633df6ab93754c49459b282fd8f3a2c44c0e8f5f3d32432ee3b9248453",
+          "sha1": "64eb311f64fb2b1dd5884019b24151060a4ff2da",
+          "md5": "8e2e8ec6ff4c2f23d23ab519578468bf"
+        }
+      ],
+      "capabilities": [
+        {
+          "group": "org.jetbrains.kotlin",
+          "name": "fus-statistics-gradle-plugin",
+          "version": "2.2.0"
+        }
+      ]
+    },
+    {
+      "name": "gradle88ApiElements",
+      "attributes": {
+        "org.gradle.category": "library",
+        "org.gradle.dependency.bundling": "external",
+        "org.gradle.jvm.environment": "standard-jvm",
+        "org.gradle.jvm.version": 8,
+        "org.gradle.libraryelements": "jar",
+        "org.gradle.plugin.api-version": "8.8",
+        "org.gradle.usage": "java-api"
+      },
+      "dependencies": [
+        {
+          "group": "org.jetbrains.kotlin",
+          "module": "kotlin-gradle-plugin-api",
+          "version": {
+            "requires": "2.2.0"
+          },
+          "excludes": [
+            {
+              "group": "org.jetbrains.kotlin",
+              "module": "kotlin-reflect"
+            },
+            {
+              "group": "org.jetbrains.kotlin",
+              "module": "kotlin-stdlib-jdk8"
+            },
+            {
+              "group": "org.jetbrains.kotlin",
+              "module": "kotlin-stdlib-jdk7"
+            },
+            {
+              "group": "org.jetbrains.kotlin",
+              "module": "kotlin-stdlib"
+            },
+            {
+              "group": "org.jetbrains.kotlin",
+              "module": "kotlin-script-runtime"
+            },
+            {
+              "group": "org.jetbrains.kotlin",
+              "module": "kotlin-stdlib-common"
+            }
+          ],
+          "requestedCapabilities": [
+            {
+              "group": "org.jetbrains.kotlin",
+              "name": "kotlin-gradle-plugin-api-gradle88"
+            }
+          ]
+        }
+      ],
+      "files": [
+        {
+          "name": "fus-statistics-gradle-plugin-2.2.0-gradle88.jar",
+          "url": "fus-statistics-gradle-plugin-2.2.0-gradle88.jar",
+          "size": 77462,
+          "sha512": "6dadb0b69392f6f4755a7845a81b6bbd4cf0c8828dbf253b671fa57a83fb7d5713c98ae66db6aadd4818e8b3f6838d77ba978bd6b5e711331a606517dd11610d",
+          "sha256": "d0cf9ff23ad38c210eed0cc25a51315a384e61fdc15a53feb86c00bee691aae8",
+          "sha1": "b278a6f702f07ca5c63d5268c1f723726fdb2511",
+          "md5": "709abb72d7053da05ae778853b6966e0"
+        }
+      ],
+      "capabilities": [
+        {
+          "group": "org.jetbrains.kotlin",
+          "name": "fus-statistics-gradle-plugin",
+          "version": "2.2.0"
+        }
+      ]
+    },
+    {
+      "name": "gradle88RuntimeElements",
+      "attributes": {
+        "org.gradle.category": "library",
+        "org.gradle.dependency.bundling": "external",
+        "org.gradle.jvm.environment": "standard-jvm",
+        "org.gradle.jvm.version": 8,
+        "org.gradle.libraryelements": "jar",
+        "org.gradle.plugin.api-version": "8.8",
+        "org.gradle.usage": "java-runtime"
+      },
+      "dependencies": [
+        {
+          "group": "org.jetbrains.kotlin",
+          "module": "kotlin-gradle-plugin-api",
+          "version": {
+            "requires": "2.2.0"
+          },
+          "excludes": [
+            {
+              "group": "org.jetbrains.kotlin",
+              "module": "kotlin-reflect"
+            },
+            {
+              "group": "org.jetbrains.kotlin",
+              "module": "kotlin-stdlib-jdk8"
+            },
+            {
+              "group": "org.jetbrains.kotlin",
+              "module": "kotlin-stdlib-jdk7"
+            },
+            {
+              "group": "org.jetbrains.kotlin",
+              "module": "kotlin-stdlib"
+            },
+            {
+              "group": "org.jetbrains.kotlin",
+              "module": "kotlin-script-runtime"
+            },
+            {
+              "group": "org.jetbrains.kotlin",
+              "module": "kotlin-stdlib-common"
+            }
+          ],
+          "requestedCapabilities": [
+            {
+              "group": "org.jetbrains.kotlin",
+              "name": "kotlin-gradle-plugin-api-gradle88"
+            }
+          ]
+        }
+      ],
+      "files": [
+        {
+          "name": "fus-statistics-gradle-plugin-2.2.0-gradle88.jar",
+          "url": "fus-statistics-gradle-plugin-2.2.0-gradle88.jar",
+          "size": 77462,
+          "sha512": "6dadb0b69392f6f4755a7845a81b6bbd4cf0c8828dbf253b671fa57a83fb7d5713c98ae66db6aadd4818e8b3f6838d77ba978bd6b5e711331a606517dd11610d",
+          "sha256": "d0cf9ff23ad38c210eed0cc25a51315a384e61fdc15a53feb86c00bee691aae8",
+          "sha1": "b278a6f702f07ca5c63d5268c1f723726fdb2511",
+          "md5": "709abb72d7053da05ae778853b6966e0"
+        }
+      ],
+      "capabilities": [
+        {
+          "group": "org.jetbrains.kotlin",
+          "name": "fus-statistics-gradle-plugin",
+          "version": "2.2.0"
+        }
+      ]
+    },
+    {
+      "name": "gradle811JavadocElements",
+      "attributes": {
+        "org.gradle.category": "documentation",
+        "org.gradle.dependency.bundling": "external",
+        "org.gradle.docstype": "javadoc",
+        "org.gradle.plugin.api-version": "8.11",
+        "org.gradle.usage": "java-runtime"
+      },
+      "files": [
+        {
+          "name": "fus-statistics-gradle-plugin-2.2.0-gradle811-javadoc.jar",
+          "url": "fus-statistics-gradle-plugin-2.2.0-gradle811-javadoc.jar",
+          "size": 261,
+          "sha512": "1487e5a20c9e4d74f298e07c42e96a61be11b7a768c3fbc199ee138cd68e1fc2267d1cfe3f11f288acc05df755315344d052cc5f6f751f126ab4fe1caa5125ea",
+          "sha256": "c6deada2fac53b8ea6523dbda77597b128006674616f140f04df23264c6d1aa3",
+          "sha1": "2ad14aed781c4a73ed4dbb421966d408a0a06686",
+          "md5": "f43436d6bec321290f6af228ad602604"
+        }
+      ],
+      "capabilities": [
+        {
+          "group": "org.jetbrains.kotlin",
+          "name": "fus-statistics-gradle-plugin",
+          "version": "2.2.0"
+        }
+      ]
+    },
+    {
+      "name": "gradle811SourcesElements",
+      "attributes": {
+        "org.gradle.category": "documentation",
+        "org.gradle.dependency.bundling": "external",
+        "org.gradle.docstype": "sources",
+        "org.gradle.plugin.api-version": "8.11",
+        "org.gradle.usage": "java-runtime"
+      },
+      "files": [
+        {
+          "name": "fus-statistics-gradle-plugin-2.2.0-gradle811-sources.jar",
+          "url": "fus-statistics-gradle-plugin-2.2.0-gradle811-sources.jar",
+          "size": 14137,
+          "sha512": "26934375064fb6d1ff225fa138f144c7f7a93c0fcdc18ae9dd5841fbcd5777868ecb0213939721a00cc5f385d7061aaefc6fd01f76d2cc75c3c8ee3e31e21b17",
+          "sha256": "13da02633df6ab93754c49459b282fd8f3a2c44c0e8f5f3d32432ee3b9248453",
+          "sha1": "64eb311f64fb2b1dd5884019b24151060a4ff2da",
+          "md5": "8e2e8ec6ff4c2f23d23ab519578468bf"
+        }
+      ],
+      "capabilities": [
+        {
+          "group": "org.jetbrains.kotlin",
+          "name": "fus-statistics-gradle-plugin",
+          "version": "2.2.0"
+        }
+      ]
+    },
+    {
+      "name": "gradle811ApiElements",
+      "attributes": {
+        "org.gradle.category": "library",
+        "org.gradle.dependency.bundling": "external",
+        "org.gradle.jvm.environment": "standard-jvm",
+        "org.gradle.jvm.version": 8,
+        "org.gradle.libraryelements": "jar",
+        "org.gradle.plugin.api-version": "8.11",
+        "org.gradle.usage": "java-api"
+      },
+      "dependencies": [
+        {
+          "group": "org.jetbrains.kotlin",
+          "module": "kotlin-gradle-plugin-api",
+          "version": {
+            "requires": "2.2.0"
+          },
+          "excludes": [
+            {
+              "group": "org.jetbrains.kotlin",
+              "module": "kotlin-reflect"
+            },
+            {
+              "group": "org.jetbrains.kotlin",
+              "module": "kotlin-stdlib-jdk8"
+            },
+            {
+              "group": "org.jetbrains.kotlin",
+              "module": "kotlin-stdlib-jdk7"
+            },
+            {
+              "group": "org.jetbrains.kotlin",
+              "module": "kotlin-stdlib"
+            },
+            {
+              "group": "org.jetbrains.kotlin",
+              "module": "kotlin-script-runtime"
+            },
+            {
+              "group": "org.jetbrains.kotlin",
+              "module": "kotlin-stdlib-common"
+            }
+          ],
+          "requestedCapabilities": [
+            {
+              "group": "org.jetbrains.kotlin",
+              "name": "kotlin-gradle-plugin-api-gradle811"
+            }
+          ]
+        }
+      ],
+      "files": [
+        {
+          "name": "fus-statistics-gradle-plugin-2.2.0-gradle811.jar",
+          "url": "fus-statistics-gradle-plugin-2.2.0-gradle811.jar",
+          "size": 77462,
+          "sha512": "6dadb0b69392f6f4755a7845a81b6bbd4cf0c8828dbf253b671fa57a83fb7d5713c98ae66db6aadd4818e8b3f6838d77ba978bd6b5e711331a606517dd11610d",
+          "sha256": "d0cf9ff23ad38c210eed0cc25a51315a384e61fdc15a53feb86c00bee691aae8",
+          "sha1": "b278a6f702f07ca5c63d5268c1f723726fdb2511",
+          "md5": "709abb72d7053da05ae778853b6966e0"
+        }
+      ],
+      "capabilities": [
+        {
+          "group": "org.jetbrains.kotlin",
+          "name": "fus-statistics-gradle-plugin",
+          "version": "2.2.0"
+        }
+      ]
+    },
+    {
+      "name": "gradle811RuntimeElements",
+      "attributes": {
+        "org.gradle.category": "library",
+        "org.gradle.dependency.bundling": "external",
+        "org.gradle.jvm.environment": "standard-jvm",
+        "org.gradle.jvm.version": 8,
+        "org.gradle.libraryelements": "jar",
+        "org.gradle.plugin.api-version": "8.11",
+        "org.gradle.usage": "java-runtime"
+      },
+      "dependencies": [
+        {
+          "group": "org.jetbrains.kotlin",
+          "module": "kotlin-gradle-plugin-api",
+          "version": {
+            "requires": "2.2.0"
+          },
+          "excludes": [
+            {
+              "group": "org.jetbrains.kotlin",
+              "module": "kotlin-reflect"
+            },
+            {
+              "group": "org.jetbrains.kotlin",
+              "module": "kotlin-stdlib-jdk8"
+            },
+            {
+              "group": "org.jetbrains.kotlin",
+              "module": "kotlin-stdlib-jdk7"
+            },
+            {
+              "group": "org.jetbrains.kotlin",
+              "module": "kotlin-stdlib"
+            },
+            {
+              "group": "org.jetbrains.kotlin",
+              "module": "kotlin-script-runtime"
+            },
+            {
+              "group": "org.jetbrains.kotlin",
+              "module": "kotlin-stdlib-common"
+            }
+          ],
+          "requestedCapabilities": [
+            {
+              "group": "org.jetbrains.kotlin",
+              "name": "kotlin-gradle-plugin-api-gradle811"
+            }
+          ]
+        }
+      ],
+      "files": [
+        {
+          "name": "fus-statistics-gradle-plugin-2.2.0-gradle811.jar",
+          "url": "fus-statistics-gradle-plugin-2.2.0-gradle811.jar",
+          "size": 77462,
+          "sha512": "6dadb0b69392f6f4755a7845a81b6bbd4cf0c8828dbf253b671fa57a83fb7d5713c98ae66db6aadd4818e8b3f6838d77ba978bd6b5e711331a606517dd11610d",
+          "sha256": "d0cf9ff23ad38c210eed0cc25a51315a384e61fdc15a53feb86c00bee691aae8",
+          "sha1": "b278a6f702f07ca5c63d5268c1f723726fdb2511",
+          "md5": "709abb72d7053da05ae778853b6966e0"
+        }
+      ],
+      "capabilities": [
+        {
+          "group": "org.jetbrains.kotlin",
+          "name": "fus-statistics-gradle-plugin",
+          "version": "2.2.0"
+        }
+      ]
+    },
+    {
+      "name": "gradle813JavadocElements",
+      "attributes": {
+        "org.gradle.category": "documentation",
+        "org.gradle.dependency.bundling": "external",
+        "org.gradle.docstype": "javadoc",
+        "org.gradle.plugin.api-version": "8.13",
+        "org.gradle.usage": "java-runtime"
+      },
+      "files": [
+        {
+          "name": "fus-statistics-gradle-plugin-2.2.0-gradle813-javadoc.jar",
+          "url": "fus-statistics-gradle-plugin-2.2.0-gradle813-javadoc.jar",
+          "size": 261,
+          "sha512": "1487e5a20c9e4d74f298e07c42e96a61be11b7a768c3fbc199ee138cd68e1fc2267d1cfe3f11f288acc05df755315344d052cc5f6f751f126ab4fe1caa5125ea",
+          "sha256": "c6deada2fac53b8ea6523dbda77597b128006674616f140f04df23264c6d1aa3",
+          "sha1": "2ad14aed781c4a73ed4dbb421966d408a0a06686",
+          "md5": "f43436d6bec321290f6af228ad602604"
+        }
+      ],
+      "capabilities": [
+        {
+          "group": "org.jetbrains.kotlin",
+          "name": "fus-statistics-gradle-plugin",
+          "version": "2.2.0"
+        }
+      ]
+    },
+    {
+      "name": "gradle813SourcesElements",
+      "attributes": {
+        "org.gradle.category": "documentation",
+        "org.gradle.dependency.bundling": "external",
+        "org.gradle.docstype": "sources",
+        "org.gradle.plugin.api-version": "8.13",
+        "org.gradle.usage": "java-runtime"
+      },
+      "files": [
+        {
+          "name": "fus-statistics-gradle-plugin-2.2.0-gradle813-sources.jar",
+          "url": "fus-statistics-gradle-plugin-2.2.0-gradle813-sources.jar",
+          "size": 14137,
+          "sha512": "26934375064fb6d1ff225fa138f144c7f7a93c0fcdc18ae9dd5841fbcd5777868ecb0213939721a00cc5f385d7061aaefc6fd01f76d2cc75c3c8ee3e31e21b17",
+          "sha256": "13da02633df6ab93754c49459b282fd8f3a2c44c0e8f5f3d32432ee3b9248453",
+          "sha1": "64eb311f64fb2b1dd5884019b24151060a4ff2da",
+          "md5": "8e2e8ec6ff4c2f23d23ab519578468bf"
+        }
+      ],
+      "capabilities": [
+        {
+          "group": "org.jetbrains.kotlin",
+          "name": "fus-statistics-gradle-plugin",
+          "version": "2.2.0"
+        }
+      ]
+    },
+    {
+      "name": "gradle813ApiElements",
+      "attributes": {
+        "org.gradle.category": "library",
+        "org.gradle.dependency.bundling": "external",
+        "org.gradle.jvm.environment": "standard-jvm",
+        "org.gradle.jvm.version": 8,
+        "org.gradle.libraryelements": "jar",
+        "org.gradle.plugin.api-version": "8.13",
+        "org.gradle.usage": "java-api"
+      },
+      "dependencies": [
+        {
+          "group": "org.jetbrains.kotlin",
+          "module": "kotlin-gradle-plugin-api",
+          "version": {
+            "requires": "2.2.0"
+          },
+          "excludes": [
+            {
+              "group": "org.jetbrains.kotlin",
+              "module": "kotlin-reflect"
+            },
+            {
+              "group": "org.jetbrains.kotlin",
+              "module": "kotlin-stdlib-jdk8"
+            },
+            {
+              "group": "org.jetbrains.kotlin",
+              "module": "kotlin-stdlib-jdk7"
+            },
+            {
+              "group": "org.jetbrains.kotlin",
+              "module": "kotlin-stdlib"
+            },
+            {
+              "group": "org.jetbrains.kotlin",
+              "module": "kotlin-script-runtime"
+            },
+            {
+              "group": "org.jetbrains.kotlin",
+              "module": "kotlin-stdlib-common"
+            }
+          ],
+          "requestedCapabilities": [
+            {
+              "group": "org.jetbrains.kotlin",
+              "name": "kotlin-gradle-plugin-api-gradle813"
+            }
+          ]
+        }
+      ],
+      "files": [
+        {
+          "name": "fus-statistics-gradle-plugin-2.2.0-gradle813.jar",
+          "url": "fus-statistics-gradle-plugin-2.2.0-gradle813.jar",
+          "size": 77462,
+          "sha512": "6dadb0b69392f6f4755a7845a81b6bbd4cf0c8828dbf253b671fa57a83fb7d5713c98ae66db6aadd4818e8b3f6838d77ba978bd6b5e711331a606517dd11610d",
+          "sha256": "d0cf9ff23ad38c210eed0cc25a51315a384e61fdc15a53feb86c00bee691aae8",
+          "sha1": "b278a6f702f07ca5c63d5268c1f723726fdb2511",
+          "md5": "709abb72d7053da05ae778853b6966e0"
+        }
+      ],
+      "capabilities": [
+        {
+          "group": "org.jetbrains.kotlin",
+          "name": "fus-statistics-gradle-plugin",
+          "version": "2.2.0"
+        }
+      ]
+    },
+    {
+      "name": "gradle813RuntimeElements",
+      "attributes": {
+        "org.gradle.category": "library",
+        "org.gradle.dependency.bundling": "external",
+        "org.gradle.jvm.environment": "standard-jvm",
+        "org.gradle.jvm.version": 8,
+        "org.gradle.libraryelements": "jar",
+        "org.gradle.plugin.api-version": "8.13",
+        "org.gradle.usage": "java-runtime"
+      },
+      "dependencies": [
+        {
+          "group": "org.jetbrains.kotlin",
+          "module": "kotlin-gradle-plugin-api",
+          "version": {
+            "requires": "2.2.0"
+          },
+          "excludes": [
+            {
+              "group": "org.jetbrains.kotlin",
+              "module": "kotlin-reflect"
+            },
+            {
+              "group": "org.jetbrains.kotlin",
+              "module": "kotlin-stdlib-jdk8"
+            },
+            {
+              "group": "org.jetbrains.kotlin",
+              "module": "kotlin-stdlib-jdk7"
+            },
+            {
+              "group": "org.jetbrains.kotlin",
+              "module": "kotlin-stdlib"
+            },
+            {
+              "group": "org.jetbrains.kotlin",
+              "module": "kotlin-script-runtime"
+            },
+            {
+              "group": "org.jetbrains.kotlin",
+              "module": "kotlin-stdlib-common"
+            }
+          ],
+          "requestedCapabilities": [
+            {
+              "group": "org.jetbrains.kotlin",
+              "name": "kotlin-gradle-plugin-api-gradle813"
+            }
+          ]
+        }
+      ],
+      "files": [
+        {
+          "name": "fus-statistics-gradle-plugin-2.2.0-gradle813.jar",
+          "url": "fus-statistics-gradle-plugin-2.2.0-gradle813.jar",
+          "size": 77462,
+          "sha512": "6dadb0b69392f6f4755a7845a81b6bbd4cf0c8828dbf253b671fa57a83fb7d5713c98ae66db6aadd4818e8b3f6838d77ba978bd6b5e711331a606517dd11610d",
+          "sha256": "d0cf9ff23ad38c210eed0cc25a51315a384e61fdc15a53feb86c00bee691aae8",
+          "sha1": "b278a6f702f07ca5c63d5268c1f723726fdb2511",
+          "md5": "709abb72d7053da05ae778853b6966e0"
+        }
+      ],
+      "capabilities": [
+        {
+          "group": "org.jetbrains.kotlin",
+          "name": "fus-statistics-gradle-plugin",
+          "version": "2.2.0"
+        }
+      ]
+    }
+  ]
+}

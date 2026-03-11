@@ -1,0 +1,132 @@
+{
+  "formatVersion": "1.1",
+  "component": {
+    "url": "../../material-icons-extended/1.7.8/material-icons-extended-1.7.8.module",
+    "group": "androidx.compose.material",
+    "module": "material-icons-extended",
+    "version": "1.7.8",
+    "attributes": {
+      "org.gradle.status": "release"
+    }
+  },
+  "createdBy": {
+    "gradle": {
+      "version": "8.8-rc-1"
+    }
+  },
+  "variants": [
+    {
+      "name": "releaseApiElements-published",
+      "attributes": {
+        "org.gradle.category": "library",
+        "org.gradle.usage": "java-api",
+        "org.jetbrains.kotlin.platform.type": "androidJvm"
+      },
+      "dependencies": [
+        {
+          "group": "androidx.compose.material",
+          "module": "material-icons-core",
+          "version": {
+            "requires": "1.7.8"
+          }
+        }
+      ],
+      "files": [
+        {
+          "name": "material-icons-extended-release.aar",
+          "url": "material-icons-extended-android-1.7.8.aar",
+          "size": 35720998,
+          "sha512": "85b6efd862810ae4777867205a75974134537a058143cf433e181952877484650ac425bdb9fa48363972477e328d8c536f7d2cbc671c73b4033284888ddeced5",
+          "sha256": "64e86269f1106848981dd76f0046f81b46f3bd92efb22645de8fd044c0402b61",
+          "sha1": "7499b6142a798c77a178b1098319c0b90595ab84",
+          "md5": "edf3a62ca2a167e51467bc6ba6c4534b"
+        }
+      ]
+    },
+    {
+      "name": "releaseRuntimeElements-published",
+      "attributes": {
+        "org.gradle.category": "library",
+        "org.gradle.usage": "java-runtime",
+        "org.jetbrains.kotlin.platform.type": "androidJvm"
+      },
+      "dependencies": [
+        {
+          "group": "androidx.compose.material",
+          "module": "material-icons-core",
+          "version": {
+            "requires": "1.7.8"
+          },
+          "excludes": [
+            {
+              "group": "org.jetbrains.kotlin",
+              "module": "kotlin-stdlib-common"
+            },
+            {
+              "group": "org.jetbrains.kotlin",
+              "module": "kotlin-test-common"
+            },
+            {
+              "group": "org.jetbrains.kotlin",
+              "module": "kotlin-test-annotations-common"
+            }
+          ]
+        },
+        {
+          "group": "org.jetbrains.kotlin",
+          "module": "kotlin-stdlib-common",
+          "version": {
+            "requires": "1.8.22"
+          },
+          "excludes": [
+            {
+              "group": "org.jetbrains.kotlin",
+              "module": "kotlin-stdlib-common"
+            },
+            {
+              "group": "org.jetbrains.kotlin",
+              "module": "kotlin-test-common"
+            },
+            {
+              "group": "org.jetbrains.kotlin",
+              "module": "kotlin-test-annotations-common"
+            }
+          ]
+        }
+      ],
+      "files": [
+        {
+          "name": "material-icons-extended-release.aar",
+          "url": "material-icons-extended-android-1.7.8.aar",
+          "size": 35720998,
+          "sha512": "85b6efd862810ae4777867205a75974134537a058143cf433e181952877484650ac425bdb9fa48363972477e328d8c536f7d2cbc671c73b4033284888ddeced5",
+          "sha256": "64e86269f1106848981dd76f0046f81b46f3bd92efb22645de8fd044c0402b61",
+          "sha1": "7499b6142a798c77a178b1098319c0b90595ab84",
+          "md5": "edf3a62ca2a167e51467bc6ba6c4534b"
+        }
+      ]
+    },
+    {
+      "name": "releaseSourcesElements-published",
+      "attributes": {
+        "org.gradle.category": "documentation",
+        "org.gradle.dependency.bundling": "external",
+        "org.gradle.docstype": "fake-sources",
+        "org.gradle.libraryelements": "jar",
+        "org.gradle.usage": "java-runtime",
+        "org.jetbrains.kotlin.platform.type": "androidJvm"
+      },
+      "files": [
+        {
+          "name": "material-icons-extended-android-1.7.8-sources.jar",
+          "url": "material-icons-extended-android-1.7.8-sources.jar",
+          "size": 12086044,
+          "sha512": "f24f98c6a99f38ceefae7eca7ba34093810e1e631d210cbdff05b35f906230d7cffcbe863bdaed0972b43b050efc91bcb0db681c8b75f1f275e8c0f94eaf05da",
+          "sha256": "77b7e782a519a3e074fc91e09d59334ac1b815edd87d2e89c0c9ca7c95678e93",
+          "sha1": "fd5e20a9a49831a8c9ce04b7012d1ea5ff755a7c",
+          "md5": "50ad9455a4e80286f2e50f2dc8c6addb"
+        }
+      ]
+    }
+  ]
+}

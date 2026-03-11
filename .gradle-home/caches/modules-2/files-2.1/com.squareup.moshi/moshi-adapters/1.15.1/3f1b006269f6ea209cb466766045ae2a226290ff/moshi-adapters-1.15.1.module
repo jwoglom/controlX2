@@ -1,0 +1,96 @@
+{
+  "formatVersion": "1.1",
+  "component": {
+    "group": "com.squareup.moshi",
+    "module": "moshi-adapters",
+    "version": "1.15.1",
+    "attributes": {
+      "org.gradle.status": "release"
+    }
+  },
+  "createdBy": {
+    "gradle": {
+      "version": "7.4.2"
+    }
+  },
+  "variants": [
+    {
+      "name": "apiElements",
+      "attributes": {
+        "org.gradle.category": "library",
+        "org.gradle.dependency.bundling": "external",
+        "org.gradle.jvm.environment": "standard-jvm",
+        "org.gradle.jvm.version": 8,
+        "org.gradle.libraryelements": "jar",
+        "org.gradle.usage": "java-api",
+        "org.jetbrains.kotlin.platform.type": "jvm"
+      },
+      "dependencies": [
+        {
+          "group": "com.squareup.moshi",
+          "module": "moshi",
+          "version": {
+            "requires": "1.15.1"
+          }
+        },
+        {
+          "group": "org.jetbrains.kotlin",
+          "module": "kotlin-stdlib-jdk8",
+          "version": {
+            "requires": "1.8.21"
+          }
+        }
+      ],
+      "files": [
+        {
+          "name": "moshi-adapters-1.15.1.jar",
+          "url": "moshi-adapters-1.15.1.jar",
+          "size": 14247,
+          "sha512": "0763354ade94a4af6a021d63dde183027fa7ecc99ab606c73425d14b3fff9e0d3e1db0c6d6f461c0ed83fb9e13b51566d88c98b31825f32672eddec5014326b7",
+          "sha256": "923f9fbc750db262877e9e5b3ae192c80c5b8fbeb1cc196885860a6e8adc4c3e",
+          "sha1": "c2b2b5fa53ec3a8bfa88bf1221d4820eb5af30c7",
+          "md5": "4cdc580c1e44b2a82b2f9b973a4348b5"
+        }
+      ]
+    },
+    {
+      "name": "runtimeElements",
+      "attributes": {
+        "org.gradle.category": "library",
+        "org.gradle.dependency.bundling": "external",
+        "org.gradle.jvm.environment": "standard-jvm",
+        "org.gradle.jvm.version": 8,
+        "org.gradle.libraryelements": "jar",
+        "org.gradle.usage": "java-runtime",
+        "org.jetbrains.kotlin.platform.type": "jvm"
+      },
+      "dependencies": [
+        {
+          "group": "com.squareup.moshi",
+          "module": "moshi",
+          "version": {
+            "requires": "1.15.1"
+          }
+        },
+        {
+          "group": "org.jetbrains.kotlin",
+          "module": "kotlin-stdlib-jdk8",
+          "version": {
+            "requires": "1.8.21"
+          }
+        }
+      ],
+      "files": [
+        {
+          "name": "moshi-adapters-1.15.1.jar",
+          "url": "moshi-adapters-1.15.1.jar",
+          "size": 14247,
+          "sha512": "0763354ade94a4af6a021d63dde183027fa7ecc99ab606c73425d14b3fff9e0d3e1db0c6d6f461c0ed83fb9e13b51566d88c98b31825f32672eddec5014326b7",
+          "sha256": "923f9fbc750db262877e9e5b3ae192c80c5b8fbeb1cc196885860a6e8adc4c3e",
+          "sha1": "c2b2b5fa53ec3a8bfa88bf1221d4820eb5af30c7",
+          "md5": "4cdc580c1e44b2a82b2f9b973a4348b5"
+        }
+      ]
+    }
+  ]
+}

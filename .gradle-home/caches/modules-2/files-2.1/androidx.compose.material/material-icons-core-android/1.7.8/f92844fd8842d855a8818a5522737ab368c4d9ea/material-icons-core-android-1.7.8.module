@@ -1,0 +1,162 @@
+{
+  "formatVersion": "1.1",
+  "component": {
+    "url": "../../material-icons-core/1.7.8/material-icons-core-1.7.8.module",
+    "group": "androidx.compose.material",
+    "module": "material-icons-core",
+    "version": "1.7.8",
+    "attributes": {
+      "org.gradle.status": "release"
+    }
+  },
+  "createdBy": {
+    "gradle": {
+      "version": "8.8-rc-1"
+    }
+  },
+  "variants": [
+    {
+      "name": "releaseApiElements-published",
+      "attributes": {
+        "org.gradle.category": "library",
+        "org.gradle.usage": "java-api",
+        "org.jetbrains.kotlin.platform.type": "androidJvm"
+      },
+      "dependencies": [
+        {
+          "group": "androidx.compose.ui",
+          "module": "ui",
+          "version": {
+            "requires": "1.6.0"
+          }
+        }
+      ],
+      "files": [
+        {
+          "name": "material-icons-core-release.aar",
+          "url": "material-icons-core-android-1.7.8.aar",
+          "size": 823515,
+          "sha512": "0947c7b38974efd9442094598cf7e5e07aea67965932d00fca3df1fda6cc5a3c577ee64c5fe29f2e92d37e6732371c7f49feab8a0179d128e02be7ec5f114528",
+          "sha256": "332c06b25e662cc417fb087e76b8faa5cb249f4992ffa3360084a3d4ab882284",
+          "sha1": "e7c6d6e090689228ba336dae014ce884c5f71436",
+          "md5": "c375a834e07063e24bd25d0d11d27355"
+        }
+      ]
+    },
+    {
+      "name": "releaseRuntimeElements-published",
+      "attributes": {
+        "org.gradle.category": "library",
+        "org.gradle.usage": "java-runtime",
+        "org.jetbrains.kotlin.platform.type": "androidJvm"
+      },
+      "dependencies": [
+        {
+          "group": "androidx.compose.ui",
+          "module": "ui",
+          "version": {
+            "requires": "1.6.0"
+          },
+          "excludes": [
+            {
+              "group": "org.jetbrains.kotlin",
+              "module": "kotlin-stdlib-common"
+            },
+            {
+              "group": "org.jetbrains.kotlin",
+              "module": "kotlin-test-common"
+            },
+            {
+              "group": "org.jetbrains.kotlin",
+              "module": "kotlin-test-annotations-common"
+            }
+          ]
+        },
+        {
+          "group": "org.jetbrains.kotlin",
+          "module": "kotlin-stdlib",
+          "version": {
+            "requires": "1.8.22"
+          },
+          "excludes": [
+            {
+              "group": "org.jetbrains.kotlin",
+              "module": "kotlin-stdlib-common"
+            },
+            {
+              "group": "org.jetbrains.kotlin",
+              "module": "kotlin-test-common"
+            },
+            {
+              "group": "org.jetbrains.kotlin",
+              "module": "kotlin-test-annotations-common"
+            }
+          ]
+        },
+        {
+          "group": "org.jetbrains.kotlin",
+          "module": "kotlin-stdlib-common",
+          "version": {
+            "requires": "1.8.22"
+          },
+          "excludes": [
+            {
+              "group": "org.jetbrains.kotlin",
+              "module": "kotlin-stdlib-common"
+            },
+            {
+              "group": "org.jetbrains.kotlin",
+              "module": "kotlin-test-common"
+            },
+            {
+              "group": "org.jetbrains.kotlin",
+              "module": "kotlin-test-annotations-common"
+            }
+          ]
+        }
+      ],
+      "files": [
+        {
+          "name": "material-icons-core-release.aar",
+          "url": "material-icons-core-android-1.7.8.aar",
+          "size": 823515,
+          "sha512": "0947c7b38974efd9442094598cf7e5e07aea67965932d00fca3df1fda6cc5a3c577ee64c5fe29f2e92d37e6732371c7f49feab8a0179d128e02be7ec5f114528",
+          "sha256": "332c06b25e662cc417fb087e76b8faa5cb249f4992ffa3360084a3d4ab882284",
+          "sha1": "e7c6d6e090689228ba336dae014ce884c5f71436",
+          "md5": "c375a834e07063e24bd25d0d11d27355"
+        }
+      ]
+    },
+    {
+      "name": "releaseSourcesElements-published",
+      "attributes": {
+        "org.gradle.category": "documentation",
+        "org.gradle.dependency.bundling": "external",
+        "org.gradle.docstype": "fake-sources",
+        "org.gradle.libraryelements": "jar",
+        "org.gradle.usage": "java-runtime",
+        "org.jetbrains.kotlin.platform.type": "androidJvm"
+      },
+      "files": [
+        {
+          "name": "material-icons-core-1.7.8-samples-sources.jar",
+          "url": "material-icons-core-android-1.7.8-samples-sources.jar",
+          "size": 1849,
+          "sha512": "5e82b6fc611569270b0a77b159588b3d249a31627630b5e8a1eeb18b462eca347a9a9dfd07bac984a4b1b3df6d71fd490fda7a6f07995b5fcaaee4c2f038ec6c",
+          "sha256": "262d79cf95faf69f89988b01d568d48b69742a95b0959b9238e2e797457938fa",
+          "sha1": "578ff7394b718fb34c333c24bcfade35ccba41c5",
+          "md5": "6dfd44933714f319df97b87cf801f994"
+        },
+        {
+          "name": "material-icons-core-android-1.7.8-sources.jar",
+          "url": "material-icons-core-android-1.7.8-sources.jar",
+          "size": 284036,
+          "sha512": "ef1084049ea94826ff512bff23b97b2a4d241995b0359040d2cbf96c1df7b0609520bfaf9eb8728fad886ac19e8e34a27b166c555ccf3b57df5d27cf324ccdda",
+          "sha256": "14db888d2f698178799a4c18a58bb134b3e98063c6748c443b339044e0145432",
+          "sha1": "1a531b2b075ae0d42a724108153e0021ebd69f52",
+          "md5": "d2e7fd3e348378d6cd221854818ddab7"
+        }
+      ]
+    }
+  ]
+}
