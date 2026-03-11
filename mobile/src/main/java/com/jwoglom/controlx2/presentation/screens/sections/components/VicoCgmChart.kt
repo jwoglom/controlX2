@@ -173,12 +173,64 @@ private data class BolusChartData(
     val sampleFailureSeqIds: List<Long>
 )
 
+private data class BasalChartData(
+    val events: List<BasalDataPoint>,
+    val rawLogCount: Int,
+    val parseFailureCount: Int,
+    val sampleFailureSeqIds: List<Long>,
+    val rawEntries: List<BasalHistoryDebugEntry>
+)
+
+private data class BasalHistoryDebugEntry(
+    val seqId: Long,
+    val timestamp: Long,
+    val details: String
+)
+
 data class BasalDataPoint(
     val timestamp: Long,       // Pump time in seconds
     val rate: Float,           // Units per hour
     val isTemp: Boolean,       // True if temporary basal
     val duration: Int?         // Duration in minutes (for temp basal)
 )
+
+internal fun com.jwoglom.pumpx2.pump.messages.response.historyLog.BasalDeliveryHistoryLog.toBasalDataPoint(): BasalDataPoint? {
+    val commandedRateUnits = commandedRate / 1000f
+    return BasalDataPoint(
+        timestamp = toChartTimestampSeconds(),
+        rate = commandedRateUnits,
+        isTemp = tempRate > 0,
+        duration = null
+    )
+}
+
+internal fun com.jwoglom.pumpx2.pump.messages.response.historyLog.BasalRateChangeHistoryLog.toBasalDataPoint(): BasalDataPoint? {
+    val effectiveRate = when (getChangeType()) {
+        com.jwoglom.pumpx2.pump.messages.response.historyLog.BasalRateChangeHistoryLog.ChangeType.TIMED_SEGMENT,
+        com.jwoglom.pumpx2.pump.messages.response.historyLog.BasalRateChangeHistoryLog.ChangeType.NEW_PROFILE,
+        com.jwoglom.pumpx2.pump.messages.response.historyLog.BasalRateChangeHistoryLog.ChangeType.TEMP_RATE_END,
+        com.jwoglom.pumpx2.pump.messages.response.historyLog.BasalRateChangeHistoryLog.ChangeType.PUMP_RESUMED -> {
+            if (commandBasalRate > 0f) commandBasalRate else baseBasalRate
+        }
+        com.jwoglom.pumpx2.pump.messages.response.historyLog.BasalRateChangeHistoryLog.ChangeType.TEMP_RATE_START -> {
+            commandBasalRate
+        }
+        com.jwoglom.pumpx2.pump.messages.response.historyLog.BasalRateChangeHistoryLog.ChangeType.PUMP_SUSPENDED,
+        com.jwoglom.pumpx2.pump.messages.response.historyLog.BasalRateChangeHistoryLog.ChangeType.PUMP_SHUT_DOWN,
+        null -> {
+            commandBasalRate
+        }
+    }
+
+    if (effectiveRate < 0f) return null
+
+    return BasalDataPoint(
+        timestamp = toChartTimestampSeconds(),
+        rate = effectiveRate,
+        isTemp = getChangeType() == com.jwoglom.pumpx2.pump.messages.response.historyLog.BasalRateChangeHistoryLog.ChangeType.TEMP_RATE_START,
+        duration = null
+    )
+}
 
 data class CarbEvent(
     val timestamp: Long,       // Pump time in seconds
@@ -234,8 +286,10 @@ private const val CARB_MARKER_SIZE_DP = 14f
 private const val CARB_MARKER_CORNER_RADIUS_DP = 3f
 private const val CARB_MARKER_STROKE_DP = 2f
 private const val CARB_LABEL_TEXT_SIZE_SP = 12f
-private const val BASAL_DISPLAY_RANGE = 60.0
-private const val MIN_BASAL_RATE_UNITS_PER_HOUR = 3f
+private const val BASAL_CHART_MAX_UNITS_PER_HOUR = 5.0
+private const val CGM_CHART_HEIGHT_DP = 240
+private const val BASAL_CHART_HEIGHT_DP = 90
+private const val CHART_Y_AXIS_WIDTH_DP = 40
 
 private data class BolusMarkerPoint(
     val markerTimestamp: Long,  // Snapped chart X position (timestamp in seconds)
@@ -467,11 +521,18 @@ private fun rememberBolusData(
 private fun rememberBasalData(
     historyLogViewModel: HistoryLogViewModel?,
     timeRange: TimeRange
-): List<BasalDataPoint> {
-    // Use BasalRateChangeHistoryLog and TempRateActivatedHistoryLog
+): BasalChartData {
+    // Use all basal-related history log types so logging and charting reflect actual delivery records.
     val basalClasses = listOf(
+        com.jwoglom.pumpx2.pump.messages.response.historyLog.BasalDeliveryHistoryLog::class.java,
         com.jwoglom.pumpx2.pump.messages.response.historyLog.BasalRateChangeHistoryLog::class.java,
-        com.jwoglom.pumpx2.pump.messages.response.historyLog.TempRateActivatedHistoryLog::class.java
+        com.jwoglom.pumpx2.pump.messages.response.historyLog.TempRateActivatedHistoryLog::class.java,
+        com.jwoglom.pumpx2.pump.messages.response.historyLog.TempRateCompletedHistoryLog::class.java,
+        com.jwoglom.pumpx2.pump.messages.response.historyLog.PumpingSuspendedHistoryLog::class.java,
+        com.jwoglom.pumpx2.pump.messages.response.historyLog.PumpingResumedHistoryLog::class.java,
+        com.jwoglom.pumpx2.pump.messages.response.historyLog.HypoMinimizerSuspendHistoryLog::class.java,
+        com.jwoglom.pumpx2.pump.messages.response.historyLog.HypoMinimizerResumeHistoryLog::class.java,
+        com.jwoglom.pumpx2.pump.messages.response.historyLog.DailyBasalHistoryLog::class.java
     )
 
     val basalHistoryLogs = historyLogViewModel?.latestItemsForTypes(
@@ -480,49 +541,148 @@ private fun rememberBasalData(
         (timeRange.hours * 4) + 10
     )?.observeAsState()
 
-    return remember(basalHistoryLogs?.value, timeRange) {
-        basalHistoryLogs?.value?.mapNotNull { dao: com.jwoglom.controlx2.db.historylog.HistoryLogItem ->
+    val basalChartData = remember(basalHistoryLogs?.value, timeRange) {
+        val rawLogs = basalHistoryLogs?.value ?: emptyList()
+        val events = mutableListOf<BasalDataPoint>()
+        val rawEntries = mutableListOf<BasalHistoryDebugEntry>()
+        var parseFailureCount = 0
+        val sampleFailureSeqIds = mutableListOf<Long>()
+
+        rawLogs.forEach { dao: com.jwoglom.controlx2.db.historylog.HistoryLogItem ->
             try {
                 val parsed = dao.parse()
-                val timestamp = parsed.toChartTimestampSeconds()
 
                 when (parsed) {
+                    is com.jwoglom.pumpx2.pump.messages.response.historyLog.BasalDeliveryHistoryLog -> {
+                        rawEntries += BasalHistoryDebugEntry(
+                            seqId = dao.seqId,
+                            timestamp = parsed.toChartTimestampSeconds(),
+                            details = "type=BasalDeliveryHistoryLog commandedRateSource=${parsed.commandedRateSource} commandedRate=${parsed.commandedRate} profileBasalRate=${parsed.profileBasalRate} algorithmRate=${parsed.algorithmRate} tempRate=${parsed.tempRate}"
+                        )
+                        parsed.toBasalDataPoint()?.let(events::add)
+                    }
                     is com.jwoglom.pumpx2.pump.messages.response.historyLog.BasalRateChangeHistoryLog -> {
-                        // Extract basal rate (already in units/hr)
-                        val rate = parsed.commandBasalRate
-                        
-                        // Determine if temp basal based on change type ID
-                        // TEMP_RATE_START = 4, TEMP_RATE_END = 8
-                        val changeTypeId = parsed.changeTypeId
-                        val isTemp = changeTypeId == 4  // TEMP_RATE_START
-
-                        if (rate > 0) {
-                            BasalDataPoint(
-                                timestamp = timestamp,
-                                rate = rate,
-                                isTemp = isTemp,
-                                duration = null  // Duration not available in BasalRateChangeHistoryLog
-                            )
-                        } else null
+                        rawEntries += BasalHistoryDebugEntry(
+                            seqId = dao.seqId,
+                            timestamp = parsed.toChartTimestampSeconds(),
+                            details = "type=BasalRateChangeHistoryLog changeType=${parsed.changeType} changeTypeId=${parsed.changeTypeId} commandBasalRate=${parsed.commandBasalRate} baseBasalRate=${parsed.baseBasalRate} maxBasalRate=${parsed.maxBasalRate} insulinDeliveryProfile=${parsed.insulinDeliveryProfile}"
+                        )
+                        parsed.toBasalDataPoint()?.let(events::add)
                     }
                     is com.jwoglom.pumpx2.pump.messages.response.historyLog.TempRateActivatedHistoryLog -> {
-                        // TempRateActivatedHistoryLog provides percent and duration
-                        // We need the base rate to calculate actual rate, which we don't have here
-                        // For now, we'll just mark this as a temp basal event
-                        val duration = parsed.duration.toInt()  // Already in minutes
-
-                        // Note: We can't determine the actual rate without the base basal rate
-                        // This would require looking up the corresponding BasalRateChangeHistoryLog
-                        // For now, skip these or use a placeholder
-                        null  // Skip TempRateActivatedHistoryLog for now since we need base rate
+                        rawEntries += BasalHistoryDebugEntry(
+                            seqId = dao.seqId,
+                            timestamp = parsed.toChartTimestampSeconds(),
+                            details = "type=TempRateActivatedHistoryLog percent=${parsed.percent} duration=${parsed.duration} tempRateId=${parsed.tempRateId}"
+                        )
                     }
-                    else -> null
+                    is com.jwoglom.pumpx2.pump.messages.response.historyLog.TempRateCompletedHistoryLog -> {
+                        rawEntries += BasalHistoryDebugEntry(
+                            seqId = dao.seqId,
+                            timestamp = parsed.toChartTimestampSeconds(),
+                            details = "type=TempRateCompletedHistoryLog tempRateId=${parsed.tempRateId} timeLeft=${parsed.timeLeft}"
+                        )
+                    }
+                    is com.jwoglom.pumpx2.pump.messages.response.historyLog.PumpingSuspendedHistoryLog -> {
+                        rawEntries += BasalHistoryDebugEntry(
+                            seqId = dao.seqId,
+                            timestamp = parsed.toChartTimestampSeconds(),
+                            details = "type=PumpingSuspendedHistoryLog reason=${parsed.reason} reasonId=${parsed.reasonId} insulinAmount=${parsed.insulinAmount}"
+                        )
+                    }
+                    is com.jwoglom.pumpx2.pump.messages.response.historyLog.PumpingResumedHistoryLog -> {
+                        rawEntries += BasalHistoryDebugEntry(
+                            seqId = dao.seqId,
+                            timestamp = parsed.toChartTimestampSeconds(),
+                            details = "type=PumpingResumedHistoryLog insulinAmount=${parsed.insulinAmount}"
+                        )
+                    }
+                    is com.jwoglom.pumpx2.pump.messages.response.historyLog.HypoMinimizerSuspendHistoryLog -> {
+                        rawEntries += BasalHistoryDebugEntry(
+                            seqId = dao.seqId,
+                            timestamp = parsed.toChartTimestampSeconds(),
+                            details = "type=HypoMinimizerSuspendHistoryLog"
+                        )
+                    }
+                    is com.jwoglom.pumpx2.pump.messages.response.historyLog.HypoMinimizerResumeHistoryLog -> {
+                        rawEntries += BasalHistoryDebugEntry(
+                            seqId = dao.seqId,
+                            timestamp = parsed.toChartTimestampSeconds(),
+                            details = "type=HypoMinimizerResumeHistoryLog"
+                        )
+                    }
+                    is com.jwoglom.pumpx2.pump.messages.response.historyLog.DailyBasalHistoryLog -> {
+                        rawEntries += BasalHistoryDebugEntry(
+                            seqId = dao.seqId,
+                            timestamp = parsed.toChartTimestampSeconds(),
+                            details = "type=DailyBasalHistoryLog dailyTotalBasal=${parsed.dailyTotalBasal} lastBasalRate=${parsed.lastBasalRate} iob=${parsed.iob} finalEventForDay=${parsed.finalEventForDay} batteryChargeRaw=${parsed.batteryChargeRaw} lipoMv=${parsed.lipoMv}"
+                        )
+                    }
+                    else -> {
+                        rawEntries += BasalHistoryDebugEntry(
+                            seqId = dao.seqId,
+                            timestamp = parsed.toChartTimestampSeconds(),
+                            details = "type=${parsed.javaClass.simpleName} unexpectedForBasal=true"
+                        )
+                        parseFailureCount++
+                        if (sampleFailureSeqIds.size < 5) sampleFailureSeqIds += dao.seqId
+                    }
                 }
             } catch (e: Exception) {
-                null
+                rawEntries += BasalHistoryDebugEntry(
+                    seqId = dao.seqId,
+                    timestamp = dao.pumpTime.atZone(java.time.ZoneId.systemDefault()).toEpochSecond(),
+                    details = "parseFailure=${e.javaClass.simpleName}:${e.message ?: ""}"
+                )
+                parseFailureCount++
+                if (sampleFailureSeqIds.size < 5) sampleFailureSeqIds += dao.seqId
             }
-        }?.reversed() ?: emptyList()  // Reverse to get chronological order
+        }
+
+        BasalChartData(
+            events = events.reversed(),
+            rawLogCount = rawLogs.size,
+            parseFailureCount = parseFailureCount,
+            sampleFailureSeqIds = sampleFailureSeqIds,
+            rawEntries = rawEntries.reversed()
+        )
     }
+
+    val sourceLogSignature = remember(basalChartData, timeRange) {
+        listOf(
+            timeRange.label,
+            basalChartData.rawLogCount,
+            basalChartData.events.size,
+            basalChartData.parseFailureCount,
+            basalChartData.sampleFailureSeqIds.joinToString(",")
+        ).joinToString("|")
+    }
+    var lastSourceLogSignature by remember { mutableStateOf<String?>(null) }
+    LaunchedEffect(sourceLogSignature) {
+        if (lastSourceLogSignature == sourceLogSignature) return@LaunchedEffect
+        lastSourceLogSignature = sourceLogSignature
+        Timber.i(
+            "VicoCgmChart basal source: range=%s rawLogs=%d parsedEvents=%d parseFailures=%d sampleFailureSeqIds=%s",
+            timeRange.label,
+            basalChartData.rawLogCount,
+            basalChartData.events.size,
+            basalChartData.parseFailureCount,
+            basalChartData.sampleFailureSeqIds
+        )
+        basalChartData.events.take(8).forEachIndexed { index, event ->
+            Timber.i(
+                "VicoCgmChart basal event[%d]: ts=%d (%s) rate=%.3f temp=%s duration=%s",
+                index,
+                event.timestamp,
+                formatDebugTimestamp(event.timestamp),
+                event.rate,
+                event.isTemp,
+                event.duration?.toString() ?: "null"
+            )
+        }
+    }
+
+    return basalChartData
 }
 
 // Helper function to fetch and convert Carb data
@@ -659,9 +819,6 @@ private fun buildBasalSeries(
         return BasalSeriesResult(null, null)
     }
 
-    // Build separate series for scheduled and temp basal with explicit X,Y coordinates
-    val basalMaxRate = max(MIN_BASAL_RATE_UNITS_PER_HOUR, basalDataPoints.maxOfOrNull { it.rate } ?: MIN_BASAL_RATE_UNITS_PER_HOUR)
-
     val scheduledX = mutableListOf<Long>()
     val scheduledY = mutableListOf<Double>()
     val tempX = mutableListOf<Long>()
@@ -673,13 +830,12 @@ private fun buildBasalSeries(
             .maxByOrNull { it.timestamp }
 
         if (relevantBasal != null) {
-            val normalized = (relevantBasal.rate / basalMaxRate) * BASAL_DISPLAY_RANGE
             if (relevantBasal.isTemp) {
                 tempX.add(bucketTime)
-                tempY.add(normalized)
+                tempY.add(relevantBasal.rate.toDouble())
             } else {
                 scheduledX.add(bucketTime)
-                scheduledY.add(normalized)
+                scheduledY.add(relevantBasal.rate.toDouble())
             }
         }
     }
@@ -715,7 +871,18 @@ fun VicoCgmChart(
         rememberBolusData(historyLogViewModel, timeRange)
     }
     val bolusEvents = bolusChartData.events
-    val basalDataPoints = previewData?.basalDataPoints ?: rememberBasalData(historyLogViewModel, timeRange)
+    val basalChartData = if (previewData != null) {
+        BasalChartData(
+            events = previewData.basalDataPoints,
+            rawLogCount = previewData.basalDataPoints.size,
+            parseFailureCount = 0,
+            sampleFailureSeqIds = emptyList(),
+            rawEntries = emptyList()
+        )
+    } else {
+        rememberBasalData(historyLogViewModel, timeRange)
+    }
+    val basalDataPoints = basalChartData.events
     val carbEvents = previewData?.carbEvents ?: rememberCarbData(historyLogViewModel, timeRange)
     val modeEvents = previewData?.modeEvents ?: rememberModeData(historyLogViewModel, timeRange)
 
@@ -808,8 +975,133 @@ fun VicoCgmChart(
     val basalSeriesResult = remember(bucketTimes, basalDataPoints) {
         buildBasalSeries(bucketTimes, basalDataPoints)
     }
+    val visibleBasalHistoryEntries = remember(
+        basalChartData.rawEntries,
+        startTimeSeconds,
+        currentTimeSeconds
+    ) {
+        basalChartData.rawEntries.filter { it.timestamp in startTimeSeconds..currentTimeSeconds }
+    }
     val hasScheduledBasalSeries = basalSeriesResult.scheduled != null
     val hasTempBasalSeries = basalSeriesResult.temp != null
+    val basalRenderLogSignature = remember(
+        timeRange,
+        startTimeSeconds,
+        currentTimeSeconds,
+        basalDataPoints,
+        basalSeriesResult
+    ) {
+        buildString {
+            append(timeRange.label)
+            append('|')
+            append(startTimeSeconds)
+            append('|')
+            append(currentTimeSeconds)
+            append('|')
+            append(basalDataPoints.size)
+            append('|')
+            append(basalSeriesResult.scheduled?.xValues?.size ?: 0)
+            append('|')
+            append(basalSeriesResult.temp?.xValues?.size ?: 0)
+            append('|')
+            append(
+                basalDataPoints.take(5).joinToString(";") {
+                    "${it.timestamp}:${it.rate}:${it.isTemp}"
+                }
+            )
+        }
+    }
+    var lastBasalRenderLogSignature by remember { mutableStateOf<String?>(null) }
+    LaunchedEffect(basalRenderLogSignature) {
+        if (lastBasalRenderLogSignature == basalRenderLogSignature) return@LaunchedEffect
+        lastBasalRenderLogSignature = basalRenderLogSignature
+        Timber.i(
+            "VicoCgmChart basal render: range=%s window=%d..%d totalEvents=%d scheduledPoints=%d tempPoints=%d",
+            timeRange.label,
+            startTimeSeconds,
+            currentTimeSeconds,
+            basalDataPoints.size,
+            basalSeriesResult.scheduled?.xValues?.size ?: 0,
+            basalSeriesResult.temp?.xValues?.size ?: 0
+        )
+        basalDataPoints.take(8).forEachIndexed { index, event ->
+            Timber.i(
+                "VicoCgmChart basal visible[%d]: ts=%d (%s) rate=%.3f temp=%s duration=%s",
+                index,
+                event.timestamp,
+                formatDebugTimestamp(event.timestamp),
+                event.rate,
+                event.isTemp,
+                event.duration?.toString() ?: "null"
+            )
+        }
+        basalSeriesResult.scheduled?.let { scheduled ->
+            scheduled.xValues.zip(scheduled.yValues).take(5).forEachIndexed { index, (ts, rate) ->
+                Timber.i(
+                    "VicoCgmChart basal scheduledPoint[%d]: ts=%d (%s) rate=%.3f",
+                    index,
+                    ts,
+                    formatDebugTimestamp(ts),
+                    rate
+                )
+            }
+        }
+        basalSeriesResult.temp?.let { temp ->
+            temp.xValues.zip(temp.yValues).take(5).forEachIndexed { index, (ts, rate) ->
+                Timber.i(
+                    "VicoCgmChart basal tempPoint[%d]: ts=%d (%s) rate=%.3f",
+                    index,
+                    ts,
+                    formatDebugTimestamp(ts),
+                    rate
+                )
+            }
+        }
+    }
+    val basalHistoryLogSignature = remember(
+        timeRange,
+        startTimeSeconds,
+        currentTimeSeconds,
+        visibleBasalHistoryEntries
+    ) {
+        buildString {
+            append(timeRange.label)
+            append('|')
+            append(startTimeSeconds)
+            append('|')
+            append(currentTimeSeconds)
+            append('|')
+            append(visibleBasalHistoryEntries.size)
+            append('|')
+            append(
+                visibleBasalHistoryEntries.joinToString(";") {
+                    "${it.seqId}:${it.timestamp}:${it.details}"
+                }
+            )
+        }
+    }
+    var lastBasalHistoryLogSignature by remember { mutableStateOf<String?>(null) }
+    LaunchedEffect(basalHistoryLogSignature) {
+        if (lastBasalHistoryLogSignature == basalHistoryLogSignature) return@LaunchedEffect
+        lastBasalHistoryLogSignature = basalHistoryLogSignature
+        Timber.i(
+            "VicoCgmChart basal history: range=%s window=%d..%d visibleRawLogs=%d",
+            timeRange.label,
+            startTimeSeconds,
+            currentTimeSeconds,
+            visibleBasalHistoryEntries.size
+        )
+        visibleBasalHistoryEntries.forEachIndexed { index, entry ->
+            Timber.i(
+                "VicoCgmChart basal history[%d]: seqId=%d ts=%d (%s) %s",
+                index,
+                entry.seqId,
+                entry.timestamp,
+                formatDebugTimestamp(entry.timestamp),
+                entry.details
+            )
+        }
+    }
 
     val circleShape = remember { CircleShape.toVicoShape() }
     val bolusLabelColor = MaterialTheme.colorScheme.onSurface
@@ -872,8 +1164,10 @@ fun VicoCgmChart(
         null
     )
 
-    // Create model producer for chart data
-    val modelProducer = remember { CartesianChartModelProducer() }
+    // Separate model producers keep the CGM/bolus chart and the basal chart aligned on X
+    // while allowing each chart to have its own Y range.
+    val cgmModelProducer = remember { CartesianChartModelProducer() }
+    val basalModelProducer = remember { CartesianChartModelProducer() }
 
     val axisTimeFormatter = remember {
         SimpleDateFormat("h:mm a", Locale.getDefault())
@@ -930,33 +1224,26 @@ fun VicoCgmChart(
         }
     }
 
-    // Calculate glucose range for positioning markers
-    val glucoseRange = fixedGlucoseRange
-    val maxGlucose = fixedMaxGlucose
-    val minGlucose = fixedMinGlucose
-    val glucoseSpan = fixedGlucoseSpan
-
-    // Update chart data when data changes
-    // Use explicit X,Y coordinates for all series
-    LaunchedEffect(cgmSegments, basalSeriesResult, hasValidCgmData) {
+    LaunchedEffect(cgmSegments, hasValidCgmData) {
         if (hasValidCgmData && cgmSegments.isNotEmpty()) {
-            modelProducer.runTransaction {
+            cgmModelProducer.runTransaction {
                 lineSeries {
-                    // Add each CGM segment with explicit timestamps (X) and glucose values (Y)
-                    // This allows proper positioning on the time axis
                     cgmSegments.forEach { segment ->
                         series(segment.xValues, segment.yValues)
                     }
-                    // Add basal series with explicit timestamps and normalized rates
-                    if (hasScheduledBasalSeries) {
-                        basalSeriesResult.scheduled?.let { scheduled ->
-                            series(scheduled.xValues, scheduled.yValues)
-                        }
+                }
+            }
+        }
+    }
+    LaunchedEffect(basalSeriesResult, hasScheduledBasalSeries, hasTempBasalSeries) {
+        if (hasScheduledBasalSeries || hasTempBasalSeries) {
+            basalModelProducer.runTransaction {
+                lineSeries {
+                    basalSeriesResult.scheduled?.let { scheduled ->
+                        series(scheduled.xValues, scheduled.yValues)
                     }
-                    if (hasTempBasalSeries) {
-                        basalSeriesResult.temp?.let { temp ->
-                            series(temp.xValues, temp.yValues)
-                        }
+                    basalSeriesResult.temp?.let { temp ->
+                        series(temp.xValues, temp.yValues)
                     }
                 }
             }
@@ -984,6 +1271,9 @@ fun VicoCgmChart(
                     if (i in sparseIndices) String.format("%.1f", v * GlucoseConverter.MGDL_TO_MMOL_FACTOR) else " "
                 }
             }
+        }
+        val basalYAxisLabels = remember {
+            listOf("5u", "2.5u", "0u")
         }
 
         // Create persistent markers for bolus events
@@ -1179,13 +1469,47 @@ fun VicoCgmChart(
             }
         }
         
-        // Display the chart with Vico and mode bands overlay
+        val cgmLineRangeProvider = remember {
+            object : CartesianLayerRangeProvider {
+                override fun getMinX(minX: Double, maxX: Double, extraStore: ExtraStore): Double = minX
+                override fun getMaxX(minX: Double, maxX: Double, extraStore: ExtraStore): Double = maxX
+                override fun getMinY(minY: Double, maxY: Double, extraStore: ExtraStore): Double = fixedMinGlucose.toDouble()
+                override fun getMaxY(minY: Double, maxY: Double, extraStore: ExtraStore): Double = fixedMaxGlucose.toDouble()
+            }
+        }
+        val basalLineRangeProvider = remember {
+            object : CartesianLayerRangeProvider {
+                override fun getMinX(minX: Double, maxX: Double, extraStore: ExtraStore): Double = minX
+                override fun getMaxX(minX: Double, maxX: Double, extraStore: ExtraStore): Double = maxX
+                override fun getMinY(minY: Double, maxY: Double, extraStore: ExtraStore): Double = 0.0
+                override fun getMaxY(minY: Double, maxY: Double, extraStore: ExtraStore): Double = BASAL_CHART_MAX_UNITS_PER_HOUR
+            }
+        }
+        val cgmLineLayer = rememberLineCartesianLayer(
+            rangeProvider = cgmLineRangeProvider
+        )
+        val basalLineLayer = rememberLineCartesianLayer(
+            rangeProvider = basalLineRangeProvider
+        )
+        val cgmScrollState = rememberVicoScrollState(
+            scrollEnabled = false,
+            initialScroll = Scroll.Absolute.End
+        )
+        val basalScrollState = rememberVicoScrollState(
+            scrollEnabled = false,
+            initialScroll = Scroll.Absolute.End
+        )
+
+        LaunchedEffect(timeRange, currentTimeSeconds) {
+            cgmScrollState.scroll(Scroll.Absolute.End)
+            basalScrollState.scroll(Scroll.Absolute.End)
+        }
+
         Box(
             modifier = modifier
                 .fillMaxWidth()
-                .height(300.dp)
+                .height(CGM_CHART_HEIGHT_DP.dp)
         ) {
-            // Mode bands overlay at top of chart
             if (modeEvents.isNotEmpty()) {
                 Canvas(
                     modifier = Modifier
@@ -1197,17 +1521,13 @@ fun VicoCgmChart(
                     val bandHeight = size.height
 
                     modeEvents.forEach { modeEvent ->
-                        // Calculate X position based on timestamp
                         val modeStartRatio = ((modeEvent.timestamp - startTimeSeconds).toFloat() / rangeSeconds).coerceIn(0f, 1f)
                         val startX = modeStartRatio * chartWidth
-
-                        // Calculate end position (use duration or extend to current time)
-                        val durationSeconds = (modeEvent.duration ?: 120) * 60L  // Default 2 hours if no duration
+                        val durationSeconds = (modeEvent.duration ?: 120) * 60L
                         val modeEndTime = modeEvent.timestamp + durationSeconds
                         val modeEndRatio = ((modeEndTime - startTimeSeconds).toFloat() / rangeSeconds).coerceIn(0f, 1f)
                         val endX = modeEndRatio * chartWidth
 
-                        // Only draw if within visible range
                         if (endX > 0 && startX < chartWidth) {
                             val bandColor = when (modeEvent.mode) {
                                 TherapyMode.SLEEP -> ModeColors.SleepBand
@@ -1234,7 +1554,8 @@ fun VicoCgmChart(
                 Column(
                     modifier = Modifier
                         .fillMaxHeight()
-                        .padding(horizontal = Spacing.Small),
+                        .width(CHART_Y_AXIS_WIDTH_DP.dp)
+                        .padding(end = 1.dp),
                     verticalArrangement = Arrangement.SpaceBetween,
                     horizontalAlignment = Alignment.End
                 ) {
@@ -1247,39 +1568,53 @@ fun VicoCgmChart(
                     }
                 }
 
-                val lineRangeProvider = remember {
-                    object : CartesianLayerRangeProvider {
-                        override fun getMinX(minX: Double, maxX: Double, extraStore: ExtraStore): Double = minX
-                        override fun getMaxX(minX: Double, maxX: Double, extraStore: ExtraStore): Double = maxX
-                        override fun getMinY(minY: Double, maxY: Double, extraStore: ExtraStore): Double = fixedMinGlucose.toDouble()
-                        override fun getMaxY(minY: Double, maxY: Double, extraStore: ExtraStore): Double = fixedMaxGlucose.toDouble()
-                    }
-                }
-
-                // Configure line styling for each series
-                val lineLayer = rememberLineCartesianLayer(
-                    rangeProvider = lineRangeProvider
-                )
-                val scrollState = rememberVicoScrollState(
-                    scrollEnabled = false,
-                    initialScroll = Scroll.Absolute.End
-                )
-
-                LaunchedEffect(timeRange, currentTimeSeconds) {
-                    scrollState.scroll(Scroll.Absolute.End)
-                }
                 CartesianChartHost(
                     chart = rememberCartesianChart(
-                        lineLayer,
-                        marker = dragMarker, // May be null if series contains NaN
+                        cgmLineLayer,
+                        marker = dragMarker,
                         persistentMarkers = persistentMarkers
                     ),
-                    scrollState = scrollState,
+                    scrollState = cgmScrollState,
                     consumeMoveEvents = true,
-                    modelProducer = modelProducer,
+                    modelProducer = cgmModelProducer,
                     modifier = Modifier.fillMaxHeight().weight(1f)
                 )
             }
+        }
+
+        Spacer(Modifier.height(Spacing.Small))
+
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(BASAL_CHART_HEIGHT_DP.dp)
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxHeight()
+                    .width(CHART_Y_AXIS_WIDTH_DP.dp)
+                    .padding(end = 1.dp),
+                verticalArrangement = Arrangement.SpaceBetween,
+                horizontalAlignment = Alignment.End
+            ) {
+                basalYAxisLabels.forEach { label ->
+                    Text(
+                        text = label,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+
+            CartesianChartHost(
+                chart = rememberCartesianChart(
+                    basalLineLayer
+                ),
+                scrollState = basalScrollState,
+                consumeMoveEvents = false,
+                modelProducer = basalModelProducer,
+                modifier = Modifier.fillMaxHeight().weight(1f)
+            )
         }
 
         if (axisLabels.isNotEmpty()) {
@@ -1288,12 +1623,18 @@ fun VicoCgmChart(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
-                axisLabels.forEach { label ->
-                    Text(
-                        text = label,
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
+                Spacer(Modifier.width(CHART_Y_AXIS_WIDTH_DP.dp))
+                Row(
+                    modifier = Modifier.weight(1f),
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    axisLabels.forEach { label ->
+                        Text(
+                            text = label,
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
                 }
             }
         }
@@ -1442,16 +1783,17 @@ fun ChartTimeRangeSelector(
 ) {
     Row(
         modifier = modifier,
-        horizontalArrangement = Arrangement.spacedBy(Spacing.Small)
+        horizontalArrangement = Arrangement.spacedBy(Spacing.ExtraSmall)
     ) {
         TimeRange.values().forEach { range ->
             FilterChip(
+                modifier = Modifier.height(28.dp),
                 selected = range == selectedRange,
                 onClick = { onRangeSelected(range) },
                 label = {
                     Text(
                         range.label,
-                        style = MaterialTheme.typography.labelMedium
+                        style = MaterialTheme.typography.labelSmall
                     )
                 },
                 leadingIcon = if (range == selectedRange) {
@@ -1459,7 +1801,7 @@ fun ChartTimeRangeSelector(
                         Icon(
                             Icons.Default.Check,
                             contentDescription = null,
-                            modifier = Modifier.width(16.dp)
+                            modifier = Modifier.width(12.dp).height(12.dp)
                         )
                     }
                 } else null
@@ -1487,7 +1829,12 @@ fun VicoCgmChartCard(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(Spacing.CardPadding)
+                .padding(
+                    start = Spacing.ExtraSmall,
+                    end = Spacing.CardPadding,
+                    top = Spacing.Small,
+                    bottom = Spacing.CardPadding
+                )
         ) {
             // Header with time range selector
             Row(

@@ -2,8 +2,10 @@ package com.jwoglom.controlx2.presentation.screens.sections.components
 
 import com.jwoglom.controlx2.db.historylog.HistoryLogItem
 import com.jwoglom.controlx2.db.historylog.itemLruCache
+import com.jwoglom.pumpx2.pump.messages.response.historyLog.BasalRateChangeHistoryLog
 import com.jwoglom.pumpx2.pump.messages.response.historyLog.DexcomG6CGMHistoryLog
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Before
 import org.junit.Test
 import java.text.SimpleDateFormat
@@ -84,5 +86,23 @@ class VicoCgmChartTest {
                 bucketCount = 13
             )
         )
+    }
+
+    @Test
+    fun toBasalDataPoint_usesBaseRateWhenResumeLikeEventHasZeroCommandRate() {
+        val event = BasalRateChangeHistoryLog(
+            1_000_000L,
+            42L,
+            0f,
+            0.85f,
+            3.0f,
+            1,
+            8
+        )
+
+        val point = event.toBasalDataPoint()
+
+        assertEquals(0.85f, point?.rate)
+        assertFalse(point?.isTemp ?: true)
     }
 }
