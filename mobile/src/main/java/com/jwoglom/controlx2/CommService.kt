@@ -543,6 +543,11 @@ class CommService : Service() {
 
             @Synchronized
             fun command(message: com.jwoglom.pumpx2.pump.messages.Message?) {
+                if (message == null) {
+                    Timber.w("Not sending null message")
+                    return
+                }
+
                 if (lastPeripheral == null) {
                     Timber.w("Not sending message because no saved peripheral yet: $message")
                     return
@@ -553,8 +558,14 @@ class CommService : Service() {
                     return
                 }
 
+                val session = currentSession
+                if (session == null) {
+                    Timber.w("Not sending message because no active session: $message")
+                    return
+                }
+
                 Timber.i("Pump send command: $message")
-                currentSession!!.sendCommand(message!!)
+                session.sendCommand(message)
             }
 
             override fun toString(): String {
