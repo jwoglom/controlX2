@@ -15,6 +15,7 @@ import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Send
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Divider
@@ -48,6 +49,11 @@ import com.jwoglom.controlx2.presentation.components.HeaderLine
 import com.jwoglom.controlx2.presentation.navigation.Screen
 import com.jwoglom.controlx2.presentation.screens.sections.components.VersionInfo
 import com.jwoglom.controlx2.presentation.theme.ControlX2Theme
+import com.jwoglom.controlx2.presentation.util.SupportBundleSummary
+import com.jwoglom.controlx2.presentation.util.formatLogLineCount
+import com.jwoglom.controlx2.presentation.util.getSupportBundleSummary
+import com.jwoglom.controlx2.presentation.util.sendSupportBundleEmail
+import com.jwoglom.controlx2.presentation.util.shareSupportBundle
 import com.jwoglom.controlx2.shared.util.SendType
 import com.jwoglom.controlx2.util.AppVersionCheck
 import com.jwoglom.controlx2.util.AppVersionInfo
@@ -76,6 +82,8 @@ fun Settings(
 
     var showSyncTimeDialog by remember { mutableStateOf(false) }
     var showPlaySoundDialog by remember { mutableStateOf(false) }
+    var showSupportBundleDialog by remember { mutableStateOf(false) }
+    var supportBundleSummary by remember { mutableStateOf<SupportBundleSummary?>(null) }
 
     LazyColumn(
         contentPadding = innerPadding,
@@ -95,25 +103,30 @@ fun Settings(
             }
 
             item {
-                if (Prefs(context).serviceEnabled()) {
-                    ListItem(
-                        headlineContent = { Text("Disable ControlX2 service") },
-                        supportingContent = { Text("Stops the background service and disables it from starting automatically when the app is opened.") },
-                        leadingContent = {
-                            Icon(
-                                Icons.Filled.Close,
-                                contentDescription = "Stop icon",
-                            )
-                        },
-                        modifier = Modifier.clickable {
-                            Prefs(context).setServiceEnabled(false)
-                            coroutineScope.launch {
-                                delay(250)
-                                sendMessage("/to-phone/force-reload", "".toByteArray())
-                            }
+                ListItem(
+                    headlineContent = { Text("Send PumpX2 Support Bundle") },
+                    supportingContent = { Text("Generates a zip file with ControlX2 debug logs.") },
+                    leadingContent = {
+                        Icon(
+                            Icons.Filled.Send,
+                            contentDescription = null,
+                        )
+                    },
+                    modifier = Modifier.clickable {
+                        val summary = getSupportBundleSummary(context)
+                        if (summary == null) {
+                            Toast.makeText(context, "No debug logs are available to share.", Toast.LENGTH_SHORT).show()
+                        } else {
+                            supportBundleSummary = summary
+                            showSupportBundleDialog = true
                         }
-                    )
-                } else {
+                    }
+                )
+                Divider()
+            }
+
+            item {
+                if (!Prefs(context).serviceEnabled()) {
                     ListItem(
                         headlineContent = { Text("Enable ControlX2 service") },
                         supportingContent = { Text("Starts the background service and enables it to start automatically when the app is opened.") },
@@ -135,8 +148,8 @@ fun Settings(
                             }
                         }
                     )
+                    Divider()
                 }
-                Divider()
             }
 //            item {
 //                if (Prefs(context).connectionSharingEnabled()) {
@@ -222,7 +235,7 @@ fun Settings(
             item {
                 ListItem(
                     headlineContent = { Text("Reconfigure app") },
-                    supportingContent = { Text("Enable or disable insulin delivery actions (for remote bolus).") },
+                    supportingContent = { Text("Enable or disable insulin delivery actions.") },
                     leadingContent = {
                         Icon(
                             Icons.Filled.Settings,
@@ -240,7 +253,7 @@ fun Settings(
             item {
                 ListItem(
                     headlineContent = { Text("Nightscout") },
-                    supportingContent = { Text("Configure Nightscout sync to upload pump data to the cloud.") },
+                    supportingContent = { Text("Configure Nightscout sync to upload pump data.") },
                     leadingContent = {
                         Icon(
                             Icons.Filled.Refresh,
@@ -332,6 +345,45 @@ fun Settings(
             },
             dismissButton = {
                 TextButton(onClick = { showPumpSetupConfirmDialog = false }) {
+                    Text("Cancel")
+                }
+            }
+        )
+    }
+
+    if (showSupportBundleDialog && supportBundleSummary != null) {
+        val summary = supportBundleSummary!!
+        AlertDialog(
+            onDismissRequest = {
+                showSupportBundleDialog = false
+                supportBundleSummary = null
+            },
+            title = { Text("Send PumpX2 Support Bundle") },
+            text = {
+                Text("Send ${summary.debugFileCount} debug files with ${formatLogLineCount(summary.totalLogLines)} total logs from ${summary.rangeStart} - ${summary.rangeEnd} to the developers for assistance?")
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    sendSupportBundleEmail(context)
+                    showSupportBundleDialog = false
+                    supportBundleSummary = null
+                }) {
+                    Text("Send email")
+                }
+
+                TextButton(onClick = {
+                    shareSupportBundle(context)
+                    showSupportBundleDialog = false
+                    supportBundleSummary = null
+                }) {
+                    Text("Share")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = {
+                    showSupportBundleDialog = false
+                    supportBundleSummary = null
+                }) {
                     Text("Cancel")
                 }
             }
