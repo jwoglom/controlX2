@@ -33,6 +33,7 @@ class HistoryLogFetcher(
     val pumpSid: Int,
     private val commandSender: (startSeqId: Long, count: Int) -> Unit,
     private val autoFetchEnabled: () -> Boolean = { true },
+    private val canRequest: () -> Boolean = { true },
     private val broadcastCallback: ((HistoryLogItem) -> Unit)? = null,
     private val requestDelayMs: Long = 500,
     private val pollIntervalMs: Long = 250,
@@ -44,16 +45,31 @@ class HistoryLogFetcher(
     private val triggerRangeMutex = Mutex()
     private val statusResponseLock = Mutex()
     private val streamResponseLock = Mutex()
+    @Volatile
+    private var cancelled = false
 
     constructor(context: Context, pump: TandemPump, peripheral: BluetoothPeripheral, pumpSid: Int) : this(
         historyLogRepo = (context as CommService).historyLogRepo,
         pumpSid = pumpSid,
         commandSender = { start, count -> pump.sendCommand(peripheral, HistoryLogRequest(start, count)) },
         autoFetchEnabled = { Prefs(context).autoFetchHistoryLogs() },
+        canRequest = { (context as? CommService)?.isPumpReadyForHistoryFetch() ?: true },
         broadcastCallback = { item -> (context as? CommService)?.broadcastHistoryLogItem(item) }
     )
 
+    fun cancel() {
+        cancelled = true
+    }
+
+    private fun shouldContinue(): Boolean {
+        return !cancelled && autoFetchEnabled() && canRequest()
+    }
+
     private fun request(start: Long, count: Int) {
+        if (!shouldContinue()) {
+            Timber.i("HistoryLogFetcher.request skipped start=$start count=$count")
+            return
+        }
         commandSender(start, count)
     }
 
@@ -69,6 +85,10 @@ class HistoryLogFetcher(
         startLog: Long,
         endLog: Long
     )  {
+        if (!shouldContinue()) {
+            Timber.i("HistoryLogFetcher.triggerRange skipped $startLog - $endLog")
+            return
+        }
         Timber.i("HistoryLogFetcher.triggerRange($startLog, $endLog)")
         val chunkSize = 32
         var num = 1
@@ -79,6 +99,10 @@ class HistoryLogFetcher(
 
         var i = endLog
         while (i >= startLog) {
+            if (!shouldContinue()) {
+                Timber.i("HistoryLogFetcher.triggerRange stopping early at $i")
+                return
+            }
             val count = min(chunkSize.toLong(), i - startLog + 1).toInt()
             val startI = i - count + 1
             Timber.i("HistoryLogFetcher.triggerRangeStart $startI - $i ($count)")
@@ -91,6 +115,10 @@ class HistoryLogFetcher(
 
             var waitTimeMs = 0L
             while (true) {
+                if (!shouldContinue()) {
+                    Timber.i("HistoryLogFetcher.triggerRange poll stopping early at $startI - $i")
+                    return
+                }
                 delay(pollIntervalMs)
                 waitTimeMs += pollIntervalMs
                 val dbCount = historyLogRepo.getCount(pumpSid, startI, i).firstOrNull() ?: 0
@@ -109,7 +137,7 @@ class HistoryLogFetcher(
         }
     }
     suspend fun onStatusResponse(message: HistoryLogStatusResponse, scope: CoroutineScope) {
-        if (!autoFetchEnabled()) return;
+        if (!shouldContinue()) return
         statusResponseLock.withLock {
             Timber.i("HistoryLogFetcher.onStatusResponse<lock>")
             onStatusResponseInternal(message, scope)
@@ -156,8 +184,16 @@ class HistoryLogFetcher(
         Timber.i("HistoryLogFetcher.onStatusResponse: missingIds=${missingIdsTotal} $missingIds")
 
         scope.launch {
+            if (!shouldContinue()) {
+                Timber.i("HistoryLogFetcher.onStatusResponse: cancelled before launch")
+                return@launch
+            }
             Timber.i("HistoryLogFetcher.onStatusResponse: launching ranges: $missingIds (dbCount=$dbCount)")
             missingIds.reversed().forEach {
+                if (!shouldContinue()) {
+                    Timber.i("HistoryLogFetcher.onStatusResponse: cancelled during launch")
+                    return@launch
+                }
                 triggerRange(it.first, it.last)
             }
             Timber.i("HistoryLogFetcher.onStatusResponse: completed, fetched $missingIdsTotal")

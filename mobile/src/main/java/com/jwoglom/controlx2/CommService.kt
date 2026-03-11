@@ -158,6 +158,10 @@ class CommService : Service() {
             return if (this::pump.isInitialized) pump.pumpSid else null
         }
 
+        fun isPumpReadyForHistoryFetch(): Boolean {
+            return this::pump.isInitialized && pump.isConnected && pump.lastPeripheral != null
+        }
+
         private fun ensurePumpUnbondedForFreshInit(filterToBluetoothMac: String?): Boolean {
             val targetMac = (filterToBluetoothMac ?: Prefs(applicationContext).pumpFinderPumpMac().orEmpty())
                 .trim()
@@ -432,10 +436,7 @@ class CommService : Service() {
                 Timber.i("HistoryLogFetcher initialized")
 
                 historyLogSyncWorker = HistoryLogSyncWorker(requestSync = { requestHistoryLogStatusUpdate() })
-                if (Prefs(applicationContext).autoFetchHistoryLogs()) {
-                    historyLogSyncWorker?.start()
-                    historyLogSyncWorker?.triggerImmediateSync()
-                }
+                refreshHistoryLogSyncWorker(triggerImmediateSync = true)
                 // Start Nightscout sync worker if enabled
                 NightscoutSyncWorker.startIfEnabled(
                     applicationContext,
@@ -490,6 +491,7 @@ class CommService : Service() {
                 Timber.i("service onPumpDisconnected: isConnected=false")
                 lastPeripheral = null
                 lastResponseMessage.clear()
+                historyLogFetcher?.cancel()
                 historyLogFetcher = null
                 historyLogSyncWorker?.stop()
                 historyLogSyncWorker = null
@@ -1008,6 +1010,30 @@ class CommService : Service() {
         )
     }
 
+    fun isPumpReadyForHistoryFetch(): Boolean {
+        return pumpCommHandler?.isPumpReadyForHistoryFetch() == true
+    }
+
+    private fun refreshHistoryLogSyncWorker(triggerImmediateSync: Boolean = false) {
+        val worker = historyLogSyncWorker
+        if (worker == null) {
+            Timber.i("refreshHistoryLogSyncWorker skipped: worker not initialized")
+            return
+        }
+
+        if (!Prefs(applicationContext).autoFetchHistoryLogs()) {
+            Timber.i("refreshHistoryLogSyncWorker stopping worker")
+            worker.stop()
+            return
+        }
+
+        Timber.i("refreshHistoryLogSyncWorker starting worker")
+        worker.start()
+        if (triggerImmediateSync) {
+            worker.triggerImmediateSync()
+        }
+    }
+
     private val checkForUpdatesDelayMs: Long = 1000 * 30 // 30 seconds
     private var checkForUpdatesTask: Runnable = Runnable {
         if (Prefs(applicationContext).checkForUpdates()) {
@@ -1142,6 +1168,10 @@ class CommService : Service() {
                 } else {
                     sendWearCommMessage("/to-phone/comm-started", "".toByteArray())
                 }
+            }
+            "/to-phone/refresh-history-log-sync" -> {
+                Timber.i("refresh-history-log-sync received")
+                refreshHistoryLogSyncWorker(triggerImmediateSync = true)
             }
             "/to-phone/service-status-acknowledged" -> {
                 Timber.i("service-status acknowledged, stopping periodic sender")

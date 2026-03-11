@@ -397,6 +397,10 @@ class MainActivity : ComponentActivity() {
 
     private fun sendPumpCommands(type: SendType, msgs: List<Message>) {
         if (msgs.isEmpty()) return
+        if (dataStore.pumpConnected.value != true) {
+            Timber.w("Skipping sendPumpCommands while pump disconnected: %s", msgs)
+            return
+        }
         if (type == SendType.DEBUG_PROMPT) {
             synchronized (dataStore.debugPromptAwaitingResponses) {
                 val awaiting = dataStore.debugPromptAwaitingResponses.value ?: mutableSetOf()
@@ -880,7 +884,7 @@ class MainActivity : ComponentActivity() {
                     CGMStatusResponse.TransmitterBatteryStatus.EXPIRED -> "Expired"
                     CGMStatusResponse.TransmitterBatteryStatus.OK -> "OK"
                     CGMStatusResponse.TransmitterBatteryStatus.OUT_OF_RANGE -> "OOR"
-                    else -> "Unknown"
+                    else -> ""
                 }
             }
             is CurrentEGVGuiDataResponse -> {
