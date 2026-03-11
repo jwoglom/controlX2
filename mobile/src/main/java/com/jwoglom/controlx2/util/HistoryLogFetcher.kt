@@ -26,7 +26,7 @@ import java.time.LocalDateTime
 import java.time.ZoneId
 
 const val InitialHistoryLogCount = 5000
-const val FetchGroupTimeoutMs = 2500
+const val FetchGroupTimeoutMs = 4000
 
 class HistoryLogFetcher(
     private val historyLogRepo: HistoryLogRepo,
@@ -35,8 +35,8 @@ class HistoryLogFetcher(
     private val autoFetchEnabled: () -> Boolean = { true },
     private val canRequest: () -> Boolean = { true },
     private val broadcastCallback: ((HistoryLogItem) -> Unit)? = null,
-    private val requestDelayMs: Long = 500,
-    private val pollIntervalMs: Long = 250,
+    private val requestDelayMs: Long = 1000,
+    private val pollIntervalMs: Long = 500,
     private val fetchGroupTimeoutMs: Long = FetchGroupTimeoutMs.toLong()
 ) {
     private var recentSeqIds = LruCache<Long, Long>(256)
