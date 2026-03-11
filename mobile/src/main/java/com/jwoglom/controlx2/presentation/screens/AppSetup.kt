@@ -87,6 +87,7 @@ fun AppSetup(
             Button(
                 onClick = {
                     Prefs(context).setAppSetupComplete(true)
+                    sendMessage("/to-phone/refresh-history-log-sync", "".toByteArray())
                     // Do not restart the app at the end of setup; restarting here can race pump
                     // bootstrap and leave CommService in a null-peripheral startup loop.
                     sendMessage("/to-phone/request-service-status", "".toByteArray())

@@ -4,7 +4,9 @@ package com.jwoglom.controlx2.presentation.screens.sections
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -85,11 +87,17 @@ fun Dashboard(
 ) {
     val context = LocalContext.current
     val ds = LocalDataStore.current
+    val pumpConnected = ds.pumpConnected.observeAsState()
 
     val refreshScope = rememberCoroutineScope()
     var refreshing by remember { mutableStateOf(true) }
 
     fun fetchDataStoreFields(type: SendType) {
+        if (pumpConnected.value != true) {
+            Timber.d("Dashboard skipping fetch while pump disconnected")
+            refreshing = false
+            return
+        }
         sendPumpCommands(type, dashboardCommands)
     }
 
@@ -143,6 +151,12 @@ fun Dashboard(
         waitForLoaded()
     }
 
+    LaunchedEffect(pumpConnected.value) {
+        if (pumpConnected.value != true) {
+            refreshing = false
+        }
+    }
+
     Box(
         modifier = Modifier
             .fillMaxSize()
@@ -170,7 +184,9 @@ fun Dashboard(
 
                     LaunchedEffect(pumpLastConnectionTimestamp.value) {
                         Timber.d("pumpLastConnectionTimestamp effect: ${pumpLastConnectionTimestamp.value}")
-                        sendPumpCommands(SendType.CACHED, dashboardCommands)
+                        if (pumpConnected.value == true) {
+                            sendPumpCommands(SendType.CACHED, dashboardCommands)
+                        }
                     }
                 }
 
@@ -182,33 +198,26 @@ fun Dashboard(
                 }
 
                 item {
-                    LazyRow(
-                        horizontalArrangement = Arrangement.spacedBy(4.dp),
-                        userScrollEnabled = false,
+                    val cgmReading = ds.cgmReading.observeAsState()
+                    val cgmDeltaArrow = ds.cgmDeltaArrow.observeAsState()
+                    Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .fillMaxHeight(),
-                        content = {
-                            // Hero card showing current glucose reading
-                            item {
-                                val cgmReading = ds.cgmReading.observeAsState()
-                                val cgmDeltaArrow = ds.cgmDeltaArrow.observeAsState()
-                                GlucoseHeroCard(
-                                    glucoseValue = cgmReading.value,
-                                    deltaArrow = cgmDeltaArrow.value,
-                                    modifier = Modifier.fillParentMaxWidth(0.5f)
-                                )
-                            }
+                            .height(IntrinsicSize.Min),
+                    ) {
+                        // Hero card showing current glucose reading
+                        GlucoseHeroCard(
+                            glucoseValue = cgmReading.value,
+                            deltaArrow = cgmDeltaArrow.value,
+                            modifier = Modifier.weight(1f).fillMaxHeight()
+                        )
 
-                            // Therapy Metrics Card - IOB, COB
-                            item {
-                                TherapyMetricsCardFromDataStore(
-                                    historyLogViewModel = historyLogViewModel,
-                                    modifier = Modifier.fillParentMaxWidth(0.5f)
-                                )
-                            }
-                        }
-                    )
+                        // Therapy Metrics Card - IOB, COB
+                        TherapyMetricsCardFromDataStore(
+                            historyLogViewModel = historyLogViewModel,
+                            modifier = Modifier.weight(1f).fillMaxHeight()
+                        )
+                    }
                 }
 
 

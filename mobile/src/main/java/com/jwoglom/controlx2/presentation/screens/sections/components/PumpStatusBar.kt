@@ -41,7 +41,9 @@ fun PumpStatusBar(middleContent: @Composable () -> Unit = {}) {
     val ds = LocalDataStore.current
 
     Row(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = Spacing.Small),
         horizontalArrangement = Arrangement.SpaceBetween
     ) {
         Box (Modifier.padding(horizontal = 8.dp)) {

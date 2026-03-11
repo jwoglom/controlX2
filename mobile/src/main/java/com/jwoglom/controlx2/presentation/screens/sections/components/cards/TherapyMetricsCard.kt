@@ -2,6 +2,7 @@ package com.jwoglom.controlx2.presentation.screens.sections.components.cards
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -64,7 +65,9 @@ fun TherapyMetricsCard(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(Spacing.CardPadding + 18.dp)
+                .fillMaxHeight()
+                .padding(Spacing.CardPadding),
+            verticalArrangement = Arrangement.Center
         ) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -109,7 +112,7 @@ private fun MetricDisplay(
     ) {
         Text(
             text = value,
-            style = MaterialTheme.typography.headlineMedium,
+            style = MaterialTheme.typography.headlineLarge,
             color = color,
             fontWeight = FontWeight.Bold
         )

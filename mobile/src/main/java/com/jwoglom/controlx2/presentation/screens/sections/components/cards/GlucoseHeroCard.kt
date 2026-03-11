@@ -3,12 +3,10 @@ package com.jwoglom.controlx2.presentation.screens.sections.components.cards
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -56,8 +54,10 @@ fun GlucoseHeroCard(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
+                .fillMaxHeight()
                 .padding(Spacing.CardPadding),
-            horizontalAlignment = Alignment.CenterHorizontally
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center
         ) {
             // Label
 //            Text(
@@ -86,27 +86,31 @@ fun GlucoseHeroCard(
 
                 Text(
                     text = displayValue,
-                    style = MaterialTheme.typography.displayLarge.copy(
+                    style = MaterialTheme.typography.headlineLarge.copy(
                         fontWeight = FontWeight.Bold
                     ),
-                    color = getGlucoseColor(glucoseValue)
+                    color = if (noCgmConnected) {
+                        MaterialTheme.colorScheme.onSurfaceVariant
+                    } else {
+                        getGlucoseColor(glucoseValue)
+                    }
                 )
 
                 if (!deltaArrow.isNullOrEmpty()) {
                     // Trend arrow
                     Text(
                         text = deltaArrow,
-                        style = MaterialTheme.typography.displayLarge.copy(
+                        style = MaterialTheme.typography.headlineLarge.copy(
                             fontWeight = FontWeight.Bold
                         ),
-                        color = getGlucoseColor(glucoseValue)
+                        color = if (noCgmConnected) {
+                            MaterialTheme.colorScheme.onSurfaceVariant
+                        } else {
+                            getGlucoseColor(glucoseValue)
+                        }
                     )
                 }
 
-                // ensures we line up with ActiveTherapyCard
-                if (noCgmConnected) {
-                    Spacer(Modifier.height(8.dp))
-                }
             }
 
             // Unit label
@@ -122,8 +126,8 @@ fun GlucoseHeroCard(
 @Composable
 private fun getGlucoseColor(glucose: Int?): Color {
     return when (glucose) {
-        null -> MaterialTheme.colorScheme.onSurfaceVariant
-        in 0..69 -> GlucoseColors.Severe
+        null, 0 -> MaterialTheme.colorScheme.onSurfaceVariant
+        in 1..69 -> GlucoseColors.Severe
         in 70..79 -> GlucoseColors.Low
         in 80..180 -> GlucoseColors.InRange
         in 181..250 -> GlucoseColors.Elevated

@@ -88,9 +88,9 @@ fun SensorInfoCard(
                 } else if (cgmSessionState == CGMSessionState.STOPPED) {
                     SensorItem(
                         icon = Icons.Default.SensorAlert,
-                        label = "No Sensor Active",
+                        label = "No CGM Sensor Active",
                         value = null,
-                        color = GlucoseColors.InRange
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
 
