@@ -4,7 +4,6 @@ import android.util.LruCache
 import com.jwoglom.controlx2.db.historylog.HistoryLogItem
 import com.jwoglom.controlx2.db.historylog.HistoryLogRepo
 import com.jwoglom.controlx2.pump.PumpSession
-import com.jwoglom.controlx2.shared.PumpSessionToken
 import com.jwoglom.pumpx2.pump.messages.response.currentStatus.HistoryLogStatusResponse
 import com.jwoglom.pumpx2.pump.messages.response.historyLog.HistoryLog
 import kotlinx.coroutines.CoroutineScope
@@ -48,15 +47,14 @@ class HistoryLogFetcher(
         historyLogRepo: HistoryLogRepo,
         pumpSid: Int,
         pumpSession: PumpSession,
-        sessionToken: PumpSessionToken,
         autoFetchEnabled: () -> Boolean = { true },
         broadcastCallback: ((HistoryLogItem) -> Unit)? = null
     ) : this(
         historyLogRepo = historyLogRepo,
         pumpSid = pumpSid,
-        commandSender = { start, count -> pumpSession.sendHistoryLogRequest(sessionToken, start, count) },
+        commandSender = { start, count -> pumpSession.sendHistoryLogRequest(start, count) },
         autoFetchEnabled = autoFetchEnabled,
-        canRequest = { pumpSession.isActive(sessionToken) },
+        canRequest = { pumpSession.isActive },
         broadcastCallback = broadcastCallback
     )
 

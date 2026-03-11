@@ -153,8 +153,7 @@ class CommService : Service() {
     private inner class PumpCommHandler(looper: Looper) : Handler(looper) {
         private lateinit var pump: Pump
         private lateinit var tandemBTHandler: TandemBluetoothHandler
-        val pumpSession = com.jwoglom.controlx2.pump.PumpSession()
-        var currentToken: com.jwoglom.controlx2.shared.PumpSessionToken? = null
+        var currentSession: com.jwoglom.controlx2.pump.PumpSession? = null
             private set
 
         fun getPumpSid(): Int? {
@@ -162,7 +161,7 @@ class CommService : Service() {
         }
 
         fun isPumpReadyForHistoryFetch(): Boolean {
-            return pumpSession.isPumpReady()
+            return currentSession?.isActive == true
         }
 
         private fun ensurePumpUnbondedForFreshInit(filterToBluetoothMac: String?): Boolean {
@@ -435,12 +434,12 @@ class CommService : Service() {
                     Prefs(applicationContext).setCurrentPumpSid(it)
                 }
 
-                currentToken = pumpSession.open(this, peripheral!!)
+                val session = com.jwoglom.controlx2.pump.PumpSession.open(this, peripheral!!)
+                currentSession = session
                 historyLogFetcher = HistoryLogFetcher(
                     historyLogRepo = this@CommService.historyLogRepo,
                     pumpSid = pumpSid!!,
-                    pumpSession = pumpSession,
-                    sessionToken = currentToken!!,
+                    pumpSession = session,
                     autoFetchEnabled = { Prefs(applicationContext).autoFetchHistoryLogs() },
                     broadcastCallback = { item -> this@CommService.broadcastHistoryLogItem(item) }
                 )
@@ -500,8 +499,8 @@ class CommService : Service() {
                 status: HciStatus?
             ): Boolean {
                 Timber.i("service onPumpDisconnected: isConnected=false")
-                pumpSession.close()
-                currentToken = null
+                currentSession?.close()
+                currentSession = null
                 lastPeripheral = null
                 lastResponseMessage.clear()
                 historyLogFetcher?.cancel()
@@ -1028,11 +1027,7 @@ class CommService : Service() {
     }
 
     fun getPumpSession(): com.jwoglom.controlx2.pump.PumpSession? {
-        return pumpCommHandler?.pumpSession
-    }
-
-    fun getCurrentSessionToken(): com.jwoglom.controlx2.shared.PumpSessionToken? {
-        return pumpCommHandler?.currentToken
+        return pumpCommHandler?.currentSession
     }
 
     private fun refreshHistoryLogSyncWorker(triggerImmediateSync: Boolean = false) {

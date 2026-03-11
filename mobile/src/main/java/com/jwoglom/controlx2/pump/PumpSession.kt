@@ -8,60 +8,52 @@ import timber.log.Timber
 import java.util.concurrent.atomic.AtomicLong
 
 /**
- * Session-scoped gateway for pump commands, owned by PumpCommHandler.
+ * Represents a single pump BLE connection. Created when the pump connects,
+ * closed when it disconnects. Implements [AutoCloseable] so the lifecycle
+ * is explicit and idiomatic.
  *
- * External code receives a [PumpSessionToken] when the pump connects and
- * passes it with every command. If the token no longer matches the active
- * connection (because the pump disconnected and possibly reconnected),
- * the command is silently dropped with a log warning. This eliminates the
- * class of bugs where callers hold stale TandemPump / BluetoothPeripheral
- * references.
+ * Once closed, every [sendCommand] / [sendHistoryLogRequest] call is
+ * silently dropped with a log warning. Callers that hold a reference to a
+ * stale session can never accidentally reach the underlying BLE objects.
  */
-class PumpSession {
-
-    data class ActiveConnection(
-        val token: PumpSessionToken,
-        val pump: TandemPump,
-        val peripheral: BluetoothPeripheral
-    )
+class PumpSession private constructor(
+    val token: PumpSessionToken,
+    private val pump: TandemPump,
+    private val peripheral: BluetoothPeripheral
+) : AutoCloseable {
 
     @Volatile
-    private var activeConnection: ActiveConnection? = null
+    private var closed = false
 
-    private val tokenCounter = AtomicLong(0)
+    val isActive: Boolean get() = !closed
 
-    fun open(pump: TandemPump, peripheral: BluetoothPeripheral): PumpSessionToken {
-        val token = PumpSessionToken(tokenCounter.incrementAndGet())
-        activeConnection = ActiveConnection(token, pump, peripheral)
-        Timber.i("PumpSession: opened $token")
-        return token
-    }
-
-    fun close() {
-        val old = activeConnection
-        activeConnection = null
-        Timber.i("PumpSession: closed ${old?.token}")
-    }
-
-    fun isActive(token: PumpSessionToken): Boolean {
-        return activeConnection?.token == token
-    }
-
-    fun sendCommand(token: PumpSessionToken, message: com.jwoglom.pumpx2.pump.messages.Message): Boolean {
-        val conn = activeConnection
-        if (conn == null || conn.token != token) {
-            Timber.w("PumpSession: stale token $token (current=${conn?.token}), dropping $message")
+    fun sendCommand(message: com.jwoglom.pumpx2.pump.messages.Message): Boolean {
+        if (closed) {
+            Timber.w("PumpSession($token): closed, dropping $message")
             return false
         }
-        conn.pump.sendCommand(conn.peripheral, message)
+        pump.sendCommand(peripheral, message)
         return true
     }
 
-    fun sendHistoryLogRequest(token: PumpSessionToken, startSeqId: Long, count: Int): Boolean {
-        return sendCommand(token, HistoryLogRequest(startSeqId, count))
+    fun sendHistoryLogRequest(startSeqId: Long, count: Int): Boolean {
+        return sendCommand(HistoryLogRequest(startSeqId, count))
     }
 
-    fun isPumpReady(): Boolean {
-        return activeConnection != null
+    override fun close() {
+        closed = true
+        Timber.i("PumpSession: closed $token")
+    }
+
+    override fun toString(): String = "PumpSession(token=$token, isActive=$isActive)"
+
+    companion object {
+        private val tokenCounter = AtomicLong(0)
+
+        fun open(pump: TandemPump, peripheral: BluetoothPeripheral): PumpSession {
+            val token = PumpSessionToken(tokenCounter.incrementAndGet())
+            Timber.i("PumpSession: opened $token")
+            return PumpSession(token, pump, peripheral)
+        }
     }
 }
