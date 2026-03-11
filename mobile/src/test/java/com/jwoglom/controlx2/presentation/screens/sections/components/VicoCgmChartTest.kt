@@ -105,4 +105,31 @@ class VicoCgmChartTest {
         assertEquals(0.85f, point?.rate)
         assertFalse(point?.isTemp ?: true)
     }
+
+    @Test
+    fun activeBasalAtTimestamp_returnsMostRecentEarlierBasalRate() {
+        val basalPoints = listOf(
+            BasalDataPoint(timestamp = 1_000L, rate = 1.2f, isTemp = false, duration = null),
+            BasalDataPoint(timestamp = 1_200L, rate = 1.4f, isTemp = false, duration = null)
+        )
+
+        val point = activeBasalAtTimestamp(basalPoints, 1_100L)
+
+        assertEquals(1.2f, point?.rate)
+    }
+
+    @Test
+    fun hoverTimestampForPosition_snapsToSharedBucketGrid() {
+        assertEquals(
+            1_000_000_300L,
+            hoverTimestampForPosition(
+                x = 50f,
+                width = 100f,
+                startTimeSeconds = 1_000_000_000L,
+                currentTimeSeconds = 1_000_000_600L,
+                bucketSeconds = 300L,
+                bucketCount = 3
+            )
+        )
+    }
 }
