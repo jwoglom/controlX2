@@ -10,6 +10,6 @@ package com.jwoglom.controlx2.pump
  */
 data class RateLimitConfig(
     val baseRps: Double = 10.0,
-    val burstRps: Int = 15,
+    val burstRps: Double = 15.0,
     val commSuspendedPauseMs: Long = 5_000
 )

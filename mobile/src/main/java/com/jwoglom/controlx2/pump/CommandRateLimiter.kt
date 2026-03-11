@@ -15,7 +15,7 @@ import timber.log.Timber
 class CommandRateLimiter(private val config: RateLimitConfig) {
 
     private val mutex = Mutex()
-    private var tokens: Double = config.burstRps.toDouble()
+    private var tokens: Double = config.burstRps
     private var lastRefillNanos: Long = System.nanoTime()
 
     @Volatile
@@ -61,7 +61,7 @@ class CommandRateLimiter(private val config: RateLimitConfig) {
     private fun refill() {
         val now = System.nanoTime()
         val elapsedSec = (now - lastRefillNanos) / 1_000_000_000.0
-        tokens = (tokens + elapsedSec * config.baseRps).coerceAtMost(config.burstRps.toDouble())
+        tokens = (tokens + elapsedSec * config.baseRps).coerceAtMost(config.burstRps)
         lastRefillNanos = now
     }
 }
