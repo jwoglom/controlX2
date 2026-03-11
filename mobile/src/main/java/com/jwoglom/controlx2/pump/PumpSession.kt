@@ -2,7 +2,6 @@ package com.jwoglom.controlx2.pump
 
 import com.jwoglom.controlx2.shared.PumpSessionToken
 import com.jwoglom.pumpx2.pump.bluetooth.TandemPump
-import com.jwoglom.pumpx2.pump.messages.request.currentStatus.HistoryLogRequest
 import com.welie.blessed.BluetoothPeripheral
 import timber.log.Timber
 import java.util.concurrent.atomic.AtomicLong
@@ -34,10 +33,6 @@ class PumpSession private constructor(
         }
         pump.sendCommand(peripheral, message)
         return true
-    }
-
-    fun sendHistoryLogRequest(startSeqId: Long, count: Int): Boolean {
-        return sendCommand(HistoryLogRequest(startSeqId, count))
     }
 
     override fun close() {
