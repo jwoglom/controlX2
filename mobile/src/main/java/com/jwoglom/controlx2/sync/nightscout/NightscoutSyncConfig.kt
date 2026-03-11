@@ -75,13 +75,13 @@ data class NightscoutSyncConfig(
      * Validate configuration
      */
     fun isValid(): Boolean {
-        return nightscoutUrl.isNotBlank() && apiSecret.isNotBlank()
+        return normalizeNightscoutUrl(nightscoutUrl) != null && apiSecret.isNotBlank()
     }
 
     /**
      * Get sanitized Nightscout URL (remove trailing slash)
      */
     fun getSanitizedUrl(): String {
-        return nightscoutUrl.trimEnd('/')
+        return normalizeNightscoutUrl(nightscoutUrl) ?: nightscoutUrl.trimEnd('/')
     }
 }

@@ -1,9 +1,7 @@
 package com.jwoglom.controlx2.sync.nightscout
 
-import com.jwoglom.controlx2.sync.nightscout.api.NightscoutClient
 import org.junit.Assert.*
 import org.junit.Test
-import java.security.MessageDigest
 
 /**
  * Unit tests for NightscoutClient
@@ -14,13 +12,12 @@ class NightscoutClientTest {
     fun testApiSecretHashing() {
         // Test SHA-1 hash calculation
         val apiSecret = "test-secret-123"
-        val expectedHash = MessageDigest.getInstance("SHA-1")
-            .digest(apiSecret.toByteArray())
-            .joinToString("") { "%02x".format(it) }
+        val expectedHash = hashNightscoutApiSecret(apiSecret)
 
         // The client should use this hash for authentication
         assertNotNull(expectedHash)
         assertEquals(40, expectedHash.length) // SHA-1 produces 40 hex characters
+        assertEquals("api-secret", NightscoutApiSecretHeader)
     }
 
     @Test
@@ -51,13 +48,9 @@ class NightscoutClientTest {
     @Test
     fun testHashConsistency() {
         val secret = "my-secret"
-        val hash1 = MessageDigest.getInstance("SHA-1")
-            .digest(secret.toByteArray())
-            .joinToString("") { "%02x".format(it) }
+        val hash1 = hashNightscoutApiSecret(secret)
 
-        val hash2 = MessageDigest.getInstance("SHA-1")
-            .digest(secret.toByteArray())
-            .joinToString("") { "%02x".format(it) }
+        val hash2 = hashNightscoutApiSecret(secret)
 
         // Same secret should produce same hash
         assertEquals(hash1, hash2)
@@ -68,13 +61,9 @@ class NightscoutClientTest {
         val secret1 = "secret1"
         val secret2 = "secret2"
 
-        val hash1 = MessageDigest.getInstance("SHA-1")
-            .digest(secret1.toByteArray())
-            .joinToString("") { "%02x".format(it) }
+        val hash1 = hashNightscoutApiSecret(secret1)
 
-        val hash2 = MessageDigest.getInstance("SHA-1")
-            .digest(secret2.toByteArray())
-            .joinToString("") { "%02x".format(it) }
+        val hash2 = hashNightscoutApiSecret(secret2)
 
         // Different secrets should produce different hashes
         assertNotEquals(hash1, hash2)
@@ -83,9 +72,7 @@ class NightscoutClientTest {
     @Test
     fun testEmptySecret() {
         val secret = ""
-        val hash = MessageDigest.getInstance("SHA-1")
-            .digest(secret.toByteArray())
-            .joinToString("") { "%02x".format(it) }
+        val hash = hashNightscoutApiSecret(secret)
 
         // Empty string should still produce a valid hash
         assertEquals(40, hash.length)

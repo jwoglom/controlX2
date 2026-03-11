@@ -42,10 +42,15 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavHostController
 import com.jwoglom.controlx2.sync.nightscout.NightscoutSyncConfig
+import com.jwoglom.controlx2.sync.nightscout.NightscoutSyncStatusStore
 import com.jwoglom.controlx2.sync.nightscout.ProcessorType
 import com.jwoglom.controlx2.sync.nightscout.NightscoutSyncWorker
+import com.jwoglom.controlx2.sync.nightscout.normalizeNightscoutUrl
 import com.jwoglom.controlx2.presentation.components.HeaderLine
 import kotlinx.coroutines.launch
+import java.time.Instant
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
 
 @Composable
 fun NightscoutSettings(
@@ -58,6 +63,7 @@ fun NightscoutSettings(
     val coroutineScope = rememberCoroutineScope()
 
     var config by remember { mutableStateOf(NightscoutSyncConfig.load(prefs)) }
+    var syncStatus by remember { mutableStateOf(NightscoutSyncStatusStore.load(prefs)) }
     var showUrlDialog by remember { mutableStateOf(false) }
     var showApiSecretDialog by remember { mutableStateOf(false) }
     var showProcessorsDialog by remember { mutableStateOf(false) }
@@ -109,6 +115,51 @@ fun NightscoutSettings(
                         } else {
                             NightscoutSyncWorker.stopIfRunning()
                             Toast.makeText(context, "Nightscout sync disabled", Toast.LENGTH_SHORT).show()
+                        }
+
+                        syncStatus = NightscoutSyncStatusStore.load(prefs)
+                    }
+                )
+                Divider()
+            }
+
+            item {
+                ListItem(
+                    headlineContent = { Text("Last successful sync") },
+                    supportingContent = {
+                        Text(
+                            syncStatus.lastSuccessfulSyncMillis?.let { formatTimestamp(it) } ?: "Never"
+                        )
+                    }
+                )
+                Divider()
+            }
+
+            item {
+                val connectionMessage = if (!config.enabled) {
+                    "Nightscout sync is disabled"
+                } else if (!config.isValid()) {
+                    "Nightscout config is incomplete"
+                } else if (!syncStatus.lastError.isNullOrBlank()) {
+                    syncStatus.lastError ?: "Connection error"
+                } else {
+                    "Connected"
+                }
+
+                val supportingMessage = if (config.enabled && !syncStatus.lastError.isNullOrBlank()) {
+                    syncStatus.lastErrorMillis?.let { "Last failure: ${formatTimestamp(it)}" } ?: ""
+                } else {
+                    ""
+                }
+
+                ListItem(
+                    headlineContent = { Text("Connection status") },
+                    supportingContent = {
+                        Column {
+                            Text(connectionMessage)
+                            if (supportingMessage.isNotBlank()) {
+                                Text(supportingMessage)
+                            }
                         }
                     }
                 )
@@ -193,6 +244,7 @@ fun NightscoutSettings(
                         if (config.enabled && config.isValid()) {
                             coroutineScope.launch {
                                 NightscoutSyncWorker.getInstance(context, prefs, pumpSid).syncNow()
+                                syncStatus = NightscoutSyncStatusStore.load(prefs)
                                 Toast.makeText(context, "Sync triggered", Toast.LENGTH_SHORT).show()
                             }
                         } else {
@@ -212,21 +264,41 @@ fun NightscoutSettings(
     // URL Dialog
     if (showUrlDialog) {
         var urlInput by remember { mutableStateOf(config.nightscoutUrl) }
+        var urlError by remember { mutableStateOf<String?>(null) }
         AlertDialog(
             onDismissRequest = { showUrlDialog = false },
             title = { Text("Nightscout URL") },
             text = {
-                OutlinedTextField(
-                    value = urlInput,
-                    onValueChange = { urlInput = it },
-                    label = { Text("URL") },
-                    placeholder = { Text("https://your-nightscout.herokuapp.com") },
-                    modifier = Modifier.fillMaxWidth()
-                )
+                Column {
+                    OutlinedTextField(
+                        value = urlInput,
+                        onValueChange = {
+                            urlInput = it
+                            urlError = null
+                        },
+                        label = { Text("URL") },
+                        placeholder = { Text("https://your-nightscout.herokuapp.com") },
+                        isError = urlError != null,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+
+                    if (urlError != null) {
+                        Text(
+                            text = urlError!!,
+                            modifier = Modifier.padding(top = 8.dp)
+                        )
+                    }
+                }
             },
             confirmButton = {
                 TextButton(onClick = {
-                    val newConfig = config.copy(nightscoutUrl = urlInput.trim())
+                    val normalizedUrl = normalizeNightscoutUrl(urlInput)
+                    if (normalizedUrl == null) {
+                        urlError = "Please enter a valid Nightscout URL"
+                        return@TextButton
+                    }
+
+                    val newConfig = config.copy(nightscoutUrl = normalizedUrl)
                     config = newConfig
                     NightscoutSyncConfig.save(prefs, newConfig)
                     showUrlDialog = false
@@ -404,4 +476,11 @@ fun NightscoutSettings(
             }
         )
     }
+}
+
+private fun formatTimestamp(timestampMillis: Long): String {
+    val formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")
+    return Instant.ofEpochMilli(timestampMillis)
+        .atZone(ZoneId.systemDefault())
+        .format(formatter)
 }
