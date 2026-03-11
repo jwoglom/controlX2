@@ -1,16 +1,12 @@
 package com.jwoglom.controlx2.util
 
-import android.content.Context
 import android.util.LruCache
-import com.jwoglom.controlx2.CommService
-import com.jwoglom.controlx2.Prefs
 import com.jwoglom.controlx2.db.historylog.HistoryLogItem
 import com.jwoglom.controlx2.db.historylog.HistoryLogRepo
-import com.jwoglom.pumpx2.pump.bluetooth.TandemPump
+import com.jwoglom.controlx2.pump.PumpSession
 import com.jwoglom.pumpx2.pump.messages.request.currentStatus.HistoryLogRequest
 import com.jwoglom.pumpx2.pump.messages.response.currentStatus.HistoryLogStatusResponse
 import com.jwoglom.pumpx2.pump.messages.response.historyLog.HistoryLog
-import com.welie.blessed.BluetoothPeripheral
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -31,7 +27,7 @@ const val FetchGroupTimeoutMs = 4000
 class HistoryLogFetcher(
     private val historyLogRepo: HistoryLogRepo,
     val pumpSid: Int,
-    private val commandSender: (startSeqId: Long, count: Int) -> Unit,
+    private val commandSender: suspend (startSeqId: Long, count: Int) -> Unit,
     private val autoFetchEnabled: () -> Boolean = { true },
     private val canRequest: () -> Boolean = { true },
     private val broadcastCallback: ((HistoryLogItem) -> Unit)? = null,
@@ -48,13 +44,19 @@ class HistoryLogFetcher(
     @Volatile
     private var cancelled = false
 
-    constructor(context: Context, pump: TandemPump, peripheral: BluetoothPeripheral, pumpSid: Int) : this(
-        historyLogRepo = (context as CommService).historyLogRepo,
+    constructor(
+        historyLogRepo: HistoryLogRepo,
+        pumpSid: Int,
+        pumpSession: PumpSession,
+        autoFetchEnabled: () -> Boolean = { true },
+        broadcastCallback: ((HistoryLogItem) -> Unit)? = null
+    ) : this(
+        historyLogRepo = historyLogRepo,
         pumpSid = pumpSid,
-        commandSender = { start, count -> pump.sendCommand(peripheral, HistoryLogRequest(start, count)) },
-        autoFetchEnabled = { Prefs(context).autoFetchHistoryLogs() },
-        canRequest = { (context as? CommService)?.isPumpReadyForHistoryFetch() ?: true },
-        broadcastCallback = { item -> (context as? CommService)?.broadcastHistoryLogItem(item) }
+        commandSender = { start, count -> pumpSession.sendCommand(HistoryLogRequest(start, count)) },
+        autoFetchEnabled = autoFetchEnabled,
+        canRequest = { pumpSession.isActive },
+        broadcastCallback = broadcastCallback
     )
 
     fun cancel() {
@@ -65,7 +67,7 @@ class HistoryLogFetcher(
         return !cancelled && autoFetchEnabled() && canRequest()
     }
 
-    private fun request(start: Long, count: Int) {
+    private suspend fun request(start: Long, count: Int) {
         if (!shouldContinue()) {
             Timber.i("HistoryLogFetcher.request skipped start=$start count=$count")
             return

@@ -32,6 +32,7 @@ import com.jwoglom.controlx2.db.historylog.HistoryLogItem
 import com.jwoglom.controlx2.db.historylog.HistoryLogRepo
 import com.jwoglom.controlx2.messaging.MessageBusFactory
 import com.jwoglom.controlx2.presentation.util.ShouldLogToFile
+import com.jwoglom.controlx2.pump.PumpSession
 import com.jwoglom.controlx2.shared.CommServiceCodes
 import com.jwoglom.controlx2.shared.InitiateConfirmedBolusSerializer
 import com.jwoglom.controlx2.shared.PumpMessageSerializer
@@ -98,6 +99,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
 import org.bouncycastle.jce.provider.BouncyCastleProvider
 import org.json.JSONObject
 import timber.log.Timber
@@ -153,13 +155,15 @@ class CommService : Service() {
     private inner class PumpCommHandler(looper: Looper) : Handler(looper) {
         private lateinit var pump: Pump
         private lateinit var tandemBTHandler: TandemBluetoothHandler
+        var currentSession: PumpSession? = null
+            private set
 
         fun getPumpSid(): Int? {
             return if (this::pump.isInitialized) pump.pumpSid else null
         }
 
         fun isPumpReadyForHistoryFetch(): Boolean {
-            return this::pump.isInitialized && pump.isConnected && pump.lastPeripheral != null
+            return currentSession?.isActive == true
         }
 
         private fun ensurePumpUnbondedForFreshInit(filterToBluetoothMac: String?): Boolean {
@@ -325,11 +329,14 @@ class CommService : Service() {
             ) {
                 Timber.i("onReceiveQualifyingEvent: $events")
                 Toast.makeText(this@CommService, "Events: $events", Toast.LENGTH_SHORT).show()
+                if (events != null && QualifyingEvent.PUMP_COMMUNICATIONS_SUSPENDED in events) {
+                    Timber.w("onReceiveQualifyingEvent: PUMP_COMMUNICATIONS_SUSPENDED — pausing sends")
+                    currentSession?.pauseSends(currentSession?.rateLimitConfig?.commSuspendedPauseMs ?: 5_000)
+                }
                 events?.forEach { event ->
                     event.suggestedHandlers.forEach { handler ->
                         Timber.i("onReceiveQualifyingEvent: running handler for $event message: ${handler.get()}")
                         handler.get()?.let { command(it) }
-                        Thread.sleep(50) // prevent message flood
                     }
                 }
                 sendWearCommMessage("/from-pump/receive-qualifying-event", PumpQualifyingEventsSerializer.toBytes(events))
@@ -432,7 +439,15 @@ class CommService : Service() {
                     Prefs(applicationContext).setCurrentPumpSid(it)
                 }
 
-                historyLogFetcher = HistoryLogFetcher(this@CommService, pump, peripheral!!, pumpSid!!)
+                val session = PumpSession.open(this, peripheral!!)
+                currentSession = session
+                historyLogFetcher = HistoryLogFetcher(
+                    historyLogRepo = this@CommService.historyLogRepo,
+                    pumpSid = pumpSid!!,
+                    pumpSession = session,
+                    autoFetchEnabled = { Prefs(applicationContext).autoFetchHistoryLogs() },
+                    broadcastCallback = { item -> this@CommService.broadcastHistoryLogItem(item) }
+                )
                 Timber.i("HistoryLogFetcher initialized")
 
                 historyLogSyncWorker = HistoryLogSyncWorker(requestSync = { requestHistoryLogStatusUpdate() })
@@ -489,6 +504,8 @@ class CommService : Service() {
                 status: HciStatus?
             ): Boolean {
                 Timber.i("service onPumpDisconnected: isConnected=false")
+                currentSession?.close()
+                currentSession = null
                 lastPeripheral = null
                 lastResponseMessage.clear()
                 historyLogFetcher?.cancel()
@@ -527,6 +544,11 @@ class CommService : Service() {
 
             @Synchronized
             fun command(message: com.jwoglom.pumpx2.pump.messages.Message?) {
+                if (message == null) {
+                    Timber.w("Not sending null message")
+                    return
+                }
+
                 if (lastPeripheral == null) {
                     Timber.w("Not sending message because no saved peripheral yet: $message")
                     return
@@ -537,9 +559,14 @@ class CommService : Service() {
                     return
                 }
 
+                val session = currentSession
+                if (session == null) {
+                    Timber.w("Not sending message because no active session: $message")
+                    return
+                }
+
                 Timber.i("Pump send command: $message")
-                sendCommand(lastPeripheral, message)
-                Thread.sleep(25) // prevent message flood
+                runBlocking { session.sendCommand(message) }
             }
 
             override fun toString(): String {
@@ -1012,6 +1039,10 @@ class CommService : Service() {
 
     fun isPumpReadyForHistoryFetch(): Boolean {
         return pumpCommHandler?.isPumpReadyForHistoryFetch() == true
+    }
+
+    fun getPumpSession(): PumpSession? {
+        return pumpCommHandler?.currentSession
     }
 
     private fun refreshHistoryLogSyncWorker(triggerImmediateSync: Boolean = false) {
