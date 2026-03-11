@@ -54,6 +54,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.jwoglom.controlx2.LocalDataStore
+import com.jwoglom.controlx2.db.historylog.HistoryLogItem
 import com.jwoglom.controlx2.db.historylog.HistoryLogViewModel
 import com.jwoglom.controlx2.presentation.theme.CardBackground
 import com.jwoglom.controlx2.presentation.theme.ControlX2Theme
@@ -68,6 +69,7 @@ import com.jwoglom.controlx2.presentation.theme.CarbColor
 import com.jwoglom.controlx2.presentation.theme.ModeColors
 import com.jwoglom.controlx2.shared.enums.GlucoseUnit
 import com.jwoglom.controlx2.shared.util.GlucoseConverter
+import com.jwoglom.controlx2.shared.util.pumpTimeToLocalTz
 import com.jwoglom.pumpx2.pump.messages.helpers.Dates
 import com.jwoglom.pumpx2.pump.messages.models.InsulinUnit
 import com.jwoglom.pumpx2.pump.messages.response.currentStatus.LastBolusStatusAbstractResponse
@@ -75,6 +77,7 @@ import com.jwoglom.pumpx2.pump.messages.response.historyLog.BolusDeliveryHistory
 import com.jwoglom.pumpx2.pump.messages.response.historyLog.DexcomG6CGMHistoryLog
 import com.jwoglom.pumpx2.pump.messages.response.historyLog.DexcomG7CGMHistoryLog
 import com.jwoglom.pumpx2.pump.messages.response.historyLog.CgmDataGxHistoryLog
+import com.jwoglom.pumpx2.pump.messages.response.historyLog.HistoryLog
 import com.jwoglom.pumpx2.pump.messages.response.historyLog.HistoryLogParser
 import com.patrykandpatrick.vico.compose.cartesian.CartesianChartHost
 import com.patrykandpatrick.vico.compose.cartesian.layer.rememberLineCartesianLayer
@@ -97,8 +100,6 @@ import com.patrykandpatrick.vico.core.common.component.Component
 import com.patrykandpatrick.vico.core.common.component.TextComponent
 import com.patrykandpatrick.vico.core.common.data.ExtraStore
 import java.time.Instant
-import java.time.ZoneId
-import java.time.ZoneOffset
 import java.util.Locale
 import kotlin.math.max
 import kotlin.math.min
@@ -109,6 +110,35 @@ data class CgmDataPoint(
     val timestamp: Long,
     val value: Float
 )
+
+internal fun HistoryLog.toChartTimestampSeconds(): Long {
+    return pumpTimeToLocalTz(Dates.fromJan12008EpochSecondsToDate(pumpTimeSec)).epochSecond
+}
+
+internal fun HistoryLogItem.toCgmDataPoint(): CgmDataPoint? {
+    val parsed = parse()
+    val value = when (parsed) {
+        is DexcomG6CGMHistoryLog -> parsed.currentGlucoseDisplayValue.toFloat()
+        is DexcomG7CGMHistoryLog -> parsed.currentGlucoseDisplayValue.toFloat()
+        is CgmDataGxHistoryLog -> parsed.value.toFloat()
+        else -> null
+    }
+
+    if (value == null || value <= 0f) {
+        return null
+    }
+
+    // Tandem history-log times need the same pump-local timezone correction used elsewhere.
+    val timestamp = parsed.toChartTimestampSeconds()
+    return CgmDataPoint(
+        timestamp = timestamp,
+        value = value
+    )
+}
+
+internal fun formatChartTimestamp(timestampSeconds: Long, timeFormat: SimpleDateFormat): String {
+    return timeFormat.format(Date(timestampSeconds * 1000L))
+}
 
 data class BolusEvent(
     val timestamp: Long,       // Pump time in seconds
@@ -216,31 +246,7 @@ private fun rememberCgmChartData(
     )?.observeAsState(emptyList())
 
     return remember(cgmData?.value, timeRange) {
-        cgmData?.value?.mapNotNull { dao ->
-            val parsed = dao.parse()
-            val value = when (parsed) {
-                is DexcomG6CGMHistoryLog -> parsed.currentGlucoseDisplayValue.toFloat()
-                is DexcomG7CGMHistoryLog -> parsed.currentGlucoseDisplayValue.toFloat()
-                is CgmDataGxHistoryLog -> parsed.value.toFloat()
-                else -> null
-            }
-
-            val pumpTimestamp = when (parsed) {
-                is DexcomG6CGMHistoryLog -> parsed.timeStampSeconds
-                is DexcomG7CGMHistoryLog -> parsed.egvTimestamp
-                is CgmDataGxHistoryLog -> parsed.transmitterTimestamp
-                else -> parsed.pumpTimeSec
-
-            }
-
-            if (value != null && value > 0) {
-                val timestamp = Dates.fromJan12008EpochSecondsToDate(pumpTimestamp)
-                CgmDataPoint(
-                    timestamp = timestamp.epochSecond,
-                    value = value
-                )
-            } else null
-        }?.reversed() ?: emptyList()  // Reverse to get chronological order
+        cgmData?.value?.mapNotNull { dao -> dao.toCgmDataPoint() }?.reversed() ?: emptyList()
     }
 }
 
@@ -328,7 +334,7 @@ private fun rememberBolusData(
                     // Get bolus type as string representation
                     val bolusType = parsed.bolusTypes.toString()
 
-                    val timestamp = dao.pumpTime.atZone(ZoneId.systemDefault()).toEpochSecond()
+                    val timestamp = parsed.toChartTimestampSeconds()
 
                     if (units > 0) {
                         BolusEvent(
@@ -368,7 +374,7 @@ private fun rememberBasalData(
         basalHistoryLogs?.value?.mapNotNull { dao: com.jwoglom.controlx2.db.historylog.HistoryLogItem ->
             try {
                 val parsed = dao.parse()
-                val timestamp = dao.pumpTime.atZone(ZoneId.systemDefault()).toEpochSecond()
+                val timestamp = parsed.toChartTimestampSeconds()
 
                 when (parsed) {
                     is com.jwoglom.pumpx2.pump.messages.response.historyLog.BasalRateChangeHistoryLog -> {
@@ -429,7 +435,7 @@ private fun rememberCarbData(
                     val carbs = parsed.carbs.toInt()
 
                     if (carbs > 0) {
-                        val timestamp = dao.pumpTime.atZone(ZoneId.systemDefault()).toEpochSecond()
+                        val timestamp = parsed.toChartTimestampSeconds()
                         CarbEvent(
                             timestamp = timestamp,
                             grams = carbs,
@@ -476,7 +482,7 @@ private fun rememberModeData(
                         else -> TherapyMode.STANDARD
                     }
 
-                    val timestamp = dao.pumpTime.atZone(ZoneId.systemDefault()).toEpochSecond()
+                    val timestamp = parsed.toChartTimestampSeconds()
 
                     // Only return mode events for Sleep/Exercise activations
                     // We don't have duration data in this history log, so use null
@@ -618,6 +624,9 @@ fun VicoCgmChart(
             ChartBucket(ts, values[index].takeUnless { it.isNaN() })
         }
     }
+    val glucoseValueByTimestamp = remember(chartBuckets) {
+        chartBuckets.associate { it.timestamp to it.value }
+    }
 
     // Split CGM data into segments to avoid drawing lines across gaps > 5 minutes
     // Each segment contains explicit X (timestamp) and Y (glucose) values
@@ -748,7 +757,7 @@ fun VicoCgmChart(
     val axisTimeFormatter = remember {
         SimpleDateFormat("h:mm a", Locale.getDefault())
     }
-    val markerValueFormatter = remember(glucoseUnit) {
+    val markerValueFormatter = remember(glucoseUnit, glucoseValueByTimestamp) {
         DefaultCartesianMarker.ValueFormatter { _, targets ->
             val lineTarget = targets.filterIsInstance<LineCartesianLayerMarkerTarget>().firstOrNull()
             val entry = lineTarget?.points?.firstOrNull()?.entry ?: return@ValueFormatter ""
@@ -758,8 +767,12 @@ fun VicoCgmChart(
             }
             // entry.x is now a timestamp in seconds
             val timestamp = entry.x.toLong()
-            val timeText = axisTimeFormatter.format(Date.from(Dates.fromJan12008EpochSecondsToDate(timestamp)))
-            val glucoseValue = entry.y.roundToInt()
+            val glucoseAtTimestamp = glucoseValueByTimestamp[timestamp] ?: return@ValueFormatter ""
+            if (glucoseAtTimestamp <= 0.0) {
+                return@ValueFormatter ""
+            }
+            val timeText = formatChartTimestamp(timestamp, axisTimeFormatter)
+            val glucoseValue = glucoseAtTimestamp.roundToInt()
             val glucoseText = when (glucoseUnit) {
                 GlucoseUnit.MGDL -> "$glucoseValue mg/dL"
                 GlucoseUnit.MMOL -> "${String.format("%.1f", glucoseValue * GlucoseConverter.MGDL_TO_MMOL_FACTOR)} mmol/L"
