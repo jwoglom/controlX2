@@ -26,3 +26,5 @@ wear/src/main/assets/paperwork.json
 .kotlin
 buildSrc/.kotlin
 buildSrc/build
+.android-sdk/
+.gradle-home/
