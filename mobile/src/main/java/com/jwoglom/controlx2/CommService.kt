@@ -328,11 +328,14 @@ class CommService : Service() {
             ) {
                 Timber.i("onReceiveQualifyingEvent: $events")
                 Toast.makeText(this@CommService, "Events: $events", Toast.LENGTH_SHORT).show()
+                if (events != null && QualifyingEvent.PUMP_COMMUNICATIONS_SUSPENDED in events) {
+                    Timber.w("onReceiveQualifyingEvent: PUMP_COMMUNICATIONS_SUSPENDED — pausing sends")
+                    currentSession?.pauseSends(currentSession?.rateLimitConfig?.commSuspendedPauseMs ?: 5_000)
+                }
                 events?.forEach { event ->
                     event.suggestedHandlers.forEach { handler ->
                         Timber.i("onReceiveQualifyingEvent: running handler for $event message: ${handler.get()}")
                         handler.get()?.let { command(it) }
-                        Thread.sleep(50) // prevent message flood
                     }
                 }
                 sendWearCommMessage("/from-pump/receive-qualifying-event", PumpQualifyingEventsSerializer.toBytes(events))
@@ -551,8 +554,12 @@ class CommService : Service() {
                 }
 
                 Timber.i("Pump send command: $message")
-                sendCommand(lastPeripheral, message)
-                Thread.sleep(25) // prevent message flood
+                val session = currentSession
+                if (session != null) {
+                    session.sendCommand(message!!)
+                } else {
+                    sendCommand(lastPeripheral, message)
+                }
             }
 
             override fun toString(): String {

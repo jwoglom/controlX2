@@ -11,15 +11,22 @@ import java.util.concurrent.atomic.AtomicLong
  * closed when it disconnects. Implements [AutoCloseable] so the lifecycle
  * is explicit and idiomatic.
  *
- * Once closed, every [sendCommand] / [sendHistoryLogRequest] call is
- * silently dropped with a log warning. Callers that hold a reference to a
- * stale session can never accidentally reach the underlying BLE objects.
+ * All pump commands flow through [sendCommand], which enforces a
+ * [CommandRateLimiter] (token-bucket at the configured base/burst rates)
+ * and honours temporary pauses triggered by qualifying events.
+ *
+ * Once closed, every [sendCommand] call is silently dropped with a log
+ * warning. Callers that hold a reference to a stale session can never
+ * accidentally reach the underlying BLE objects.
  */
 class PumpSession private constructor(
     val token: PumpSessionToken,
     private val pump: TandemPump,
-    private val peripheral: BluetoothPeripheral
+    private val peripheral: BluetoothPeripheral,
+    val rateLimitConfig: RateLimitConfig
 ) : AutoCloseable {
+
+    private val rateLimiter = CommandRateLimiter(rateLimitConfig)
 
     @Volatile
     private var closed = false
@@ -31,8 +38,22 @@ class PumpSession private constructor(
             Timber.w("PumpSession($token): closed, dropping $message")
             return false
         }
+        rateLimiter.acquire()
+        if (closed) {
+            Timber.w("PumpSession($token): closed during rate-limit wait, dropping $message")
+            return false
+        }
         pump.sendCommand(peripheral, message)
         return true
+    }
+
+    /**
+     * Immediately pauses all command sends for [durationMs].
+     * In-flight [sendCommand] calls will block until the pause expires.
+     */
+    fun pauseSends(durationMs: Long) {
+        Timber.i("PumpSession($token): pausing sends for ${durationMs}ms")
+        rateLimiter.pause(durationMs)
     }
 
     override fun close() {
@@ -45,10 +66,14 @@ class PumpSession private constructor(
     companion object {
         private val tokenCounter = AtomicLong(0)
 
-        fun open(pump: TandemPump, peripheral: BluetoothPeripheral): PumpSession {
+        fun open(
+            pump: TandemPump,
+            peripheral: BluetoothPeripheral,
+            rateLimitConfig: RateLimitConfig = RateLimitConfig()
+        ): PumpSession {
             val token = PumpSessionToken(tokenCounter.incrementAndGet())
             Timber.i("PumpSession: opened $token")
-            return PumpSession(token, pump, peripheral)
+            return PumpSession(token, pump, peripheral, rateLimitConfig)
         }
     }
 }
