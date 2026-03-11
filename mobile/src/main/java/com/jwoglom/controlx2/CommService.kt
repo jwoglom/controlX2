@@ -32,6 +32,7 @@ import com.jwoglom.controlx2.db.historylog.HistoryLogItem
 import com.jwoglom.controlx2.db.historylog.HistoryLogRepo
 import com.jwoglom.controlx2.messaging.MessageBusFactory
 import com.jwoglom.controlx2.presentation.util.ShouldLogToFile
+import com.jwoglom.controlx2.pump.PumpSession
 import com.jwoglom.controlx2.shared.CommServiceCodes
 import com.jwoglom.controlx2.shared.InitiateConfirmedBolusSerializer
 import com.jwoglom.controlx2.shared.PumpMessageSerializer
@@ -153,7 +154,7 @@ class CommService : Service() {
     private inner class PumpCommHandler(looper: Looper) : Handler(looper) {
         private lateinit var pump: Pump
         private lateinit var tandemBTHandler: TandemBluetoothHandler
-        var currentSession: com.jwoglom.controlx2.pump.PumpSession? = null
+        var currentSession: PumpSession? = null
             private set
 
         fun getPumpSid(): Int? {
@@ -434,7 +435,7 @@ class CommService : Service() {
                     Prefs(applicationContext).setCurrentPumpSid(it)
                 }
 
-                val session = com.jwoglom.controlx2.pump.PumpSession.open(this, peripheral!!)
+                val session = PumpSession.open(this, peripheral!!)
                 currentSession = session
                 historyLogFetcher = HistoryLogFetcher(
                     historyLogRepo = this@CommService.historyLogRepo,
@@ -1026,7 +1027,7 @@ class CommService : Service() {
         return pumpCommHandler?.isPumpReadyForHistoryFetch() == true
     }
 
-    fun getPumpSession(): com.jwoglom.controlx2.pump.PumpSession? {
+    fun getPumpSession(): PumpSession? {
         return pumpCommHandler?.currentSession
     }
 
