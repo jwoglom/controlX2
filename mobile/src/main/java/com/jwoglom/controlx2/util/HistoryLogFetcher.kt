@@ -27,7 +27,7 @@ const val FetchGroupTimeoutMs = 2500
 class HistoryLogFetcher(
     private val historyLogRepo: HistoryLogRepo,
     val pumpSid: Int,
-    private val commandSender: (startSeqId: Long, count: Int) -> Unit,
+    private val commandSender: suspend (startSeqId: Long, count: Int) -> Unit,
     private val autoFetchEnabled: () -> Boolean = { true },
     private val canRequest: () -> Boolean = { true },
     private val broadcastCallback: ((HistoryLogItem) -> Unit)? = null,
@@ -67,7 +67,7 @@ class HistoryLogFetcher(
         return !cancelled && autoFetchEnabled() && canRequest()
     }
 
-    private fun request(start: Long, count: Int) {
+    private suspend fun request(start: Long, count: Int) {
         if (!shouldContinue()) {
             Timber.i("HistoryLogFetcher.request skipped start=$start count=$count")
             return

@@ -99,6 +99,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
 import org.bouncycastle.jce.provider.BouncyCastleProvider
 import org.json.JSONObject
 import timber.log.Timber
@@ -565,7 +566,7 @@ class CommService : Service() {
                 }
 
                 Timber.i("Pump send command: $message")
-                session.sendCommand(message)
+                runBlocking { session.sendCommand(message) }
             }
 
             override fun toString(): String {

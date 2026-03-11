@@ -33,7 +33,7 @@ class PumpSession private constructor(
 
     val isActive: Boolean get() = !closed
 
-    fun sendCommand(message: com.jwoglom.pumpx2.pump.messages.Message): Boolean {
+    suspend fun sendCommand(message: com.jwoglom.pumpx2.pump.messages.Message): Boolean {
         if (closed) {
             Timber.w("PumpSession($token): closed, dropping $message")
             return false
