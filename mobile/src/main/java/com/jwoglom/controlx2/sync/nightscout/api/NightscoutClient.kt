@@ -2,6 +2,8 @@ package com.jwoglom.controlx2.sync.nightscout.api
 
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
+import com.jwoglom.controlx2.sync.nightscout.NightscoutApiSecretHeader
+import com.jwoglom.controlx2.sync.nightscout.hashNightscoutApiSecret
 import com.jwoglom.controlx2.sync.nightscout.models.NightscoutDeviceStatus
 import com.jwoglom.controlx2.sync.nightscout.models.NightscoutEntry
 import com.jwoglom.controlx2.sync.nightscout.models.NightscoutTreatment
@@ -13,7 +15,6 @@ import java.io.InputStreamReader
 import java.io.OutputStreamWriter
 import java.net.HttpURLConnection
 import java.net.URL
-import java.security.MessageDigest
 
 /**
  * Nightscout API client implementation
@@ -27,11 +28,7 @@ class NightscoutClient(
 ) : NightscoutApi {
 
     private val gson = Gson()
-    private val apiSecretHash: String by lazy {
-        MessageDigest.getInstance("SHA-1")
-            .digest(apiSecret.toByteArray())
-            .joinToString("") { "%02x".format(it) }
-    }
+    private val apiSecretHash: String by lazy { hashNightscoutApiSecret(apiSecret) }
 
     override suspend fun uploadEntries(entries: List<NightscoutEntry>): Result<Int> {
         return withContext(Dispatchers.IO) {
@@ -107,7 +104,7 @@ class NightscoutClient(
         return try {
             connection.requestMethod = "POST"
             connection.setRequestProperty("Content-Type", "application/json")
-            connection.setRequestProperty("api-secret", apiSecretHash)
+            connection.setRequestProperty(NightscoutApiSecretHeader, apiSecretHash)
             connection.doOutput = true
             connection.connectTimeout = 30000
             connection.readTimeout = 30000
@@ -142,7 +139,7 @@ class NightscoutClient(
 
         return try {
             connection.requestMethod = "GET"
-            connection.setRequestProperty("api-secret", apiSecretHash)
+            connection.setRequestProperty(NightscoutApiSecretHeader, apiSecretHash)
             connection.connectTimeout = 30000
             connection.readTimeout = 30000
 

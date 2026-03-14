@@ -13,6 +13,10 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 import timber.log.Timber
+import java.io.BufferedReader
+import java.io.InputStreamReader
+import java.net.HttpURLConnection
+import java.net.URL
 
 /**
  * Worker for periodic Nightscout sync
@@ -107,6 +111,22 @@ class NightscoutSyncWorker(
 
             if (!config.isValid()) {
                 Timber.e("Nightscout configuration is invalid, skipping sync")
+                NightscoutSyncStatusStore.recordFailure(prefs, "Nightscout configuration is invalid")
+                return
+            }
+
+            val normalizedUrl = normalizeNightscoutUrl(config.nightscoutUrl)
+            if (normalizedUrl == null) {
+                Timber.e("Nightscout URL is invalid, skipping sync")
+                NightscoutSyncStatusStore.recordFailure(prefs, "Nightscout URL is invalid")
+                return
+            }
+
+            val connectivityCheck = checkNightscoutConnection(normalizedUrl, config.apiSecret)
+            if (connectivityCheck.isFailure) {
+                val message = connectivityCheck.exceptionOrNull()?.message ?: "Connection test failed"
+                Timber.e("Nightscout connection check failed: $message")
+                NightscoutSyncStatusStore.recordFailure(prefs, "Connection failed: $message")
                 return
             }
 
@@ -115,7 +135,7 @@ class NightscoutSyncWorker(
                 HistoryLogDatabase.getDatabase(context).historyLogDao()
             )
             val nightscoutClient = NightscoutClient(
-                config.getSanitizedUrl(),
+                normalizedUrl,
                 config.apiSecret
             )
             val syncStateDao = NightscoutSyncStateDatabase.getDatabase(context)
@@ -132,6 +152,7 @@ class NightscoutSyncWorker(
             // Perform sync
             when (val result = coordinator.syncAll()) {
                 is SyncResult.Success -> {
+                    NightscoutSyncStatusStore.recordSuccess(prefs)
                     Timber.i(
                         "Nightscout sync completed: " +
                         "processed ${result.processedCount}, " +
@@ -140,17 +161,48 @@ class NightscoutSyncWorker(
                     )
                 }
                 is SyncResult.NoData -> {
+                    NightscoutSyncStatusStore.recordSuccess(prefs)
                     Timber.d("No new data to sync")
                 }
                 is SyncResult.Disabled -> {
                     Timber.d("Nightscout sync is disabled")
                 }
                 is SyncResult.InvalidConfig -> {
+                    NightscoutSyncStatusStore.recordFailure(prefs, "Nightscout configuration is invalid")
                     Timber.e("Nightscout configuration is invalid")
                 }
             }
         } catch (e: Exception) {
+            NightscoutSyncStatusStore.recordFailure(
+                prefs,
+                e.message ?: "Unexpected Nightscout sync error"
+            )
             Timber.e(e, "Error during Nightscout sync")
+        }
+    }
+
+    private fun checkNightscoutConnection(baseUrl: String, apiSecret: String): Result<Unit> {
+        return runCatching {
+            val statusUrl = URL("$baseUrl/api/v1/verifyauth")
+            val connection = (statusUrl.openConnection() as HttpURLConnection).apply {
+                requestMethod = "GET"
+                setRequestProperty(NightscoutApiSecretHeader, hashNightscoutApiSecret(apiSecret))
+                connectTimeout = 10000
+                readTimeout = 10000
+                doInput = true
+            }
+
+            try {
+                val responseCode = connection.responseCode
+                if (responseCode !in 200..299) {
+                    val errorBody = connection.errorStream?.use { stream ->
+                        BufferedReader(InputStreamReader(stream)).readText()
+                    } ?: ""
+                    throw IllegalStateException("HTTP $responseCode $errorBody".trim())
+                }
+            } finally {
+                connection.disconnect()
+            }
         }
     }
 
