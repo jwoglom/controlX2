@@ -282,6 +282,28 @@ fun BolusWindow(
         }
     }
 
+    fun requestBolusDeliveryFromInputSubmit() {
+        if (refreshing) {
+            return
+        }
+
+        if (validBolus(
+                params = dataStore.bolusCurrentParameters.value,
+                maxBolusAmount1000 = dataStore.bolusCalcDataSnapshot.value?.maxBolusAmount?.toLong()
+            )
+        ) {
+            dataStore.bolusFinalConditions.value =
+                bolusCalcDecision(dataStore.bolusCalculatorBuilder.value, dataStore.bolusConditionsExcluded.value)?.conditions
+
+            val pair = bolusCalcParameters(dataStore.bolusCalculatorBuilder.value, dataStore.bolusConditionsExcluded.value)
+            dataStore.bolusFinalParameters.value = pair.first
+            dataStore.bolusFinalCalcUnits.value = pair.second
+
+            showPermissionCheckDialog = true
+            sendPumpCommands(SendType.BUST_CACHE, listOf(BolusPermissionRequest()))
+        }
+    }
+
     LaunchedEffect (cgmReading) {
         refresh()
     }
@@ -309,7 +331,10 @@ fun BolusWindow(
         onGlucoseChanged = {
             dataStore.bolusGlucoseRawValue.value = it
             glucoseHumanEntered = if (it == "") null else it.toIntOrNull()
-        }
+        },
+        onSubmitRequested = {
+            requestBolusDeliveryFromInputSubmit()
+        },
     )
 
     BolusConditionPromptRegion(
