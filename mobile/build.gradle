@@ -63,10 +63,8 @@ android {
 }
 
 roborazzi {
-    generateComposePreviewRobolectricTests {
-        enable = true
-        packages = ['com.jwoglom.controlx2']
-    }
+    generateComposePreviewRobolectricTests.enable.set(true)
+    generateComposePreviewRobolectricTests.packages.set(['com.jwoglom.controlx2'])
 }
 
 paperwork {
