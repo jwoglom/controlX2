@@ -1,8 +1,8 @@
 package com.jwoglom.controlx2.sync.nightscout.models
 
 import com.google.gson.annotations.SerializedName
+import com.jwoglom.controlx2.sync.nightscout.NightscoutTimestampPolicy
 import java.time.LocalDateTime
-import java.time.ZoneId
 
 /**
  * Nightscout device status
@@ -10,7 +10,10 @@ import java.time.ZoneId
  */
 data class NightscoutDeviceStatus(
     @SerializedName("created_at")
-    val createdAt: String,  // ISO 8601 format
+    val createdAt: String,  // RFC3339/ISO instant in UTC (Z)
+
+    @SerializedName("utcOffset")
+    val utcOffset: Int,  // Minutes offset for pump-local wall time (e.g. -420)
 
     @SerializedName("device")
     val device: String = "ControlX2",
@@ -39,7 +42,7 @@ data class PumpStatus(
     val status: PumpStatusInfo? = null,
 
     @SerializedName("clock")
-    val clock: String? = null  // ISO 8601 pump time
+    val clock: String? = null  // RFC3339/ISO instant in UTC (Z)
 )
 
 data class Battery(
@@ -80,14 +83,17 @@ fun createDeviceStatus(
     pumpStatus: String? = null,
     uploaderBattery: Int? = null
 ): NightscoutDeviceStatus {
+    // Nightscout expects timezone-aware timestamps and matching offset from the same instant.
+    val nightscoutTimestamp = NightscoutTimestampPolicy.fromPumpTime(timestamp, "devicestatus")
     return NightscoutDeviceStatus(
-        createdAt = timestamp.toString(),
+        createdAt = nightscoutTimestamp.isoInstant,
+        utcOffset = nightscoutTimestamp.utcOffsetMinutes,
         pump = PumpStatus(
             battery = batteryPercent?.let { Battery(it) },
             reservoir = reservoirUnits,
-            iob = iob?.let { IOB(iob = it, timestamp = timestamp.toString()) },
-            status = pumpStatus?.let { PumpStatusInfo(status = it, timestamp = timestamp.toString()) },
-            clock = timestamp.toString()
+            iob = iob?.let { IOB(iob = it, timestamp = nightscoutTimestamp.isoInstant) },
+            status = pumpStatus?.let { PumpStatusInfo(status = it, timestamp = nightscoutTimestamp.isoInstant) },
+            clock = nightscoutTimestamp.isoInstant
         ),
         uploaderBattery = uploaderBattery
     )
