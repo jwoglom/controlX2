@@ -68,10 +68,8 @@ android {
     }
 }
 
-roborazzi {
-    generateComposePreviewRobolectricTests.enable.set(true)
-    generateComposePreviewRobolectricTests.packages.set(['com.jwoglom.controlx2'])
-}
+// Roborazzi preview tests are defined manually in
+// src/test/java/.../snapshots/ComposePreviewSnapshotTests.kt
 
 paperwork {
     set = [
