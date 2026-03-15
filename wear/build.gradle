@@ -144,6 +144,10 @@ dependencies {
 
     // Roborazzi snapshot testing
     testImplementation 'junit:junit:4.13.2'
+    testImplementation 'androidx.test.ext:junit:1.2.1'
+    testImplementation "androidx.compose.ui:ui-test-junit4:$compose_version"
+    testImplementation "androidx.compose.ui:ui-test-manifest:$compose_version"
+    testImplementation 'androidx.activity:activity-ktx:1.10.1'
     testImplementation 'io.github.takahirom.roborazzi:roborazzi:1.58.0'
     testImplementation 'io.github.takahirom.roborazzi:roborazzi-compose:1.58.0'
     testImplementation 'io.github.takahirom.roborazzi:roborazzi-junit-rule:1.58.0'
