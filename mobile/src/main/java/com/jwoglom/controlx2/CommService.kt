@@ -45,6 +45,7 @@ import com.jwoglom.controlx2.shared.util.setupTimber
 import com.jwoglom.controlx2.shared.util.shortTime
 import com.jwoglom.controlx2.shared.util.twoDecimalPlaces
 import com.jwoglom.controlx2.sync.nightscout.NightscoutSyncWorker
+import com.jwoglom.controlx2.sync.xdrip.XdripMessageDispatcher
 import com.jwoglom.controlx2.util.AppVersionCheck
 import com.jwoglom.controlx2.util.DataClientState
 import com.jwoglom.controlx2.util.HistoryLogFetcher
@@ -240,6 +241,7 @@ class CommService : Service() {
 
         private inner class Pump(var tandemConfig: TandemConfig) : TandemPump(applicationContext, tandemConfig) {
             private val scope = CoroutineScope(SupervisorJob(parent = supervisorJob) + Dispatchers.IO)
+            private val xdripMessageDispatcher = XdripMessageDispatcher(this@CommService)
             var lastPeripheral: BluetoothPeripheral? = null
             var isConnected = false
             var pumpSid: Int? = null
@@ -320,8 +322,12 @@ class CommService : Service() {
                         }
                     }
                 }
+
+                message?.let { xdripMessageDispatcher.onReceiveMessage(it) }
                 message?.let { updateNotificationWithPumpData(it) }
             }
+
+
 
             override fun onReceiveQualifyingEvent(
                 peripheral: BluetoothPeripheral?,
