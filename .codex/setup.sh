@@ -4,7 +4,11 @@ set -euo pipefail
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 SDK_ROOT="${ANDROID_SDK_ROOT:-$REPO_ROOT/.android-sdk}"
 CMDLINE_VERSION="11076708"
-CMDLINE_ZIP_URL="https://dl.google.com/android/repository/commandlinetools-linux-${CMDLINE_VERSION}_latest.zip"
+# Try multiple mirror URLs for Android command-line tools (proxy may block some)
+CMDLINE_ZIP_URLS=(
+  "https://developer.android.com/studio/command-line-tools-linux-9477386_latest.zip"
+  "https://dl.google.com/android/repository/commandlinetools-linux-${CMDLINE_VERSION}_latest.zip"
+)
 CMDLINE_DIR="$SDK_ROOT/cmdline-tools/latest"
 SDKMANAGER="$CMDLINE_DIR/bin/sdkmanager"
 
@@ -16,12 +20,26 @@ if [[ ! -x "$SDKMANAGER" ]]; then
   trap 'rm -rf "$tmpdir"' EXIT
 
   archive="$tmpdir/cmdline-tools.zip"
-  if command -v wget >/dev/null 2>&1; then
-    wget -q "$CMDLINE_ZIP_URL" -O "$archive"
-  elif command -v curl >/dev/null 2>&1; then
-    curl -fsSL "$CMDLINE_ZIP_URL" -o "$archive"
-  else
-    echo "ERROR: Neither wget nor curl is available to download Android tools." >&2
+  download_success=false
+
+  for url in "${CMDLINE_ZIP_URLS[@]}"; do
+    echo "Attempting to download from: $url"
+    if command -v wget >/dev/null 2>&1; then
+      if wget -q "$url" -O "$archive" 2>/dev/null; then
+        download_success=true
+        break
+      fi
+    elif command -v curl >/dev/null 2>&1; then
+      if curl -fsSL "$url" -o "$archive" 2>/dev/null; then
+        download_success=true
+        break
+      fi
+    fi
+  done
+
+  if [[ "$download_success" != "true" ]]; then
+    echo "ERROR: Failed to download Android command-line tools from any source." >&2
+    echo "ERROR: Proxy may be blocking access. Please check network configuration." >&2
     exit 1
   fi
 
