@@ -87,6 +87,7 @@ import com.jwoglom.controlx2.presentation.screens.sections.Settings
 import com.jwoglom.controlx2.presentation.screens.sections.TempRateWindow
 import com.jwoglom.controlx2.presentation.screens.sections.SoundSettingsActions
 import com.jwoglom.controlx2.presentation.screens.sections.NightscoutSettings
+import com.jwoglom.controlx2.presentation.screens.sections.XdripSettings
 import com.jwoglom.controlx2.presentation.screens.sections.dashboardCommands
 import com.jwoglom.controlx2.presentation.screens.sections.dashboardFields
 import com.jwoglom.controlx2.presentation.screens.sections.resetBolusDataStoreState
@@ -450,6 +451,9 @@ fun Landing(
                                 },
                                 navigateToNightscoutSettings = {
                                     selectedItem = LandingSection.NIGHTSCOUT_SETTINGS
+                                },
+                                navigateToXdripSettings = {
+                                    selectedItem = LandingSection.XDRIP_SETTINGS
                                 }
                             )
                         }
@@ -458,6 +462,13 @@ fun Landing(
                                 innerPadding = innerPadding,
                                 navController = navController,
                                 pumpSid = ds.pumpSid.observeAsState().value ?: 0
+                            )
+                        }
+                        LandingSection.XDRIP_SETTINGS -> {
+                            XdripSettings(
+                                innerPadding = innerPadding,
+                                navController = navController,
+                                sendMessage = sendMessage
                             )
                         }
                     }
@@ -562,6 +573,7 @@ enum class LandingSection(val label: String, val icon: ImageVector, val showInNa
     SETTINGS("Settings", Icons.Filled.Settings, true),
     DEBUG("Settings", Icons.Filled.Settings, false),
     NIGHTSCOUT_SETTINGS("Settings", Icons.Filled.Settings, false),
+    XDRIP_SETTINGS("Settings", Icons.Filled.Settings, false),
     ;
 }
 
