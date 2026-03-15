@@ -2,6 +2,9 @@ package com.jwoglom.controlx2.sync.xdrip
 
 import android.content.Context
 import android.content.Intent
+import com.jwoglom.controlx2.sync.xdrip.models.XdripDeviceStatusPayload
+import com.jwoglom.controlx2.sync.xdrip.models.XdripSgvPayload
+import com.jwoglom.controlx2.sync.xdrip.models.XdripTreatmentPayload
 import timber.log.Timber
 
 interface XdripBroadcaster {
@@ -40,9 +43,9 @@ class XdripBroadcastSender(
         const val ACTION_NEW_FOOD = "info.nightscout.client.NEW_FOOD"
         const val ACTION_EXTERNAL_STATUSLINE = "com.eveningoutpost.dexdrip.ExternalStatusline"
 
-        private const val EXTRA_SGVS = "sgvs"
-        private const val EXTRA_DEVICESTATUS = "devicestatus"
-        private const val EXTRA_TREATMENTS = "treatments"
+        private const val EXTRA_SGVS = XdripSgvPayload.EXTRA_KEY
+        private const val EXTRA_DEVICESTATUS = XdripDeviceStatusPayload.EXTRA_KEY
+        private const val EXTRA_TREATMENTS = XdripTreatmentPayload.EXTRA_KEY
         private const val EXTRA_EXTERNAL_STATUSLINE = "com.eveningoutpost.dexdrip.Extras.Statusline"
     }
 

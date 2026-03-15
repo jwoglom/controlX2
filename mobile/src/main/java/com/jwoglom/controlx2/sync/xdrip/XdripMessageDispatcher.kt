@@ -3,6 +3,10 @@ package com.jwoglom.controlx2.sync.xdrip
 import android.content.Context
 import com.jwoglom.controlx2.Prefs
 import com.jwoglom.controlx2.shared.util.twoDecimalPlaces
+import com.jwoglom.controlx2.sync.xdrip.models.XdripDeviceStatusSnapshot
+import com.jwoglom.controlx2.sync.xdrip.models.XdripSgvPayload
+import com.jwoglom.controlx2.sync.xdrip.models.XdripTimedValue
+import com.jwoglom.controlx2.sync.xdrip.models.XdripTreatmentPayload
 import com.jwoglom.pumpx2.pump.messages.Message
 import com.jwoglom.pumpx2.pump.messages.models.InsulinUnit
 import com.jwoglom.pumpx2.pump.messages.response.control.InitiateBolusResponse
@@ -12,22 +16,7 @@ import com.jwoglom.pumpx2.pump.messages.response.currentStatus.CurrentBatteryAbs
 import com.jwoglom.pumpx2.pump.messages.response.currentStatus.CurrentBolusStatusResponse
 import com.jwoglom.pumpx2.pump.messages.response.currentStatus.CurrentEGVGuiDataResponse
 import com.jwoglom.pumpx2.pump.messages.response.currentStatus.InsulinStatusResponse
-import org.json.JSONArray
-import org.json.JSONObject
 import java.time.Instant
-
-data class TimedPumpValue<T>(
-    var value: T,
-    var receivedAt: Instant
-)
-
-private data class LatestPumpSnapshot(
-    var batteryPercent: TimedPumpValue<Int>? = null,
-    var iobUnits: TimedPumpValue<Double>? = null,
-    var cartridgeUnits: TimedPumpValue<Int>? = null,
-    var basalUnitsPerHour: TimedPumpValue<Double>? = null,
-    var sgvMgdl: TimedPumpValue<Int>? = null,
-)
 
 internal sealed class DispatchEvent {
     data class PumpBattery(val percent: Int) : DispatchEvent()
@@ -50,7 +39,7 @@ class XdripMessageDispatcher(
         configProvider = { XdripSyncConfig.load(Prefs(context).prefs()) }
     )
 
-    private val latestPumpSnapshot = LatestPumpSnapshot()
+    private val latestPumpSnapshot = XdripDeviceStatusSnapshot()
 
     fun onReceiveMessage(message: Message) {
         onEvent(message.toDispatchEvent())
@@ -64,58 +53,35 @@ class XdripMessageDispatcher(
         val category = updateSnapshot(event, receivedAt)
 
         if (config.sendCgmSgv && event is DispatchEvent.CgmSgv) {
-            val sgvPayload = JSONArray().put(
-                JSONObject().apply {
-                    put("sgv", event.mgdl)
-                    put("date", receivedAt.toEpochMilli())
-                    put("dateString", receivedAt.toString())
-                }
-            ).toString()
+            val sgvPayload = XdripSgvPayload
+                .fromValue(event.mgdl, receivedAt)
+                .toJsonArrayString()
             broadcaster.sendSgv(sgvPayload, config.cgmSgvMinimumIntervalSeconds)
         }
 
         if (config.sendPumpDeviceStatus && category == StatusCategory.PUMP_STATUS) {
-            val deviceStatusPayload = JSONObject().apply {
-                put("created_at", receivedAt.toString())
-                put("uploaderBattery", latestPumpSnapshot.batteryPercent?.value)
-                put("pump", JSONObject().apply {
-                    put("battery", JSONObject().apply { put("percent", latestPumpSnapshot.batteryPercent?.value) })
-                    put("iob", JSONObject().apply { put("bolusiob", latestPumpSnapshot.iobUnits?.value) })
-                    put("reservoir", latestPumpSnapshot.cartridgeUnits?.value)
-                    put("basal", latestPumpSnapshot.basalUnitsPerHour?.value)
-                })
-                put("cgm", JSONObject().apply {
-                    put("sgv", latestPumpSnapshot.sgvMgdl?.value)
-                })
-                put("controlx2ReceivedAt", JSONObject().apply {
-                    put("battery", latestPumpSnapshot.batteryPercent?.receivedAt?.toString())
-                    put("iob", latestPumpSnapshot.iobUnits?.receivedAt?.toString())
-                    put("reservoir", latestPumpSnapshot.cartridgeUnits?.receivedAt?.toString())
-                    put("basal", latestPumpSnapshot.basalUnitsPerHour?.receivedAt?.toString())
-                    put("sgv", latestPumpSnapshot.sgvMgdl?.receivedAt?.toString())
-                })
-            }.toString()
+            val deviceStatusPayload = latestPumpSnapshot
+                .toPayload(createdAt = receivedAt)
+                .toJsonString()
             broadcaster.sendDeviceStatus(deviceStatusPayload, config.pumpDeviceStatusMinimumIntervalSeconds)
         }
 
         if (config.sendTreatments && category == StatusCategory.TREATMENT) {
             val treatmentPayload = when (event) {
-                is DispatchEvent.TreatmentInitiated -> JSONArray().put(
-                    JSONObject().apply {
-                        put("eventType", "Bolus")
-                        put("created_at", receivedAt.toString())
-                        put("notes", "ControlX2 bolus initiated bolusId=${event.bolusId} status=${event.status}")
-                    }
-                ).toString()
+                is DispatchEvent.TreatmentInitiated -> XdripTreatmentPayload(
+                    eventType = "Bolus",
+                    createdAt = receivedAt.toString(),
+                    notes = "ControlX2 bolus initiated bolusId=${event.bolusId} status=${event.status}"
+                ).toJsonArrayString()
 
-                is DispatchEvent.TreatmentStatus -> JSONArray().put(
-                    JSONObject().apply {
-                        put("eventType", "Bolus")
-                        put("created_at", event.timestamp.toString())
-                        put("insulin", InsulinUnit.from1000To1(event.requestedVolumeMilli))
-                        put("notes", "ControlX2 bolus status bolusId=${event.bolusId} status=${event.status}")
-                    }
-                ).toString()
+                is DispatchEvent.TreatmentStatus -> XdripTreatmentPayload
+                    .fromStatus(
+                        bolusId = event.bolusId,
+                        requestedVolumeMilli = event.requestedVolumeMilli,
+                        status = event.status,
+                        timestamp = event.timestamp
+                    )
+                    .toJsonArrayString()
 
                 else -> null
             }
@@ -144,23 +110,23 @@ class XdripMessageDispatcher(
     private fun updateSnapshot(event: DispatchEvent, receivedAt: Instant): StatusCategory {
         return when (event) {
             is DispatchEvent.PumpBattery -> {
-                latestPumpSnapshot.batteryPercent = TimedPumpValue(event.percent, receivedAt)
+                latestPumpSnapshot.batteryPercent = XdripTimedValue(event.percent, receivedAt)
                 StatusCategory.PUMP_STATUS
             }
             is DispatchEvent.PumpIob -> {
-                latestPumpSnapshot.iobUnits = TimedPumpValue(event.units, receivedAt)
+                latestPumpSnapshot.iobUnits = XdripTimedValue(event.units, receivedAt)
                 StatusCategory.PUMP_STATUS
             }
             is DispatchEvent.PumpReservoir -> {
-                latestPumpSnapshot.cartridgeUnits = TimedPumpValue(event.units, receivedAt)
+                latestPumpSnapshot.cartridgeUnits = XdripTimedValue(event.units, receivedAt)
                 StatusCategory.PUMP_STATUS
             }
             is DispatchEvent.PumpBasal -> {
-                latestPumpSnapshot.basalUnitsPerHour = TimedPumpValue(event.unitsPerHour, receivedAt)
+                latestPumpSnapshot.basalUnitsPerHour = XdripTimedValue(event.unitsPerHour, receivedAt)
                 StatusCategory.PUMP_STATUS
             }
             is DispatchEvent.CgmSgv -> {
-                latestPumpSnapshot.sgvMgdl = TimedPumpValue(event.mgdl, receivedAt)
+                latestPumpSnapshot.applySgvValue(event.mgdl, receivedAt)
                 StatusCategory.PUMP_STATUS
             }
             is DispatchEvent.TreatmentInitiated,
