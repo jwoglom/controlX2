@@ -1,8 +1,8 @@
 package com.jwoglom.controlx2.sync.nightscout.models
 
 import com.google.gson.annotations.SerializedName
+import com.jwoglom.controlx2.sync.nightscout.NightscoutTimestampPolicy
 import java.time.LocalDateTime
-import java.time.ZoneId
 
 /**
  * Nightscout treatment (bolus, basal, carbs, etc.)
@@ -13,10 +13,13 @@ data class NightscoutTreatment(
     val eventType: String,  // "Bolus", "Temp Basal", "Site Change", etc.
 
     @SerializedName("created_at")
-    val createdAt: String,  // ISO 8601 format
+    val createdAt: String,  // RFC3339/ISO instant in UTC (Z)
 
     @SerializedName("timestamp")
     val timestamp: Long,  // Unix timestamp in milliseconds
+
+    @SerializedName("utcOffset")
+    val utcOffset: Int,  // Minutes offset for pump-local wall time (e.g. -420)
 
     @SerializedName("insulin")
     val insulin: Double? = null,  // Insulin in units
@@ -64,11 +67,13 @@ data class NightscoutTreatment(
             reason: String? = null,
             notes: String? = null
         ): NightscoutTreatment {
-            val epochMilli = timestamp.atZone(ZoneId.systemDefault()).toInstant().toEpochMilli()
+            // Nightscout expects timezone-aware timestamps and matching epoch/offset from one instant.
+            val nightscoutTimestamp = NightscoutTimestampPolicy.fromPumpTime(timestamp, "treatment")
             return NightscoutTreatment(
                 eventType = eventType,
-                createdAt = timestamp.toString(),
-                timestamp = epochMilli,
+                createdAt = nightscoutTimestamp.isoInstant,
+                timestamp = nightscoutTimestamp.epochMillis,
+                utcOffset = nightscoutTimestamp.utcOffsetMinutes,
                 insulin = insulin,
                 carbs = carbs,
                 duration = duration,

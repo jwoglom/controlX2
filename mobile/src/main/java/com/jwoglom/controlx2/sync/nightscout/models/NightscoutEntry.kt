@@ -1,8 +1,8 @@
 package com.jwoglom.controlx2.sync.nightscout.models
 
 import com.google.gson.annotations.SerializedName
+import com.jwoglom.controlx2.sync.nightscout.NightscoutTimestampPolicy
 import java.time.LocalDateTime
-import java.time.ZoneId
 
 /**
  * Nightscout CGM entry (glucose reading)
@@ -22,7 +22,7 @@ data class NightscoutEntry(
     val date: Long,  // Unix timestamp in milliseconds
 
     @SerializedName("dateString")
-    val dateString: String,  // ISO 8601 format
+    val dateString: String,  // RFC3339/ISO instant in UTC (Z)
 
     @SerializedName("device")
     val device: String = "ControlX2",
@@ -40,12 +40,13 @@ data class NightscoutEntry(
             direction: String? = null,
             seqId: Long
         ): NightscoutEntry {
-            val epochMilli = timestamp.atZone(ZoneId.systemDefault()).toInstant().toEpochMilli()
+            // Keep date + dateString from the same instant for Nightscout consistency.
+            val nightscoutTimestamp = NightscoutTimestampPolicy.fromPumpTime(timestamp, "entry")
             return NightscoutEntry(
                 sgv = sgv,
                 direction = direction,
-                date = epochMilli,
-                dateString = timestamp.toString(),
+                date = nightscoutTimestamp.epochMillis,
+                dateString = nightscoutTimestamp.isoInstant,
                 identifier = seqId.toString()
             )
         }
