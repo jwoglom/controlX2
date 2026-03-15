@@ -51,6 +51,12 @@ android {
     testOptions {
         unitTests {
             includeAndroidResources = true
+            returnDefaultValues = true
+            all {
+                jvmArgs '-noverify'
+                maxHeapSize = '4g'
+                systemProperty 'robolectric.pixelCopyRenderMode', 'hardware'
+            }
         }
     }
 }
@@ -153,6 +159,6 @@ dependencies {
     testImplementation 'io.github.takahirom.roborazzi:roborazzi-junit-rule:1.58.0'
     testImplementation 'io.github.takahirom.roborazzi:roborazzi-compose-preview-scanner-support:1.58.0'
     testImplementation 'io.github.sergio-sastre.ComposablePreviewScanner:android:0.8.1'
-    testImplementation 'org.robolectric:robolectric:4.14.1'
+    testImplementation 'org.robolectric:robolectric:4.16.1'
 
 }
