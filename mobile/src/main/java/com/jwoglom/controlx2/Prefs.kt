@@ -198,6 +198,17 @@ class Prefs(val context: Context) {
         prefs().edit().putString("http-debug-api-password", s).commit()
     }
 
+    /**
+     * Time range selected for the dashboard CGM/basal chart.
+     */
+    fun dashboardChartTimeRange(): String? {
+        return prefs().getString("dashboard-chart-time-range", null)
+    }
+
+    fun setDashboardChartTimeRange(timeRange: String) {
+        prefs().edit().putString("dashboard-chart-time-range", timeRange).commit()
+    }
+
     fun prefs(): SharedPreferences {
         return context.getSharedPreferences("WearX2", WearableListenerService.MODE_PRIVATE)
     }

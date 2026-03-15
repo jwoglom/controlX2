@@ -46,12 +46,14 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color as ComposeColor
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.jwoglom.controlx2.LocalDataStore
+import com.jwoglom.controlx2.Prefs
 import com.jwoglom.controlx2.db.historylog.HistoryLogItem
 import com.jwoglom.controlx2.db.historylog.HistoryLogViewModel
 import com.jwoglom.controlx2.presentation.theme.CardBackground
@@ -389,6 +391,10 @@ enum class TimeRange(val label: String, val hours: Int) {
     SIX_HOURS("6h", 6),
     TWELVE_HOURS("12h", 12),
     TWENTY_FOUR_HOURS("24h", 24)
+}
+
+private fun String.toTimeRangeOrNull(): TimeRange? {
+    return TimeRange.values().firstOrNull { it.name == this }
 }
 
 // Helper function to fetch and convert CGM data
@@ -2101,7 +2107,13 @@ fun VicoCgmChartCard(
     modifier: Modifier = Modifier,
     previewData: ChartPreviewData? = null
 ) {
-    var selectedTimeRange by remember { mutableStateOf(TimeRange.SIX_HOURS) }
+    val context = LocalContext.current
+    val prefs = remember(context) { Prefs(context) }
+    var selectedTimeRange by remember {
+        mutableStateOf(
+            prefs.dashboardChartTimeRange()?.toTimeRangeOrNull() ?: TimeRange.SIX_HOURS
+        )
+    }
 
     Card(
         modifier = modifier
@@ -2129,7 +2141,10 @@ fun VicoCgmChartCard(
             ) {
                 ChartTimeRangeSelector(
                     selectedRange = selectedTimeRange,
-                    onRangeSelected = { selectedTimeRange = it }
+                    onRangeSelected = {
+                        selectedTimeRange = it
+                        prefs.setDashboardChartTimeRange(it.name)
+                    }
                 )
             }
 
