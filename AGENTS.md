@@ -167,20 +167,43 @@ This document summarizes the structure, design, and common workflows inside the 
 - Respect the message throttling/caching logic (`CacheSeconds`, `lastResponseMessage` map). Clearing the cache too aggressively can increase BLE load and battery consumption.
 - `HistoryLogFetcher` uses coroutines with `Mutex` to serialize fetch ranges. If you adjust fetch sizes/timeouts, update the constants (`InitialHistoryLogCount`, `FetchGroupTimeoutMs`) thoughtfully.
 
+## Cursor Cloud specific instructions
+
+### Environment prerequisites
+- The VM has JDK 21 pre-installed, which satisfies AGP 8.13.2's JDK 17+ requirement.
+- Run `.codex/setup.sh` to bootstrap a repo-local Android SDK at `.android-sdk/`, accept licenses, install required packages (`platforms;android-35`, `platforms;android-36`, `build-tools;35.0.0`, `platform-tools`), and generate `local.properties`.
+- The helper scripts are self-contained and use `python3` directly (no extra `python` symlink step is required).
+
+### Running builds
+Before any Gradle command, export the SDK environment variables (or source them from the helper scripts):
+```
+export ANDROID_SDK_ROOT="/workspace/controlX2/.android-sdk"
+export ANDROID_HOME="/workspace/controlX2/.android-sdk"
+export PATH="/workspace/controlX2/.android-sdk/cmdline-tools/latest/bin:/workspace/controlX2/.android-sdk/platform-tools:$PATH"
+export GRADLE_USER_HOME="/workspace/controlX2/.gradle-home"
+```
+Then use the standard commands documented in the "Running & testing" section above.
+
+### Key gotchas
+- This is an Android-only project — there is no web frontend, backend server, or Docker dependency. The "hello world" verification is a successful `assembleDebug` producing APK files, since running the app requires an Android device or emulator.
+- `compileSdk` is 36; ensure platform 36 is installed (the current `.codex/setup.sh` handles this automatically).
+- The root `build.gradle` reads `local.properties` eagerly at configuration time. If `local.properties` is missing, Gradle will fail immediately. Always run `.codex/setup.sh` first.
+- Paparazzi screenshot tests run as part of `testDebugUnitTest` and produce reports at `{module}/build/reports/paparazzi/debug/index.html`.
+
 ## Claude Code environment specific instructions
 
 ### Environment prerequisites
 - The VM has JDK 21 pre-installed, which satisfies AGP 8.13.2's JDK 17+ requirement.
-- The environment uses a proxy that blocks direct downloads from certain hosts (e.g., `dl.google.com`). Android SDK setup scripts may fail due to network restrictions. See "Network environment" section below for workarounds.
+- The environment uses an authenticated HTTP proxy that restricts downloads to a specific allowlist of domains. This affects Android SDK setup—see "Network environment" section below for details.
 - Run `.codex/setup.sh` to bootstrap a repo-local Android SDK at `.android-sdk/`, accept licenses, install required packages (`platforms;android-35`, `platforms;android-36`, `build-tools;35.0.0`, `platform-tools`), and generate `local.properties`.
 - The helper scripts are self-contained and use `python3` directly (no extra `python` symlink step is required).
 
 ### Network environment
-The environment uses an authenticated HTTP proxy that restricts downloads to a specific allowlist of domains. This affects Android SDK setup:
-- **Blocked**: `dl.google.com` (required for Android command-line tools)
-- **Allowed**: `developer.android.com`, `maven.org`, `gradle.org`, and other standard package repositories
+The Claude Code environment uses an authenticated HTTP proxy that restricts downloads to a specific allowlist of domains. This affects Android SDK setup:
+- **Blocked**: `dl.google.com` (required for Android command-line tools), and other domains not on the allowlist
+- **Allowed**: `developer.android.com`, `maven.org`, `gradle.org`, `github.com`, `apache.org`, and other standard package repositories
 
-**Workaround for limited environments**:
+**Workarounds for proxy-restricted environments**:
 - If SDK setup fails due to network restrictions, you may need to run Android builds outside the restricted environment (on a local machine or CI system)
 - For JVM unit tests (`./gradlew testDebugUnitTest`), only gradle dependencies are needed, which should download fine from allowed repositories
 - The Gradle wrapper (`./gradlew`) is already committed and can function without full Android SDK setup for pure JVM test runs
