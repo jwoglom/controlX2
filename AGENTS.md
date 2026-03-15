@@ -174,6 +174,30 @@ This document summarizes the structure, design, and common workflows inside the 
 - Run `.codex/setup.sh` to bootstrap a repo-local Android SDK at `.android-sdk/`, accept licenses, install required packages (`platforms;android-35`, `platforms;android-36`, `build-tools;35.0.0`, `platform-tools`), and generate `local.properties`.
 - The helper scripts are self-contained and use `python3` directly (no extra `python` symlink step is required).
 
+### Known limitations in this runtime environment (as of 2026-03-15)
+- **Network connectivity issue**: The gradle build and Android SDK setup cannot complete due to network connectivity issues. When attempting to run `./gradlew build`, the build fails with: `Plugin [id: 'com.android.application', version: '8.13.2', apply: false] was not found in any of the following sources`
+- **Root cause**: The Android Gradle plugin and Android SDK packages cannot be downloaded from Google's repositories. Running `.codex/setup.sh` fails with warnings like "Failed to download any source lists!" and "IO exception while downloading manifest"
+- **Impact**:
+  - Unit tests cannot be executed (`./gradlew testDebugUnitTest` cannot run)
+  - APK builds cannot be produced (`./gradlew :mobile:assembleDebug` cannot run)
+  - Gradle configuration phase fails before any tasks can run
+  - This prevents all development workflows in this environment
+- **What would be needed to resolve**:
+  - The Android Gradle plugin (com.android.application:8.13.2) must be downloaded from Google's Gradle Plugin Repository (gradle.com)
+  - Android SDK packages must be downloadable from Google's Android SDK repository (dl.google.com)
+  - The runtime environment must have network access to these repositories
+- **Current test infrastructure**: The project has comprehensive unit test coverage (17 test files found in mobile/src/test/java, shared/src/test/java, wear/src/test/java) with:
+  - JUnit 4 tests (junit:junit:4.13.2)
+  - Kotlin Paparazzi screenshot tests (app.cash.paparazzi:1.3.4)
+  - Room database testing (androidx.room:room-testing)
+  - Multiple domain test suites (Nightscout, xDrip, history log, serialization, etc.)
+  - These tests are properly configured in build.gradle but cannot execute until Gradle can resolve the Android plugin
+- **Workaround options**:
+  1. Ensure the proxy configuration allows connections to Google's repositories (maven.google.com, dl.google.com, gradle.com)
+  2. Check if proxy JWT authentication (visible in JAVA_TOOL_OPTIONS) is valid and not expired
+  3. Switch to an environment with direct network access to Android repositories
+  4. Use Android Studio on a development machine with unrestricted network access
+
 ### Running builds
 Before any Gradle command, export the SDK environment variables (or source them from the helper scripts):
 ```
