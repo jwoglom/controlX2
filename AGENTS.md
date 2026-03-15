@@ -188,4 +188,4 @@ Then use the standard commands documented in the "Running & testing" section abo
 - This is an Android-only project — there is no web frontend, backend server, or Docker dependency. The "hello world" verification is a successful `assembleDebug` producing APK files, since running the app requires an Android device or emulator.
 - `compileSdk` is 36; ensure platform 36 is installed (the current `.codex/setup.sh` handles this automatically).
 - The root `build.gradle` reads `local.properties` eagerly at configuration time. If `local.properties` is missing, Gradle will fail immediately. Always run `.codex/setup.sh` first.
-- Paparazzi screenshot tests run as part of `testDebugUnitTest` and produce reports at `{module}/build/reports/paparazzi/debug/index.html`.
+- Roborazzi screenshot tests: record with `./gradlew :mobile:recordRoborazziDebug :wear:recordRoborazziDebug`, verify with `./gradlew :mobile:verifyRoborazziDebug :wear:verifyRoborazziDebug`. Golden images are stored in each module's test snapshots directory.

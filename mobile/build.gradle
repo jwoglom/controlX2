@@ -4,7 +4,7 @@ plugins {
     id 'org.jetbrains.kotlin.plugin.compose'
     id 'hu.supercluster.paperwork'
     id 'com.google.devtools.ksp'
-    id 'app.cash.paparazzi' version '1.3.4'
+    id 'io.github.takahirom.roborazzi'
 }
 
 android {
@@ -54,6 +54,18 @@ android {
         resources {
             excludes += '/META-INF/{AL2.0,LGPL2.1}'
         }
+    }
+    testOptions {
+        unitTests {
+            includeAndroidResources = true
+        }
+    }
+}
+
+roborazzi {
+    generateComposePreviewRobolectricTests {
+        enable = true
+        packages = ['com.jwoglom.controlx2']
     }
 }
 
@@ -152,9 +164,16 @@ dependencies {
     testImplementation("androidx.room:room-testing:$room_version")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3")
 
-    // SLF4J for Paparazzi tests (pumpx2 library uses it)
+    // SLF4J (pumpx2 library uses it)
     testImplementation 'org.slf4j:slf4j-api:2.0.16'
     testImplementation 'org.slf4j:slf4j-simple:2.0.16'
+
+    // Roborazzi snapshot testing
+    testImplementation 'io.github.takahirom.roborazzi:roborazzi:1.58.0'
+    testImplementation 'io.github.takahirom.roborazzi:roborazzi-compose:1.58.0'
+    testImplementation 'io.github.takahirom.roborazzi:roborazzi-junit-rule:1.58.0'
+    testImplementation 'io.github.takahirom.roborazzi:roborazzi-compose-preview-scanner-support:1.58.0'
+    testImplementation 'org.robolectric:robolectric:4.14.1'
 
     // HTTP server for debug API
     implementation 'org.nanohttpd:nanohttpd:2.3.1'

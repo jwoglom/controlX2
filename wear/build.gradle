@@ -4,7 +4,7 @@ plugins {
     id 'hu.supercluster.paperwork'
     id 'org.jetbrains.kotlin.android'
     id 'org.jetbrains.kotlin.plugin.compose'
-    id 'app.cash.paparazzi'
+    id 'io.github.takahirom.roborazzi'
 }
 
 android {
@@ -48,7 +48,18 @@ android {
         compose = true
         buildConfig true
     }
+    testOptions {
+        unitTests {
+            includeAndroidResources = true
+        }
+    }
+}
 
+roborazzi {
+    generateComposePreviewRobolectricTests {
+        enable = true
+        packages = ['com.jwoglom.controlx2']
+    }
 }
 
 paperwork {
@@ -129,8 +140,16 @@ dependencies {
     implementation "androidx.wear.watchface:watchface-editor:${project.androidx_watchface_version}"
     implementation "androidx.wear.watchface:watchface-complications-rendering:${project.androidx_watchface_version}"
 
-    // SLF4J for Paparazzi tests (pumpx2 library uses it)
+    // SLF4J (pumpx2 library uses it)
     testImplementation 'org.slf4j:slf4j-api:2.0.16'
     testImplementation 'org.slf4j:slf4j-simple:2.0.16'
+
+    // Roborazzi snapshot testing
+    testImplementation 'junit:junit:4.13.2'
+    testImplementation 'io.github.takahirom.roborazzi:roborazzi:1.58.0'
+    testImplementation 'io.github.takahirom.roborazzi:roborazzi-compose:1.58.0'
+    testImplementation 'io.github.takahirom.roborazzi:roborazzi-junit-rule:1.58.0'
+    testImplementation 'io.github.takahirom.roborazzi:roborazzi-compose-preview-scanner-support:1.58.0'
+    testImplementation 'org.robolectric:robolectric:4.14.1'
 
 }
