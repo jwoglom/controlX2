@@ -17,4 +17,4 @@ export PATH="$CMDLINE_DIR/bin:$SDK_ROOT/platform-tools:$PATH"
 export GRADLE_USER_HOME="${GRADLE_USER_HOME:-$REPO_ROOT/.gradle-home}"
 
 cd "$REPO_ROOT"
-./gradlew testDebugUnitTest --console=plain
+./gradlew testDebugUnitTest --console=plain --no-daemon
