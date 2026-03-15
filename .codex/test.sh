@@ -5,10 +5,9 @@ REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 SDK_ROOT="${ANDROID_SDK_ROOT:-$REPO_ROOT/.android-sdk}"
 CMDLINE_DIR="$SDK_ROOT/cmdline-tools/latest"
 
-if [[ ! -x "$CMDLINE_DIR/bin/sdkmanager" ]]; then
-  echo "Android SDK command-line tools not found at $CMDLINE_DIR." >&2
-  echo "Run .codex/setup.sh first." >&2
-  exit 1
+if [[ ! -x "$CMDLINE_DIR/bin/sdkmanager" || ! -f "$REPO_ROOT/local.properties" ]]; then
+  echo "Bootstrapping Android SDK and local.properties via .codex/setup.sh"
+  "$REPO_ROOT/.codex/setup.sh"
 fi
 
 export ANDROID_SDK_ROOT="$SDK_ROOT"
