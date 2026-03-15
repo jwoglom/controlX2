@@ -2,6 +2,7 @@ package com.jwoglom.controlx2.sync.nightscout.models
 
 import org.junit.Assert.*
 import org.junit.Test
+import java.time.Instant
 import java.time.LocalDateTime
 import java.time.ZoneId
 
@@ -25,10 +26,11 @@ class NightscoutModelsTest {
         assertEquals("sgv", entry.type)
         assertEquals("ControlX2", entry.device)
         assertEquals("12345", entry.identifier)
-        assertEquals(timestamp.toString(), entry.dateString)
+        assertTrue(entry.dateString.endsWith("Z"))
 
         val expectedEpochMilli = timestamp.atZone(ZoneId.systemDefault()).toInstant().toEpochMilli()
         assertEquals(expectedEpochMilli, entry.date)
+        assertEquals(expectedEpochMilli, Instant.parse(entry.dateString).toEpochMilli())
     }
 
     @Test
@@ -74,10 +76,12 @@ class NightscoutModelsTest {
         assertEquals("ControlX2", treatment.enteredBy)
         assertEquals("ControlX2", treatment.device)
         assertEquals("54321", treatment.pumpId)
-        assertEquals(timestamp.toString(), treatment.createdAt)
+        assertTrue(treatment.createdAt.endsWith("Z"))
 
         val expectedEpochMilli = timestamp.atZone(ZoneId.systemDefault()).toInstant().toEpochMilli()
         assertEquals(expectedEpochMilli, treatment.timestamp)
+        assertEquals(expectedEpochMilli, Instant.parse(treatment.createdAt).toEpochMilli())
+        assertEquals(timestamp.atZone(ZoneId.systemDefault()).offset.totalSeconds / 60, treatment.utcOffset)
     }
 
     @Test
@@ -121,8 +125,9 @@ class NightscoutModelsTest {
         )
 
         assertEquals("ControlX2", status.device)
-        assertEquals(timestamp.toString(), status.createdAt)
+        assertTrue(status.createdAt.endsWith("Z"))
         assertEquals(90, status.uploaderBattery)
+        assertEquals(timestamp.atZone(ZoneId.systemDefault()).offset.totalSeconds / 60, status.utcOffset)
 
         assertNotNull(status.pump)
         assertEquals(75, status.pump?.battery?.percent)
@@ -131,7 +136,9 @@ class NightscoutModelsTest {
         assertNotNull(status.pump?.iob?.iob)
         assertEquals(3.2, status.pump?.iob?.iob!!, 0.001)
         assertEquals("normal", status.pump?.status?.status)
-        assertEquals(timestamp.toString(), status.pump?.clock)
+        assertEquals(status.createdAt, status.pump?.clock)
+        assertEquals(status.createdAt, status.pump?.iob?.timestamp)
+        assertEquals(status.createdAt, status.pump?.status?.timestamp)
     }
 
     @Test

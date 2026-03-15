@@ -54,6 +54,8 @@ class NightscoutSyncCoordinator(
      * Sync all enabled processors
      */
     suspend fun syncAll(): SyncResult {
+        // Reset one-shot timestamp sample logging for this sync run.
+        NightscoutTimestampPolicy.resetSampleLoggingForSyncRun()
         if (!config.enabled) {
             Timber.d("Nightscout sync is disabled")
             return SyncResult.Disabled
