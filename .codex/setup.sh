@@ -52,6 +52,7 @@ echo "Installing required Android SDK packages"
 "$SDKMANAGER" --sdk_root="$SDK_ROOT" --install \
   "platform-tools" \
   "platforms;android-35" \
+  "platforms;android-36" \
   "build-tools;35.0.0"
 
 echo "Setup complete."
