@@ -2,8 +2,6 @@
 
 package com.jwoglom.controlx2.presentation.screens.sections
 
-import android.os.Handler
-import android.os.Looper
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Box
@@ -14,12 +12,17 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.material.ExperimentalMaterialApi
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.SegmentedButton
+import androidx.compose.material3.SegmentedButtonDefaults
+import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -32,10 +35,11 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.focus.onFocusChanged
-import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.focus.FocusDirection
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -45,17 +49,22 @@ import com.jwoglom.controlx2.presentation.DataStore
 import com.jwoglom.controlx2.presentation.components.HeaderLine
 import com.jwoglom.controlx2.presentation.navigation.TempRateInputPrefill
 import com.jwoglom.controlx2.presentation.screens.TempRatePreview
+import com.jwoglom.controlx2.presentation.screens.sections.components.DecimalOutlinedText
 import com.jwoglom.controlx2.presentation.screens.sections.components.IntegerOutlinedText
 import com.jwoglom.controlx2.presentation.util.LifecycleStateObserver
-import com.jwoglom.controlx2.shared.enums.BasalStatus
 import com.jwoglom.controlx2.shared.util.SendType
 import com.jwoglom.pumpx2.pump.messages.Message
 import com.jwoglom.pumpx2.pump.messages.request.control.SetTempRateRequest
-import com.jwoglom.pumpx2.pump.messages.request.currentStatus.HomeScreenMirrorRequest
 import com.jwoglom.pumpx2.pump.messages.request.currentStatus.TempRateRequest
-import kotlinx.coroutines.launch
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import timber.log.Timber
+import kotlin.math.roundToInt
+
+private enum class TempRateInputMode {
+    PERCENT,
+    UNITS,
+}
 
 @Composable
 fun TempRateWindow(
@@ -64,9 +73,8 @@ fun TempRateWindow(
     onPrefillConsumed: () -> Unit = {},
     closeWindow: () -> Unit,
 ) {
-    val mainHandler = Handler(Looper.getMainLooper())
-    val context = LocalContext.current
     val dataStore = LocalDataStore.current
+    val focusManager = LocalFocusManager.current
 
     val refreshScope = rememberCoroutineScope()
     var refreshing by remember { mutableStateOf(true) }
@@ -76,14 +84,16 @@ fun TempRateWindow(
     val hoursRawValue = dataStore.tempRateHoursRawValue.observeAsState()
     val minutesRawValue = dataStore.tempRateMinutesRawValue.observeAsState()
 
-    var percentSubtitle by remember { mutableStateOf<String>("percent") }
-    var hoursSubtitle by remember { mutableStateOf<String>("hours") }
-    var minutesSubtitle by remember { mutableStateOf<String>("mins") }
+    var inputMode by remember { mutableStateOf(TempRateInputMode.PERCENT) }
+    var unitsRawValue by remember { mutableStateOf<String?>(null) }
+
+    var inputErrorText by remember { mutableStateOf<String?>(null) }
+    var effectiveText by remember { mutableStateOf<String?>(null) }
 
     var percentHumanEntered by remember { mutableStateOf<Int?>(null) }
-    var percentHumanFocus by remember { mutableStateOf(false) }
     var hoursHumanEntered by remember { mutableStateOf<Int?>(null) }
     var minutesHumanEntered by remember { mutableStateOf<Int?>(null) }
+    var unitsHumanEntered by remember { mutableStateOf<Double?>(null) }
 
     var tempRateButtonEnabled by remember { mutableStateOf(false) }
     var tempRate by remember { mutableStateOf<SetTempRateRequest?>(null) }
@@ -91,18 +101,16 @@ fun TempRateWindow(
 
     var showPermissionCheckDialog by remember { mutableStateOf(false) }
 
-    val commands = listOf(
-        TempRateRequest()
-    )
+    val commands = listOf(TempRateRequest())
 
     val baseFields = listOf(
         dataStore.tempRateActive,
-        dataStore.tempRateDetails
+        dataStore.tempRateDetails,
     )
 
     @Synchronized
     fun waitForLoaded() = refreshScope.launch {
-        if (!refreshing) return@launch;
+        if (!refreshing) return@launch
         var sinceLastFetchTime = 0
         while (true) {
             val nullBaseFields = baseFields.filter { field -> field.value == null }.toSet()
@@ -130,7 +138,6 @@ fun TempRateWindow(
 
     fun refresh() = refreshScope.launch {
         refreshing = true
-
         sendPumpCommands(SendType.BUST_CACHE, commands)
     }
 
@@ -143,11 +150,141 @@ fun TempRateWindow(
         minutesHumanEntered = prefillValues.minutesRawValue?.toIntOrNull()
     }
 
+    fun parseBasalRateUph(): Double? {
+        return dataStore.basalRate.value
+            ?.replace("U/hr", "", ignoreCase = true)
+            ?.trim()
+            ?.toDoubleOrNull()
+    }
+
+    fun effectivePercentFromUnits(units: Double?, baseBasal: Double?): Double? {
+        if (units == null || baseBasal == null || baseBasal <= 0.0) {
+            return null
+        }
+        if (units == 0.0) {
+            return 0.0
+        }
+        return units / baseBasal * 100.0
+    }
+
+    fun validateDuration(rawHours: Int?, rawMinutes: Int?): String? {
+        if (rawHours == null && rawMinutes == null) {
+            return "Enter temp rate duration"
+        }
+
+        val hours = rawHours ?: 0
+        val minutes = rawMinutes ?: 0
+
+        if (hours < 0 || hours > 72) {
+            return "Hours must be between 0 and 72"
+        }
+        if (minutes < 0 || minutes >= 60) {
+            return "Minutes must be between 0 and 59"
+        }
+        if (hours == 0 && minutes < 15) {
+            return "Duration must be at least 15 minutes"
+        }
+        if (60 * hours + minutes > 72 * 60) {
+            return "Duration must be 72 hours or less"
+        }
+
+        return null
+    }
+
+    fun validateTempRate(
+        mode: TempRateInputMode,
+        rawPercent: Int?,
+        rawUnits: Double?,
+        rawHours: Int?,
+        rawMinutes: Int?,
+        baseBasal: Double?,
+    ): String? {
+        when (mode) {
+            TempRateInputMode.PERCENT -> {
+                if (rawPercent == null) {
+                    return "Enter a temp rate percent"
+                }
+                if (rawPercent < 0 || rawPercent > 250) {
+                    return "Percent must be between 0 and 250"
+                }
+            }
+
+            TempRateInputMode.UNITS -> {
+                if (rawUnits == null) {
+                    return "Enter a temp rate in U/hr"
+                }
+                if (rawUnits < 0.0) {
+                    return "Rate must be 0 U/hr or greater"
+                }
+                if (rawUnits != 0.0 && rawUnits < 0.05) {
+                    return "Rate must be 0 or at least 0.05 U/hr"
+                }
+                if (baseBasal == null || baseBasal <= 0.0) {
+                    return "Current profile basal rate unavailable"
+                }
+
+                val effectivePercent = effectivePercentFromUnits(rawUnits, baseBasal)
+                if (effectivePercent == null) {
+                    return "Unable to calculate effective percent"
+                }
+                if (effectivePercent > 250.0) {
+                    return "Effective percent cannot exceed 250%"
+                }
+            }
+        }
+
+        return validateDuration(rawHours, rawMinutes)
+    }
+
+    fun validTempRate(
+        mode: TempRateInputMode,
+        rawPercent: Int?,
+        rawUnits: Double?,
+        rawHours: Int?,
+        rawMinutes: Int?,
+        baseBasal: Double?,
+    ): SetTempRateRequest? {
+        if (validateTempRate(mode, rawPercent, rawUnits, rawHours, rawMinutes, baseBasal) != null) {
+            return null
+        }
+
+        val hours = rawHours ?: 0
+        val minutes = rawMinutes ?: 0
+        val effectivePercent = when (mode) {
+            TempRateInputMode.PERCENT -> rawPercent
+            TempRateInputMode.UNITS -> effectivePercentFromUnits(rawUnits, baseBasal)?.roundToInt()
+        } ?: return null
+
+        return try {
+            SetTempRateRequest(
+                60 * hours + minutes,
+                effectivePercent,
+            )
+        } catch (e: IllegalArgumentException) {
+            null
+        }
+    }
+
+    fun trySubmitFromIme() {
+        val request = validTempRate(
+            mode = inputMode,
+            rawPercent = percentHumanEntered,
+            rawUnits = unitsHumanEntered,
+            rawHours = hoursHumanEntered,
+            rawMinutes = minutesHumanEntered,
+            baseBasal = parseBasalRateUph(),
+        )
+        if (request != null) {
+            tempRate = request
+            showPermissionCheckDialog = true
+        }
+    }
+
     LifecycleStateObserver(
         lifecycleOwner = LocalLifecycleOwner.current,
         onStop = {
             resetTempRateDataStoreState(dataStore)
-        }
+        },
     ) {
         resetTempRateDataStoreState(dataStore)
         pendingPrefill?.let {
@@ -158,132 +295,230 @@ fun TempRateWindow(
         refresh()
     }
 
-    LaunchedEffect (refreshing, Unit) {
+    LaunchedEffect(refreshing, Unit) {
         waitForLoaded()
     }
 
-    fun recalculate() {
+    LaunchedEffect(percentRawValue.value, hoursRawValue.value, minutesRawValue.value) {
         percentHumanEntered = if (percentRawValue.value != null) rawToInt(percentRawValue.value) else null
         hoursHumanEntered = if (hoursRawValue.value != null) rawToInt(hoursRawValue.value) else null
         minutesHumanEntered = if (minutesRawValue.value != null) rawToInt(minutesRawValue.value) else null
     }
 
-    fun validTempRate(rawPercent: Int?, rawHours: Int?, rawMinutes: Int?): SetTempRateRequest? {
-        if (rawPercent == null || rawPercent < 0 || rawPercent > 250) {
-            return null
-        }
-
-        if (rawHours == null && rawMinutes == null) {
-            return null
-        }
-
-        var hours = 0
-        var minutes = 0
-        if (rawHours != null && rawMinutes != null) {
-            hours = rawHours
-            minutes = rawMinutes
-        } else if (rawHours == null && rawMinutes != null) {
-            hours = 0
-            minutes = rawMinutes
-        } else if (rawHours != null && rawMinutes == null) {
-            hours = rawHours
-            minutes = 0
-        } else {
-            return null
-        }
-
-        if (hours < 0 || hours > 72 || minutes < 15 || minutes >= 60) {
-            return null
-        }
-
-        if (60*hours + minutes > 72*60) {
-            return null
-        }
-
-        try {
-            return SetTempRateRequest(
-                60 * hours + minutes,
-                rawPercent
-
-            )
-        } catch (e: IllegalArgumentException) {
-            return null
-        }
+    LaunchedEffect(unitsRawValue) {
+        unitsHumanEntered = unitsRawValue?.toDoubleOrNull()
     }
 
-    LaunchedEffect (percentRawValue.value, hoursRawValue.value, minutesRawValue.value) {
-        recalculate()
-        val request = validTempRate(percentHumanEntered, hoursHumanEntered, minutesHumanEntered)
-        tempRateButtonEnabled = request != null
+    LaunchedEffect(
+        inputMode,
+        percentHumanEntered,
+        unitsHumanEntered,
+        hoursHumanEntered,
+        minutesHumanEntered,
+        dataStore.basalRate.value,
+    ) {
+        val baseBasal = parseBasalRateUph()
+        inputErrorText = validateTempRate(
+            mode = inputMode,
+            rawPercent = percentHumanEntered,
+            rawUnits = unitsHumanEntered,
+            rawHours = hoursHumanEntered,
+            rawMinutes = minutesHumanEntered,
+            baseBasal = baseBasal,
+        )
+
+        tempRate = validTempRate(
+            mode = inputMode,
+            rawPercent = percentHumanEntered,
+            rawUnits = unitsHumanEntered,
+            rawHours = hoursHumanEntered,
+            rawMinutes = minutesHumanEntered,
+            baseBasal = baseBasal,
+        )
+        tempRateButtonEnabled = tempRate != null
+
+        effectiveText = when (inputMode) {
+            TempRateInputMode.PERCENT -> {
+                if (baseBasal != null && percentHumanEntered != null) {
+                    val effectiveRate = baseBasal * (percentHumanEntered!!.toDouble() / 100.0)
+                    "Effective basal rate: ${String.format("%.2f", effectiveRate)} U/hr"
+                } else {
+                    null
+                }
+            }
+
+            TempRateInputMode.UNITS -> {
+                val effectivePercent = effectivePercentFromUnits(unitsHumanEntered, baseBasal)
+                if (effectivePercent != null) {
+                    "Effective temp rate: ${String.format("%.1f", effectivePercent)}%"
+                } else {
+                    null
+                }
+            }
+        }
     }
 
     HeaderLine("Temp Rate")
 
     Row(
-        modifier = Modifier.fillMaxWidth()
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Column(Modifier.weight(0.5f)) {}
+        Column(Modifier.weight(2f)) {
+            SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
+                SegmentedButton(
+                    shape = SegmentedButtonDefaults.itemShape(index = 0, count = 2),
+                    selected = inputMode == TempRateInputMode.PERCENT,
+                    onClick = { inputMode = TempRateInputMode.PERCENT },
+                ) {
+                    Text("Percent")
+                }
+                SegmentedButton(
+                    shape = SegmentedButtonDefaults.itemShape(index = 1, count = 2),
+                    selected = inputMode == TempRateInputMode.UNITS,
+                    onClick = { inputMode = TempRateInputMode.UNITS },
+                ) {
+                    Text("Units")
+                }
+            }
+        }
+        Column(Modifier.weight(0.5f)) {}
+    }
+
+    Row(
+        modifier = Modifier.fillMaxWidth(),
     ) {
         Column(Modifier.weight(0.75f)) {}
         Column(Modifier.weight(1f)) {
-            IntegerOutlinedText(
-                title = percentSubtitle,
-                value = percentRawValue.value,
-                onValueChange = {
-                    dataStore.tempRatePercentRawValue.value = it
-                    percentHumanEntered = if (it == "") null else it.toIntOrNull()
-                },
-                modifier = Modifier.onFocusChanged {
-                    percentHumanFocus = it.isFocused
+            when (inputMode) {
+                TempRateInputMode.PERCENT -> {
+                    IntegerOutlinedText(
+                        title = "percent",
+                        value = percentRawValue.value,
+                        onValueChange = {
+                            dataStore.tempRatePercentRawValue.value = it
+                            percentHumanEntered = if (it == "") null else it.toIntOrNull()
+                        },
+                        imeAction = ImeAction.Next,
+                        keyboardActions = KeyboardActions(
+                            onNext = {
+                                focusManager.moveFocus(FocusDirection.Down)
+                            },
+                        ),
+                    )
                 }
-            )
+
+                TempRateInputMode.UNITS -> {
+                    DecimalOutlinedText(
+                        title = "U/hr",
+                        value = unitsRawValue,
+                        onValueChange = {
+                            unitsRawValue = it
+                            unitsHumanEntered = if (it == "") null else it.toDoubleOrNull()
+                        },
+                        imeAction = ImeAction.Next,
+                        keyboardActions = KeyboardActions(
+                            onNext = {
+                                focusManager.moveFocus(FocusDirection.Down)
+                            },
+                        ),
+                    )
+                }
+            }
         }
         Column(Modifier.weight(0.75f)) {}
     }
-    
+
     Row(
-        modifier = Modifier.fillMaxWidth()
+        modifier = Modifier.fillMaxWidth(),
     ) {
         Column(Modifier.weight(0.5f)) {}
         Column(
             Modifier
                 .weight(0.75f)
-                .padding(all = 8.dp)) {
+                .padding(all = 8.dp),
+        ) {
             IntegerOutlinedText(
-                title = hoursSubtitle,
+                title = "hours",
                 value = hoursRawValue.value,
-                onValueChange = { dataStore.tempRateHoursRawValue.value = it }
+                onValueChange = {
+                    dataStore.tempRateHoursRawValue.value = it
+                    hoursHumanEntered = if (it == "") null else it.toIntOrNull()
+                },
+                imeAction = ImeAction.Next,
+                keyboardActions = KeyboardActions(
+                    onNext = {
+                        focusManager.moveFocus(FocusDirection.Right)
+                    },
+                ),
             )
         }
 
         Column(
             Modifier
                 .weight(0.75f)
-                .padding(all = 8.dp)) {
+                .padding(all = 8.dp),
+        ) {
             IntegerOutlinedText(
-                title = minutesSubtitle,
+                title = "mins",
                 value = minutesRawValue.value,
                 onValueChange = {
                     dataStore.tempRateMinutesRawValue.value = it
                     minutesHumanEntered = if (it == "") null else it.toIntOrNull()
-                }
+                },
+                imeAction = ImeAction.Done,
+                keyboardActions = KeyboardActions(
+                    onDone = {
+                        focusManager.clearFocus()
+                        trySubmitFromIme()
+                    },
+                ),
             )
         }
         Column(Modifier.weight(0.5f)) {}
     }
 
+    val hasAnyTempRateInput =
+        when (inputMode) {
+            TempRateInputMode.PERCENT -> !percentRawValue.value.isNullOrBlank()
+            TempRateInputMode.UNITS -> !unitsRawValue.isNullOrBlank()
+        } || !hoursRawValue.value.isNullOrBlank() || !minutesRawValue.value.isNullOrBlank()
+
+    if (hasAnyTempRateInput && inputErrorText != null) {
+        Text(
+            text = inputErrorText!!,
+            modifier = Modifier.padding(horizontal = 24.dp),
+            color = MaterialTheme.colorScheme.error,
+        )
+    }
+
+    if (effectiveText != null) {
+        Text(
+            text = effectiveText!!,
+            modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp),
+        )
+    }
 
     Box(
         Modifier
             .fillMaxSize()
-            .padding(top = 16.dp)) {
+            .padding(top = 16.dp),
+    ) {
         if (refreshing) {
             CircularProgressIndicator(Modifier.align(Alignment.Center))
         } else if (sending) {
             /* */
         } else {
-
             Button(
                 onClick = {
-                    tempRate = validTempRate(percentHumanEntered, hoursHumanEntered, minutesHumanEntered)
+                    tempRate = validTempRate(
+                        mode = inputMode,
+                        rawPercent = percentHumanEntered,
+                        rawUnits = unitsHumanEntered,
+                        rawHours = hoursHumanEntered,
+                        rawMinutes = minutesHumanEntered,
+                        baseBasal = parseBasalRateUph(),
+                    )
                     if (tempRate != null) {
                         showPermissionCheckDialog = true
                     }
@@ -291,18 +526,17 @@ fun TempRateWindow(
                 contentPadding = ButtonDefaults.ButtonWithIconContentPadding,
                 enabled = tempRateButtonEnabled,
                 colors = ButtonDefaults.filledTonalButtonColors(),
-                modifier = Modifier.align(Alignment.Center)
-
+                modifier = Modifier.align(Alignment.Center),
             ) {
                 Image(
                     painterResource(R.drawable.bolus_icon),
                     "Bolus icon",
-                    Modifier.size(ButtonDefaults.IconSize)
+                    Modifier.size(ButtonDefaults.IconSize),
                 )
                 Spacer(Modifier.size(ButtonDefaults.IconSpacing))
                 Text(
                     "Set temp rate",
-                    fontSize = 18.sp
+                    fontSize = 18.sp,
                 )
             }
         }
@@ -316,7 +550,6 @@ fun TempRateWindow(
             }
 
             sendPumpCommands(SendType.BUST_CACHE, listOf(tempRate as Message))
-
         }
 
         fun prettyDuration(minutes: Int?): String {
@@ -335,7 +568,7 @@ fun TempRateWindow(
                     if (isSystemInDarkTheme()) painterResource(R.drawable.bolus_icon_secondary)
                     else painterResource(R.drawable.bolus_icon),
                     "Bolus icon",
-                    Modifier.size(ButtonDefaults.IconSize)
+                    Modifier.size(ButtonDefaults.IconSize),
                 )
             },
             dismissButton = {
@@ -347,7 +580,6 @@ fun TempRateWindow(
                 ) {
                     Text("Cancel")
                 }
-
             },
             confirmButton = {
                 TextButton(
@@ -363,19 +595,16 @@ fun TempRateWindow(
                         }
                         refreshScope.launch {
                             sendPumpCommands(
-                                SendType.BUST_CACHE, listOf(
-                                    TempRateRequest()
-                                )
+                                SendType.BUST_CACHE,
+                                listOf(TempRateRequest()),
                             )
                         }
                     },
-                    enabled = (
-                        tempRate != null
-                    )
+                    enabled = (tempRate != null),
                 ) {
                     Text("Set temp rate")
                 }
-            }
+            },
         )
     }
 }

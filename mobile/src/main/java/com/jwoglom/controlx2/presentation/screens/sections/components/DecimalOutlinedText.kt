@@ -1,6 +1,7 @@
 package com.jwoglom.controlx2.presentation.screens.sections.components
 
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
@@ -12,12 +13,11 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.TextFieldValue
 import com.jwoglom.controlx2.presentation.util.onFocusSelectAll
-import com.jwoglom.controlx2.shared.util.twoDecimalPlaces
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -25,7 +25,9 @@ fun DecimalOutlinedText(
     title: String,
     value: String?,
     onValueChange: (String) -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    imeAction: ImeAction = ImeAction.Default,
+    keyboardActions: KeyboardActions = KeyboardActions.Default,
 ) {
     var error = false
     val decimalPlaces = 2
@@ -55,7 +57,9 @@ fun DecimalOutlinedText(
             autoCorrect = false,
             capitalization = KeyboardCapitalization.None,
             keyboardType = KeyboardType.Number,
+            imeAction = imeAction,
         ),
+        keyboardActions = keyboardActions,
         label = {
             Text(title)
         },
