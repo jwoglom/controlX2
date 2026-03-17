@@ -28,6 +28,7 @@ fun BolusEntryFormRegion(
     onUnitsFocusChanged: (Boolean) -> Unit,
     onCarbsChanged: (String) -> Unit,
     onGlucoseChanged: (String) -> Unit,
+    onSubmitRequested: () -> Unit,
 ) {
     val dataStore = LocalDataStore.current
     val snapshot = BolusEntrySnapshot(
@@ -43,6 +44,7 @@ fun BolusEntryFormRegion(
                 title = unitsSubtitle,
                 value = snapshot.unitsValue,
                 onValueChange = onUnitsChanged,
+                onSubmitRequested = onSubmitRequested,
                 modifier = Modifier.onFocusChanged { onUnitsFocusChanged(it.isFocused) }
             )
         }
@@ -58,7 +60,8 @@ fun BolusEntryFormRegion(
             IntegerOutlinedText(
                 title = carbsSubtitle,
                 value = snapshot.carbsValue,
-                onValueChange = onCarbsChanged
+                onValueChange = onCarbsChanged,
+                onSubmitRequested = onSubmitRequested
             )
         }
 
@@ -70,7 +73,8 @@ fun BolusEntryFormRegion(
             IntegerOutlinedText(
                 title = glucoseSubtitle,
                 value = snapshot.glucoseValue,
-                onValueChange = onGlucoseChanged
+                onValueChange = onGlucoseChanged,
+                onSubmitRequested = onSubmitRequested
             )
         }
     }
