@@ -71,7 +71,7 @@ class ComposePreviewSnapshotTests {
     @Test fun snapshot_ActiveTherapyCardExercisePreview() = snapshot { com.jwoglom.controlx2.presentation.screens.sections.components.cards.ActiveTherapyCardExercisePreview() }
     @Test fun snapshot_ActiveTherapyCardSleepPreview() = snapshot { com.jwoglom.controlx2.presentation.screens.sections.components.cards.ActiveTherapyCardSleepPreview() }
     @Test fun snapshot_ActiveTherapyCardEmptyPreview() = snapshot { com.jwoglom.controlx2.presentation.screens.sections.components.cards.ActiveTherapyCardEmptyPreview() }
-    @Test fun snapshot_PumpStatusCardPreview() = snapshot { com.jwoglom.controlx2.presentation.screens.sections.components.cards.PumpStatusCardPreview() }
+    @Test fun snapshot_PumpStatusCardPreview() = snapshot { com.jwoglom.controlx2.presentation.screens.sections.components.PumpStatusCardPreview() }
     @Test fun snapshot_TherapyMetricsCardPreview() = snapshot { com.jwoglom.controlx2.presentation.screens.sections.components.cards.TherapyMetricsCardPreview() }
     @Test fun snapshot_TherapyMetricsCardPartialPreview() = snapshot { com.jwoglom.controlx2.presentation.screens.sections.components.cards.TherapyMetricsCardPartialPreview() }
     @Test fun snapshot_TherapyMetricsCardEmptyPreview() = snapshot { com.jwoglom.controlx2.presentation.screens.sections.components.cards.TherapyMetricsCardEmptyPreview() }
