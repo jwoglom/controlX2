@@ -1,9 +1,11 @@
 package com.jwoglom.controlx2.sync.nightscout.api
 
 import com.google.gson.Gson
+import com.google.gson.JsonSyntaxException
 import com.google.gson.reflect.TypeToken
 import com.jwoglom.controlx2.sync.nightscout.NightscoutApiSecretHeader
 import com.jwoglom.controlx2.sync.nightscout.hashNightscoutApiSecret
+import com.jwoglom.controlx2.sync.nightscout.models.NightscoutAnnouncement
 import com.jwoglom.controlx2.sync.nightscout.models.NightscoutDeviceStatus
 import com.jwoglom.controlx2.sync.nightscout.models.NightscoutEntry
 import com.jwoglom.controlx2.sync.nightscout.models.NightscoutTreatment
@@ -11,6 +13,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import timber.log.Timber
 import java.io.BufferedReader
+import java.io.InputStream
 import java.io.InputStreamReader
 import java.io.OutputStreamWriter
 import java.net.HttpURLConnection
@@ -29,11 +32,12 @@ class NightscoutClient(
 
     private val gson = Gson()
     private val apiSecretHash: String by lazy { hashNightscoutApiSecret(apiSecret) }
+    private val announcementParser = NightscoutAnnouncementParser(gson)
 
     override suspend fun uploadEntries(entries: List<NightscoutEntry>): Result<Int> {
         return withContext(Dispatchers.IO) {
             try {
-                val response = post("/api/v1/entries", entries)
+                post("/api/v1/entries", entries)
                 Timber.d("Uploaded ${entries.size} entries to Nightscout")
                 Result.success(entries.size)
             } catch (e: Exception) {
@@ -46,7 +50,7 @@ class NightscoutClient(
     override suspend fun uploadTreatments(treatments: List<NightscoutTreatment>): Result<Int> {
         return withContext(Dispatchers.IO) {
             try {
-                val response = post("/api/v1/treatments", treatments)
+                post("/api/v1/treatments", treatments)
                 Timber.d("Uploaded ${treatments.size} treatments to Nightscout")
                 Result.success(treatments.size)
             } catch (e: Exception) {
@@ -59,7 +63,7 @@ class NightscoutClient(
     override suspend fun uploadDeviceStatus(status: NightscoutDeviceStatus): Result<Boolean> {
         return withContext(Dispatchers.IO) {
             try {
-                val response = post("/api/v1/devicestatus", listOf(status))
+                post("/api/v1/devicestatus", listOf(status))
                 Timber.d("Uploaded device status to Nightscout")
                 Result.success(true)
             } catch (e: Exception) {
@@ -97,6 +101,53 @@ class NightscoutClient(
         }
     }
 
+    override suspend fun getAnnouncements(count: Int): Result<List<NightscoutAnnouncement>> {
+        return withContext(Dispatchers.IO) {
+            try {
+                val response = get(NightscoutAnnouncementEndpoint.latest(count))
+                Result.success(announcementParser.parseAnnouncements(response))
+            } catch (e: NightscoutAuthException) {
+                Timber.w(e, "Nightscout auth failed while fetching announcements")
+                Result.failure(e)
+            } catch (e: JsonSyntaxException) {
+                val wrapped = IllegalArgumentException("Malformed announcements response payload", e)
+                Timber.e(wrapped)
+                Result.failure(wrapped)
+            } catch (e: Exception) {
+                Timber.e(e, "Failed to fetch announcements")
+                Result.failure(e)
+            }
+        }
+    }
+
+    override suspend fun getAnnouncementsSince(
+        sinceTimestamp: Long?,
+        sinceId: String?,
+        count: Int
+    ): Result<List<NightscoutAnnouncement>> {
+        return withContext(Dispatchers.IO) {
+            try {
+                val endpoint = NightscoutAnnouncementEndpoint.since(
+                    sinceTimestamp = sinceTimestamp,
+                    sinceId = sinceId,
+                    count = count
+                )
+                val response = get(endpoint)
+                Result.success(announcementParser.parseAnnouncements(response))
+            } catch (e: NightscoutAuthException) {
+                Timber.w(e, "Nightscout auth failed while fetching announcements since marker")
+                Result.failure(e)
+            } catch (e: JsonSyntaxException) {
+                val wrapped = IllegalArgumentException("Malformed announcements response payload", e)
+                Timber.e(wrapped)
+                Result.failure(wrapped)
+            } catch (e: Exception) {
+                Timber.e(e, "Failed to fetch announcements since marker")
+                Result.failure(e)
+            }
+        }
+    }
+
     private fun post(endpoint: String, body: Any): String {
         val url = URL("$baseUrl$endpoint")
         val connection = url.openConnection() as HttpURLConnection
@@ -109,24 +160,16 @@ class NightscoutClient(
             connection.connectTimeout = 30000
             connection.readTimeout = 30000
 
-            // Write body
             val writer = OutputStreamWriter(connection.outputStream)
             writer.write(gson.toJson(body))
             writer.flush()
             writer.close()
 
-            // Read response
             val responseCode = connection.responseCode
             if (responseCode in 200..299) {
-                val reader = BufferedReader(InputStreamReader(connection.inputStream))
-                val response = reader.readText()
-                reader.close()
-                response
+                readResponseBody(connection.inputStream)
             } else {
-                val errorReader = BufferedReader(InputStreamReader(connection.errorStream))
-                val error = errorReader.readText()
-                errorReader.close()
-                throw Exception("Nightscout API error ($responseCode): $error")
+                throw createHttpException(responseCode, readResponseBody(connection.errorStream))
             }
         } finally {
             connection.disconnect()
@@ -145,18 +188,28 @@ class NightscoutClient(
 
             val responseCode = connection.responseCode
             if (responseCode in 200..299) {
-                val reader = BufferedReader(InputStreamReader(connection.inputStream))
-                val response = reader.readText()
-                reader.close()
-                response
+                readResponseBody(connection.inputStream)
             } else {
-                val errorReader = BufferedReader(InputStreamReader(connection.errorStream))
-                val error = errorReader.readText()
-                errorReader.close()
-                throw Exception("Nightscout API error ($responseCode): $error")
+                throw createHttpException(responseCode, readResponseBody(connection.errorStream))
             }
         } finally {
             connection.disconnect()
+        }
+    }
+
+    private fun readResponseBody(stream: InputStream?): String {
+        if (stream == null) {
+            return ""
+        }
+        val reader = BufferedReader(InputStreamReader(stream))
+        return reader.use { it.readText() }
+    }
+
+    private fun createHttpException(responseCode: Int, errorBody: String): Exception {
+        return if (responseCode == 401 || responseCode == 403) {
+            NightscoutAuthException("Nightscout API auth failed ($responseCode): $errorBody")
+        } else {
+            Exception("Nightscout API error ($responseCode): $errorBody")
         }
     }
 }
