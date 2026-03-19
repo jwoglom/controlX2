@@ -29,6 +29,8 @@ fun DecimalOutlinedText(
     value: String?,
     onValueChange: (String) -> Unit,
     onSubmitRequested: (() -> Unit)? = null,
+    imeAction: ImeAction = ImeAction.Done,
+    keyboardActions: KeyboardActions? = null,
     modifier: Modifier = Modifier
 ) {
     var error = false
@@ -75,9 +77,9 @@ fun DecimalOutlinedText(
             autoCorrect = false,
             capitalization = KeyboardCapitalization.None,
             keyboardType = KeyboardType.Number,
-            imeAction = ImeAction.Done,
+            imeAction = imeAction,
         ),
-        keyboardActions = KeyboardActions(
+        keyboardActions = keyboardActions ?: KeyboardActions(
             onDone = {
                 onSubmitRequested?.invoke()
             }
