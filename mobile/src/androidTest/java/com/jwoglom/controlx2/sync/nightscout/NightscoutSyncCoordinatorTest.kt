@@ -11,6 +11,7 @@ import com.jwoglom.controlx2.db.nightscout.NightscoutSyncStateDatabase
 import com.jwoglom.controlx2.sync.nightscout.api.NightscoutApi
 import com.jwoglom.controlx2.sync.nightscout.models.NightscoutEntry
 import com.jwoglom.controlx2.sync.nightscout.models.NightscoutTreatment
+import com.jwoglom.controlx2.sync.nightscout.models.NightscoutAnnouncement
 import com.jwoglom.controlx2.sync.nightscout.models.NightscoutDeviceStatus
 import kotlinx.coroutines.runBlocking
 import org.junit.After
@@ -279,6 +280,18 @@ class MockNightscoutApi : NightscoutApi {
         return Result.success(
             uploadedTreatments.lastOrNull { it.eventType == eventType }
         )
+    }
+
+    override suspend fun getAnnouncements(count: Int): Result<List<NightscoutAnnouncement>> {
+        return Result.success(emptyList())
+    }
+
+    override suspend fun getAnnouncementsSince(
+        sinceTimestamp: Long?,
+        sinceId: String?,
+        count: Int
+    ): Result<List<NightscoutAnnouncement>> {
+        return Result.success(emptyList())
     }
 
     fun reset() {
