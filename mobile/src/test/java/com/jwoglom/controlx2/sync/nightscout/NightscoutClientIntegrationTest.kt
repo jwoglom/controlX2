@@ -2,6 +2,7 @@ package com.jwoglom.controlx2.sync.nightscout
 
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
+import com.jwoglom.controlx2.sync.nightscout.api.NightscoutAuthException
 import com.jwoglom.controlx2.sync.nightscout.api.NightscoutClient
 import com.jwoglom.controlx2.sync.nightscout.models.NightscoutEntry
 import com.jwoglom.controlx2.sync.nightscout.models.NightscoutTreatment
@@ -412,6 +413,57 @@ class NightscoutClientIntegrationTest {
 
         assertTrue(result.isSuccess)
         assertNull(result.getOrNull())
+    }
+
+    @Test
+    fun getAnnouncements_parsesResponse() = runBlocking {
+        server.nextResponseBody = """[
+            {"_id":"ann-1","title":"Maintenance","message":"Nightscout maintenance window","created_at":"2024-03-15T00:00:00Z","isActive":true}
+        ]"""
+
+        val result = client.getAnnouncements(3)
+
+        assertTrue(result.isSuccess)
+        assertEquals("/api/v1/announcements?count=3", server.capturedRequests[0].path)
+        val announcements = result.getOrNull()!!
+        assertEquals(1, announcements.size)
+        assertEquals("ann-1", announcements[0].id)
+        assertEquals("Maintenance", announcements[0].title)
+    }
+
+    @Test
+    fun getAnnouncements_returnsAuthFailureOnUnauthorized() = runBlocking {
+        server.nextResponseCode = NanoHTTPD.Response.Status.UNAUTHORIZED
+        server.nextResponseBody = """{"status":401,"message":"Unauthorized"}"""
+
+        val result = client.getAnnouncements(1)
+
+        assertTrue(result.isFailure)
+        assertTrue(result.exceptionOrNull() is NightscoutAuthException)
+    }
+
+    @Test
+    fun getAnnouncements_returnsFailureOnMalformedPayload() = runBlocking {
+        server.nextResponseBody = """[{"_id":"ann-1","message":"oops"""
+
+        val result = client.getAnnouncements(1)
+
+        assertTrue(result.isFailure)
+        assertTrue(result.exceptionOrNull()?.message?.contains("Malformed announcements response payload") == true)
+    }
+
+    @Test
+    fun getAnnouncementsSince_includesSinceMarkersInRequest() = runBlocking {
+        server.nextResponseBody = "[]"
+
+        val result = client.getAnnouncementsSince(1710500000000, "abc 123", 20)
+
+        assertTrue(result.isSuccess)
+        assertEquals(
+            "/api/v1/announcements?count=20&find[created_at][\$gte]=1710500000000&find[_id][\$gt]=abc+123",
+            server.capturedRequests[0].path
+        )
+        assertTrue(result.getOrNull()!!.isEmpty())
     }
 
     // --- Error Handling ---

@@ -1,6 +1,7 @@
 package com.jwoglom.controlx2.sync.nightscout.api
 
 import com.jwoglom.controlx2.sync.nightscout.models.NightscoutDeviceStatus
+import com.jwoglom.controlx2.sync.nightscout.models.NightscoutAnnouncement
 import com.jwoglom.controlx2.sync.nightscout.models.NightscoutEntry
 import com.jwoglom.controlx2.sync.nightscout.models.NightscoutTreatment
 
@@ -40,4 +41,19 @@ interface NightscoutApi {
      * GET /api/v1/treatments?eventType=X&count=1
      */
     suspend fun getLastTreatment(eventType: String): Result<NightscoutTreatment?>
+
+    /**
+     * Get latest announcements
+     * GET /api/v1/announcements?count=N
+     */
+    suspend fun getAnnouncements(count: Int = 10): Result<List<NightscoutAnnouncement>>
+
+    /**
+     * Get announcements after a point in time and/or id marker
+     */
+    suspend fun getAnnouncementsSince(
+        sinceTimestamp: Long? = null,
+        sinceId: String? = null,
+        count: Int = 100
+    ): Result<List<NightscoutAnnouncement>>
 }
