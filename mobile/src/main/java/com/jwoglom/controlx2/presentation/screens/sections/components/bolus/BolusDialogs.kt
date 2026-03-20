@@ -324,11 +324,17 @@ fun ApprovedDialogRegion(
             )
         },
         dismissButton = {
-            TextButton(
-                onClick = onCancel,
-                modifier = Modifier.padding(top = 16.dp)
-            ) {
-                Text("Cancel Bolus Delivery")
+            val bolusStillActive = bolusCurrentResponse.value?.let {
+                it.bolusId != 0 && (it.status == CurrentBolusStatusResponse.CurrentBolusStatus.REQUESTING ||
+                    it.status == CurrentBolusStatusResponse.CurrentBolusStatus.DELIVERING)
+            } ?: false
+            if (bolusStillActive) {
+                TextButton(
+                    onClick = onCancel,
+                    modifier = Modifier.padding(top = 16.dp)
+                ) {
+                    Text("Cancel Bolus Delivery")
+                }
             }
         },
         confirmButton = {
@@ -336,7 +342,14 @@ fun ApprovedDialogRegion(
                 onClick = onClose,
                 modifier = Modifier.padding(top = 16.dp)
             ) {
-                Text("OK")
+                Text(
+                    if (bolusCurrentResponse.value?.bolusId == 0 ||
+                        bolusCurrentResponse.value?.status?.let {
+                            it != CurrentBolusStatusResponse.CurrentBolusStatus.REQUESTING &&
+                            it != CurrentBolusStatusResponse.CurrentBolusStatus.DELIVERING
+                        } == true
+                    ) "Done" else "OK"
+                )
             }
         }
     )

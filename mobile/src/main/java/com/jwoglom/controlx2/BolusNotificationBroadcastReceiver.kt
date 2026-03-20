@@ -203,7 +203,19 @@ class BolusNotificationBroadcastReceiver : BroadcastReceiver() {
                                 "The ${bolusSummaryText(initiateRequest)} $statusText"
                             )
                             
-                            if (currentBolusId != 0) {
+                            if (bolusCompleted || currentBolusId == 0) {
+                                val dismissIntent =
+                                    Intent(context, BolusNotificationBroadcastReceiver::class.java).apply {
+                                        putExtra("action", "DISMISS")
+                                    }
+                                val dismissPendingIntent = PendingIntent.getBroadcast(
+                                    context,
+                                    2004,
+                                    dismissIntent,
+                                    PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_ONE_SHOT
+                                )
+                                notificationBuilder.addAction(R.drawable.confirm, "Done", dismissPendingIntent)
+                            } else {
                                 val cancelIntent =
                                     Intent(context, BolusNotificationBroadcastReceiver::class.java).apply {
                                         putExtra("action", "CANCEL")
@@ -252,6 +264,11 @@ class BolusNotificationBroadcastReceiver : BroadcastReceiver() {
                 )
                 resetBolusPrefs(context)
                 sendMessageWhenReady(messageBus, "/to-wear/bolus-rejected", "from_phone".toByteArray(), context)
+            }
+            "DISMISS" -> {
+                val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+                notificationManager.cancel(notifId)
+                resetBolusPrefs(context)
             }
             "CANCEL" -> {
                 stopBolusStatusUpdates(context)

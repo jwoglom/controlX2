@@ -24,6 +24,8 @@ import androidx.compose.foundation.layout.size
 import android.os.SystemClock
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.DirectionsRun
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.KingBed
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -49,6 +51,7 @@ import androidx.navigation.NavType
 import androidx.navigation.navArgument
 import androidx.wear.compose.material.Button
 import androidx.wear.compose.material.ButtonDefaults
+import androidx.wear.compose.material.Icon
 import androidx.wear.compose.material.MaterialTheme
 import androidx.wear.compose.material.PositionIndicator
 import androidx.wear.compose.material.Scaffold
@@ -329,11 +332,9 @@ fun WearApp(
                                 onClick = {
                                     navController.navigate(Screen.Landing.route)
                                 },
-                                colors = ButtonDefaults.secondaryButtonColors(),
-                                modifier = Modifier.fillMaxWidth()
-
+                                colors = ButtonDefaults.secondaryButtonColors()
                             ) {
-                                Text("Cancel")
+                                Icon(imageVector = Icons.Filled.Clear, contentDescription = "Cancel")
                             }
                         },
                         positiveButton = {
@@ -345,11 +346,9 @@ fun WearApp(
                                                 SetModesRequest(SetModesRequest.ModeCommand.SLEEP_MODE_OFF)
                                             ))
                                         },
-                                        colors = ButtonDefaults.secondaryButtonColors(),
-                                        modifier = Modifier.fillMaxWidth()
-
+                                        colors = ButtonDefaults.primaryButtonColors()
                                     ) {
-                                        Text("Disable")
+                                        Icon(imageVector = Icons.Filled.Check, contentDescription = "Disable Sleep mode")
                                     }
 
                                 UserMode.NONE ->
@@ -359,15 +358,12 @@ fun WearApp(
                                                 SetModesRequest(SetModesRequest.ModeCommand.SLEEP_MODE_ON)
                                             ))
                                         },
-                                        colors = ButtonDefaults.secondaryButtonColors(),
-                                        modifier = Modifier.fillMaxWidth()
-
+                                        colors = ButtonDefaults.primaryButtonColors()
                                     ) {
-                                        Text("Enable")
+                                        Icon(imageVector = Icons.Filled.Check, contentDescription = "Enable Sleep mode")
                                     }
                                 else -> {}
                             }
-
                         },
                         icon = {
                             Image(
@@ -399,11 +395,9 @@ fun WearApp(
                                 onClick = {
                                     navController.navigate(Screen.Landing.route)
                                 },
-                                colors = ButtonDefaults.secondaryButtonColors(),
-                                modifier = Modifier.fillMaxWidth()
-
+                                colors = ButtonDefaults.secondaryButtonColors()
                             ) {
-                                Text("Cancel")
+                                Icon(imageVector = Icons.Filled.Clear, contentDescription = "Cancel")
                             }
                         },
                         positiveButton = {
@@ -415,11 +409,9 @@ fun WearApp(
                                                 SetModesRequest(SetModesRequest.ModeCommand.EXERCISE_MODE_OFF)
                                             ))
                                         },
-                                        colors = ButtonDefaults.secondaryButtonColors(),
-                                        modifier = Modifier.fillMaxWidth()
-
+                                        colors = ButtonDefaults.primaryButtonColors()
                                     ) {
-                                        Text("Disable")
+                                        Icon(imageVector = Icons.Filled.Check, contentDescription = "Disable Exercise mode")
                                     }
 
                                 UserMode.NONE ->
@@ -429,15 +421,12 @@ fun WearApp(
                                                 SetModesRequest(SetModesRequest.ModeCommand.EXERCISE_MODE_ON)
                                             ))
                                         },
-                                        colors = ButtonDefaults.secondaryButtonColors(),
-                                        modifier = Modifier.fillMaxWidth()
-
+                                        colors = ButtonDefaults.primaryButtonColors()
                                     ) {
-                                        Text("Enable")
+                                        Icon(imageVector = Icons.Filled.Check, contentDescription = "Enable Exercise mode")
                                     }
                                 else -> {}
                             }
-
                         },
                         icon = {
                             Image(
