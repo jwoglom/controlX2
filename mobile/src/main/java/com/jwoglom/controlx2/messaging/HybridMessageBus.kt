@@ -41,28 +41,16 @@ class HybridMessageBus(
         override fun onMessageReceived(path: String, data: ByteArray, sourceNodeId: String) {
             //Timber.d("HybridMessageBus: Message from Wear transport: $path")
 
-            when {
-                // /to-phone/* from Wear: re-broadcast locally AND notify directly.
-                // The broadcast reaches CommService cross-process; direct notify
-                // reaches in-process listeners immediately.
-                path.startsWith("/to-phone/") -> {
-                    broadcastBus.sendMessage(path, data, MessageBusSender.WEAR_UI)
-                    notifyListeners(path, data, sourceNodeId)
-                }
-
-                // /to-pump/* from Wear: only notify listeners directly.
-                // Both CommService and MainActivity have their own HybridMessageBus
-                // with independent WearMessageBus instances, so each receives the
-                // Wear message independently. Re-broadcasting would cause duplicates.
-                path.startsWith("/to-pump/") -> {
-                    notifyListeners(path, data, sourceNodeId)
-                }
-
-                // Other messages (like /from-pump/*) come via Broadcast transport instead.
-                else -> {
-                    //Timber.d("HybridMessageBus: Ignoring message from Wear transport (will come via Broadcast): $path")
-                }
+            // Forward /to-phone/* and /to-pump/* messages from Wear transport.
+            // Only call notifyListeners (no re-broadcast) because both CommService
+            // and MainActivity have their own HybridMessageBus with independent
+            // WearMessageBus instances that each receive the Wear message.
+            // Re-broadcasting causes duplicate processing (e.g., confirmBolusRequest
+            // called twice, overwriting the bolus secret and causing hash mismatch).
+            if (path.startsWith("/to-phone/") || path.startsWith("/to-pump/")) {
+                notifyListeners(path, data, sourceNodeId)
             }
+            // Other messages (like /from-pump/*) come via Broadcast transport instead.
         }
     }
 
