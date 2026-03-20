@@ -21,6 +21,7 @@ import androidx.compose.foundation.layout.wrapContentSize
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -35,6 +36,8 @@ import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.input.pointer.pointerInteropFilter
 import androidx.compose.ui.input.rotary.onRotaryScrollEvent
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
@@ -191,73 +194,75 @@ fun DecimalNumberPicker(
                     .fillMaxWidth()
                     .weight(0.5f)
             )
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.Center
-            ) {
-                Spacer(Modifier.width(8.dp))
-                PickerWithRSB(
-                    readOnly = selectedColumn != 0,
-                    state = leftState,
-                    focusRequester = focusRequesterLeft,
-                    modifier = Modifier
-                        .size(64.dp, 100.dp)
-                        .onRotaryScrollEvent {
-                            coroutineScope.launch {
-                                leftState.scrollBy(rotaryScrollCalc(it.verticalScrollPixels))
-                            }
-                            true
-                        },
-                    readOnlyLabel = { LabelText("") }
-                ) { leftNumber: Int ->
-                    if (leftNumber > maxNumber) {
-                        Spacer(Modifier.height(50.dp))
-                    } else {
-                        NumberPiece(
-                            selected = selectedColumn == 0,
-                            onSelected = { selectedColumn = 0 },
-                            text = "%2d".format(leftNumber),
-                            style = textStyle
-                        )
+            CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.Center
+                ) {
+                    Spacer(Modifier.width(8.dp))
+                    PickerWithRSB(
+                        readOnly = selectedColumn != 0,
+                        state = leftState,
+                        focusRequester = focusRequesterLeft,
+                        modifier = Modifier
+                            .size(64.dp, 100.dp)
+                            .onRotaryScrollEvent {
+                                coroutineScope.launch {
+                                    leftState.scrollBy(rotaryScrollCalc(it.verticalScrollPixels))
+                                }
+                                true
+                            },
+                        readOnlyLabel = { LabelText("") }
+                    ) { leftNumber: Int ->
+                        if (leftNumber > maxNumber) {
+                            Spacer(Modifier.height(50.dp))
+                        } else {
+                            NumberPiece(
+                                selected = selectedColumn == 0,
+                                onSelected = { selectedColumn = 0 },
+                                text = "%2d".format(leftNumber),
+                                style = textStyle
+                            )
+                        }
+
                     }
 
-                }
+                    Spacer(Modifier.width(2.dp))
+                    Text(
+                        text = java.text.DecimalFormatSymbols.getInstance().decimalSeparator.toString(),
+                        style = textStyle,
+                        color = MaterialTheme.colors.onBackground
+                    )
+                    Spacer(Modifier.width(2.dp))
 
-                Spacer(Modifier.width(2.dp))
-                Text(
-                    text = java.text.DecimalFormatSymbols.getInstance().decimalSeparator.toString(),
-                    style = textStyle,
-                    color = MaterialTheme.colors.onBackground
-                )
-                Spacer(Modifier.width(2.dp))
-
-                PickerWithRSB(
-                    readOnly = selectedColumn != 1,
-                    state = rightState,
-                    focusRequester = focusRequesterRight,
-                    modifier = Modifier
-                        .size(64.dp, 100.dp)
-                        .onRotaryScrollEvent {
-                            coroutineScope.launch {
-                                rightState.scrollBy(rotaryScrollCalc(it.verticalScrollPixels))
-                            }
-                            true
-                        },
-                    readOnlyLabel = { LabelText("") },
-                ) { rightNumber: Int ->
-                    if (rightNumber > 10 * maxNumber) {
-                        Spacer(Modifier.height(50.dp))
-                    } else {
-                        NumberPiece(
-                            selected = selectedColumn == 1,
-                            onSelected = { selectedColumn = 1 },
-                            text = "%1d".format(rightNumber % 10),
-                            style = textStyle
-                        )
+                    PickerWithRSB(
+                        readOnly = selectedColumn != 1,
+                        state = rightState,
+                        focusRequester = focusRequesterRight,
+                        modifier = Modifier
+                            .size(64.dp, 100.dp)
+                            .onRotaryScrollEvent {
+                                coroutineScope.launch {
+                                    rightState.scrollBy(rotaryScrollCalc(it.verticalScrollPixels))
+                                }
+                                true
+                            },
+                        readOnlyLabel = { LabelText("") },
+                    ) { rightNumber: Int ->
+                        if (rightNumber > 10 * maxNumber) {
+                            Spacer(Modifier.height(50.dp))
+                        } else {
+                            NumberPiece(
+                                selected = selectedColumn == 1,
+                                onSelected = { selectedColumn = 1 },
+                                text = "%1d".format(rightNumber % 10),
+                                style = textStyle
+                            )
+                        }
                     }
+                    Spacer(Modifier.width(8.dp))
                 }
-                Spacer(Modifier.width(8.dp))
             }
             Spacer(
                 Modifier
