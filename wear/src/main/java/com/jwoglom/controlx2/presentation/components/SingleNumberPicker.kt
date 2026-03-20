@@ -68,6 +68,7 @@ fun SingleNumberPicker(
     minNumber: Int = 0,
     defaultNumber: Int = minNumber,
     rotaryScrollCalc: (Float) -> Float = {weight -> weight},
+    displayTransform: ((Int) -> String)? = null,
 ) {
     // Omit scaling according to Settings > Display > Font size for this screen,
     val typography = MaterialTheme.typography.copy(
@@ -169,7 +170,7 @@ fun SingleNumberPicker(
                         NumberPiece(
                             selected = true,
                             onSelected = {  },
-                            text = "${minNumber+leftNumber}",
+                            text = displayTransform?.invoke(minNumber + leftNumber) ?: "${minNumber+leftNumber}",
                             style = textStyle
                         )
                     }

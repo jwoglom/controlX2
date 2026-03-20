@@ -57,6 +57,7 @@ import com.jwoglom.pumpx2.pump.messages.response.currentStatus.ControlIQIOBRespo
 import com.jwoglom.pumpx2.pump.messages.response.currentStatus.ControlIQInfoAbstractResponse
 import com.jwoglom.pumpx2.pump.messages.response.currentStatus.ControlIQInfoAbstractResponse.UserModeType
 import com.jwoglom.pumpx2.pump.messages.response.currentStatus.CurrentBasalStatusResponse
+import com.jwoglom.pumpx2.pump.messages.response.currentStatus.TempRateResponse
 import com.jwoglom.pumpx2.pump.messages.response.currentStatus.CurrentBatteryAbstractResponse
 import com.jwoglom.pumpx2.pump.messages.response.currentStatus.CurrentBolusStatusResponse
 import com.jwoglom.pumpx2.pump.messages.response.currentStatus.CurrentEGVGuiDataResponse
@@ -424,6 +425,10 @@ class MainActivity : ComponentActivity(), MessageClient.OnMessageReceivedListene
             }
             is CurrentBasalStatusResponse -> {
                 dataStore.basalRate.value = "${twoDecimalPlaces1000Unit(message.currentBasalRate)}u"
+            }
+            is TempRateResponse -> {
+                dataStore.tempRateActive.value = message.active
+                dataStore.tempRateDetails.value = message
             }
             is CGMStatusResponse -> {
                 dataStore.cgmSessionState.value = when (message.sessionState) {

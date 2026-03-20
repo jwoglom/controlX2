@@ -46,4 +46,9 @@ sealed class Screen(
     object BolusNotEnabled : Screen("BolusNotEnabled")
     object BolusRejectedOnPhone : Screen("BolusRejectedOnPhone")
 
+    object TempBasal : Screen("TempBasal")
+    object TempBasalSelectPercent : Screen("TempBasalSelectPercent")
+    object TempBasalSelectUnitsPerHr : Screen("TempBasalSelectUnitsPerHr")
+    object TempBasalSelectDurationHours : Screen("TempBasalSelectDurationHours")
+    object TempBasalSelectDurationMinutes : Screen("TempBasalSelectDurationMinutes")
 }

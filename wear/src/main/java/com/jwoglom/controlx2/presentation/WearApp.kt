@@ -80,6 +80,9 @@ import com.jwoglom.controlx2.presentation.navigation.DestinationScrollType
 import com.jwoglom.controlx2.presentation.navigation.SCROLL_TYPE_NAV_ARGUMENT
 import com.jwoglom.controlx2.presentation.navigation.Screen
 import com.jwoglom.controlx2.presentation.ui.BolusScreen
+import com.jwoglom.controlx2.presentation.ui.TempBasalScreen
+import com.jwoglom.controlx2.presentation.ui.resetTempBasalDataStoreState
+import com.jwoglom.controlx2.presentation.ui.components.tempbasal.TempBasalRateMode
 import com.jwoglom.controlx2.presentation.ui.FullScreenText
 import com.jwoglom.controlx2.presentation.ui.IndeterminateProgressIndicator
 import com.jwoglom.controlx2.presentation.ui.LandingScreen
@@ -153,6 +156,20 @@ fun WearApp(
             bolusUnitsUserInput = null
             bolusCarbsGramsUserInput = null
             bolusBgMgdlUserInput = null
+        }
+
+        // Temp basal user input state
+        var tempBasalPercentUserInput by remember { mutableStateOf<Int?>(null) }
+        var tempBasalUnitsPerHrUserInput by remember { mutableStateOf<Double?>(null) }
+        var tempBasalDurationHoursUserInput by remember { mutableStateOf<Int?>(null) }
+        var tempBasalDurationMinutesUserInput by remember { mutableStateOf<Int?>(null) }
+        var tempBasalRateMode by remember { mutableStateOf(TempBasalRateMode.PERCENT) }
+
+        val resetSavedTempBasalEnteredState: () -> Unit = {
+            tempBasalPercentUserInput = null
+            tempBasalUnitsPerHrUserInput = null
+            tempBasalDurationHoursUserInput = null
+            tempBasalDurationMinutesUserInput = null
         }
 
         LaunchedEffect (Unit) {
@@ -304,6 +321,7 @@ fun WearApp(
                         sendPhoneCommand = sendPhoneCommand,
                         sendPhoneOpenActivity = sendPhoneOpenActivity,
                         resetSavedBolusEnteredState = resetSavedBolusEnteredState,
+                        resetSavedTempBasalEnteredState = resetSavedTempBasalEnteredState,
                     )
 
                     RequestFocusOnResume(focusRequester)
@@ -616,6 +634,137 @@ fun WearApp(
                             color = MaterialTheme.colors.onBackground
                         )
                     }
+                    BottomText()
+                }
+
+                // Temp Basal Screen
+                composable(
+                    route = Screen.TempBasal.route,
+                    arguments = listOf(
+                        navArgument(SCROLL_TYPE_NAV_ARGUMENT) {
+                            type = NavType.EnumType(DestinationScrollType::class.java)
+                            defaultValue = DestinationScrollType.SCALING_LAZY_COLUMN_SCROLLING
+                        }
+                    )
+                ) {
+                    val scalingLazyListState = scalingLazyListState(it)
+                    val focusRequester = remember { FocusRequester() }
+
+                    TempBasalScreen(
+                        scalingLazyListState = scalingLazyListState,
+                        focusRequester = focusRequester,
+                        tempBasalPercentUserInput = tempBasalPercentUserInput,
+                        tempBasalUnitsPerHrUserInput = tempBasalUnitsPerHrUserInput,
+                        tempBasalDurationHoursUserInput = tempBasalDurationHoursUserInput,
+                        tempBasalDurationMinutesUserInput = tempBasalDurationMinutesUserInput,
+                        rateMode = tempBasalRateMode,
+                        onToggleRateMode = {
+                            tempBasalRateMode = when (tempBasalRateMode) {
+                                TempBasalRateMode.PERCENT -> TempBasalRateMode.UNITS_PER_HR
+                                TempBasalRateMode.UNITS_PER_HR -> TempBasalRateMode.PERCENT
+                            }
+                        },
+                        onClickPercent = {
+                            navController.navigate(Screen.TempBasalSelectPercent.route)
+                        },
+                        onClickUnitsPerHr = {
+                            navController.navigate(Screen.TempBasalSelectUnitsPerHr.route)
+                        },
+                        onClickDurationHours = {
+                            navController.navigate(Screen.TempBasalSelectDurationHours.route)
+                        },
+                        onClickDurationMinutes = {
+                            navController.navigate(Screen.TempBasalSelectDurationMinutes.route)
+                        },
+                        onClickLanding = {
+                            navController.navigate(Screen.Landing.route)
+                        },
+                        sendPumpCommands = sendPumpCommands,
+                    )
+
+                    RequestFocusOnResume(focusRequester)
+                    BottomText()
+                }
+
+                // Temp Basal Percent Picker (5% increments, 0-250%)
+                composable(Screen.TempBasalSelectPercent.route) {
+                    SingleNumberPicker(
+                        label = "%",
+                        minNumber = 0,
+                        maxNumber = 50,
+                        defaultNumber = when {
+                            tempBasalPercentUserInput != null -> tempBasalPercentUserInput!! / 5
+                            else -> 20 // 100%
+                        },
+                        rotaryScrollCalc = rotaryExponentialScroll(1.3f),
+                        onNumberConfirm = {
+                            navController.popBackStack()
+                            tempBasalPercentUserInput = it * 5
+                        },
+                        displayTransform = { "${it * 5}%" },
+                    )
+                    BottomText()
+                }
+
+                // Temp Basal Units/hr Picker (0.05 increments)
+                composable(Screen.TempBasalSelectUnitsPerHr.route) {
+                    val ds = LocalDataStore.current
+                    val basalRateStr = ds.basalRate.observeAsState()
+                    val currentBasalRate = basalRateStr.value?.replace("u", "")?.toDoubleOrNull() ?: 1.0
+                    val maxUnitsPerHr = currentBasalRate * 2.5 // 250%
+                    val maxSteps = (maxUnitsPerHr / 0.05).toInt()
+
+                    SingleNumberPicker(
+                        label = "u/hr",
+                        minNumber = 0,
+                        maxNumber = maxSteps,
+                        defaultNumber = when {
+                            tempBasalUnitsPerHrUserInput != null -> (tempBasalUnitsPerHrUserInput!! / 0.05).toInt()
+                            else -> (currentBasalRate / 0.05).toInt() // default to current rate
+                        },
+                        rotaryScrollCalc = rotaryExponentialScroll(1.3f),
+                        onNumberConfirm = {
+                            navController.popBackStack()
+                            tempBasalUnitsPerHrUserInput = it * 0.05
+                        },
+                        displayTransform = { "${String.format("%.2f", it * 0.05)}" },
+                    )
+                    BottomText()
+                }
+
+                // Temp Basal Duration Hours Picker
+                composable(Screen.TempBasalSelectDurationHours.route) {
+                    SingleNumberPicker(
+                        label = "Hours",
+                        minNumber = 0,
+                        maxNumber = 72,
+                        defaultNumber = tempBasalDurationHoursUserInput ?: 0,
+                        rotaryScrollCalc = rotaryExponentialScroll(1.3f),
+                        onNumberConfirm = {
+                            navController.popBackStack()
+                            tempBasalDurationHoursUserInput = it
+                        }
+                    )
+                    BottomText()
+                }
+
+                // Temp Basal Duration Minutes Picker (15-min increments)
+                composable(Screen.TempBasalSelectDurationMinutes.route) {
+                    SingleNumberPicker(
+                        label = "Mins",
+                        minNumber = 0,
+                        maxNumber = 3,
+                        defaultNumber = when {
+                            tempBasalDurationMinutesUserInput != null -> tempBasalDurationMinutesUserInput!! / 15
+                            else -> 0
+                        },
+                        rotaryScrollCalc = rotaryExponentialScroll(1.3f),
+                        onNumberConfirm = {
+                            navController.popBackStack()
+                            tempBasalDurationMinutesUserInput = it * 15
+                        },
+                        displayTransform = { "${it * 15}" },
+                    )
                     BottomText()
                 }
             }

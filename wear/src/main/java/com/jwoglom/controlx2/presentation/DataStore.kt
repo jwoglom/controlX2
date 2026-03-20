@@ -10,6 +10,7 @@ import com.jwoglom.pumpx2.pump.messages.calculator.BolusCalcUnits
 import com.jwoglom.pumpx2.pump.messages.calculator.BolusCalculatorBuilder
 import com.jwoglom.pumpx2.pump.messages.calculator.BolusParameters
 import com.jwoglom.pumpx2.pump.messages.response.control.BolusPermissionResponse
+import com.jwoglom.pumpx2.pump.messages.response.currentStatus.TempRateResponse
 import com.jwoglom.pumpx2.pump.messages.response.control.CancelBolusResponse
 import com.jwoglom.pumpx2.pump.messages.response.control.InitiateBolusResponse
 import com.jwoglom.pumpx2.pump.messages.response.control.RemoteCarbEntryResponse
@@ -75,6 +76,9 @@ class DataStore {
     val lastBolusStatusResponse = MutableLiveData<LastBolusStatusAbstractResponse>()
     val bolusCurrentResponse = MutableLiveData<CurrentBolusStatusResponse>()
 
+    val tempRateActive = MutableLiveData<Boolean>()
+    val tempRateDetails = MutableLiveData<TempRateResponse>()
+
     private fun <T> MutableLiveData<T>.logOnChange(fieldName: String) {
         var initialized = false
         var previous: Any? = null
@@ -139,5 +143,8 @@ class DataStore {
         bolusInitiateResponse.logOnChange("bolusInitiateResponse")
         bolusCancelResponse.logOnChange("bolusCancelResponse")
         bolusCurrentResponse.logOnChange("bolusCurrentResponse")
+
+        tempRateActive.logOnChange("tempRateActive")
+        tempRateDetails.logOnChange("tempRateDetails")
     }
 }

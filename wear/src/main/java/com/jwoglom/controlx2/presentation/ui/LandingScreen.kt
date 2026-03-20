@@ -70,6 +70,7 @@ fun LandingScreen(
     sendPhoneCommand: (String) -> Unit,
     sendPhoneOpenActivity: () -> Unit,
     resetSavedBolusEnteredState: () -> Unit,
+    resetSavedTempBasalEnteredState: () -> Unit = {},
     navController: NavHostController,
     modifier: Modifier = Modifier,
 ) {
@@ -180,7 +181,15 @@ fun LandingScreen(
                 )
             }
 
-            item { LandingBasalRow() }
+            item {
+                LandingBasalRow(
+                    onClick = {
+                        resetSavedTempBasalEnteredState()
+                        resetTempBasalDataStoreState(dataStore)
+                        navController.navigate(Screen.TempBasal.route)
+                    }
+                )
+            }
 
             item {
                 LandingModeActionsRow(
