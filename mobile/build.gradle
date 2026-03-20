@@ -63,6 +63,10 @@ android {
                 jvmArgs '-noverify'
                 maxHeapSize = '4g'
                 systemProperty 'robolectric.pixelCopyRenderMode', 'hardware'
+                // Snapshot tests require Java 21 + Roborazzi tasks; exclude from normal testDebugUnitTest
+                if (!project.gradle.startParameter.taskNames.any { it.contains('Roborazzi') }) {
+                    exclude '**/snapshots/**'
+                }
             }
         }
     }
