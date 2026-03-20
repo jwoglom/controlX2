@@ -517,6 +517,9 @@ class MainActivity : ComponentActivity(), MessageClient.OnMessageReceivedListene
             "/to-wear/bolus-min-notify-threshold" -> {
                 dataStore.bolusMinNotifyThreshold.value = String(messageEvent.data).toDoubleOrNull()
             }
+            "/to-wear/wear-auto-approve-timeout" -> {
+                dataStore.wearAutoApproveTimeout.value = String(messageEvent.data).toIntOrNull() ?: 0
+            }
             "/to-wear/glucose-unit" -> {
                 val unitName = String(messageEvent.data)
                 val unit = com.jwoglom.controlx2.shared.enums.GlucoseUnit.fromName(unitName)

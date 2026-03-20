@@ -1601,7 +1601,10 @@ class CommService : Service() {
         }
 
         val minNotifyThreshold = Prefs(this).bolusConfirmationInsulinThreshold()
+        val autoApproveTimeout = if (source == BolusRequestSource.WEAR)
+            Prefs(this).wearBolusAutoApproveTimeoutSeconds() else 0
         sendWearCommMessage("/to-wear/bolus-min-notify-threshold", "$minNotifyThreshold".toByteArray())
+        sendWearCommMessage("/to-wear/wear-auto-approve-timeout", "$autoApproveTimeout".toByteArray())
 
         if (InsulinUnit.from1000To1(request.totalVolume) >= minNotifyThreshold || minNotifyThreshold == 0.0) {
             Timber.i("Requesting permission for bolus because $units >= minNotifyThreshold=$minNotifyThreshold")
@@ -1609,7 +1612,8 @@ class CommService : Service() {
             val builder = confirmBolusRequestBaseNotification(
                 this,
                 "Bolus Request",
-                "$units units. Press Confirm to deliver."
+                if (autoApproveTimeout > 0) "$units units. Auto-approving in ${autoApproveTimeout}s unless canceled."
+                else "$units units. Press Confirm to deliver."
             )
                 .setSound(RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION))
                 .setVibrate(longArrayOf(500L, 500L, 500L, 500L, 500L, 500L, 500L, 500L, 500L, 500L))
@@ -1621,6 +1625,15 @@ class CommService : Service() {
             val notif = builder.build()
             Timber.i("bolus notification $bolusNotificationId $builder $notif")
             makeNotif(bolusNotificationId, notif)
+
+            // Broadcast to phone UI for in-app dialog
+            sendWearCommMessage("/to-phone/bolus-confirm-dialog",
+                "${Hex.encodeHexString(PumpMessageSerializer.toBytes(request))}|${source.id}|$autoApproveTimeout".toByteArray())
+
+            // Schedule auto-approve if timeout is set
+            if (autoApproveTimeout > 0) {
+                scheduleAutoApprove(autoApproveTimeout, getConfirmIntent())
+            }
         } else {
             Timber.i("Sending immediate bolus request because $units is less than minNotifyThreshold=$minNotifyThreshold")
 
@@ -1638,6 +1651,40 @@ class CommService : Service() {
             // wait to avoid prefs not being saved
             Thread.sleep(250)
             confirmPendingIntent.send()
+        }
+    }
+
+    private fun scheduleAutoApprove(timeoutSeconds: Int, confirmIntent: PendingIntent) {
+        cancelAutoApproveStatic(this)
+        val handler = Handler(Looper.getMainLooper())
+        _autoApproveHandler = handler
+        val runnable = Runnable {
+            Timber.i("Auto-approving bolus after ${timeoutSeconds}s timeout")
+            try {
+                confirmIntent.send()
+            } catch (e: PendingIntent.CanceledException) {
+                Timber.w("Auto-approve PendingIntent already cancelled (bolus was manually handled)")
+            }
+            _autoApproveRunnable = null
+            _autoApproveHandler = null
+        }
+        _autoApproveRunnable = runnable
+        handler.postDelayed(runnable, timeoutSeconds * 1000L)
+    }
+
+    companion object {
+        @Volatile
+        private var _autoApproveHandler: Handler? = null
+        @Volatile
+        private var _autoApproveRunnable: Runnable? = null
+
+        fun cancelAutoApproveStatic(context: Context?) {
+            _autoApproveRunnable?.let { runnable ->
+                _autoApproveHandler?.removeCallbacks(runnable)
+                Timber.i("Auto-approve timer cancelled")
+            }
+            _autoApproveRunnable = null
+            _autoApproveHandler = null
         }
     }
 

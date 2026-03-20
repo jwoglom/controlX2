@@ -66,6 +66,7 @@ class DataStore {
     val bolusFinalCalcUnits = MutableLiveData<BolusCalcUnits>()
     val bolusFinalConditions = MutableLiveData<Set<BolusCalcCondition>>()
     val bolusMinNotifyThreshold = MutableLiveData<Double>()
+    val wearAutoApproveTimeout = MutableLiveData<Int>()
 
     val timeSinceResetResponse = MutableLiveData<TimeSinceResetResponse>()
     val bolusPermissionResponse = MutableLiveData<BolusPermissionResponse>()
@@ -132,6 +133,7 @@ class DataStore {
         bolusFinalCalcUnits.logOnChange("bolusFinalCalcUnits")
         bolusFinalConditions.logOnChange("bolusFinalConditions")
         bolusMinNotifyThreshold.logOnChange("bolusMinNotifyThreshold")
+        wearAutoApproveTimeout.logOnChange("wearAutoApproveTimeout")
 
         timeSinceResetResponse.logOnChange("timeSinceResetResponse")
         bolusPermissionResponse.logOnChange("bolusPermissionResponse")

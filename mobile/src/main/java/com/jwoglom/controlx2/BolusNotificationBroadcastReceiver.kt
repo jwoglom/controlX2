@@ -25,6 +25,7 @@ import com.jwoglom.pumpx2.pump.messages.request.currentStatus.CurrentBolusStatus
 import com.jwoglom.pumpx2.pump.messages.response.control.InitiateBolusResponse
 import com.jwoglom.pumpx2.pump.messages.response.currentStatus.CurrentBolusStatusResponse
 import com.jwoglom.pumpx2.shared.Hex
+import com.jwoglom.controlx2.Prefs
 import timber.log.Timber
 import java.time.Instant
 
@@ -39,6 +40,7 @@ class BolusNotificationBroadcastReceiver : BroadcastReceiver() {
         val notifId = getCurrentNotificationId(context)
         when (action) {
             "INITIATE" -> {
+                CommService.cancelAutoApproveStatic(context)
                 validateBolusInfo(intent, context)?.let { intentRequest ->
                     Timber.w("BolusNotificationBroadcastReceiver performing $intentRequest")
                     val secretKey = prefs(context)?.getString("initiateBolusSecret", "") ?: ""
@@ -239,6 +241,7 @@ class BolusNotificationBroadcastReceiver : BroadcastReceiver() {
                 }
             }
             "REJECT" -> {
+                CommService.cancelAutoApproveStatic(context)
                 stopBolusStatusUpdates(context)
                 reply(
                     context, notifId, confirmBolusRequestBaseNotification(
@@ -373,8 +376,14 @@ class BolusNotificationBroadcastReceiver : BroadcastReceiver() {
 
         val nowMillis = Instant.now().toEpochMilli()
 
-        // Bolus expires after 1 minute
-        if (nowMillis - initiateMillis > 60 * 1000) {
+        // Bolus expires after 1 minute, or after auto-approve timeout + 30s buffer
+        val autoApproveTimeout = Prefs(context!!).wearBolusAutoApproveTimeoutSeconds()
+        val expiryMs = if (autoApproveTimeout > 0) {
+            (autoApproveTimeout + 30) * 1000L
+        } else {
+            60 * 1000L
+        }
+        if (nowMillis - initiateMillis > expiryMs) {
             return nowMillis - initiateMillis
         }
 

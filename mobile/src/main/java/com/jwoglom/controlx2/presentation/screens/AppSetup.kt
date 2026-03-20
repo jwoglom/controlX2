@@ -62,6 +62,7 @@ fun AppSetup(
     var connectionSharingEnabled by remember { mutableStateOf(Prefs(context).connectionSharingEnabled()) }
     var insulinDeliveryActions by remember { mutableStateOf(Prefs(context).insulinDeliveryActions()) }
     var bolusConfirmationInsulinThreshold by remember { mutableStateOf(Prefs(context).bolusConfirmationInsulinThreshold()) }
+    var wearAutoApproveTimeout by remember { mutableStateOf(Prefs(context).wearBolusAutoApproveTimeoutSeconds()) }
     var checkForUpdates by remember { mutableStateOf(Prefs(context).checkForUpdates()) }
     var autoFetchHistoryLogs by remember { mutableStateOf(Prefs(context).autoFetchHistoryLogs()) }
     var glucoseUnit by remember { mutableStateOf(Prefs(context).glucoseUnit()) }
@@ -69,6 +70,7 @@ fun AppSetup(
     var showGlucoseUnitDialog by remember { mutableStateOf(false) }
     var showInsulinWarningDialog by remember { mutableStateOf(false) }
     var showBolusThresholdDialog by remember { mutableStateOf(false) }
+    var showWearAutoApproveDialog by remember { mutableStateOf(false) }
     var showUpdatesWarningDialog by remember { mutableStateOf(false) }
 
     DialogScreen(
@@ -207,6 +209,38 @@ fun AppSetup(
                     },
                     modifier = Modifier.clickable {
                         showBolusThresholdDialog = true
+                    }
+                )
+                Divider()
+            }
+        }
+        item {
+            if (insulinDeliveryActions || preview) {
+                ListItem(
+                    headlineContent = {
+                        Text("Wear Auto-Approve Timeout")
+                    },
+                    supportingContent = {
+                        Text(
+                            when (wearAutoApproveTimeout) {
+                                0 -> "Never auto-approve (require manual confirmation)"
+                                else -> "Auto-approve after ${wearAutoApproveTimeout}s if not canceled"
+                            }
+                        )
+                    },
+                    trailingContent = {
+                        Text(
+                            text = when (wearAutoApproveTimeout) {
+                                0 -> "never"
+                                60 -> "1 min"
+                                300 -> "5 min"
+                                else -> "${wearAutoApproveTimeout}s"
+                            },
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    },
+                    modifier = Modifier.clickable {
+                        showWearAutoApproveDialog = true
                     }
                 )
                 Divider()
@@ -382,6 +416,55 @@ fun AppSetup(
             },
             dismissButton = {
                 TextButton(onClick = { showUpdatesWarningDialog = false }) {
+                    Text("Cancel")
+                }
+            }
+        )
+    }
+
+    // Wear Auto-Approve Timeout Dialog
+    if (showWearAutoApproveDialog) {
+        val options = listOf(
+            0 to "Never (require manual confirmation)",
+            30 to "30 seconds",
+            60 to "1 minute",
+            300 to "5 minutes",
+        )
+        AlertDialog(
+            onDismissRequest = { showWearAutoApproveDialog = false },
+            title = { Text("Wear Auto-Approve Timeout") },
+            text = {
+                Column {
+                    Text(
+                        "When a bolus is requested from the watch, it will be auto-approved after this timeout unless canceled on the phone.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(bottom = 8.dp)
+                    )
+                    options.forEach { (seconds, label) ->
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable {
+                                    wearAutoApproveTimeout = seconds
+                                    Prefs(context).setWearBolusAutoApproveTimeoutSeconds(seconds)
+                                    showWearAutoApproveDialog = false
+                                }
+                                .padding(vertical = 12.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            RadioButton(
+                                selected = wearAutoApproveTimeout == seconds,
+                                onClick = null
+                            )
+                            Spacer(Modifier.width(8.dp))
+                            Text(text = label)
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { showWearAutoApproveDialog = false }) {
                     Text("Cancel")
                 }
             }

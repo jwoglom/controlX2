@@ -49,6 +49,7 @@ import com.jwoglom.controlx2.presentation.screens.sections.messagePairToJson
 import com.jwoglom.controlx2.presentation.screens.sections.verbosePumpMessage
 import com.jwoglom.controlx2.presentation.util.ShouldLogToFile
 import com.jwoglom.controlx2.shared.PumpMessageSerializer
+import com.jwoglom.pumpx2.shared.Hex
 import com.jwoglom.controlx2.shared.enums.BasalStatus
 import com.jwoglom.controlx2.shared.enums.CGMSessionState
 import com.jwoglom.controlx2.shared.enums.GlucoseUnit
@@ -468,6 +469,47 @@ class MainActivity : ComponentActivity() {
     }
 
 
+    private var bolusConfirmDialog: AlertDialog? = null
+
+    private fun showBolusConfirmDialog(units: String, requestBytes: ByteArray, source: String, autoApproveTimeout: Int) {
+        bolusConfirmDialog?.dismiss()
+
+        val message = if (autoApproveTimeout > 0) {
+            "$units units from $source. Will auto-approve in ${autoApproveTimeout}s unless canceled."
+        } else {
+            "$units units from $source. Press Confirm to deliver."
+        }
+
+        bolusConfirmDialog = AlertDialog.Builder(this)
+            .setTitle("Bolus Request")
+            .setMessage(message)
+            .setPositiveButton("Confirm ${units}u") { dialog, _ ->
+                val intent = Intent(applicationContext, BolusNotificationBroadcastReceiver::class.java).apply {
+                    putExtra("action", "INITIATE")
+                    putExtra("request", requestBytes)
+                }
+                val confirmPendingIntent = android.app.PendingIntent.getBroadcast(
+                    this, 2001, intent,
+                    android.app.PendingIntent.FLAG_IMMUTABLE or android.app.PendingIntent.FLAG_ONE_SHOT
+                )
+                confirmPendingIntent.send()
+                dialog.dismiss()
+            }
+            .setNegativeButton("Reject") { dialog, _ ->
+                val intent = Intent(applicationContext, BolusNotificationBroadcastReceiver::class.java).apply {
+                    putExtra("action", "REJECT")
+                }
+                val rejectPendingIntent = android.app.PendingIntent.getBroadcast(
+                    this, 2000, intent,
+                    android.app.PendingIntent.FLAG_IMMUTABLE or android.app.PendingIntent.FLAG_ONE_SHOT
+                )
+                rejectPendingIntent.send()
+                dialog.dismiss()
+            }
+            .setCancelable(false)
+            .show()
+    }
+
     // Message received from Wear or CommService via MessageBus
     private fun handleMessageReceived(path: String, data: ByteArray, sourceNodeId: String) {
         Timber.i("phone messageReceived: $path: ${String(data)} from $sourceNodeId")
@@ -658,6 +700,24 @@ class MainActivity : ComponentActivity() {
                     Timber.i("tracked implicit disconnection (before pump-disconnected)")
                     dataStore.pumpSetupStage.value = dataStore.pumpSetupStage.value?.nextStage(PumpSetupStage.PUMPX2_PUMP_DISCONNECTED)
                     dataStore.pumpConnected.value = false
+                }
+            }
+
+            "/to-phone/bolus-confirm-dialog" -> {
+                val parts = String(data).split("|")
+                if (parts.size >= 3) {
+                    val requestHex = parts[0]
+                    val source = parts[1]
+                    val autoApproveTimeout = parts[2].toIntOrNull() ?: 0
+                    val requestBytes = Hex.decodeHex(requestHex)
+                    val request = PumpMessageSerializer.fromBytes(requestBytes) as? com.jwoglom.pumpx2.pump.messages.request.control.InitiateBolusRequest
+                    if (request != null) {
+                        val units = com.jwoglom.controlx2.shared.util.twoDecimalPlaces(
+                            com.jwoglom.pumpx2.pump.messages.models.InsulinUnit.from1000To1(request.totalVolume))
+                        runOnUiThread {
+                            showBolusConfirmDialog(units, requestBytes, source, autoApproveTimeout)
+                        }
+                    }
                 }
             }
 
@@ -898,6 +958,7 @@ class MainActivity : ComponentActivity() {
             }
             is InitiateBolusResponse -> {
                 dataStore.bolusInitiateResponse.value = message
+                runOnUiThread { bolusConfirmDialog?.dismiss() }
             }
             is CancelBolusResponse -> {
                 if (dataStore.bolusCancelResponse.value == null || message.wasCancelled()) {

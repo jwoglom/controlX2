@@ -120,6 +120,18 @@ class Prefs(val context: Context) {
     }
 
     /**
+     * Auto-approve timeout for wear-originated bolus requests (in seconds).
+     * 0 means never (require manual confirmation).
+     */
+    fun wearBolusAutoApproveTimeoutSeconds(): Int {
+        return prefs().getInt("wear-bolus-auto-approve-timeout-seconds", 0)
+    }
+
+    fun setWearBolusAutoApproveTimeoutSeconds(seconds: Int) {
+        prefs().edit().putInt("wear-bolus-auto-approve-timeout-seconds", seconds).commit()
+    }
+
+    /**
      * Sends basic application version telemetry to the server and enables automatic update checks.
      */
     fun checkForUpdates(): Boolean {
