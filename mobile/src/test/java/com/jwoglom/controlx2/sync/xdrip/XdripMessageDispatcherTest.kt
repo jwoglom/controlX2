@@ -166,4 +166,24 @@ class XdripMessageDispatcherTest {
         assertTrue(broadcaster.statuslinePayloads.isEmpty())
         assertTrue(broadcaster.treatmentPayloads.isEmpty())
     }
+
+    @Test
+    fun onEvent_readsLatestConfigProviderValuesWithoutRestart() {
+        val broadcaster = FakeBroadcaster()
+        var config = XdripSyncConfig(enabled = true, sendCgmSgv = false)
+        val dispatcher = XdripMessageDispatcher(
+            broadcaster = broadcaster,
+            configProvider = { config },
+            nowProvider = { Instant.parse("2026-01-01T00:00:00Z") }
+        )
+
+        dispatcher.onEvent(DispatchEvent.CgmSgv(120))
+        assertTrue(broadcaster.sgvPayloads.isEmpty())
+
+        config = config.copy(sendCgmSgv = true, cgmSgvMinimumIntervalSeconds = 15)
+        dispatcher.onEvent(DispatchEvent.CgmSgv(121))
+
+        assertEquals(1, broadcaster.sgvPayloads.size)
+        assertEquals(15, broadcaster.sgvPayloads.single().minimumIntervalSeconds)
+    }
 }

@@ -53,14 +53,17 @@ fun XdripSettings(
     var config by remember { mutableStateOf(XdripSyncConfig.load(prefs)) }
 
     fun saveConfig(newConfig: XdripSyncConfig, showToastText: String? = null) {
+        val oldConfig = config
         config = newConfig
         XdripSyncConfig.save(prefs, newConfig)
 
-        coroutineScope.launch {
-            delay(250)
-            sendMessage("/to-phone/force-reload", "".toByteArray())
-            delay(250)
-            sendMessage("/to-phone/app-reload", "".toByteArray())
+        if (newConfig.requiresReloadComparedTo(oldConfig)) {
+            coroutineScope.launch {
+                delay(250)
+                sendMessage("/to-phone/force-reload", "".toByteArray())
+                delay(250)
+                sendMessage("/to-phone/app-reload", "".toByteArray())
+            }
         }
 
         if (showToastText != null) {
