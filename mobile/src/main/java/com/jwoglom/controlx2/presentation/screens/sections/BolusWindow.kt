@@ -542,7 +542,7 @@ fun bolusCalcDecision(
 }
 
 fun rawToDouble(s: String?): Double? {
-    return if (s == "") 0.0 else s?.toDoubleOrNull()
+    return if (s == "") 0.0 else s?.replace(',', '.')?.toDoubleOrNull()
 }
 
 fun rawToInt(s: String?): Int? {
