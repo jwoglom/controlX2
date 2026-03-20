@@ -134,10 +134,14 @@ class MainActivity : ComponentActivity() {
         const val EXTRA_TEMP_RATE_PERCENT = "percent"
         const val EXTRA_TEMP_RATE_HOURS = "hours"
         const val EXTRA_TEMP_RATE_MINUTES = "minutes"
+
+        private const val REQUEST_BT_PERMISSIONS = 2
     }
 
     private lateinit var messageBus: MessageBus
     private val sheetLaunchRequestState = mutableStateOf<SheetLaunchRequest?>(null)
+    private var btPermissionsRequestInFlight = false
+    private var notificationPermissionRequestInFlight = false
 
     private val applicationScope = CoroutineScope(SupervisorJob())
     private val historyLogDb by lazy { HistoryLogDatabase.getDatabase(this) }
@@ -212,29 +216,8 @@ class MainActivity : ComponentActivity() {
         })
         // Show warning dialog if Play Services missing (non-blocking)
         checkPlayServicesAndInitialize()
-        checkNotificationPermissions()
-
 
         startCommServiceWithPreconditions()
-    }
-
-    private fun checkNotificationPermissions() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            if (checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED &&
-                ActivityCompat.shouldShowRequestPermissionRationale(
-                    this,
-                    Manifest.permission.POST_NOTIFICATIONS
-                )
-            ) {
-
-                val REQUEST_POST_NOTIFICATIONS = 10023;
-                ActivityCompat.requestPermissions(
-                    this,
-                    arrayOf(Manifest.permission.POST_NOTIFICATIONS),
-                    REQUEST_POST_NOTIFICATIONS
-                )
-            }
-        }
     }
 
     private val writeCharacteristicFailedCallback: (String) -> Unit = { uuid ->
@@ -266,6 +249,8 @@ class MainActivity : ComponentActivity() {
             Timber.i("BTPermissionsCheck not started because TOS not accepted")
         } else if (!Prefs(applicationContext).serviceEnabled()) {
             Timber.i("BTPermissionsCheck not started because service not enabled")
+        } else if (notificationPermissionRequestInFlight || btPermissionsRequestInFlight) {
+            Timber.i("BTPermissionsCheck not started because a permission request is already in flight")
         } else {
             startBTPermissionsCheck()
         }
@@ -296,6 +281,8 @@ class MainActivity : ComponentActivity() {
             Timber.i("commService not started because first TOS not accepted")
         } else if (!Prefs(applicationContext).serviceEnabled()) {
             Timber.i("commService not started because service not enabled")
+        } else if (notificationPermissionRequestInFlight) {
+            Timber.i("commService not started because notification permission request is in flight")
         } else if (!hasCommServicePermissions()) {
             Timber.i("commService not started because required permissions are not granted yet")
             startBTPermissionsCheck()
@@ -490,24 +477,19 @@ class MainActivity : ComponentActivity() {
                 when (String(data)) {
                     "skip_notif_permission" -> {
                         startBTPermissionsCheck()
-                        startCommServiceWithPreconditions()
                         dataStore.pumpSetupStage.value =
                             dataStore.pumpSetupStage.value?.nextStage(PumpSetupStage.WAITING_PUMPX2_INIT)
                     }
                     else -> {
-                        requestNotificationCallback = { isGranted ->
+                        launchNotificationPermissionRequest { isGranted ->
                             if (isGranted) {
                                 startBTPermissionsCheck()
-                                startCommServiceWithPreconditions()
                                 dataStore.pumpSetupStage.value =
                                     dataStore.pumpSetupStage.value?.nextStage(PumpSetupStage.WAITING_PUMPX2_INIT)
                             } else {
                                 dataStore.pumpSetupStage.value =
                                     dataStore.pumpSetupStage.value?.nextStage(PumpSetupStage.PERMISSIONS_NOT_GRANTED)
                             }
-                        }
-                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                            requestNotificationPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
                         }
                     }
                 }
@@ -527,24 +509,19 @@ class MainActivity : ComponentActivity() {
                 when (String(data)) {
                     "skip_notif_permission" -> {
                         startBTPermissionsCheck()
-                        startCommServiceWithPreconditions()
                         dataStore.pumpSetupStage.value =
                             dataStore.pumpSetupStage.value?.nextStage(PumpSetupStage.WAITING_PUMP_FINDER_INIT)
                     }
                     else -> {
-                        requestNotificationCallback = { isGranted ->
+                        launchNotificationPermissionRequest { isGranted ->
                             if (isGranted) {
                                 startBTPermissionsCheck()
-                                startCommServiceWithPreconditions()
                                 dataStore.pumpSetupStage.value =
                                     dataStore.pumpSetupStage.value?.nextStage(PumpSetupStage.WAITING_PUMP_FINDER_INIT)
                             } else {
                                 dataStore.pumpSetupStage.value =
                                     dataStore.pumpSetupStage.value?.nextStage(PumpSetupStage.PERMISSIONS_NOT_GRANTED)
                             }
-                        }
-                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                            requestNotificationPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
                         }
                     }
                 }
@@ -1003,11 +980,16 @@ class MainActivity : ComponentActivity() {
      */
 
     private fun startBTPermissionsCheck() {
+        if (btPermissionsRequestInFlight) {
+            Timber.i("startBTPermissionsCheck skipped because a Bluetooth permission request is already in flight")
+            return
+        }
+
         val missingPermissions = getMissingPermissions(getRequiredPermissions())
         if (missingPermissions.isNotEmpty()) {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-                val ACCESS_LOCATION_REQUEST = 2
-                requestPermissions(missingPermissions, ACCESS_LOCATION_REQUEST)
+                btPermissionsRequestInFlight = true
+                requestPermissions(missingPermissions, REQUEST_BT_PERMISSIONS)
             }
             return
         }
@@ -1151,6 +1133,13 @@ class MainActivity : ComponentActivity() {
     ) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
 
+        if (requestCode != REQUEST_BT_PERMISSIONS) {
+            Timber.i("Ignoring onRequestPermissionsResult for unrelated requestCode=$requestCode")
+            return
+        }
+
+        btPermissionsRequestInFlight = false
+
         // Check if all permission were granted
         var allGranted = true
         for (result in grantResults) {
@@ -1183,7 +1172,29 @@ class MainActivity : ComponentActivity() {
     private val requestNotificationPermission = registerForActivityResult(
         ActivityResultContracts.RequestPermission()
     ) { isGranted: Boolean ->
-        requestNotificationCallback(isGranted)
+        notificationPermissionRequestInFlight = false
+        val callback = requestNotificationCallback
+        requestNotificationCallback = {}
+        callback(isGranted)
+    }
+
+    private fun launchNotificationPermissionRequest(callback: (Boolean) -> Unit) {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) {
+            callback(true)
+            return
+        }
+        if (checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED) {
+            callback(true)
+            return
+        }
+        if (notificationPermissionRequestInFlight) {
+            Timber.i("Notification permission request already in flight")
+            return
+        }
+
+        notificationPermissionRequestInFlight = true
+        requestNotificationCallback = callback
+        requestNotificationPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
     }
 
 
