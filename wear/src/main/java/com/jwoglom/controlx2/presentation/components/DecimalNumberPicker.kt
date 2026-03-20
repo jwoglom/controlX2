@@ -81,14 +81,14 @@ fun DecimalNumberPicker(
         initialNumberOfOptions = maxNumber + 10, // Add extra blank options to prevent accidental selection of the maximum
         initiallySelectedOption = when (defaultNumber) {
             null -> 0
-            else -> defaultNumber.toInt()
+            else -> Math.round(defaultNumber).toInt().coerceAtMost(maxNumber)
         }
     )
     val rightState = rememberPickerState(
         initialNumberOfOptions = 10 * (maxNumber + 10) + 10,
         initiallySelectedOption = when (defaultNumber) {
             null -> 0
-            else -> 10*defaultNumber.toInt() + ((defaultNumber * 10) % 10).toInt()
+            else -> Math.round(defaultNumber * 10).toInt().coerceAtMost(10 * maxNumber)
         }
     )
 
