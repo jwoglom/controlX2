@@ -226,7 +226,7 @@ fun DecimalNumberPicker(
 
                 Spacer(Modifier.width(2.dp))
                 Text(
-                    text = ".",
+                    text = java.text.DecimalFormatSymbols.getInstance().decimalSeparator.toString(),
                     style = textStyle,
                     color = MaterialTheme.colors.onBackground
                 )
