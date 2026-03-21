@@ -66,6 +66,7 @@ fun AppSetup(
     var checkForUpdates by remember { mutableStateOf(Prefs(context).checkForUpdates()) }
     var autoFetchHistoryLogs by remember { mutableStateOf(Prefs(context).autoFetchHistoryLogs()) }
     var glucoseUnit by remember { mutableStateOf(Prefs(context).glucoseUnit()) }
+    var eventToastsEnabled by remember { mutableStateOf(Prefs(context).eventToastsEnabled()) }
 
     var showGlucoseUnitDialog by remember { mutableStateOf(false) }
     var showInsulinWarningDialog by remember { mutableStateOf(false) }
@@ -318,6 +319,30 @@ fun AppSetup(
                 },
                 modifier = Modifier.clickable {
                     showGlucoseUnitDialog = true
+                }
+            )
+            Divider()
+        }
+        item {
+            ListItem(
+                headlineContent = {
+                    Text("Show Event Toasts")
+                },
+                supportingContent = {
+                    Text("Display toast notifications when pump events are received.")
+                },
+                trailingContent = {
+                    Switch(
+                        checked = eventToastsEnabled,
+                        onCheckedChange = {
+                            eventToastsEnabled = it
+                            Prefs(context).setEventToastsEnabled(it)
+                        }
+                    )
+                },
+                modifier = Modifier.clickable {
+                    eventToastsEnabled = !eventToastsEnabled
+                    Prefs(context).setEventToastsEnabled(eventToastsEnabled)
                 }
             )
             Divider()

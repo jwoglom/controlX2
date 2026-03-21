@@ -221,6 +221,17 @@ class Prefs(val context: Context) {
         prefs().edit().putString("dashboard-chart-time-range", timeRange).commit()
     }
 
+    /**
+     * Whether to show toast notifications when pump qualifying events are received
+     */
+    fun eventToastsEnabled(): Boolean {
+        return prefs().getBoolean("event-toasts-enabled", false)
+    }
+
+    fun setEventToastsEnabled(b: Boolean) {
+        prefs().edit().putBoolean("event-toasts-enabled", b).commit()
+    }
+
     fun prefs(): SharedPreferences {
         return context.getSharedPreferences("WearX2", WearableListenerService.MODE_PRIVATE)
     }

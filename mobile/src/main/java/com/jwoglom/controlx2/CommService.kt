@@ -27,6 +27,7 @@ import android.os.Process
 import android.widget.Toast
 import androidx.core.app.NotificationCompat
 import androidx.core.graphics.drawable.IconCompat
+import com.jwoglom.controlx2.Prefs
 import com.jwoglom.controlx2.db.historylog.HistoryLogDatabase
 import com.jwoglom.controlx2.db.historylog.HistoryLogItem
 import com.jwoglom.controlx2.db.historylog.HistoryLogRepo
@@ -334,7 +335,9 @@ class CommService : Service() {
                 events: MutableSet<QualifyingEvent>?
             ) {
                 Timber.i("onReceiveQualifyingEvent: $events")
-                Toast.makeText(this@CommService, "Events: $events", Toast.LENGTH_SHORT).show()
+                if (Prefs(this@CommService).eventToastsEnabled()) {
+                    Toast.makeText(this@CommService, "Events: $events", Toast.LENGTH_SHORT).show()
+                }
                 if (events != null && QualifyingEvent.PUMP_COMMUNICATIONS_SUSPENDED in events) {
                     Timber.w("onReceiveQualifyingEvent: PUMP_COMMUNICATIONS_SUSPENDED — pausing sends")
                     currentSession?.pauseSends(currentSession?.rateLimitConfig?.commSuspendedPauseMs ?: 5_000)
