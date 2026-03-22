@@ -164,6 +164,11 @@ object MessageBusFactory {
     @Volatile
     private var forcedMode: Boolean? = null
 
+    @androidx.annotation.VisibleForTesting
+    fun setInstanceForTesting(bus: MessageBus?) {
+        messageBusInstance = bus
+    }
+
     fun forceWearOsMode(enabled: Boolean) {
         forcedMode = enabled
         Timber.w("MessageBusFactory: Forced mode set to ${if (enabled) "Wear OS" else "Local"}")

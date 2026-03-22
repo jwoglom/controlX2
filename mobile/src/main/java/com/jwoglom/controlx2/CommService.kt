@@ -125,6 +125,11 @@ class CommService : Service() {
     private lateinit var messageBus: MessageBus
     private var httpDebugApiService: HttpDebugApiService? = null
 
+    @androidx.annotation.VisibleForTesting
+    internal fun setMessageBusForTesting(bus: MessageBus) {
+        messageBus = bus
+    }
+
     private var serviceStatusAcknowledged = false
     private val serviceStatusTask = object : Runnable {
         override fun run() {
@@ -1149,7 +1154,8 @@ class CommService : Service() {
 
     override fun onBind(intent: Intent?) = null
 
-    private fun handleMessageReceived(path: String, data: ByteArray, sourceNodeId: String) {
+    @androidx.annotation.VisibleForTesting
+    internal fun handleMessageReceived(path: String, data: ByteArray, sourceNodeId: String) {
         // Ignore noisy loopback logs for pump-originated broadcasts.
         if (!path.startsWith("/from-pump/")) {
             Timber.d("service messageReceived: $path ${String(data)} from $sourceNodeId")
