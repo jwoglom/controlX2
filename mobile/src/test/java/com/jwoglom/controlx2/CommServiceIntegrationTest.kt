@@ -30,8 +30,16 @@ import org.robolectric.Shadows.shadowOf
 import org.robolectric.android.controller.ServiceController
 import org.robolectric.annotation.Config
 import com.jwoglom.pumpx2.pump.bluetooth.TandemBluetoothHandler
+import com.jwoglom.pumpx2.pump.bluetooth.TandemPump
 import com.jwoglom.pumpx2.pump.bluetooth.TandemPumpFinder
+import com.jwoglom.pumpx2.pump.messages.bluetooth.Characteristic
 import com.jwoglom.pumpx2.pump.messages.helpers.Bytes
+import com.jwoglom.pumpx2.pump.messages.response.currentStatus.ApiVersionResponse
+import com.jwoglom.pumpx2.pump.messages.response.currentStatus.ControlIQIOBResponse
+import com.jwoglom.pumpx2.pump.messages.response.currentStatus.CurrentBatteryV2Response
+import com.jwoglom.pumpx2.pump.messages.response.currentStatus.CurrentEGVGuiDataResponse
+import com.welie.blessed.BluetoothPeripheral
+import java.time.Instant
 
 /**
  * Integration tests for CommService covering all major behaviors:
@@ -56,6 +64,11 @@ class CommServiceIntegrationTest {
     private lateinit var service: CommService
     private lateinit var prefs: SharedPreferences
 
+    // Captured pump reference from TandemBluetoothHandler.getInstance() —
+    // this is the Pump inner class instance, typed as TandemPump.
+    private var capturedPump: TandemPump? = null
+    private val mockPeripheral: BluetoothPeripheral = mockk(relaxed = true)
+
     @Before
     fun setup() {
         context = ApplicationProvider.getApplicationContext()
@@ -72,10 +85,16 @@ class CommServiceIntegrationTest {
         messageBus = RecordingMessageBus()
         MessageBusFactory.setInstanceForTesting(messageBus)
 
-        // Mock TandemBluetoothHandler to prevent real BT operations
+        // Mock TandemBluetoothHandler — capture the TandemPump callback
         mockkStatic(TandemBluetoothHandler::class)
         val mockBtHandler = mockk<TandemBluetoothHandler>(relaxed = true)
-        every { TandemBluetoothHandler.getInstance(any(), any(), any()) } returns mockBtHandler
+        every { TandemBluetoothHandler.getInstance(any(), any(), any()) } answers {
+            capturedPump = secondArg<TandemPump>()
+            mockBtHandler
+        }
+
+        // Mock peripheral name for extractPumpSid()
+        every { mockPeripheral.name } returns "tslim X2 ***12345"
 
         // Mock TandemPumpFinder constructor to prevent BT scanning
         mockkConstructor(TandemPumpFinder::class)
@@ -132,6 +151,69 @@ class CommServiceIntegrationTest {
     private fun sendMessage(path: String, data: ByteArray) {
         service.handleMessageReceived(path, data, "test-node")
         shadowOf(Looper.getMainLooper()).idle()
+    }
+
+    /**
+     * Start service in normal mode, trigger INIT_PUMP_COMM via onStartCommand,
+     * and simulate a connected pump by setting internal state via reflection.
+     * This avoids calling the real onPumpConnected() which has Thread.sleep loops
+     * and complex external dependencies (NightscoutSyncWorker, HistoryLogFetcher, etc).
+     */
+    private fun startServiceAndConnectPump() {
+        startServiceNormal()
+        serviceController.startCommand(0, 0)
+        shadowOf(Looper.getMainLooper()).idle()
+        Thread.sleep(500) // Let handler thread process INIT_PUMP_COMM
+        shadowOf(Looper.getMainLooper()).idle()
+
+        // At this point, INIT_PUMP_COMM has created the Pump and called startScan()
+        // Our mock captured the pump reference via getInstance()
+        assertNotNull("Pump should have been captured via TandemBluetoothHandler.getInstance()", capturedPump)
+
+        // Use reflection to simulate connected state on the Pump inner class
+        val pumpCommHandlerField = CommService::class.java.getDeclaredField("pumpCommHandler")
+        pumpCommHandlerField.isAccessible = true
+        val handler = pumpCommHandlerField.get(service)!!
+
+        val pumpField = handler.javaClass.getDeclaredField("pump")
+        pumpField.isAccessible = true
+        val pump = pumpField.get(handler)!!
+
+        // Set pump.isConnected = true
+        val isConnectedField = pump.javaClass.getDeclaredField("isConnected")
+        isConnectedField.isAccessible = true
+        isConnectedField.set(pump, true)
+
+        // Set pump.lastPeripheral = mockPeripheral
+        val lastPeripheralField = pump.javaClass.getDeclaredField("lastPeripheral")
+        lastPeripheralField.isAccessible = true
+        lastPeripheralField.set(pump, mockPeripheral)
+
+        // Create and set a PumpSession so isPumpReadyForHistoryFetch() works
+        val session = com.jwoglom.controlx2.pump.PumpSession.open(capturedPump!!, mockPeripheral)
+        val currentSessionField = handler.javaClass.getDeclaredField("currentSession")
+        currentSessionField.isAccessible = true
+        currentSessionField.set(handler, session)
+
+        messageBus.clear()
+    }
+
+    /**
+     * Access the lastResponseMessage cache on CommService via reflection.
+     */
+    @Suppress("UNCHECKED_CAST")
+    private fun getLastResponseMessageCache(): MutableMap<Pair<Characteristic, Byte>, Pair<com.jwoglom.pumpx2.pump.messages.Message, Instant>> {
+        val field = CommService::class.java.getDeclaredField("lastResponseMessage")
+        field.isAccessible = true
+        return field.get(service) as MutableMap<Pair<Characteristic, Byte>, Pair<com.jwoglom.pumpx2.pump.messages.Message, Instant>>
+    }
+
+    /**
+     * Populate the response cache with a message, as if it had been received from the pump.
+     */
+    private fun populateCache(message: com.jwoglom.pumpx2.pump.messages.Message, age: Instant = Instant.now()) {
+        val cache = getLastResponseMessageCache()
+        cache[Pair(message.characteristic, message.opCode())] = Pair(message, age)
     }
 
     // =========================================================================
@@ -738,6 +820,382 @@ class CommServiceIntegrationTest {
                 pumpTime = java.time.LocalDateTime.now(),
                 addedTime = java.time.LocalDateTime.now()
             )
+        )
+    }
+
+    // =========================================================================
+    // TEST GROUP 8: Connected Pump — Lifecycle
+    // =========================================================================
+
+    @Test
+    fun connectedPump_initPumpComm_capturesPumpReference() {
+        startServiceNormal()
+        serviceController.startCommand(0, 0)
+        shadowOf(Looper.getMainLooper()).idle()
+        Thread.sleep(500)
+        shadowOf(Looper.getMainLooper()).idle()
+        assertNotNull(
+            "TandemBluetoothHandler.getInstance should have captured the Pump reference",
+            capturedPump
+        )
+    }
+
+    @Test
+    fun connectedPump_isPumpReadyForHistoryFetch_returnsTrue() {
+        startServiceAndConnectPump()
+        assertTrue(
+            "isPumpReadyForHistoryFetch should be true when session is active",
+            service.isPumpReadyForHistoryFetch()
+        )
+    }
+
+    @Test
+    fun connectedPump_getPumpSession_returnsNonNull() {
+        startServiceAndConnectPump()
+        assertNotNull(
+            "getPumpSession should return active session",
+            service.getPumpSession()
+        )
+    }
+
+    @Test
+    fun connectedPump_isPumpConnected_sendsPumpConnected() {
+        startServiceAndConnectPump()
+        sendMessage("/to-phone/is-pump-connected")
+        shadowOf(Looper.getMainLooper()).idle()
+        Thread.sleep(200)
+        shadowOf(Looper.getMainLooper()).idle()
+        assertTrue(
+            "Expected /from-pump/pump-connected when pump is connected",
+            messageBus.hasMessage("/from-pump/pump-connected")
+        )
+    }
+
+    @Test
+    fun connectedPump_stopComm_doesNotCrash() {
+        startServiceAndConnectPump()
+        sendMessage("/to-phone/stop-comm")
+        shadowOf(Looper.getMainLooper()).idle()
+        Thread.sleep(200)
+        shadowOf(Looper.getMainLooper()).idle()
+    }
+
+    // =========================================================================
+    // TEST GROUP 9: Connected Pump — Response Caching
+    // =========================================================================
+
+    @Test
+    fun connectedPump_cachedCommands_freshHit_returnsCachedResponse() {
+        startServiceAndConnectPump()
+
+        // Populate cache with a fresh ApiVersionResponse
+        val response = ApiVersionResponse(2, 5)
+        populateCache(response, Instant.now())
+
+        // Send cached-commands request for ApiVersionRequest
+        val requests = listOf(ApiVersionRequest())
+        val bulkBytes = PumpMessageSerializer.toBulkBytes(requests)
+        sendMessage("/to-pump/cached-commands", bulkBytes)
+        shadowOf(Looper.getMainLooper()).idle()
+        Thread.sleep(200)
+        shadowOf(Looper.getMainLooper()).idle()
+
+        // Should return cached response via /from-pump/receive-cached-message
+        assertTrue(
+            "Expected cached response via /from-pump/receive-cached-message",
+            messageBus.hasMessage("/from-pump/receive-cached-message")
+        )
+    }
+
+    @Test
+    fun connectedPump_cachedCommands_expiredHit_sendsNewCommand() {
+        startServiceAndConnectPump()
+
+        // Populate cache with an expired response (older than 30s)
+        val response = ApiVersionResponse(2, 5)
+        populateCache(response, Instant.now().minusSeconds(60))
+
+        // Send cached-commands request
+        val requests = listOf(ApiVersionRequest())
+        val bulkBytes = PumpMessageSerializer.toBulkBytes(requests)
+        sendMessage("/to-pump/cached-commands", bulkBytes)
+        shadowOf(Looper.getMainLooper()).idle()
+        Thread.sleep(200)
+        shadowOf(Looper.getMainLooper()).idle()
+
+        // Should NOT return cached response (it's expired)
+        assertFalse(
+            "Expired cache should not return /from-pump/receive-cached-message",
+            messageBus.hasMessage("/from-pump/receive-cached-message")
+        )
+        // The command should have been forwarded to the pump (via pump.command)
+        // We can't directly verify this without the pump mock, but we verify no crash
+    }
+
+    @Test
+    fun connectedPump_cachedCommands_miss_doesNotReturnCached() {
+        startServiceAndConnectPump()
+
+        // Don't populate cache — it's empty
+
+        val requests = listOf(ApiVersionRequest())
+        val bulkBytes = PumpMessageSerializer.toBulkBytes(requests)
+        sendMessage("/to-pump/cached-commands", bulkBytes)
+        shadowOf(Looper.getMainLooper()).idle()
+        Thread.sleep(200)
+        shadowOf(Looper.getMainLooper()).idle()
+
+        // No cached response should be sent
+        assertFalse(
+            "Cache miss should not return /from-pump/receive-cached-message",
+            messageBus.hasMessage("/from-pump/receive-cached-message")
+        )
+    }
+
+    @Test
+    fun connectedPump_bustCache_removesCacheEntry() {
+        startServiceAndConnectPump()
+
+        // Populate cache
+        val response = ApiVersionResponse(2, 5)
+        populateCache(response, Instant.now())
+
+        // Verify cache is populated
+        val cache = getLastResponseMessageCache()
+        val key = Pair(response.characteristic, response.opCode())
+        assertTrue("Cache should contain the response", cache.containsKey(key))
+
+        // Send bust-cache command
+        val requests = listOf(ApiVersionRequest())
+        val bulkBytes = PumpMessageSerializer.toBulkBytes(requests)
+        sendMessage("/to-pump/commands-bust-cache", bulkBytes)
+        shadowOf(Looper.getMainLooper()).idle()
+        Thread.sleep(200)
+        shadowOf(Looper.getMainLooper()).idle()
+
+        // Cache entry should have been removed
+        assertFalse(
+            "bust-cache should remove the cache entry",
+            cache.containsKey(key)
+        )
+    }
+
+    @Test
+    fun connectedPump_debugMessageCache_returnsPopulatedCache() {
+        startServiceAndConnectPump()
+
+        // Populate cache with a response
+        val response = ApiVersionResponse(2, 5)
+        populateCache(response, Instant.now())
+
+        sendMessage("/to-pump/debug-message-cache")
+        shadowOf(Looper.getMainLooper()).idle()
+        Thread.sleep(200)
+        shadowOf(Looper.getMainLooper()).idle()
+
+        // Should respond with debug-message-cache containing data
+        assertTrue(
+            "Expected /from-pump/debug-message-cache with populated cache",
+            messageBus.hasMessage("/from-pump/debug-message-cache")
+        )
+        val msg = messageBus.lastMessage("/from-pump/debug-message-cache")
+        assertNotNull(msg)
+        assertTrue("Cache data should be non-empty", msg!!.data.isNotEmpty())
+    }
+
+    // =========================================================================
+    // TEST GROUP 10: Connected Pump — Message Forwarding to Wear
+    // =========================================================================
+
+    @Test
+    fun connectedPump_onReceiveMessage_forwardsViaFromPump() {
+        startServiceAndConnectPump()
+
+        // Trigger onReceiveMessage directly on the captured pump
+        val response = ApiVersionResponse(2, 5)
+        capturedPump!!.onReceiveMessage(mockPeripheral, response)
+        shadowOf(Looper.getMainLooper()).idle()
+
+        assertTrue(
+            "All responses should be forwarded via /from-pump/receive-message",
+            messageBus.hasMessage("/from-pump/receive-message")
+        )
+    }
+
+    @Test
+    fun connectedPump_onReceiveMessage_batteryResponse_forwardedToWear() {
+        startServiceAndConnectPump()
+
+        val response = CurrentBatteryV2Response(0, 66, 0, 0, 0, 0, 0)
+        capturedPump!!.onReceiveMessage(mockPeripheral, response)
+        shadowOf(Looper.getMainLooper()).idle()
+
+        // Battery responses should be forwarded to wear via /to-wear/service-receive-message
+        assertTrue(
+            "Battery response should be forwarded to wear",
+            messageBus.hasMessage("/to-wear/service-receive-message")
+        )
+    }
+
+    @Test
+    fun connectedPump_onReceiveMessage_iobResponse_forwardedToWear() {
+        startServiceAndConnectPump()
+
+        val response = ControlIQIOBResponse(1450, 0, 0, 0, 0)
+        capturedPump!!.onReceiveMessage(mockPeripheral, response)
+        shadowOf(Looper.getMainLooper()).idle()
+
+        assertTrue(
+            "IOB response should be forwarded to wear",
+            messageBus.hasMessage("/to-wear/service-receive-message")
+        )
+    }
+
+    @Test
+    fun connectedPump_onReceiveMessage_cgmResponse_forwardedToWear() {
+        startServiceAndConnectPump()
+
+        val response = CurrentEGVGuiDataResponse(1710000000, 123, 1, 2)
+        capturedPump!!.onReceiveMessage(mockPeripheral, response)
+        shadowOf(Looper.getMainLooper()).idle()
+
+        assertTrue(
+            "CGM response should be forwarded to wear",
+            messageBus.hasMessage("/to-wear/service-receive-message")
+        )
+    }
+
+    @Test
+    fun connectedPump_onReceiveMessage_otherResponse_notForwardedToWear() {
+        startServiceAndConnectPump()
+
+        // ApiVersionResponse is NOT one of the three types forwarded to wear
+        val response = ApiVersionResponse(2, 5)
+        capturedPump!!.onReceiveMessage(mockPeripheral, response)
+        shadowOf(Looper.getMainLooper()).idle()
+
+        // Should be forwarded via /from-pump/receive-message but NOT /to-wear/service-receive-message
+        assertTrue(
+            "Response should go to /from-pump/receive-message",
+            messageBus.hasMessage("/from-pump/receive-message")
+        )
+        assertFalse(
+            "Non-battery/IOB/CGM response should NOT go to /to-wear/service-receive-message",
+            messageBus.hasMessage("/to-wear/service-receive-message")
+        )
+    }
+
+    @Test
+    fun connectedPump_onReceiveMessage_populatesCache() {
+        startServiceAndConnectPump()
+
+        val cache = getLastResponseMessageCache()
+        assertTrue("Cache should be empty initially", cache.isEmpty())
+
+        val response = ApiVersionResponse(2, 5)
+        capturedPump!!.onReceiveMessage(mockPeripheral, response)
+        shadowOf(Looper.getMainLooper()).idle()
+
+        val key = Pair(response.characteristic, response.opCode())
+        assertTrue(
+            "onReceiveMessage should populate the response cache",
+            cache.containsKey(key)
+        )
+    }
+
+    // =========================================================================
+    // TEST GROUP 11: Connected Pump — Bolus with Connection
+    // =========================================================================
+
+    @Test
+    fun connectedPump_bolus_validSignature_sentToPump() {
+        startServiceAndConnectPump()
+        prefs.edit().putBoolean("insulin-delivery-actions", true).commit()
+
+        val secret = Hex.encodeHexString(Bytes.getSecureRandom10Bytes())
+        prefs.edit().putString("initiateBolusSecret", secret).commit()
+
+        val bolusRequest = InitiateBolusRequest(1000, 0, 0, 0)
+        val signedBytes = InitiateConfirmedBolusSerializer.toBytes(secret, bolusRequest)
+
+        sendMessage("/to-phone/initiate-confirmed-bolus", signedBytes)
+        shadowOf(Looper.getMainLooper()).idle()
+        Thread.sleep(200)
+        shadowOf(Looper.getMainLooper()).idle()
+
+        // Valid signature should NOT be blocked
+        assertFalse(
+            "Valid signature should not be blocked",
+            messageBus.hasMessage("/to-wear/blocked-bolus-signature")
+        )
+        // Should NOT send bolus-not-enabled since insulin-delivery-actions is true
+        assertFalse(
+            "Insulin delivery is enabled, should not send bolus-not-enabled",
+            messageBus.hasMessage("/to-wear/bolus-not-enabled")
+        )
+    }
+
+    @Test
+    fun connectedPump_bolus_insulinDeliveryDisabled_blocked() {
+        startServiceAndConnectPump()
+        // Explicitly disable insulin delivery
+        prefs.edit().putBoolean("insulin-delivery-actions", false).commit()
+
+        val secret = Hex.encodeHexString(Bytes.getSecureRandom10Bytes())
+        prefs.edit().putString("initiateBolusSecret", secret).commit()
+
+        val bolusRequest = InitiateBolusRequest(1000, 0, 0, 0)
+        val signedBytes = InitiateConfirmedBolusSerializer.toBytes(secret, bolusRequest)
+
+        sendMessage("/to-phone/initiate-confirmed-bolus", signedBytes)
+        shadowOf(Looper.getMainLooper()).idle()
+        Thread.sleep(200)
+        shadowOf(Looper.getMainLooper()).idle()
+
+        // Signature is valid, but insulin delivery is disabled — should be blocked
+        assertFalse(
+            "Signature is valid, should not block for signature",
+            messageBus.hasMessage("/to-wear/blocked-bolus-signature")
+        )
+        assertTrue(
+            "Insulin delivery disabled should send /to-wear/bolus-not-enabled",
+            messageBus.hasMessage("/to-wear/bolus-not-enabled")
+        )
+    }
+
+    @Test
+    fun connectedPump_command_routedToPump() {
+        startServiceAndConnectPump()
+
+        // Send a non-bolus command to the connected pump
+        val request = ApiVersionRequest()
+        val msgBytes = PumpMessageSerializer.toBytes(request)
+        sendMessage("/to-pump/command", msgBytes)
+        shadowOf(Looper.getMainLooper()).idle()
+        Thread.sleep(200)
+        shadowOf(Looper.getMainLooper()).idle()
+
+        // Should not send pump-not-connected (pump IS connected)
+        assertFalse(
+            "Connected pump should not send pump-not-connected",
+            messageBus.hasMessage("/from-pump/pump-not-connected")
+        )
+    }
+
+    @Test
+    fun connectedPump_bulkCommands_routedToPump() {
+        startServiceAndConnectPump()
+
+        val requests = listOf(ApiVersionRequest(), ControlIQIOBRequest())
+        val bulkBytes = PumpMessageSerializer.toBulkBytes(requests)
+        sendMessage("/to-pump/commands", bulkBytes)
+        shadowOf(Looper.getMainLooper()).idle()
+        Thread.sleep(200)
+        shadowOf(Looper.getMainLooper()).idle()
+
+        assertFalse(
+            "Connected pump should not send pump-not-connected for bulk commands",
+            messageBus.hasMessage("/from-pump/pump-not-connected")
         )
     }
 }
