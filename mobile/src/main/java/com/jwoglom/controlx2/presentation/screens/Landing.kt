@@ -110,7 +110,7 @@ fun Landing(
     navController: NavHostController? = null,
     sendMessage: (String, ByteArray) -> Unit,
     sendPumpCommands: (SendType, List<Message>) -> Unit,
-    sendServiceBolusRequest: (Int, BolusParameters, BolusCalcUnits, BolusCalcDataSnapshotResponse, TimeSinceResetResponse) -> Unit,
+    sendServiceBolusRequest: (Int, BolusParameters, BolusCalcUnits, BolusCalcDataSnapshotResponse, TimeSinceResetResponse, Long, Long) -> Unit,
     sendServiceBolusCancel: () -> Unit,
     sectionState: LandingSection = LandingSection.DASHBOARD,
     bottomScaffoldDisplayState: BottomSheetValue = BottomSheetValue.Collapsed,
@@ -609,7 +609,7 @@ internal fun LandingDefaultPreview() {
             Landing(
                 sendMessage = { _, _ -> },
                 sendPumpCommands = { _, _ -> },
-                sendServiceBolusRequest = { _, _, _, _, _ -> },
+                sendServiceBolusRequest = { _, _, _, _, _, _, _ -> },
                 sendServiceBolusCancel = {},
             )
         }
@@ -628,7 +628,7 @@ fun BolusPreview() {
             Landing(
                 sendMessage = { _, _ -> },
                 sendPumpCommands = { _, _ -> },
-                sendServiceBolusRequest = { _, _, _, _, _ -> },
+                sendServiceBolusRequest = { _, _, _, _, _, _, _ -> },
                 sendServiceBolusCancel = {},
                 bottomScaffoldDisplayState = BottomSheetValue.Expanded,
                 _bottomScaffoldState = BottomScaffoldState.BOLUS_WINDOW
@@ -649,7 +649,7 @@ fun TempRatePreview() {
             Landing(
                 sendMessage = { _, _ -> },
                 sendPumpCommands = { _, _ -> },
-                sendServiceBolusRequest = { _, _, _, _, _ -> },
+                sendServiceBolusRequest = { _, _, _, _, _, _, _ -> },
                 sendServiceBolusCancel = {},
                 bottomScaffoldDisplayState = BottomSheetValue.Expanded,
                 _bottomScaffoldState = BottomScaffoldState.TEMP_RATE_WINDOW,
@@ -671,7 +671,7 @@ internal fun LandingDebugPreview() {
             Landing(
                 sendMessage = { _, _ -> },
                 sendPumpCommands = { _, _ -> },
-                sendServiceBolusRequest = { _, _, _, _, _ -> },
+                sendServiceBolusRequest = { _, _, _, _, _, _, _ -> },
                 sendServiceBolusCancel = {},
                 sectionState = LandingSection.DEBUG,
             )
@@ -691,7 +691,7 @@ internal fun LandingSettingsPreview() {
             Landing(
                 sendMessage = { _, _ -> },
                 sendPumpCommands = { _, _ -> },
-                sendServiceBolusRequest = { _, _, _, _, _ -> },
+                sendServiceBolusRequest = { _, _, _, _, _, _, _ -> },
                 sendServiceBolusCancel = {},
                 sectionState = LandingSection.SETTINGS,
             )

@@ -59,7 +59,7 @@ import java.util.function.Supplier
 @Composable
 fun BolusWindow(
     sendPumpCommands: (SendType, List<Message>) -> Unit,
-    sendServiceBolusRequest: (Int, BolusParameters, BolusCalcUnits, BolusCalcDataSnapshotResponse, TimeSinceResetResponse) -> Unit,
+    sendServiceBolusRequest: (Int, BolusParameters, BolusCalcUnits, BolusCalcDataSnapshotResponse, TimeSinceResetResponse, Long, Long) -> Unit,
     sendServiceBolusCancel: () -> Unit,
     prefill: BolusInputPrefill? = null,
     onPrefillConsumed: () -> Unit = {},
@@ -552,6 +552,8 @@ fun rawToInt(s: String?): Int? {
 fun resetBolusDataStoreState(dataStore: DataStore) {
     Timber.d("bolusCalc resetBolusDataStoreState")
     PumpStateSupplier.inProgressBolusId = Supplier { null }
+    dataStore.bolusCalcDataSnapshot.value = null
+    dataStore.bolusCalcLastBG.value = null
     dataStore.bolusPermissionResponse.value = null
     dataStore.bolusCancelResponse.value = null
     dataStore.bolusInitiateResponse.value = null
@@ -568,6 +570,9 @@ fun resetBolusDataStoreState(dataStore: DataStore) {
     dataStore.bolusUnitsRawValue.value = null
     dataStore.bolusCarbsRawValue.value = null
     dataStore.bolusGlucoseRawValue.value = null
+    dataStore.bolusExtendedEnabled.value = false
+    dataStore.bolusExtendedDurationMinutes.value = null
+    dataStore.bolusExtendedPercentNow.value = null
 }
 
 @Preview

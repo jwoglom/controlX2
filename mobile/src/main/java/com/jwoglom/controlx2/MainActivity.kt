@@ -174,13 +174,15 @@ class MainActivity : ComponentActivity() {
                 startDestination = startDestination,
                 sendMessage = { path, message -> sendMessage(path, message) },
                 sendPumpCommands = { type, messages -> sendPumpCommands(type, messages) },
-                sendServiceBolusRequest = { bolusId, bolusParameters, unitBreakdown, dataSnapshot, timeSinceReset ->
+                sendServiceBolusRequest = { bolusId, bolusParameters, unitBreakdown, dataSnapshot, timeSinceReset, extendedVolume, extendedSeconds ->
                     sendServiceBolusRequest(
                         bolusId,
                         bolusParameters,
                         unitBreakdown,
                         dataSnapshot,
-                        timeSinceReset
+                        timeSinceReset,
+                        extendedVolume,
+                        extendedSeconds
                     )
                 },
                 sendServiceBolusCancel = {
@@ -400,7 +402,7 @@ class MainActivity : ComponentActivity() {
         sendMessage("/to-pump/${type.slug}", PumpMessageSerializer.toBulkBytes(msgs))
     }
 
-    private fun sendServiceBolusRequest(bolusId: Int, params: BolusParameters, unitBreakdown: BolusCalcUnits, dataSnapshot: BolusCalcDataSnapshotResponse, timeSinceReset: TimeSinceResetResponse) {
+    private fun sendServiceBolusRequest(bolusId: Int, params: BolusParameters, unitBreakdown: BolusCalcUnits, dataSnapshot: BolusCalcDataSnapshotResponse, timeSinceReset: TimeSinceResetResponse, extendedVolume: Long = 0L, extendedSeconds: Long = 0L) {
         val numUnits = InsulinUnit.from1To1000(params.units)
         val numCarbs = params.carbsGrams
         val bgValue = params.glucoseMgdl
@@ -452,19 +454,39 @@ class MainActivity : ComponentActivity() {
             this.sendPumpCommands(SendType.STANDARD, preCommands)
         }
 
-        val iobUnits = dataSnapshot.iob
-        val bolusRequest = InitiateBolusRequest(
-            numUnits,
-            bolusId,
-            BolusDeliveryHistoryLog.BolusType.toBitmask(*bolusTypes.toTypedArray()),
-            foodVolume,
-            corrVolume,
-            numCarbs,
-            bgValue,
-            iobUnits
-        )
+        if (extendedVolume > 0) {
+            bolusTypes.add(BolusDeliveryHistoryLog.BolusType.EXTENDED)
+        }
 
-        Timber.i("sendServiceBolusRequest: numUnits=$numUnits numCarbs=$numCarbs bgValue=$bgValue foodVolume=$foodVolume corrVolume=$corrVolume iobUnits=$iobUnits: bolusRequest=$bolusRequest preCommands=$preCommands")
+        val iobUnits = dataSnapshot.iob
+        val bolusRequest = if (extendedVolume > 0) {
+            InitiateBolusRequest(
+                numUnits,
+                bolusId,
+                BolusDeliveryHistoryLog.BolusType.toBitmask(*bolusTypes.toTypedArray()),
+                foodVolume,
+                corrVolume,
+                numCarbs,
+                bgValue,
+                iobUnits,
+                extendedVolume,
+                extendedSeconds,
+                0L
+            )
+        } else {
+            InitiateBolusRequest(
+                numUnits,
+                bolusId,
+                BolusDeliveryHistoryLog.BolusType.toBitmask(*bolusTypes.toTypedArray()),
+                foodVolume,
+                corrVolume,
+                numCarbs,
+                bgValue,
+                iobUnits
+            )
+        }
+
+        Timber.i("sendServiceBolusRequest: numUnits=$numUnits numCarbs=$numCarbs bgValue=$bgValue foodVolume=$foodVolume corrVolume=$corrVolume iobUnits=$iobUnits extendedVolume=$extendedVolume extendedSeconds=$extendedSeconds: bolusRequest=$bolusRequest preCommands=$preCommands")
         this.sendMessage("/to-phone/bolus-request-phone", PumpMessageSerializer.toBytes(bolusRequest))
     }
 

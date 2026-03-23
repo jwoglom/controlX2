@@ -549,6 +549,7 @@ fun WearApp(
                         minNumber = 40,
                         maxNumber = 400,
                         defaultNumber = when {
+                            bolusBgMgdlUserInput != null -> bolusBgMgdlUserInput!!
                             currentBG != null -> currentBG
                             else -> 120
                         },

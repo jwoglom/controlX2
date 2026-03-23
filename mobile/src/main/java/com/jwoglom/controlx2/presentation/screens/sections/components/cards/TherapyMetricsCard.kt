@@ -24,7 +24,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
-import androidx.compose.ui.unit.dp
 import com.jwoglom.controlx2.LocalDataStore
 import com.jwoglom.controlx2.db.historylog.HistoryLogViewModel
 import com.jwoglom.controlx2.presentation.theme.CardBackground
@@ -35,13 +34,9 @@ import com.jwoglom.controlx2.presentation.theme.InsulinColors
 import com.jwoglom.controlx2.presentation.theme.CarbColor
 import com.jwoglom.controlx2.presentation.theme.Spacing
 import com.jwoglom.controlx2.presentation.theme.SurfaceBackground
-import com.jwoglom.pumpx2.pump.messages.response.historyLog.BolusDeliveryHistoryLog
 import com.jwoglom.pumpx2.pump.messages.response.historyLog.DexcomG6CGMHistoryLog
 import com.jwoglom.pumpx2.pump.messages.response.historyLog.DexcomG7CGMHistoryLog
 import com.jwoglom.pumpx2.pump.messages.response.historyLog.CgmDataGxHistoryLog
-import java.time.Instant
-import java.time.ZoneId
-import kotlin.math.exp
 
 /**
  * Therapy Metrics Card displaying IOB
@@ -82,7 +77,7 @@ fun TherapyMetricsCard(
                 if (cob != null) {
                     MetricDisplay(
                         label = "COB",
-                        value = cob?.let { "%.0f g".format(it) } ?: "--",
+                        value = "%.0f g".format(cob),
                         color = CarbColor
                     )
                 }
@@ -90,7 +85,7 @@ fun TherapyMetricsCard(
                 if (timeInRange != null) {
                     MetricDisplay(
                         label = "TIR",
-                        value = timeInRange?.let { "${it.toInt()}%" } ?: "--",
+                        value = "${timeInRange.toInt()}%",
                         color = GlucoseColors.InRange
                     )
                 }
@@ -135,8 +130,6 @@ private fun MetricDisplay(
 @Composable
 fun TherapyMetricsCardFromDataStore(
     historyLogViewModel: HistoryLogViewModel? = null,
-    showCOB: Boolean = false,
-    showTIR: Boolean = false,
     modifier: Modifier = Modifier
 ) {
     val ds = LocalDataStore.current
@@ -144,69 +137,38 @@ fun TherapyMetricsCardFromDataStore(
 
     val iob = iobUnits.value
 
-//    // Calculate TIR from CGM history (last 24 hours)
-//    val cgmHistoryLogs = historyLogViewModel?.latestItemsForTypes(
-//        listOf(
-//            DexcomG6CGMHistoryLog::class.java,
-//            DexcomG7CGMHistoryLog::class.java
-//        ),
-//        288 // ~24 hours of 5-min readings
-//    )?.observeAsState()
-//
-//    val timeInRange = remember(cgmHistoryLogs?.value) {
-//        cgmHistoryLogs?.value?.let { logs ->
-//            val validReadings = logs.mapNotNull { dao ->
-//                val parsed = dao.parse()
-//                when (parsed) {
-//                    is DexcomG6CGMHistoryLog -> parsed.currentGlucoseDisplayValue
-//                    is DexcomG7CGMHistoryLog -> parsed.currentGlucoseDisplayValue
-//                    is CgmDataGxHistoryLog -> parsed.value
-//                    else -> null
-//                }?.takeIf { it > 0 }
-//            }
-//            if (validReadings.isNotEmpty()) {
-//                val inRange = validReadings.count { it in 70..180 }
-//                (inRange.toFloat() / validReadings.size.toFloat()) * 100f
-//            } else null
-//        }
-//    }
-//
-//    // Calculate COB from carb history (carbs with exponential decay)
-//    val carbHistoryLogs = historyLogViewModel?.latestItemsForTypes(
-//        listOf(com.jwoglom.pumpx2.pump.messages.response.historyLog.CarbEnteredHistoryLog::class.java),
-//        50 // Last ~50 carb entries
-//    )?.observeAsState()
-//
-//    // TODO(jwoglom): THIS IS NOT READY YET
-//    val currentTimeSeconds = remember { Instant.now().epochSecond }
-//    val absorptionTimeSeconds = 180 * 60L // 3 hours
-//    val tau = absorptionTimeSeconds / 3.0
-//
-//    val cob = remember(carbHistoryLogs?.value, currentTimeSeconds) {
-//        carbHistoryLogs?.value?.let { logs ->
-//            var totalCob = 0f
-//            logs.forEach { dao ->
-//                val parsed = dao.parse()
-//                if (parsed is com.jwoglom.pumpx2.pump.messages.response.historyLog.CarbEnteredHistoryLog) {
-//                    val carbs = parsed.carbs.toInt()
-//                    if (carbs > 0) {
-//                        val timestamp = dao.pumpTime.atZone(ZoneId.systemDefault()).toEpochSecond()
-//                        val elapsedSeconds = currentTimeSeconds - timestamp
-//                        if (elapsedSeconds >= 0 && elapsedSeconds < absorptionTimeSeconds * 2) {
-//                            val remaining = carbs * exp(-elapsedSeconds / tau)
-//                            totalCob += remaining.toFloat()
-//                        }
-//                    }
-//                }
-//            }
-//            if (totalCob > 0.5f) totalCob else null
-//        }
-//    }
+    // Calculate TIR from CGM history (last 24 hours)
+    val cgmHistoryLogs = historyLogViewModel?.latestItemsForTypes(
+        listOf(
+            DexcomG6CGMHistoryLog::class.java,
+            DexcomG7CGMHistoryLog::class.java,
+            CgmDataGxHistoryLog::class.java
+        ),
+        288 // ~24 hours of 5-min readings
+    )?.observeAsState()
+
+    val timeInRange = remember(cgmHistoryLogs?.value) {
+        cgmHistoryLogs?.value?.let { logs ->
+            val validReadings = logs.mapNotNull { dao ->
+                val parsed = dao.parse()
+                when (parsed) {
+                    is DexcomG6CGMHistoryLog -> parsed.currentGlucoseDisplayValue
+                    is DexcomG7CGMHistoryLog -> parsed.currentGlucoseDisplayValue
+                    is CgmDataGxHistoryLog -> parsed.value
+                    else -> null
+                }?.takeIf { it > 0 }
+            }
+            if (validReadings.isNotEmpty()) {
+                val inRange = validReadings.count { it in 70..180 }
+                (inRange.toFloat() / validReadings.size.toFloat()) * 100f
+            } else null
+        }
+    }
 
     TherapyMetricsCard(
         iob = iob?.toFloat(),
         cob = null,
-        timeInRange = null,
+        timeInRange = timeInRange,
         modifier = modifier
     )
 }
