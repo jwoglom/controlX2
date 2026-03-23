@@ -20,7 +20,11 @@ data class NightscoutSyncConfig(
     val syncIntervalMinutes: Int = 15,
 
     // Initial lookback when first enabled (hours)
-    val initialLookbackHours: Int = 24
+    val initialLookbackHours: Int = 24,
+
+    // Runtime-only fields (not persisted to SharedPreferences)
+    val pumpModel: String? = null,
+    val uploaderBattery: Int? = null
 ) {
     companion object {
         private const val PREF_ENABLED = "nightscout_enabled"

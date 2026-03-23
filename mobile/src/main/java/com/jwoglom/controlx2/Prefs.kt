@@ -221,6 +221,17 @@ class Prefs(val context: Context) {
         prefs().edit().putString("dashboard-chart-time-range", timeRange).commit()
     }
 
+    /**
+     * Pump model name (e.g. "TSLIM_X2", "MOBI") detected from Bluetooth connection
+     */
+    fun pumpModel(): String? {
+        return prefs().getString("pump-model", null)
+    }
+
+    fun setPumpModel(s: String) {
+        prefs().edit().putString("pump-model", s).commit()
+    }
+
     fun prefs(): SharedPreferences {
         return context.getSharedPreferences("WearX2", WearableListenerService.MODE_PRIVATE)
     }

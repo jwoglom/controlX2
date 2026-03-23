@@ -81,18 +81,32 @@ fun createDeviceStatus(
     reservoirUnits: Double? = null,
     iob: Double? = null,
     pumpStatus: String? = null,
-    uploaderBattery: Int? = null
+    suspended: Boolean? = null,
+    bolusing: Boolean? = null,
+    uploaderBattery: Int? = null,
+    deviceName: String = "ControlX2"
 ): NightscoutDeviceStatus {
     // Nightscout expects timezone-aware timestamps and matching offset from the same instant.
     val nightscoutTimestamp = NightscoutTimestampPolicy.fromPumpTime(timestamp, "devicestatus")
+
+    val statusInfo = if (pumpStatus != null || suspended != null || bolusing != null) {
+        PumpStatusInfo(
+            status = pumpStatus,
+            suspended = suspended,
+            bolusing = bolusing,
+            timestamp = nightscoutTimestamp.isoInstant
+        )
+    } else null
+
     return NightscoutDeviceStatus(
         createdAt = nightscoutTimestamp.isoInstant,
         utcOffset = nightscoutTimestamp.utcOffsetMinutes,
+        device = deviceName,
         pump = PumpStatus(
             battery = batteryPercent?.let { Battery(it) },
             reservoir = reservoirUnits,
             iob = iob?.let { IOB(iob = it, timestamp = nightscoutTimestamp.isoInstant) },
-            status = pumpStatus?.let { PumpStatusInfo(status = it, timestamp = nightscoutTimestamp.isoInstant) },
+            status = statusInfo,
             clock = nightscoutTimestamp.isoInstant
         ),
         uploaderBattery = uploaderBattery

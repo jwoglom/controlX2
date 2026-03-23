@@ -499,9 +499,10 @@ class CommService : Service() {
 
             override fun onPumpModel(peripheral: BluetoothPeripheral?, model: KnownDeviceModel?) {
                 super.onPumpModel(peripheral, model)
-                Timber.i("service onPumpModel")
+                Timber.i("service onPumpModel: ${model?.name}")
+                Prefs(applicationContext).setPumpModel(model!!.name)
                 sendWearCommMessage("/from-pump/pump-model",
-                    model!!.name.toByteArray()
+                    model.name.toByteArray()
                 )
             }
 
