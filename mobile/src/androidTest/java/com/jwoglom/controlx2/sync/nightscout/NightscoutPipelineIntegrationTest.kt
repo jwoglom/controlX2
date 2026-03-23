@@ -156,6 +156,7 @@ class NightscoutPipelineIntegrationTest {
             historyLogRepo,
             client,
             syncStateDb.nightscoutSyncStateDao(),
+            syncStateDb.nightscoutProcessorStateDao(),
             config,
             pumpSid = PUMP_SID
         )

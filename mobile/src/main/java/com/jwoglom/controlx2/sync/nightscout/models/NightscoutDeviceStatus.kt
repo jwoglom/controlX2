@@ -78,15 +78,28 @@ fun createDeviceStatus(
     reservoirUnits: Double? = null,
     iob: Double? = null,
     pumpStatus: String? = null,
-    uploaderBattery: Int? = null
+    suspended: Boolean? = null,
+    bolusing: Boolean? = null,
+    uploaderBattery: Int? = null,
+    deviceName: String = "ControlX2"
 ): NightscoutDeviceStatus {
+    val statusInfo = if (pumpStatus != null || suspended != null || bolusing != null) {
+        PumpStatusInfo(
+            status = pumpStatus,
+            suspended = suspended,
+            bolusing = bolusing,
+            timestamp = timestamp.toString()
+        )
+    } else null
+
     return NightscoutDeviceStatus(
         createdAt = timestamp.toString(),
+        device = deviceName,
         pump = PumpStatus(
             battery = batteryPercent?.let { Battery(it) },
             reservoir = reservoirUnits,
             iob = iob?.let { IOB(iob = it, timestamp = timestamp.toString()) },
-            status = pumpStatus?.let { PumpStatusInfo(status = it, timestamp = timestamp.toString()) },
+            status = statusInfo,
             clock = timestamp.toString()
         ),
         uploaderBattery = uploaderBattery

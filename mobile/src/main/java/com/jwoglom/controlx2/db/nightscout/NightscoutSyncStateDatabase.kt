@@ -7,10 +7,15 @@ import androidx.room.RoomDatabase
 import androidx.room.TypeConverters
 import com.jwoglom.controlx2.db.util.Converters
 
-@Database(entities = [NightscoutSyncState::class], version = 1, exportSchema = false)
+@Database(
+    entities = [NightscoutSyncState::class, NightscoutProcessorState::class],
+    version = 2,
+    exportSchema = false
+)
 @TypeConverters(Converters::class)
 abstract class NightscoutSyncStateDatabase : RoomDatabase() {
     abstract fun nightscoutSyncStateDao(): NightscoutSyncStateDao
+    abstract fun nightscoutProcessorStateDao(): NightscoutProcessorStateDao
 
     companion object {
         @Volatile
@@ -22,7 +27,7 @@ abstract class NightscoutSyncStateDatabase : RoomDatabase() {
                     context.applicationContext,
                     NightscoutSyncStateDatabase::class.java,
                     NightscoutSyncStateTable
-                ).build()
+                ).fallbackToDestructiveMigration().build()
                 INSTANCE = instance
                 return instance
             }

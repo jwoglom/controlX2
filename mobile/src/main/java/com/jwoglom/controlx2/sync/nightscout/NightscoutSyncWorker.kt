@@ -4,6 +4,7 @@ import android.content.Context
 import android.content.SharedPreferences
 import android.os.Handler
 import android.os.Looper
+import com.jwoglom.controlx2.Prefs
 import com.jwoglom.controlx2.db.historylog.HistoryLogDatabase
 import com.jwoglom.controlx2.db.historylog.HistoryLogRepo
 import com.jwoglom.controlx2.db.nightscout.NightscoutSyncStateDatabase
@@ -98,7 +99,7 @@ class NightscoutSyncWorker(
      */
     private suspend fun performSync() {
         try {
-            val config = NightscoutSyncConfig.load(prefs)
+            var config = NightscoutSyncConfig.load(prefs)
 
             if (!config.enabled) {
                 Timber.d("Nightscout sync is disabled, skipping")
@@ -110,6 +111,17 @@ class NightscoutSyncWorker(
                 return
             }
 
+            // Enrich config with runtime data
+            val batteryManager = context.getSystemService(android.content.Context.BATTERY_SERVICE)
+                as? android.os.BatteryManager
+            val uploaderBattery = batteryManager
+                ?.getIntProperty(android.os.BatteryManager.BATTERY_PROPERTY_CAPACITY)
+                ?.takeIf { it > 0 }
+            config = config.copy(
+                pumpModel = Prefs(context).pumpModel(),
+                uploaderBattery = uploaderBattery
+            )
+
             // Create coordinator with dependencies
             val historyLogRepo = HistoryLogRepo(
                 HistoryLogDatabase.getDatabase(context).historyLogDao()
@@ -118,13 +130,15 @@ class NightscoutSyncWorker(
                 config.getSanitizedUrl(),
                 config.apiSecret
             )
-            val syncStateDao = NightscoutSyncStateDatabase.getDatabase(context)
-                .nightscoutSyncStateDao()
+            val syncStateDb = NightscoutSyncStateDatabase.getDatabase(context)
+            val syncStateDao = syncStateDb.nightscoutSyncStateDao()
+            val processorStateDao = syncStateDb.nightscoutProcessorStateDao()
 
             val coordinator = NightscoutSyncCoordinator(
                 historyLogRepo,
                 nightscoutClient,
                 syncStateDao,
+                processorStateDao,
                 config,
                 pumpSid
             )
