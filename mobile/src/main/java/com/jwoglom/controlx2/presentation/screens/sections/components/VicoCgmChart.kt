@@ -397,14 +397,21 @@ private fun rememberCgmChartData(
     historyLogViewModel: HistoryLogViewModel?,
     timeRange: TimeRange
 ): List<CgmDataPoint> {
+    val expectedReadings = (timeRange.hours * 60 / 5) + 20  // Extra buffer
+    // Fetch extra rows to account for multiple CGM log types per reading
+    // (e.g. both G6 and G7 entries for the same timestamp)
     val cgmData = historyLogViewModel?.latestItemsForTypes(
         CgmReadingHistoryLogs,
-        // Calculate how many data points we need (CGM reading every 5 min)
-        (timeRange.hours * 60 / 5) + 20  // Extra buffer
+        expectedReadings * CgmReadingHistoryLogs.size
     )?.observeAsState(emptyList())
 
     return remember(cgmData?.value, timeRange) {
-        cgmData?.value?.mapNotNull { dao -> dao.toCgmDataPoint() }?.reversed() ?: emptyList()
+        cgmData?.value
+            ?.mapNotNull { dao -> dao.toCgmDataPoint() }
+            ?.reversed()
+            // Deduplicate: keep the first (earliest-sequenced) value per 5-minute bucket
+            ?.distinctBy { it.timestamp / 300L }
+            ?: emptyList()
     }
 }
 
@@ -506,8 +513,10 @@ private fun rememberBolusData(
 ): BolusChartData {
     val bolusHistoryLogs = historyLogViewModel?.latestItemsForTypes(
         listOf(BolusDeliveryHistoryLog::class.java),
-        // Estimate: ~10-30 boluses per day, get enough for time range
-        (timeRange.hours * 2) + 10
+        // Control-IQ auto-boluses can fire every ~5 min (~12/hr), and many may have
+        // deliveredTotal == 0 which are filtered out after fetch.  Fetch generously so
+        // that enough non-zero-unit events survive for the visible time range.
+        (timeRange.hours * 12) + 20
     )?.observeAsState()
 
     val bolusChartData = remember(bolusHistoryLogs?.value, timeRange) {
@@ -789,7 +798,7 @@ private fun rememberCarbData(
     // Carbs are recorded in CarbEnteredHistoryLog
     val carbHistoryLogs = historyLogViewModel?.latestItemsForTypes(
         listOf(com.jwoglom.pumpx2.pump.messages.response.historyLog.CarbEnteredHistoryLog::class.java),
-        (timeRange.hours * 2) + 10
+        (timeRange.hours * 4) + 10
     )?.observeAsState()
 
     return remember(carbHistoryLogs?.value, timeRange) {
@@ -828,7 +837,7 @@ private fun rememberModeData(
 
     val modeHistoryLogs = historyLogViewModel?.latestItemsForTypes(
         modeClasses,
-        (timeRange.hours * 2) + 10
+        (timeRange.hours * 4) + 10
     )?.observeAsState()
 
     return remember(modeHistoryLogs?.value, timeRange) {
@@ -979,13 +988,15 @@ fun VicoCgmChart(
     val basalLimitSettings by dataStore.basalLimitSettingsResponse.observeAsState()
 
     // Fetch all chart data
-    val currentTimeSeconds = remember(timeRange) {
+    // Derive currentTimeSeconds from cgmDataPoints so the time window advances
+    // whenever new readings arrive, rather than being frozen at first render.
+    val cgmDataPoints = previewData?.cgmDataPoints ?: rememberCgmChartData(historyLogViewModel, timeRange)
+    val currentTimeSeconds = remember(timeRange, cgmDataPoints) {
         previewData?.currentTimeSeconds ?: Instant.now().epochSecond
     }
     val rangeSeconds = timeRange.hours * 3600L
     val startTimeSeconds = currentTimeSeconds - rangeSeconds
 
-    val cgmDataPoints = previewData?.cgmDataPoints ?: rememberCgmChartData(historyLogViewModel, timeRange)
     val bolusChartData = if (previewData != null) {
         BolusChartData(
             events = previewData.bolusEvents,
