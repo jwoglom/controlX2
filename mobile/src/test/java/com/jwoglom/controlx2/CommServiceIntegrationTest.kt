@@ -58,6 +58,27 @@ import java.time.Instant
 @Config(sdk = [34])
 class CommServiceIntegrationTest {
 
+    companion object {
+        @JvmStatic
+        @org.junit.BeforeClass
+        fun fixBouncyCastle() {
+            // The test classpath contains both the JVM's built-in BouncyCastle
+            // and bcprov-jdk14:1.77 from pumpx2. Their JAR signatures conflict,
+            // causing SecurityException. Replace the built-in provider with ours.
+            val bc = java.security.Security.getProvider(
+                org.bouncycastle.jce.provider.BouncyCastleProvider.PROVIDER_NAME
+            )
+            if (bc != null) {
+                java.security.Security.removeProvider(
+                    org.bouncycastle.jce.provider.BouncyCastleProvider.PROVIDER_NAME
+                )
+            }
+            java.security.Security.addProvider(
+                org.bouncycastle.jce.provider.BouncyCastleProvider()
+            )
+        }
+    }
+
     private lateinit var context: Context
     private lateinit var messageBus: RecordingMessageBus
     private lateinit var serviceController: ServiceController<CommService>
