@@ -58,6 +58,12 @@ android {
     testOptions {
         unitTests {
             includeAndroidResources = true
+            all {
+                // Exclude bcprov-jdk14 from unit test classpath to avoid
+                // BouncyCastle JAR signer conflict with Robolectric's
+                // android-all framework JAR (which bundles its own BC).
+                classpath = classpath.filter { !it.name.startsWith('bcprov') }
+            }
         }
     }
 }
