@@ -154,6 +154,19 @@ class CommServiceIntegrationTest {
     }
 
     /**
+     * Idle the service's background HandlerThread looper so that messages
+     * posted to pumpCommHandler / pumpFinderCommHandler are processed.
+     */
+    private fun idleServiceLooper() {
+        val field = CommService::class.java.getDeclaredField("serviceLooper")
+        field.isAccessible = true
+        val looper = field.get(service) as? Looper
+        if (looper != null) {
+            shadowOf(looper).idle()
+        }
+    }
+
+    /**
      * Start service in normal mode, trigger INIT_PUMP_COMM via onStartCommand,
      * and simulate a connected pump by setting internal state via reflection.
      * This avoids calling the real onPumpConnected() which has Thread.sleep loops
@@ -328,8 +341,9 @@ class CommServiceIntegrationTest {
         // When pump is not connected, should get pump-not-connected
         sendMessage("/to-phone/is-pump-connected")
         shadowOf(Looper.getMainLooper()).idle()
-        // The handler should respond — either pump-connected or pump-not-connected
-        // Since we haven't connected a pump, we expect not-connected
+        // The pumpCommHandler runs on a background HandlerThread.
+        // Idle it so the CHECK_PUMP_CONNECTED message is processed.
+        idleServiceLooper()
         val hasConnected = messageBus.hasMessage("/from-pump/pump-connected")
         val hasNotConnected = messageBus.hasMessage("/from-pump/pump-not-connected")
         assertTrue(
@@ -427,7 +441,7 @@ class CommServiceIntegrationTest {
     fun bolus_bolusCommandOnNormalPath_rejected() {
         startServiceNormal()
         // InitiateBolusRequest on the normal SEND_PUMP_COMMAND path should be blocked
-        val bolusRequest = InitiateBolusRequest(1000, 0, 0, 0, 0, 0, 0, 0)
+        val bolusRequest = InitiateBolusRequest(1000, 1, 0, 0, 0, 0, 0, 0)
         val msgBytes = PumpMessageSerializer.toBytes(bolusRequest)
         sendMessage("/to-pump/command", msgBytes)
         shadowOf(Looper.getMainLooper()).idle()
@@ -448,7 +462,7 @@ class CommServiceIntegrationTest {
         // Set threshold high so notification is created
         prefs.edit().putLong("bolus-confirmation-insulin-threshold", 0).commit()
 
-        val bolusRequest = InitiateBolusRequest(1000, 0, 0, 0, 0, 0, 0, 0)
+        val bolusRequest = InitiateBolusRequest(1000, 1, 0, 0, 0, 0, 0, 0)
         val msgBytes = PumpMessageSerializer.toBytes(bolusRequest)
         sendMessage("/to-phone/bolus-request-phone", msgBytes)
         shadowOf(Looper.getMainLooper()).idle()
@@ -471,7 +485,7 @@ class CommServiceIntegrationTest {
         prefs.edit().putBoolean("insulin-delivery-actions", true).commit()
         prefs.edit().putLong("bolus-confirmation-insulin-threshold", 0).commit()
 
-        val bolusRequest = InitiateBolusRequest(1000, 0, 0, 0, 0, 0, 0, 0)
+        val bolusRequest = InitiateBolusRequest(1000, 1, 0, 0, 0, 0, 0, 0)
         val msgBytes = PumpMessageSerializer.toBytes(bolusRequest)
         sendMessage("/to-phone/bolus-request-wear", msgBytes)
         shadowOf(Looper.getMainLooper()).idle()
@@ -492,7 +506,7 @@ class CommServiceIntegrationTest {
         prefs.edit().putString("initiateBolusSecret", secret).commit()
 
         // Create a signed bolus message
-        val bolusRequest = InitiateBolusRequest(1000, 0, 0, 0, 0, 0, 0, 0)
+        val bolusRequest = InitiateBolusRequest(1000, 1, 0, 0, 0, 0, 0, 0)
         val signedBytes = InitiateConfirmedBolusSerializer.toBytes(secret, bolusRequest)
 
         sendMessage("/to-phone/initiate-confirmed-bolus", signedBytes)
@@ -513,7 +527,7 @@ class CommServiceIntegrationTest {
         prefs.edit().putString("initiateBolusSecret", "correct-secret").commit()
 
         // Sign with wrong secret
-        val bolusRequest = InitiateBolusRequest(1000, 0, 0, 0, 0, 0, 0, 0)
+        val bolusRequest = InitiateBolusRequest(1000, 1, 0, 0, 0, 0, 0, 0)
         val signedBytes = InitiateConfirmedBolusSerializer.toBytes("wrong-secret", bolusRequest)
 
         sendMessage("/to-phone/initiate-confirmed-bolus", signedBytes)
@@ -786,7 +800,7 @@ class CommServiceIntegrationTest {
         prefs.edit().putLong("bolus-confirmation-insulin-threshold", thresholdMilliunits.toLong()).commit()
 
         // Request a small bolus (0.5u = 500 milliunits) - below 5u threshold
-        val bolusRequest = InitiateBolusRequest(500, 0, 0, 0, 0, 0, 0, 0)
+        val bolusRequest = InitiateBolusRequest(500, 1, 0, 0, 0, 0, 0, 0)
         val msgBytes = PumpMessageSerializer.toBytes(bolusRequest)
         sendMessage("/to-phone/bolus-request-phone", msgBytes)
         shadowOf(Looper.getMainLooper()).idle()
@@ -1115,7 +1129,7 @@ class CommServiceIntegrationTest {
         val secret = Hex.encodeHexString(Bytes.getSecureRandom10Bytes())
         prefs.edit().putString("initiateBolusSecret", secret).commit()
 
-        val bolusRequest = InitiateBolusRequest(1000, 0, 0, 0, 0, 0, 0, 0)
+        val bolusRequest = InitiateBolusRequest(1000, 1, 0, 0, 0, 0, 0, 0)
         val signedBytes = InitiateConfirmedBolusSerializer.toBytes(secret, bolusRequest)
 
         sendMessage("/to-phone/initiate-confirmed-bolus", signedBytes)
@@ -1144,7 +1158,7 @@ class CommServiceIntegrationTest {
         val secret = Hex.encodeHexString(Bytes.getSecureRandom10Bytes())
         prefs.edit().putString("initiateBolusSecret", secret).commit()
 
-        val bolusRequest = InitiateBolusRequest(1000, 0, 0, 0, 0, 0, 0, 0)
+        val bolusRequest = InitiateBolusRequest(1000, 1, 0, 0, 0, 0, 0, 0)
         val signedBytes = InitiateConfirmedBolusSerializer.toBytes(secret, bolusRequest)
 
         sendMessage("/to-phone/initiate-confirmed-bolus", signedBytes)
