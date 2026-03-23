@@ -536,6 +536,8 @@ fun BolusScreen(
 
 
 fun resetBolusDataStoreState(dataStore: DataStore) {
+    dataStore.bolusCalcDataSnapshot.value = null
+    dataStore.bolusCalcLastBG.value = null
     dataStore.bolusPermissionResponse.value = null
     dataStore.bolusCancelResponse.value = null
     dataStore.bolusInitiateResponse.value = null
@@ -549,6 +551,10 @@ fun resetBolusDataStoreState(dataStore: DataStore) {
     dataStore.bolusFinalParameters.value = null
     dataStore.bolusFinalCalcUnits.value = null
     dataStore.bolusFinalConditions.value = null
+    dataStore.bolusUnitsDisplayedText.value = null
+    dataStore.bolusUnitsDisplayedSubtitle.value = null
+    dataStore.bolusBGDisplayedText.value = null
+    dataStore.bolusBGDisplayedSubtitle.value = null
 }
 
 

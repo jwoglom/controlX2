@@ -515,6 +515,7 @@ fun WearApp(
                             else -> maxBolusAmount.value!!.toInt()
                         },
                         defaultNumber = when {
+                            bolusUnitsUserInput != null -> bolusUnitsUserInput
                             currentUnits != null -> currentUnits
                             else -> 0.0
                          },
@@ -559,6 +560,7 @@ fun WearApp(
                         minNumber = 40,
                         maxNumber = 400,
                         defaultNumber = when {
+                            bolusBgMgdlUserInput != null -> bolusBgMgdlUserInput!!
                             currentBG != null -> currentBG
                             else -> 120
                         },

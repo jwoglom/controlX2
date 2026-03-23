@@ -34,6 +34,7 @@ import com.jwoglom.controlx2.shared.util.twoDecimalPlaces1000Unit
 import com.jwoglom.pumpx2.pump.messages.Message
 import com.jwoglom.pumpx2.pump.messages.calculator.BolusCalcUnits
 import com.jwoglom.pumpx2.pump.messages.calculator.BolusParameters
+import com.jwoglom.pumpx2.pump.messages.models.InsulinUnit
 import com.jwoglom.pumpx2.pump.messages.request.currentStatus.CurrentBolusStatusRequest
 import com.jwoglom.pumpx2.pump.messages.request.currentStatus.LastBolusStatusV2Request
 import com.jwoglom.pumpx2.pump.messages.response.control.CancelBolusResponse
@@ -97,7 +98,7 @@ fun BolusPermissionDialogRegion(
     showPermissionCheckDialog: Boolean,
     onDismiss: () -> Unit,
     onShowInProgress: () -> Unit,
-    sendServiceBolusRequest: (Int, BolusParameters, BolusCalcUnits, BolusCalcDataSnapshotResponse, TimeSinceResetResponse) -> Unit,
+    sendServiceBolusRequest: (Int, BolusParameters, BolusCalcUnits, BolusCalcDataSnapshotResponse, TimeSinceResetResponse, Long, Long) -> Unit,
 ) {
     if (!showPermissionCheckDialog) {
         return
@@ -120,14 +121,61 @@ fun BolusPermissionDialogRegion(
 
         val bolusId = dataStore.bolusPermissionResponse.value!!.bolusId
 
-        Timber.i("sendBolusRequest: sending bolus request to phone: bolusId=$bolusId bolusParameters=$bolusParameters unitBreakdown=$unitBreakdown dataSnapshot=$dataSnapshot timeSinceReset=$timeSinceReset")
-        sendServiceBolusRequest(bolusId, bolusParameters, unitBreakdown, dataSnapshot, timeSinceReset)
+        // Calculate extended bolus volumes
+        val extendedEnabled = dataStore.bolusExtendedEnabled.value == true
+        val durationMinutes = dataStore.bolusExtendedDurationMinutes.value?.toIntOrNull() ?: 0
+        val percentNow = dataStore.bolusExtendedPercentNow.value // null = all extended
+
+        var extendedVolume = 0L
+        var extendedSeconds = 0L
+        var immediateParams = bolusParameters
+
+        if (extendedEnabled && durationMinutes > 0) {
+            val totalUnits1000 = InsulinUnit.from1To1000(bolusParameters.units)
+            extendedSeconds = durationMinutes.toLong() * 60L
+
+            if (percentNow == null) {
+                // All extended: no immediate portion
+                extendedVolume = totalUnits1000
+                immediateParams = BolusParameters(0.0, bolusParameters.carbsGrams, bolusParameters.glucoseMgdl)
+            } else {
+                // Split: percentNow delivered immediately, rest extended
+                val immediateUnits1000 = totalUnits1000 * percentNow / 100
+                extendedVolume = totalUnits1000 - immediateUnits1000
+                immediateParams = BolusParameters(
+                    InsulinUnit.from1000To1(immediateUnits1000),
+                    bolusParameters.carbsGrams,
+                    bolusParameters.glucoseMgdl
+                )
+            }
+        }
+
+        Timber.i("sendBolusRequest: sending bolus request to phone: bolusId=$bolusId bolusParameters=$immediateParams extendedVolume=$extendedVolume extendedSeconds=$extendedSeconds unitBreakdown=$unitBreakdown dataSnapshot=$dataSnapshot timeSinceReset=$timeSinceReset")
+        sendServiceBolusRequest(bolusId, immediateParams, unitBreakdown, dataSnapshot, timeSinceReset, extendedVolume, extendedSeconds)
     }
+
+    val extendedEnabled = dataStore.bolusExtendedEnabled.observeAsState(false).value
+    val extDurationMin = dataStore.bolusExtendedDurationMinutes.observeAsState().value?.toIntOrNull() ?: 0
+    val extPercentNow = dataStore.bolusExtendedPercentNow.observeAsState().value
+
+    val dialogTitle = bolusCurrentParameters.value?.units?.let { totalUnits ->
+        if (extendedEnabled && extDurationMin > 0) {
+            if (extPercentNow == null) {
+                "Deliver ${twoDecimalPlaces(totalUnits)}u extended over ${extDurationMin}min?"
+            } else {
+                val nowUnits = totalUnits * extPercentNow / 100.0
+                val extUnits = totalUnits - nowUnits
+                "Deliver ${twoDecimalPlaces(nowUnits)}u now + ${twoDecimalPlaces(extUnits)}u over ${extDurationMin}min?"
+            }
+        } else {
+            "Deliver ${twoDecimalPlaces(totalUnits)}u bolus?"
+        }
+    } ?: "Deliver bolus?"
 
     AlertDialog(
         onDismissRequest = onDismiss,
         title = {
-            Text("Deliver ${bolusCurrentParameters.value?.units?.let { "${twoDecimalPlaces(it)}u " }}bolus?")
+            Text(dialogTitle)
         },
         icon = {
             Image(

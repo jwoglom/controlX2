@@ -116,6 +116,10 @@ class DataStore {
     val bolusCarbsRawValue = MutableLiveData<String?>()
     val bolusGlucoseRawValue = MutableLiveData<String?>()
 
+    val bolusExtendedEnabled = MutableLiveData<Boolean>(false)
+    val bolusExtendedDurationMinutes = MutableLiveData<String?>()
+    val bolusExtendedPercentNow = MutableLiveData<Int?>(null) // null = all extended, 0-100 = split
+
     val tempRatePercentRawValue = MutableLiveData<String?>()
     val tempRateMinutesRawValue = MutableLiveData<String?>()
     val tempRateHoursRawValue = MutableLiveData<String?>()

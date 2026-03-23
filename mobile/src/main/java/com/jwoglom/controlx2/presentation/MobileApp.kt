@@ -30,7 +30,7 @@ fun MobileApp(
     startDestination: String = Screen.FirstLaunch.route,
     sendMessage: (String, ByteArray) -> Unit,
     sendPumpCommands: (SendType, List<Message>) -> Unit,
-    sendServiceBolusRequest: (Int, BolusParameters, BolusCalcUnits, BolusCalcDataSnapshotResponse, TimeSinceResetResponse) -> Unit,
+    sendServiceBolusRequest: (Int, BolusParameters, BolusCalcUnits, BolusCalcDataSnapshotResponse, TimeSinceResetResponse, Long, Long) -> Unit,
     sendServiceBolusCancel: () -> Unit,
     historyLogViewModel: HistoryLogViewModel? = null,
     sheetLaunchRequest: SheetLaunchRequest? = null,
@@ -86,7 +86,7 @@ fun DefaultPreview() {
         startDestination = Screen.FirstLaunch.route,
         sendMessage = {_, _ -> },
         sendPumpCommands = {_, _ -> },
-        sendServiceBolusRequest = {_, _, _, _, _ -> },
+        sendServiceBolusRequest = {_, _, _, _, _, _, _ -> },
         sendServiceBolusCancel = {},
         onSheetLaunchHandled = {},
     )
