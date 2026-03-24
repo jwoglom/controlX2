@@ -213,9 +213,9 @@ private fun sendDiagnosticsPayload(context: Context) {
     val sgvSent = sender.sendSgv(
         JSONArray().put(
             JSONObject().apply {
-                put("sgv", 123)
-                put("date", now.toEpochMilli())
-                put("dateString", now.toString())
+                put("mgdl", 123)
+                put("mills", now.toEpochMilli())
+                put("direction", "Flat")
             }
         ).toString()
     )

@@ -10,6 +10,7 @@ import java.time.Instant
 data class XdripTreatmentPayload(
     val eventType: String,
     val createdAt: String,
+    val mills: Long,
     val insulin: Double? = null,
     val notes: String
 ) {
@@ -17,6 +18,7 @@ data class XdripTreatmentPayload(
         return JSONObject().apply {
             put("eventType", eventType)
             put("created_at", createdAt)
+            put("mills", mills)
             insulin?.let { put("insulin", it) }
             put("notes", notes)
         }
@@ -31,6 +33,7 @@ data class XdripTreatmentPayload(
             return XdripTreatmentPayload(
                 eventType = "Bolus",
                 createdAt = receivedAt.toString(),
+                mills = receivedAt.toEpochMilli(),
                 notes = "ControlX2 bolus initiated bolusId=${response.bolusId} status=${response.statusType}"
             )
         }
@@ -39,6 +42,7 @@ data class XdripTreatmentPayload(
             return XdripTreatmentPayload(
                 eventType = "Bolus",
                 createdAt = response.timestampInstant.toString(),
+                mills = response.timestampInstant.toEpochMilli(),
                 insulin = InsulinUnit.from1000To1(response.requestedVolume),
                 notes = "ControlX2 bolus status bolusId=${response.bolusId} status=${response.status}"
             )
@@ -53,6 +57,7 @@ data class XdripTreatmentPayload(
             return XdripTreatmentPayload(
                 eventType = "Bolus",
                 createdAt = timestamp.toString(),
+                mills = timestamp.toEpochMilli(),
                 insulin = InsulinUnit.from1000To1(requestedVolumeMilli),
                 notes = "ControlX2 bolus status bolusId=$bolusId status=$status"
             )
