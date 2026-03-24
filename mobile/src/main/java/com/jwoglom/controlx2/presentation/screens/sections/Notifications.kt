@@ -206,7 +206,9 @@ fun Notifications(
 val notificationsCommands = listOf(
     HomeScreenMirrorRequest(),
     *NotificationBundle.allRequests().toTypedArray()
-)
+).filter { msg ->
+    apiVersion() >= msg.props().minApi.get()
+}
 
 val notificationsFields = listOf(
     dataStore.notificationBundle

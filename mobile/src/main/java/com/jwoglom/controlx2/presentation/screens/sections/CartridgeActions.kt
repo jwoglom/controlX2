@@ -373,7 +373,9 @@ val cartridgeActionsCommands = listOf(
 val cartridgeNotificationCommands = listOf(
     HomeScreenMirrorRequest(),
     *NotificationBundle.allRequests().toTypedArray(),
-)
+).filter { msg ->
+    apiVersion() >= msg.props().minApi.get()
+}
 
 val cartridgeActionsFields = listOf(
     dataStore.cgmSessionState
