@@ -371,6 +371,7 @@ fun Actions(
 
                 item {
                     val controlIQMode = ds.controlIQMode.observeAsState()
+                    val isMobi = determinePumpModel(deviceName.value ?: "") == KnownDeviceModel.MOBI
                     Box(
                         modifier = Modifier
                             .fillMaxSize()
@@ -392,6 +393,7 @@ fun Actions(
                             trailingContent = {
                                 Switch(
                                     checked = controlIQMode.value == UserMode.EXERCISE,
+                                    enabled = isMobi,
                                     onCheckedChange = { checked ->
                                         if (checked) {
                                             // User toggling to ON
@@ -451,6 +453,7 @@ fun Actions(
 
                 item {
                     val controlIQMode = ds.controlIQMode.observeAsState()
+                    val isMobi = determinePumpModel(deviceName.value ?: "") == KnownDeviceModel.MOBI
                     Box(
                         modifier = Modifier
                             .fillMaxSize()
@@ -472,6 +475,7 @@ fun Actions(
                             trailingContent = {
                                 Switch(
                                     checked = controlIQMode.value == UserMode.SLEEP,
+                                    enabled = isMobi,
                                     onCheckedChange = { checked ->
                                         if (checked) {
                                             // User toggling to ON
@@ -530,6 +534,7 @@ fun Actions(
                 item {
                     val tempRateActive = ds.tempRateActive.observeAsState()
                     val tempRateDetails = ds.tempRateDetails.observeAsState()
+                    val isMobi = determinePumpModel(deviceName.value ?: "") == KnownDeviceModel.MOBI
                     Box(
                         modifier = Modifier
                             .fillMaxSize()
@@ -561,7 +566,7 @@ fun Actions(
                                     contentDescription = null,
                                 )
                             },
-                            modifier = Modifier.clickable {
+                            modifier = Modifier.clickable(enabled = isMobi) {
                                 when (tempRateActive.value) {
                                     true -> { showStopTempRateMenu = true }
                                     false -> { openTempRateWindow() }
