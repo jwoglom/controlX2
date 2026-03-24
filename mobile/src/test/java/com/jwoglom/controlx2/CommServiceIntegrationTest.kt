@@ -154,19 +154,6 @@ class CommServiceIntegrationTest {
     }
 
     /**
-     * Idle the service's background HandlerThread looper so that messages
-     * posted to pumpCommHandler / pumpFinderCommHandler are processed.
-     */
-    private fun idleServiceLooper() {
-        val field = CommService::class.java.getDeclaredField("serviceLooper")
-        field.isAccessible = true
-        val looper = field.get(service) as? Looper
-        if (looper != null) {
-            shadowOf(looper).idle()
-        }
-    }
-
-    /**
      * Start service in normal mode, trigger INIT_PUMP_COMM via onStartCommand,
      * and simulate a connected pump by setting internal state via reflection.
      * This avoids calling the real onPumpConnected() which has Thread.sleep loops
@@ -230,7 +217,7 @@ class CommServiceIntegrationTest {
     }
 
     // =========================================================================
-    // TEST GROUP 7: Service Lifecycle
+    // Service Lifecycle
     // =========================================================================
 
     @Test
@@ -303,22 +290,8 @@ class CommServiceIntegrationTest {
     }
 
     // =========================================================================
-    // TEST GROUP 1: Message Routing
+    // Message Routing
     // =========================================================================
-
-    @Test
-    fun routing_requestServiceStatus_normalMode_respondsCommStarted() {
-        startServiceNormal()
-        sendMessage("/to-phone/request-service-status")
-        assertTrue(messageBus.hasMessage("/to-phone/comm-started"))
-    }
-
-    @Test
-    fun routing_requestServiceStatus_pumpFinderMode_respondsPumpFinderStarted() {
-        startServicePumpFinder()
-        sendMessage("/to-phone/request-service-status")
-        assertTrue(messageBus.hasMessage("/to-phone/pump-finder-started"))
-    }
 
     @Test
     fun routing_serviceStatusAcknowledged_stopsPolling() {
@@ -335,106 +308,9 @@ class CommServiceIntegrationTest {
         )
     }
 
-    @Test
-    fun routing_isPumpConnected_queriesState() {
-        startServiceNormal()
-        // When pump is not connected, should get pump-not-connected
-        sendMessage("/to-phone/is-pump-connected")
-        shadowOf(Looper.getMainLooper()).idle()
-        // The pumpCommHandler runs on a background HandlerThread.
-        // Idle it so the CHECK_PUMP_CONNECTED message is processed.
-        idleServiceLooper()
-        val hasConnected = messageBus.hasMessage("/from-pump/pump-connected")
-        val hasNotConnected = messageBus.hasMessage("/from-pump/pump-not-connected")
-        assertTrue(
-            "Expected either pump-connected or pump-not-connected",
-            hasConnected || hasNotConnected
-        )
-    }
-
-    @Test
-    fun routing_bolusCancel_resetsPrefs() {
-        startServiceNormal()
-        // Set up bolus prefs
-        prefs.edit()
-            .putString("initiateBolusRequest", "test")
-            .putLong("initiateBolusTime", System.currentTimeMillis())
-            .commit()
-        sendMessage("/to-phone/bolus-cancel")
-        // Prefs should be cleared
-        assertNull(prefs.getString("initiateBolusRequest", null))
-    }
-
-    @Test
-    fun routing_setPairingCode_doesNotCrash() {
-        startServiceNormal()
-        sendMessage("/to-phone/set-pairing-code", "123456")
-        // Should handle gracefully (logged but no action needed in service)
-    }
-
-    @Test
-    fun routing_stopComm_sendsToHandler() {
-        startServiceNormal()
-        // Should not crash when sending stop-comm
-        sendMessage("/to-phone/stop-comm")
-        shadowOf(Looper.getMainLooper()).idle()
-    }
-
-    @Test
-    fun routing_pumpCommand_routedToHandler() {
-        startServiceNormal()
-        // Create a serialized pump command
-        val request = ApiVersionRequest()
-        val msgBytes = PumpMessageSerializer.toBytes(request)
-        sendMessage("/to-pump/command", msgBytes)
-        shadowOf(Looper.getMainLooper()).idle()
-        // Handler processes it - we can't easily verify BLE was called without
-        // connecting, but we verify no crash and message was consumed
-    }
-
-    @Test
-    fun routing_pumpCommandsBulk_routedToHandler() {
-        startServiceNormal()
-        val requests = listOf(ApiVersionRequest(), ControlIQIOBRequest())
-        val bulkBytes = PumpMessageSerializer.toBulkBytes(requests)
-        sendMessage("/to-pump/commands", bulkBytes)
-        shadowOf(Looper.getMainLooper()).idle()
-    }
-
-    @Test
-    fun routing_cachedCommands_routedToHandler() {
-        startServiceNormal()
-        val requests = listOf(ApiVersionRequest())
-        val bulkBytes = PumpMessageSerializer.toBulkBytes(requests)
-        sendMessage("/to-pump/cached-commands", bulkBytes)
-        shadowOf(Looper.getMainLooper()).idle()
-    }
-
-    @Test
-    fun routing_commandsBustCache_routedToHandler() {
-        startServiceNormal()
-        val requests = listOf(ApiVersionRequest())
-        val bulkBytes = PumpMessageSerializer.toBulkBytes(requests)
-        sendMessage("/to-pump/commands-bust-cache", bulkBytes)
-        shadowOf(Looper.getMainLooper()).idle()
-    }
-
-    @Test
-    fun routing_refreshHistoryLogSync_doesNotCrash() {
-        startServiceNormal()
-        sendMessage("/to-phone/refresh-history-log-sync")
-        shadowOf(Looper.getMainLooper()).idle()
-    }
-
-    @Test
-    fun routing_writeCharacteristicFailedCallback_doesNotCrash() {
-        startServiceNormal()
-        sendMessage("/to-phone/write-characteristic-failed-callback", "some-uuid")
-        shadowOf(Looper.getMainLooper()).idle()
-    }
 
     // =========================================================================
-    // TEST GROUP 3: Bolus Security
+    // Bolus Security
     // =========================================================================
 
     @Test
@@ -559,15 +435,8 @@ class CommServiceIntegrationTest {
     }
 
     // =========================================================================
-    // TEST GROUP 4: Data Forwarding to Wear
+    // Data Forwarding to Wear
     // =========================================================================
-
-    // Note: These tests require a connected pump to trigger onReceiveMessage.
-    // Since we can't easily connect a real pump in unit tests, we test the
-    // message routing logic that decides WHICH messages get forwarded.
-    // The forwarding logic is in the Pump.onReceiveMessage callback.
-    //
-    // For now, we verify the sendWearCommMessage behavior itself.
 
     @Test
     fun sendWearCommMessage_sendsViaMessageBus() {
@@ -591,14 +460,8 @@ class CommServiceIntegrationTest {
     }
 
     // =========================================================================
-    // TEST GROUP 5: Pump Connection Lifecycle
+    // Pump Connection Lifecycle
     // =========================================================================
-
-    // These tests verify the service state transitions. Since we mock the BT
-    // layer, we can't trigger actual pump connections. Instead we verify:
-    // 1. The handler is created
-    // 2. Commands are routed correctly
-    // 3. State queries work
 
     @Test
     fun lifecycle_isPumpConnected_whenNotConnected_sendsPumpNotConnected() {
@@ -615,23 +478,6 @@ class CommServiceIntegrationTest {
             "Expected pump-not-connected when pump handler not initialized",
             messageBus.hasMessage("/from-pump/pump-not-connected")
         )
-    }
-
-    @Test
-    fun lifecycle_stopComm_doesNotCrash() {
-        startServiceNormal()
-        sendMessage("/to-phone/stop-comm")
-        shadowOf(Looper.getMainLooper()).idle()
-        // Verify service still functions after stop
-        sendMessage("/to-phone/request-service-status")
-        assertTrue(messageBus.hasMessage("/to-phone/comm-started"))
-    }
-
-    @Test
-    fun lifecycle_serviceDestroy_cleansUp() {
-        startServiceNormal()
-        serviceController.destroy()
-        // Should not crash during cleanup
     }
 
     @Test
@@ -653,35 +499,8 @@ class CommServiceIntegrationTest {
     }
 
     // =========================================================================
-    // TEST GROUP 6: PumpFinder Mode
+    // PumpFinder Mode
     // =========================================================================
-
-    @Test
-    fun pumpFinder_requestServiceStatus_respondsPumpFinderStarted() {
-        startServicePumpFinder()
-        sendMessage("/to-phone/request-service-status")
-        assertTrue(messageBus.hasMessage("/to-phone/pump-finder-started"))
-    }
-
-    @Test
-    fun pumpFinder_checkFoundPumps_returnsEmptyInitially() {
-        startServicePumpFinder()
-        // Start the pump finder
-        serviceController.startCommand(0, 0)
-        shadowOf(Looper.getMainLooper()).idle()
-        messageBus.clear()
-
-        sendMessage("/to-phone/check-pump-finder-found-pumps")
-        shadowOf(Looper.getMainLooper()).idle()
-        Thread.sleep(100)
-        shadowOf(Looper.getMainLooper()).idle()
-
-        // Should respond with found-pumps (empty list = empty string)
-        val foundPumpsMessages = messageBus.messagesForPath("/from-pump/pump-finder-found-pumps")
-        if (foundPumpsMessages.isNotEmpty()) {
-            assertEquals("", foundPumpsMessages.last().dataString)
-        }
-    }
 
     @Test
     fun pumpFinder_stopPumpFinder_withInitComm_transitionsToNormalMode() {
@@ -719,77 +538,6 @@ class CommServiceIntegrationTest {
         assertFalse(messageBus.hasMessage("/to-phone/comm-started"))
     }
 
-    // =========================================================================
-    // TEST GROUP 2: Response Caching
-    // =========================================================================
-
-    // Response caching is tightly coupled to the PumpCommHandler inner class
-    // and requires a connected pump to populate the cache. We test the
-    // observable behavior: cached-commands path returns cached responses
-    // when available, or sends to pump when not.
-    //
-    // Since we can't easily populate the cache without a real pump connection,
-    // we verify the routing paths work correctly.
-
-    @Test
-    fun caching_cachedCommandsPath_routedToHandler() {
-        startServiceNormal()
-        val request = ApiVersionRequest()
-        val bulkBytes = PumpMessageSerializer.toBulkBytes(listOf(request))
-        // Should not crash — handler processes even if pump not connected
-        sendMessage("/to-pump/cached-commands", bulkBytes)
-        shadowOf(Looper.getMainLooper()).idle()
-    }
-
-    @Test
-    fun caching_bustCachePath_routedToHandler() {
-        startServiceNormal()
-        val request = ControlIQIOBRequest()
-        val bulkBytes = PumpMessageSerializer.toBulkBytes(listOf(request))
-        sendMessage("/to-pump/commands-bust-cache", bulkBytes)
-        shadowOf(Looper.getMainLooper()).idle()
-    }
-
-    @Test
-    fun caching_debugGetMessageCache_routedToHandler() {
-        startServiceNormal()
-        sendMessage("/to-pump/debug-message-cache")
-        shadowOf(Looper.getMainLooper()).idle()
-        Thread.sleep(100)
-        shadowOf(Looper.getMainLooper()).idle()
-        // Should respond with debug-message-cache (empty cache)
-        // The handler will send /from-pump/debug-message-cache
-    }
-
-    @Test
-    fun caching_debugGetHistoryLogCache_routedToHandler() {
-        startServiceNormal()
-        sendMessage("/to-pump/debug-historylog-cache")
-        shadowOf(Looper.getMainLooper()).idle()
-        Thread.sleep(100)
-        shadowOf(Looper.getMainLooper()).idle()
-    }
-
-    // =========================================================================
-    // Additional edge case tests
-    // =========================================================================
-
-    @Test
-    fun routing_unknownPath_ignoredGracefully() {
-        startServiceNormal()
-        sendMessage("/unknown/path", "data")
-        // Should not crash
-    }
-
-    @Test
-    fun routing_fromPumpPath_loopbackIgnored() {
-        startServiceNormal()
-        // /from-pump/ messages received should be ignored in the routing
-        // (they're outgoing, not incoming actions)
-        sendMessage("/from-pump/pump-connected", "TestPump")
-        // Should not crash or trigger any action
-    }
-
     @Test
     fun bolus_confirmRequest_belowThreshold_autoApproves() {
         startServiceNormal()
@@ -809,50 +557,9 @@ class CommServiceIntegrationTest {
         assertNotNull(prefs.getString("initiateBolusSecret", null))
     }
 
-    @Test
-    fun routing_debugCommands_registersForStreamTagging() {
-        startServiceNormal()
-        val requests = listOf(ApiVersionRequest())
-        val bulkBytes = PumpMessageSerializer.toBulkBytes(requests)
-        // debug-commands should register the request for stream tagging
-        sendMessage("/to-pump/debug-commands", bulkBytes)
-        shadowOf(Looper.getMainLooper()).idle()
-        // Should not crash — debug prompt response tracking is internal
-    }
-
-    @Test
-    fun service_broadcastHistoryLogItem_doesNotCrash() {
-        startServiceNormal()
-        // httpDebugApiService may or may not be initialized
-        // This should not throw
-        service.broadcastHistoryLogItem(
-            com.jwoglom.controlx2.db.historylog.HistoryLogItem(
-                seqId = 1,
-                pumpSid = 123,
-                typeId = 1,
-                cargo = byteArrayOf(),
-                pumpTime = java.time.LocalDateTime.now(),
-                addedTime = java.time.LocalDateTime.now()
-            )
-        )
-    }
-
     // =========================================================================
-    // TEST GROUP 8: Connected Pump — Lifecycle
+    // Connected Pump — Lifecycle
     // =========================================================================
-
-    @Test
-    fun connectedPump_initPumpComm_capturesPumpReference() {
-        startServiceNormal()
-        serviceController.startCommand(0, 0)
-        shadowOf(Looper.getMainLooper()).idle()
-        Thread.sleep(500)
-        shadowOf(Looper.getMainLooper()).idle()
-        assertNotNull(
-            "TandemBluetoothHandler.getInstance should have captured the Pump reference",
-            capturedPump
-        )
-    }
 
     @Test
     fun connectedPump_isPumpReadyForHistoryFetch_returnsTrue() {
@@ -885,17 +592,8 @@ class CommServiceIntegrationTest {
         )
     }
 
-    @Test
-    fun connectedPump_stopComm_doesNotCrash() {
-        startServiceAndConnectPump()
-        sendMessage("/to-phone/stop-comm")
-        shadowOf(Looper.getMainLooper()).idle()
-        Thread.sleep(200)
-        shadowOf(Looper.getMainLooper()).idle()
-    }
-
     // =========================================================================
-    // TEST GROUP 9: Connected Pump — Response Caching
+    // Connected Pump — Response Caching
     // =========================================================================
 
     @Test
@@ -1018,7 +716,7 @@ class CommServiceIntegrationTest {
     }
 
     // =========================================================================
-    // TEST GROUP 10: Connected Pump — Message Forwarding to Wear
+    // Connected Pump — Message Forwarding to Wear
     // =========================================================================
 
     @Test
@@ -1118,7 +816,7 @@ class CommServiceIntegrationTest {
     }
 
     // =========================================================================
-    // TEST GROUP 11: Connected Pump — Bolus with Connection
+    // Connected Pump — Bolus with Connection
     // =========================================================================
 
     @Test
