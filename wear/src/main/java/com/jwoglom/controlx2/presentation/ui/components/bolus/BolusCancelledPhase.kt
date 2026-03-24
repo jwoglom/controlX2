@@ -22,8 +22,11 @@ import com.jwoglom.controlx2.presentation.DataStore
 import com.jwoglom.controlx2.shared.util.SendType
 import com.jwoglom.controlx2.shared.util.snakeCaseToSpace
 import com.jwoglom.controlx2.shared.util.twoDecimalPlaces1000Unit
+import com.jwoglom.pumpx2.pump.PumpState
 import com.jwoglom.pumpx2.pump.messages.Message
-import com.jwoglom.pumpx2.pump.messages.request.currentStatus.LastBolusStatusV2Request
+import com.jwoglom.pumpx2.pump.messages.builders.LastBolusStatusRequestBuilder
+import com.jwoglom.pumpx2.pump.messages.models.ApiVersion
+import com.jwoglom.pumpx2.pump.messages.models.KnownApiVersion
 import com.jwoglom.pumpx2.pump.messages.response.control.CancelBolusResponse.CancelStatus
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.delay
@@ -38,6 +41,9 @@ fun BolusCancelledPhase(
     refreshScope: CoroutineScope,
     sendPumpCommands: (SendType, List<Message>) -> Unit,
 ) {
+    fun apiVersion(): ApiVersion = PumpState.getPumpAPIVersion() ?: KnownApiVersion.API_V2_5.get()
+    fun lastBolusStatusRequest(): Message = LastBolusStatusRequestBuilder.create(apiVersion())
+
     val scrollState = rememberScalingLazyListState()
     Dialog(showDialog = showCancelledDialog, onDismissRequest = onDismiss, scrollState = scrollState) {
         val bolusCancelResponse = dataStore.bolusCancelResponse.observeAsState()
@@ -45,7 +51,7 @@ fun BolusCancelledPhase(
         val lastBolusStatusResponse = dataStore.lastBolusStatusResponse.observeAsState()
 
         LaunchedEffect(bolusCancelResponse.value, Unit) {
-            sendPumpCommands(SendType.STANDARD, listOf(LastBolusStatusV2Request()))
+            sendPumpCommands(SendType.STANDARD, listOf(lastBolusStatusRequest()))
         }
 
         fun matchesBolusId(): Boolean? {
@@ -61,7 +67,7 @@ fun BolusCancelledPhase(
             if (matchesBolusId() == false) {
                 refreshScope.launch {
                     delay(250)
-                    sendPumpCommands(SendType.STANDARD, listOf(LastBolusStatusV2Request()))
+                    sendPumpCommands(SendType.STANDARD, listOf(lastBolusStatusRequest()))
                 }
             }
         }
