@@ -23,7 +23,7 @@ internal sealed class DispatchEvent {
     data class PumpIob(val units: Double) : DispatchEvent()
     data class PumpReservoir(val units: Int) : DispatchEvent()
     data class PumpBasal(val unitsPerHour: Double) : DispatchEvent()
-    data class CgmSgv(val mgdl: Int) : DispatchEvent()
+    data class CgmSgv(val mgdl: Int, val trendRate: Int) : DispatchEvent()
     data class TreatmentInitiated(val bolusId: Int, val status: String) : DispatchEvent()
     data class TreatmentStatus(val bolusId: Int, val requestedVolumeMilli: Long, val status: String, val timestamp: Instant) : DispatchEvent()
     data object Other : DispatchEvent()
@@ -54,7 +54,7 @@ class XdripMessageDispatcher(
 
         if (config.sendCgmSgv && event is DispatchEvent.CgmSgv) {
             val sgvPayload = XdripSgvPayload
-                .fromValue(event.mgdl, receivedAt)
+                .fromValue(event.mgdl, event.trendRate, receivedAt)
                 .toJsonArrayString()
             broadcaster.sendSgv(sgvPayload, config.cgmSgvMinimumIntervalSeconds)
         }
@@ -71,6 +71,7 @@ class XdripMessageDispatcher(
                 is DispatchEvent.TreatmentInitiated -> XdripTreatmentPayload(
                     eventType = "Bolus",
                     createdAt = receivedAt.toString(),
+                    mills = receivedAt.toEpochMilli(),
                     notes = "ControlX2 bolus initiated bolusId=${event.bolusId} status=${event.status}"
                 ).toJsonArrayString()
 
@@ -98,10 +99,10 @@ class XdripMessageDispatcher(
             val statusline = buildString {
                 append("Pump")
                 latestPumpSnapshot.sgvMgdl?.value?.let { append(" SGV:$it") }
-                latestPumpSnapshot.iobUnits?.value?.let { append(" IOB:${twoDecimalPlaces(it)}u") }
-                latestPumpSnapshot.cartridgeUnits?.value?.let { append(" Cart:${it}u") }
-                latestPumpSnapshot.basalUnitsPerHour?.value?.let { append(" Basal:${twoDecimalPlaces(it)}u/h") }
-                latestPumpSnapshot.batteryPercent?.value?.let { append(" Batt:${it}%") }
+                latestPumpSnapshot.iobUnits?.value?.let { append(" IOB:${twoDecimalPlaces(it)}U") }
+                latestPumpSnapshot.cartridgeUnits?.value?.let { append(" Cart:${it}U") }
+                latestPumpSnapshot.basalUnitsPerHour?.value?.let { append(" ${twoDecimalPlaces(it)}U/h") }
+                latestPumpSnapshot.batteryPercent?.value?.let { append(" Batt:$it") }
             }
             broadcaster.sendExternalStatusline(statusline, config.statusLineMinimumIntervalSeconds)
         }
@@ -141,7 +142,7 @@ class XdripMessageDispatcher(
             is ControlIQIOBResponse -> DispatchEvent.PumpIob(InsulinUnit.from1000To1(pumpDisplayedIOB))
             is InsulinStatusResponse -> DispatchEvent.PumpReservoir(currentInsulinAmount)
             is CurrentBasalStatusResponse -> DispatchEvent.PumpBasal(InsulinUnit.from1000To1(currentBasalRate))
-            is CurrentEGVGuiDataResponse -> DispatchEvent.CgmSgv(cgmReading)
+            is CurrentEGVGuiDataResponse -> DispatchEvent.CgmSgv(cgmReading, trendRate)
             is InitiateBolusResponse -> DispatchEvent.TreatmentInitiated(bolusId, statusType.toString())
             is CurrentBolusStatusResponse -> DispatchEvent.TreatmentStatus(
                 bolusId = bolusId,

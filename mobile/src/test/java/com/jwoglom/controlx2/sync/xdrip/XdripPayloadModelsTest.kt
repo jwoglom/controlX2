@@ -10,7 +10,6 @@ import com.jwoglom.pumpx2.pump.messages.response.currentStatus.ControlIQIOBRespo
 import com.jwoglom.pumpx2.pump.messages.response.currentStatus.CurrentBasalStatusResponse
 import com.jwoglom.pumpx2.pump.messages.response.currentStatus.CurrentBatteryV2Response
 import com.jwoglom.pumpx2.pump.messages.response.currentStatus.CurrentBolusStatusResponse
-import com.jwoglom.pumpx2.pump.messages.response.currentStatus.CurrentEGVGuiDataResponse
 import com.jwoglom.pumpx2.pump.messages.response.currentStatus.InsulinStatusResponse
 import org.json.JSONArray
 import org.json.JSONObject
@@ -21,17 +20,28 @@ import java.time.Instant
 
 class XdripPayloadModelsTest {
     @Test
-    fun sgvPayload_fromResponse_andJsonShape() {
+    fun sgvPayload_usesXdripFieldNames_andIncludesDirection() {
         val receivedAt = Instant.parse("2026-01-01T00:00:00Z")
-        val response = CurrentEGVGuiDataResponse(1710000000, 123, 1, 2)
-
-        val payload = XdripSgvPayload.fromResponse(response, receivedAt)
+        val payload = XdripSgvPayload.fromValue(123, 0, receivedAt)
         val obj = JSONArray(payload.toJsonArrayString()).getJSONObject(0)
 
         assertEquals("sgvs", XdripSgvPayload.EXTRA_KEY)
-        assertEquals(123, obj.getInt("sgv"))
-        assertEquals(receivedAt.toEpochMilli(), obj.getLong("date"))
-        assertEquals(receivedAt.toString(), obj.getString("dateString"))
+        assertEquals(123, obj.getInt("mgdl"))
+        assertEquals(receivedAt.toEpochMilli(), obj.getLong("mills"))
+        assertEquals("Flat", obj.getString("direction"))
+    }
+
+    @Test
+    fun sgvPayload_directionFromTrendRate_mapsCorrectly() {
+        assertEquals("DoubleDown", XdripSgvPayload.directionFromTrendRate(-4))
+        assertEquals("DoubleDown", XdripSgvPayload.directionFromTrendRate(-3))
+        assertEquals("SingleDown", XdripSgvPayload.directionFromTrendRate(-2))
+        assertEquals("FortyFiveDown", XdripSgvPayload.directionFromTrendRate(-1))
+        assertEquals("Flat", XdripSgvPayload.directionFromTrendRate(0))
+        assertEquals("FortyFiveUp", XdripSgvPayload.directionFromTrendRate(1))
+        assertEquals("SingleUp", XdripSgvPayload.directionFromTrendRate(2))
+        assertEquals("DoubleUp", XdripSgvPayload.directionFromTrendRate(3))
+        assertEquals("DoubleUp", XdripSgvPayload.directionFromTrendRate(5))
     }
 
     @Test
@@ -65,17 +75,20 @@ class XdripPayloadModelsTest {
     }
 
     @Test
-    fun treatmentPayload_mapsInitiateAndCurrentStatusResponses() {
+    fun treatmentPayload_includesMillsTimestamp() {
+        val receivedAt = Instant.parse("2026-01-01T00:00:00Z")
         val initiated = XdripTreatmentPayload
             .fromInitiateBolusResponse(
                 InitiateBolusResponse(0, 42, 0),
-                Instant.parse("2026-01-01T00:00:00Z")
+                receivedAt
             )
             .toJsonArrayString()
         val initiatedObj = JSONArray(initiated).getJSONObject(0)
 
         assertEquals("treatments", XdripTreatmentPayload.EXTRA_KEY)
         assertEquals("Bolus", initiatedObj.getString("eventType"))
+        assertEquals(receivedAt.toEpochMilli(), initiatedObj.getLong("mills"))
+        assertEquals(receivedAt.toString(), initiatedObj.getString("created_at"))
         assertTrue(initiatedObj.getString("notes").contains("bolusId=42"))
 
         val currentStatus = XdripTreatmentPayload
@@ -85,6 +98,7 @@ class XdripPayloadModelsTest {
             .toJsonArrayString()
         val statusObj = JSONArray(currentStatus).getJSONObject(0)
         assertEquals(InsulinUnit.from1000To1(2300), statusObj.getDouble("insulin"), 0.0001)
+        assertTrue(statusObj.getLong("mills") > 0)
         assertTrue(statusObj.getString("notes").contains("bolusId=77"))
     }
 }

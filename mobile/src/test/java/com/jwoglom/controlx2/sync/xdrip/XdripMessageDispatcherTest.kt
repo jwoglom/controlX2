@@ -52,7 +52,7 @@ class XdripMessageDispatcherTest {
     }
 
     @Test
-    fun onReceiveMessage_mapsSgvResponseAndUsesConfiguredInterval() {
+    fun onReceiveMessage_mapsSgvWithXdripFieldNames() {
         val broadcaster = FakeBroadcaster()
         val now = Instant.parse("2026-01-01T00:00:00Z")
         val dispatcher = XdripMessageDispatcher(
@@ -73,9 +73,9 @@ class XdripMessageDispatcherTest {
 
         val sgvJson = JSONArray(broadcaster.sgvPayloads.single().payload).getJSONObject(0)
         assertEquals(42, broadcaster.sgvPayloads.single().minimumIntervalSeconds)
-        assertEquals(145, sgvJson.getInt("sgv"))
-        assertEquals(now.toEpochMilli(), sgvJson.getLong("date"))
-        assertEquals(now.toString(), sgvJson.getString("dateString"))
+        assertEquals(145, sgvJson.getInt("mgdl"))
+        assertEquals(now.toEpochMilli(), sgvJson.getLong("mills"))
+        assertEquals("SingleUp", sgvJson.getString("direction"))
     }
 
     @Test
@@ -113,13 +113,18 @@ class XdripMessageDispatcherTest {
 
         val latestStatusline = broadcaster.statuslinePayloads.last()
         assertEquals(3, latestStatusline.minimumIntervalSeconds)
-        assertTrue(latestStatusline.payload.contains("Batt:55%"))
-        assertTrue(latestStatusline.payload.contains("Cart:80u"))
+        // Status line uses uppercase U/h for xDrip basal rate regex compatibility
+        assertTrue(latestStatusline.payload.contains("U/h"))
+        // Battery no longer has % suffix to avoid xDrip TBR misparse
+        assertTrue(latestStatusline.payload.contains("Batt:55"))
+        assertTrue(!latestStatusline.payload.contains("Batt:55%"))
+        assertTrue(latestStatusline.payload.contains("Cart:80U"))
     }
 
     @Test
-    fun onReceiveMessage_mapsTreatmentResponsesAndAlwaysRequestsNewFoodBroadcast() {
+    fun onReceiveMessage_mapsTreatmentResponsesWithMillsTimestamp() {
         val broadcaster = FakeBroadcaster()
+        val now = Instant.parse("2026-01-02T03:04:05Z")
         val dispatcher = XdripMessageDispatcher(
             broadcaster = broadcaster,
             configProvider = {
@@ -131,7 +136,7 @@ class XdripMessageDispatcherTest {
                     treatmentsMinimumIntervalSeconds = 11
                 )
             },
-            nowProvider = { Instant.parse("2026-01-02T03:04:05Z") }
+            nowProvider = { now }
         )
 
         dispatcher.onReceiveMessage(InitiateBolusResponse(0, 77, 0))
@@ -144,9 +149,11 @@ class XdripMessageDispatcherTest {
         val initiated = JSONArray(broadcaster.treatmentPayloads[0].payload).getJSONObject(0)
         assertEquals("Bolus", initiated.getString("eventType"))
         assertTrue(initiated.getString("notes").contains("bolusId=77"))
+        assertEquals(now.toEpochMilli(), initiated.getLong("mills"))
 
         val status = JSONArray(broadcaster.treatmentPayloads[1].payload).getJSONObject(0)
         assertEquals(InsulinUnit.from1000To1(2300), status.getDouble("insulin"), 0.0001)
+        assertTrue(status.getLong("mills") > 0)
         assertTrue(status.getString("notes").contains("status="))
     }
 
@@ -158,7 +165,7 @@ class XdripMessageDispatcherTest {
             configProvider = { XdripSyncConfig(enabled = false) }
         )
 
-        dispatcher.onEvent(DispatchEvent.CgmSgv(120))
+        dispatcher.onEvent(DispatchEvent.CgmSgv(120, 0))
         dispatcher.onEvent(DispatchEvent.PumpBattery(55))
 
         assertTrue(broadcaster.sgvPayloads.isEmpty())
@@ -177,11 +184,11 @@ class XdripMessageDispatcherTest {
             nowProvider = { Instant.parse("2026-01-01T00:00:00Z") }
         )
 
-        dispatcher.onEvent(DispatchEvent.CgmSgv(120))
+        dispatcher.onEvent(DispatchEvent.CgmSgv(120, 0))
         assertTrue(broadcaster.sgvPayloads.isEmpty())
 
         config = config.copy(sendCgmSgv = true, cgmSgvMinimumIntervalSeconds = 15)
-        dispatcher.onEvent(DispatchEvent.CgmSgv(121))
+        dispatcher.onEvent(DispatchEvent.CgmSgv(121, 1))
 
         assertEquals(1, broadcaster.sgvPayloads.size)
         assertEquals(15, broadcaster.sgvPayloads.single().minimumIntervalSeconds)

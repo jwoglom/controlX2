@@ -1,20 +1,19 @@
 package com.jwoglom.controlx2.sync.xdrip.models
 
-import com.jwoglom.pumpx2.pump.messages.response.currentStatus.CurrentEGVGuiDataResponse
 import org.json.JSONArray
 import org.json.JSONObject
 import java.time.Instant
 
 data class XdripSgvPayload(
-    val sgv: Int,
-    val date: Long,
-    val dateString: String
+    val mgdl: Int,
+    val mills: Long,
+    val direction: String
 ) {
     fun toJsonObject(): JSONObject {
         return JSONObject().apply {
-            put("sgv", sgv)
-            put("date", date)
-            put("dateString", dateString)
+            put("mgdl", mgdl)
+            put("mills", mills)
+            put("direction", direction)
         }
     }
 
@@ -23,19 +22,27 @@ data class XdripSgvPayload(
     companion object {
         const val EXTRA_KEY = "sgvs"
 
-        fun fromResponse(response: CurrentEGVGuiDataResponse, receivedAt: Instant): XdripSgvPayload {
-            return XdripSgvPayload(
-                sgv = response.cgmReading,
-                date = receivedAt.toEpochMilli(),
-                dateString = receivedAt.toString()
-            )
+        /**
+         * Map a numeric trend rate (mg/dL per minute) to an xDrip-compatible direction string.
+         * Thresholds follow the standard Dexcom CGM trend arrow ranges.
+         */
+        fun directionFromTrendRate(trendRate: Int): String {
+            return when {
+                trendRate <= -3 -> "DoubleDown"
+                trendRate <= -2 -> "SingleDown"
+                trendRate <= -1 -> "FortyFiveDown"
+                trendRate < 1 -> "Flat"
+                trendRate < 2 -> "FortyFiveUp"
+                trendRate < 3 -> "SingleUp"
+                else -> "DoubleUp"
+            }
         }
 
-        fun fromValue(mgdl: Int, receivedAt: Instant): XdripSgvPayload {
+        fun fromValue(mgdl: Int, trendRate: Int, receivedAt: Instant): XdripSgvPayload {
             return XdripSgvPayload(
-                sgv = mgdl,
-                date = receivedAt.toEpochMilli(),
-                dateString = receivedAt.toString()
+                mgdl = mgdl,
+                mills = receivedAt.toEpochMilli(),
+                direction = directionFromTrendRate(trendRate)
             )
         }
     }
