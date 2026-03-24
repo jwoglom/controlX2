@@ -52,6 +52,9 @@ import com.jwoglom.controlx2.shared.enums.BasalStatus
 import com.jwoglom.controlx2.shared.presentation.intervalOf
 import com.jwoglom.controlx2.shared.util.SendType
 import com.jwoglom.pumpx2.pump.messages.Message
+import com.jwoglom.pumpx2.pump.PumpState
+import com.jwoglom.pumpx2.pump.messages.models.ApiVersion
+import com.jwoglom.pumpx2.pump.messages.models.KnownApiVersion
 import com.jwoglom.pumpx2.pump.messages.request.currentStatus.CGMStatusRequest
 import com.jwoglom.pumpx2.pump.messages.request.currentStatus.HomeScreenMirrorRequest
 import com.jwoglom.pumpx2.pump.messages.request.currentStatus.TimeSinceResetRequest
@@ -370,11 +373,19 @@ val cartridgeActionsCommands = listOf(
     LoadStatusRequest()
 )
 
+fun cartridgeApiVersion(): ApiVersion {
+    var apiVersion = PumpState.getPumpAPIVersion()
+    if (apiVersion == null) {
+        apiVersion = KnownApiVersion.API_V2_5.get()
+    }
+    return apiVersion
+}
+
 val cartridgeNotificationCommands = listOf(
     HomeScreenMirrorRequest(),
     *NotificationBundle.allRequests().toTypedArray(),
 ).filter { msg ->
-    apiVersion() >= msg.props().minApi.get()
+    !msg.props().minApi.get().greaterThan(cartridgeApiVersion())
 }
 
 val cartridgeActionsFields = listOf(

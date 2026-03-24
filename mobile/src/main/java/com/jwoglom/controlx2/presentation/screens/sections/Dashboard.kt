@@ -276,7 +276,7 @@ val dashboardCommands = listOf(
     // update notification badge
     *NotificationBundle.allRequests().toTypedArray()
 ).filter { msg ->
-    apiVersion() >= msg.props().minApi.get()
+    !msg.props().minApi.get().greaterThan(apiVersion())
 }
 
 val dashboardFields = listOf(

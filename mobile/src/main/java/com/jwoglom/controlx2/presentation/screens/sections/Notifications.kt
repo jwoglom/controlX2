@@ -57,6 +57,9 @@ import com.jwoglom.controlx2.shared.presentation.intervalOf
 import com.jwoglom.controlx2.shared.util.SendType
 import com.jwoglom.controlx2.util.determinePumpModel
 import com.jwoglom.pumpx2.pump.messages.Message
+import com.jwoglom.pumpx2.pump.PumpState
+import com.jwoglom.pumpx2.pump.messages.models.ApiVersion
+import com.jwoglom.pumpx2.pump.messages.models.KnownApiVersion
 import com.jwoglom.pumpx2.pump.messages.models.KnownDeviceModel
 import com.jwoglom.pumpx2.pump.messages.models.NotificationBundle
 import com.jwoglom.pumpx2.pump.messages.request.currentStatus.HomeScreenMirrorRequest
@@ -203,11 +206,19 @@ fun Notifications(
     }
 }
 
+fun notificationsApiVersion(): ApiVersion {
+    var apiVersion = PumpState.getPumpAPIVersion()
+    if (apiVersion == null) {
+        apiVersion = KnownApiVersion.API_V2_5.get()
+    }
+    return apiVersion
+}
+
 val notificationsCommands = listOf(
     HomeScreenMirrorRequest(),
     *NotificationBundle.allRequests().toTypedArray()
 ).filter { msg ->
-    apiVersion() >= msg.props().minApi.get()
+    !msg.props().minApi.get().greaterThan(notificationsApiVersion())
 }
 
 val notificationsFields = listOf(
