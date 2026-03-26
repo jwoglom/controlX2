@@ -94,9 +94,19 @@ object NightscoutProfileConverter {
         )
     }
 
-    private fun formatMinutesAsTime(totalMinutes: Int): String {
+    /**
+     * Convert minutes since midnight to "HH:MM" format.
+     */
+    internal fun formatMinutesAsTime(totalMinutes: Int): String {
         val hours = totalMinutes / 60
         val minutes = totalMinutes % 60
         return "%02d:%02d".format(hours, minutes)
+    }
+
+    /**
+     * Convert a basal rate in milliunits to units per hour.
+     */
+    internal fun convertBasalRate(milliunits: Long): Double {
+        return InsulinUnit.from1000To1(milliunits)
     }
 }
