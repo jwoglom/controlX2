@@ -8,6 +8,7 @@ import com.jwoglom.controlx2.sync.nightscout.hashNightscoutApiSecret
 import com.jwoglom.controlx2.sync.nightscout.models.NightscoutAnnouncement
 import com.jwoglom.controlx2.sync.nightscout.models.NightscoutDeviceStatus
 import com.jwoglom.controlx2.sync.nightscout.models.NightscoutEntry
+import com.jwoglom.controlx2.sync.nightscout.models.NightscoutProfile
 import com.jwoglom.controlx2.sync.nightscout.models.NightscoutTreatment
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -68,6 +69,19 @@ class NightscoutClient(
                 Result.success(true)
             } catch (e: Exception) {
                 Timber.e(e, "Failed to upload device status to Nightscout")
+                Result.failure(e)
+            }
+        }
+    }
+
+    override suspend fun uploadProfile(profile: NightscoutProfile): Result<Boolean> {
+        return withContext(Dispatchers.IO) {
+            try {
+                post("/api/v1/profile", listOf(profile))
+                Timber.d("Uploaded profile to Nightscout")
+                Result.success(true)
+            } catch (e: Exception) {
+                Timber.e(e, "Failed to upload profile to Nightscout")
                 Result.failure(e)
             }
         }

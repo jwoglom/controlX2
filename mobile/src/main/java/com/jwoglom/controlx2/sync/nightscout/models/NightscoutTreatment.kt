@@ -52,7 +52,20 @@ data class NightscoutTreatment(
     val pumpId: String? = null,  // Our unique identifier (seqId) - used for deduplication
 
     @SerializedName("device")
-    val device: String = "ControlX2"
+    val device: String = "ControlX2",
+
+    // Combo/extended bolus fields (per Nightscout "Combo Bolus" eventType)
+    @SerializedName("enteredinsulin")
+    val enteredInsulin: Double? = null,  // Total insulin (immediate + extended)
+
+    @SerializedName("splitNow")
+    val splitNow: Int? = null,  // Percentage delivered immediately (0-100)
+
+    @SerializedName("splitExt")
+    val splitExt: Int? = null,  // Percentage delivered over extended period (0-100)
+
+    @SerializedName("relative")
+    val relative: Double? = null  // Extended portion rate in U/hr
 ) {
     companion object {
         fun fromTimestamp(
@@ -65,7 +78,11 @@ data class NightscoutTreatment(
             rate: Double? = null,
             absolute: Double? = null,
             reason: String? = null,
-            notes: String? = null
+            notes: String? = null,
+            enteredInsulin: Double? = null,
+            splitNow: Int? = null,
+            splitExt: Int? = null,
+            relative: Double? = null
         ): NightscoutTreatment {
             // Nightscout expects timezone-aware timestamps and matching epoch/offset from one instant.
             val nightscoutTimestamp = NightscoutTimestampPolicy.fromPumpTime(timestamp, "treatment")
@@ -81,7 +98,11 @@ data class NightscoutTreatment(
                 absolute = absolute,
                 reason = reason,
                 notes = notes,
-                pumpId = seqId.toString()
+                pumpId = seqId.toString(),
+                enteredInsulin = enteredInsulin,
+                splitNow = splitNow,
+                splitExt = splitExt,
+                relative = relative
             )
         }
     }

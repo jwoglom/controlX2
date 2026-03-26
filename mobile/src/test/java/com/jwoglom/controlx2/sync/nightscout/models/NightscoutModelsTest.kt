@@ -243,4 +243,69 @@ class NightscoutModelsTest {
         // When no status flags are provided, status should be null
         assertNull(status.pump?.status)
     }
+
+    @Test
+    fun testCarbCorrectionTreatment() {
+        val timestamp = LocalDateTime.of(2024, 12, 12, 10, 30, 0)
+        val treatment = NightscoutTreatment.fromTimestamp(
+            eventType = "Carb Correction",
+            timestamp = timestamp,
+            seqId = 77777L,
+            carbs = 30.0
+        )
+
+        assertEquals("Carb Correction", treatment.eventType)
+        assertEquals(30.0, treatment.carbs!!, 0.001)
+        assertNull(treatment.insulin)
+        assertEquals("77777", treatment.pumpId)
+        assertEquals("ControlX2", treatment.enteredBy)
+    }
+
+    @Test
+    fun testComboBolusTreatment() {
+        val timestamp = LocalDateTime.of(2024, 12, 12, 10, 30, 0)
+        // 10U total: 5U now (50%) + 5U over 120min (50%)
+        // relative rate = 5U / 120min * 60 = 2.5 U/hr
+        val treatment = NightscoutTreatment.fromTimestamp(
+            eventType = "Combo Bolus",
+            timestamp = timestamp,
+            seqId = 88888L,
+            insulin = 5.0,           // immediate portion only
+            duration = 120,           // extended duration
+            enteredInsulin = 10.0,   // total
+            splitNow = 50,
+            splitExt = 50,
+            relative = 2.5           // U/hr
+        )
+
+        assertEquals("Combo Bolus", treatment.eventType)
+        assertEquals(5.0, treatment.insulin!!, 0.001)
+        assertEquals(10.0, treatment.enteredInsulin!!, 0.001)
+        assertEquals(50, treatment.splitNow)
+        assertEquals(50, treatment.splitExt)
+        assertEquals(120, treatment.duration)
+        assertEquals(2.5, treatment.relative!!, 0.001)
+        assertEquals("88888", treatment.pumpId)
+    }
+
+    @Test
+    fun testComboBolusSplitsSumTo100() {
+        val timestamp = LocalDateTime.of(2024, 12, 12, 10, 30, 0)
+        // 70/30 split: 7U now, 3U extended
+        val treatment = NightscoutTreatment.fromTimestamp(
+            eventType = "Combo Bolus",
+            timestamp = timestamp,
+            seqId = 99999L,
+            insulin = 7.0,
+            duration = 60,
+            enteredInsulin = 10.0,
+            splitNow = 70,
+            splitExt = 30,
+            relative = 3.0  // 3U / 60min * 60 = 3.0 U/hr
+        )
+
+        assertEquals(70, treatment.splitNow)
+        assertEquals(30, treatment.splitExt)
+        assertEquals(100, treatment.splitNow!! + treatment.splitExt!!)
+    }
 }

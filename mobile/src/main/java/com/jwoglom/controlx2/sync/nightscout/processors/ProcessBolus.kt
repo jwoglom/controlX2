@@ -13,7 +13,8 @@ import timber.log.Timber
 /**
  * Process bolus deliveries for Nightscout upload
  *
- * Converts insulin bolus records to Nightscout treatments
+ * Handles standard boluses as "Bolus" events and extended/combo boluses
+ * as "Combo Bolus" events per the Nightscout treatment schema.
  */
 class ProcessBolus(
     nightscoutApi: NightscoutApi,
@@ -36,7 +37,6 @@ class ProcessBolus(
             return 0
         }
 
-        // Convert history logs to Nightscout treatments
         val treatments = logs.mapNotNull { item ->
             try {
                 bolusToNightscoutTreatment(item)
@@ -51,7 +51,6 @@ class ProcessBolus(
             return 0
         }
 
-        // Upload to Nightscout
         val result = nightscoutApi.uploadTreatments(treatments)
         return result.getOrElse {
             Timber.e(it, "${processorName()}: Upload failed")
@@ -67,41 +66,89 @@ class ProcessBolus(
             return null
         }
 
-        // Extract bolus data
-        val bolusData = extractBolusData(parsed)
+        val totalInsulin = parsed.deliveredTotal / 1000.0
+        val immediateInsulin = parsed.requestedNow / 1000.0
+        val extendedInsulin = parsed.requestedLater / 1000.0
+        val extendedDurationMinutes = parsed.extendedDurationRequested
+
+        val isExtended = extendedInsulin > 0 && extendedDurationMinutes > 0
+
+        return if (isExtended) {
+            buildComboBolus(item, parsed, totalInsulin, immediateInsulin, extendedInsulin, extendedDurationMinutes)
+        } else {
+            buildStandardBolus(item, parsed, totalInsulin)
+        }
+    }
+
+    private fun buildStandardBolus(
+        item: HistoryLogItem,
+        bolus: BolusDeliveryHistoryLog,
+        totalInsulin: Double
+    ): NightscoutTreatment {
+        val notes = buildBolusNotes(bolus)
 
         return NightscoutTreatment.fromTimestamp(
             eventType = "Bolus",
             timestamp = item.pumpTime,
             seqId = item.seqId,
-            insulin = bolusData.insulin,
-            carbs = null, // Carbs are not stored in BolusDeliveryHistoryLog
-            notes = bolusData.notes
+            insulin = totalInsulin,
+            notes = notes
         )
     }
 
-    private data class BolusData(
-        val insulin: Double?,
-        val notes: String?
-    )
+    private fun buildComboBolus(
+        item: HistoryLogItem,
+        bolus: BolusDeliveryHistoryLog,
+        totalInsulin: Double,
+        immediateInsulin: Double,
+        extendedInsulin: Double,
+        extendedDurationMinutes: Int
+    ): NightscoutTreatment {
+        // Per Nightscout spec:
+        // insulin = immediate portion only
+        // enteredinsulin = total (immediate + extended)
+        // splitNow/splitExt = percentages (must sum to 100)
+        // relative = extended rate in U/hr
+        // duration = extended duration in minutes
+        val splitNow = if (totalInsulin > 0) {
+            ((immediateInsulin / totalInsulin) * 100).toInt()
+        } else 0
+        val splitExt = 100 - splitNow
 
-    private fun extractBolusData(bolus: BolusDeliveryHistoryLog): BolusData {
-        try {
-            // Get insulin delivered (in milliunits, convert to units)
-            val insulin = bolus.deliveredTotal / 1000.0
+        val relativeRate = if (extendedDurationMinutes > 0) {
+            extendedInsulin / extendedDurationMinutes * 60
+        } else 0.0
 
-            // Build notes with bolus details
-            val bolusTypes = bolus.bolusTypes
-            val bolusSource = bolus.bolusSource
+        val notes = buildString {
+            append(buildBolusNotes(bolus))
+            append(", combo: ${immediateInsulin}U now + ${extendedInsulin}U over ${extendedDurationMinutes}min")
+        }
 
-            val notes = buildString {
-                append("Bolus delivery")
+        return NightscoutTreatment.fromTimestamp(
+            eventType = "Combo Bolus",
+            timestamp = item.pumpTime,
+            seqId = item.seqId,
+            insulin = immediateInsulin,
+            duration = extendedDurationMinutes,
+            notes = notes,
+            enteredInsulin = totalInsulin,
+            splitNow = splitNow,
+            splitExt = splitExt,
+            relative = relativeRate
+        )
+    }
 
+    private fun buildBolusNotes(bolus: BolusDeliveryHistoryLog): String {
+        return buildString {
+            append("Bolus delivery")
+
+            try {
+                val bolusTypes = bolus.bolusTypes
                 if (bolusTypes.isNotEmpty()) {
                     append(", types: ${bolusTypes.joinToString(", ") { it.name }}")
                 }
 
-                bolusSource?.let {
+                bolus.bolusSource?.let {
                     append(", source: ${it.name}")
                 }
 
@@ -114,15 +161,9 @@ class ProcessBolus(
                 if (bolus.correction > 0) {
                     append(", correction: ${bolus.correction / 1000.0}U")
                 }
+            } catch (e: Exception) {
+                Timber.e(e, "Error building bolus notes")
             }
-
-            return BolusData(
-                insulin = insulin,
-                notes = notes
-            )
-        } catch (e: Exception) {
-            Timber.e(e, "Error extracting bolus data, using defaults")
-            return BolusData(null, "Bolus delivery (details unavailable)")
         }
     }
 }
