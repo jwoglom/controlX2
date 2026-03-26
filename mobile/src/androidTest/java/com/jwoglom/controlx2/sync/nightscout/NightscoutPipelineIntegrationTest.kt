@@ -814,4 +814,144 @@ class NightscoutPipelineIntegrationTest {
         }
         assertEquals(50, totalEntries)
     }
+
+    // =========================================================================
+    // Phase 2: CGM trend arrows, boolean pump status, uploader battery
+    // =========================================================================
+
+    @Test
+    fun fullPipeline_cgmReadings_haveTrendDirections() = runBlocking {
+        val now = LocalDateTime.now()
+        // 3 readings 5 minutes apart: 100 → 110 → 120 (rising ~2 mg/dL/min)
+        val items = listOf(
+            buildHistoryLogItem(21001, now.minusMinutes(10), buildCgmCargo(now.minusMinutes(10), 21001, 100)),
+            buildHistoryLogItem(21002, now.minusMinutes(5),  buildCgmCargo(now.minusMinutes(5),  21002, 110)),
+            buildHistoryLogItem(21003, now,                  buildCgmCargo(now,                  21003, 120))
+        )
+        items.forEach { historyLogRepo.insert(it) }
+
+        val config = buildConfig(enabledProcessors = setOf(ProcessorType.CGM_READING))
+        val coordinator = buildCoordinator(config)
+        val result = coordinator.syncAll()
+
+        assertTrue("Expected Success, got $result", result is SyncResult.Success)
+
+        val entryRequests = server.requestsForPath("/api/v1/entries")
+        val type = object : TypeToken<List<Map<String, Any>>>() {}.type
+        val entries: List<Map<String, Any>> = gson.fromJson(entryRequests[0].body, type)
+        assertEquals(3, entries.size)
+
+        // First entry has only 1 reading in window (itself) -> null direction
+        assertNull(entries[0]["direction"])
+
+        // Second and third entries have enough data for trend calculation
+        // 100→110 in 5 min = 2 mg/dL/min -> SingleUp
+        assertNotNull(entries[1]["direction"])
+        assertEquals("SingleUp", entries[1]["direction"])
+
+        // Window [110, 120] over 5 min = 2 mg/dL/min -> SingleUp
+        assertNotNull(entries[2]["direction"])
+        assertEquals("SingleUp", entries[2]["direction"])
+    }
+
+    @Test
+    fun fullPipeline_deviceStatus_withSuspendedState() = runBlocking {
+        val now = LocalDateTime.now()
+        // DailyBasal for battery/IOB followed by a suspension event
+        val items = listOf(
+            buildHistoryLogItem(22001, now.minusMinutes(10),
+                buildDailyBasalCargo(now.minusMinutes(10), 22001, 75, 2.0f)),
+            buildHistoryLogItem(22002, now.minusMinutes(5),
+                buildSuspensionCargo(now.minusMinutes(5), 22002, 3000))
+        )
+        items.forEach { historyLogRepo.insert(it) }
+
+        val config = buildConfig(enabledProcessors = setOf(ProcessorType.DEVICE_STATUS))
+        val coordinator = buildCoordinator(config)
+        val result = coordinator.syncAll()
+
+        assertTrue("Expected Success, got $result", result is SyncResult.Success)
+        assertEquals(1, (result as SyncResult.Success).uploadedCount)
+
+        val statusRequests = server.requestsForPath("/api/v1/devicestatus")
+        val type = object : TypeToken<List<Map<String, Any>>>() {}.type
+        val statuses: List<Map<String, Any>> = gson.fromJson(statusRequests[0].body, type)
+        assertEquals(1, statuses.size)
+
+        @Suppress("UNCHECKED_CAST")
+        val pump = statuses[0]["pump"] as? Map<String, Any>
+        assertNotNull(pump)
+
+        // Battery should be populated from DailyBasal
+        @Suppress("UNCHECKED_CAST")
+        val battery = pump!!["battery"] as? Map<String, Any>
+        assertNotNull(battery)
+        assertEquals(75.0, battery!!["percent"])
+
+        // Pump status should show suspended=true (boolean, not string)
+        @Suppress("UNCHECKED_CAST")
+        val status = pump["status"] as? Map<String, Any>
+        assertNotNull(status)
+        assertEquals(true, status!!["suspended"])
+        assertEquals("suspended", status["status"])
+    }
+
+    @Test
+    fun fullPipeline_deviceStatus_withResumedState() = runBlocking {
+        val now = LocalDateTime.now()
+        // Suspension followed by resume -> should show suspended=false
+        val items = listOf(
+            buildHistoryLogItem(23001, now.minusMinutes(15),
+                buildDailyBasalCargo(now.minusMinutes(15), 23001, 60, 1.5f)),
+            buildHistoryLogItem(23002, now.minusMinutes(10),
+                buildSuspensionCargo(now.minusMinutes(10), 23002, 3000)),
+            buildHistoryLogItem(23003, now.minusMinutes(5),
+                buildResumeCargo(now.minusMinutes(5), 23003, 2800))
+        )
+        items.forEach { historyLogRepo.insert(it) }
+
+        val config = buildConfig(enabledProcessors = setOf(ProcessorType.DEVICE_STATUS))
+        val coordinator = buildCoordinator(config)
+        val result = coordinator.syncAll()
+
+        assertTrue("Expected Success, got $result", result is SyncResult.Success)
+
+        val statusRequests = server.requestsForPath("/api/v1/devicestatus")
+        val type = object : TypeToken<List<Map<String, Any>>>() {}.type
+        val statuses: List<Map<String, Any>> = gson.fromJson(statusRequests[0].body, type)
+
+        @Suppress("UNCHECKED_CAST")
+        val pump = statuses[0]["pump"] as? Map<String, Any>
+        @Suppress("UNCHECKED_CAST")
+        val status = pump!!["status"] as? Map<String, Any>
+        assertNotNull(status)
+        assertEquals(false, status!!["suspended"])
+        assertEquals("normal", status["status"])
+    }
+
+    @Test
+    fun fullPipeline_deviceStatus_uploaderBatteryIncluded() = runBlocking {
+        val now = LocalDateTime.now()
+        val items = listOf(
+            buildHistoryLogItem(24001, now.minusMinutes(5),
+                buildDailyBasalCargo(now.minusMinutes(5), 24001, 90, 1.0f))
+        )
+        items.forEach { historyLogRepo.insert(it) }
+
+        // Config with uploaderBattery set
+        val config = buildConfig(enabledProcessors = setOf(ProcessorType.DEVICE_STATUS))
+            .copy(uploaderBattery = 72)
+        val coordinator = buildCoordinator(config)
+        val result = coordinator.syncAll()
+
+        assertTrue("Expected Success, got $result", result is SyncResult.Success)
+
+        val statusRequests = server.requestsForPath("/api/v1/devicestatus")
+        val type = object : TypeToken<List<Map<String, Any>>>() {}.type
+        val statuses: List<Map<String, Any>> = gson.fromJson(statusRequests[0].body, type)
+        assertEquals(1, statuses.size)
+
+        // Nightscout expects uploaderBattery as a top-level integer
+        assertEquals(72.0, statuses[0]["uploaderBattery"])
+    }
 }
