@@ -954,4 +954,97 @@ class NightscoutPipelineIntegrationTest {
         // Nightscout expects uploaderBattery as a top-level integer
         assertEquals(72.0, statuses[0]["uploaderBattery"])
     }
+
+    // =========================================================================
+    // Phase 3: Combo bolus, carb correction
+    // =========================================================================
+
+    // --- Combo bolus cargo builder -------------------------------------------
+
+    private fun buildComboBolusCargo(
+        pumpTime: LocalDateTime,
+        seqId: Long,
+        requestedNowMilliunits: Int,
+        requestedLaterMilliunits: Int,
+        extendedDurationMinutes: Int
+    ): ByteArray {
+        val pts = toPumpTimeSec(pumpTime)
+        val total = requestedNowMilliunits + requestedLaterMilliunits
+        return BolusDeliveryHistoryLog.buildCargo(
+            pts, seqId,
+            /* bolusID */ 1,
+            /* bolusDeliveryStatusId */ 2,
+            /* bolusTypeBitmask */ 1,
+            /* bolusSource */ 0,
+            /* reserved */ 0,
+            /* requestedNow */ requestedNowMilliunits,
+            /* requestedLater */ requestedLaterMilliunits,
+            /* correction */ 0,
+            /* extendedDurationRequested */ extendedDurationMinutes,
+            /* deliveredTotal */ total
+        )
+    }
+
+    @Test
+    fun fullPipeline_comboBolus_uploadedWithSplitFields() = runBlocking {
+        val now = LocalDateTime.now()
+        // 10U total: 5U now + 5U over 120 min
+        val items = listOf(
+            buildHistoryLogItem(25001, now.minusMinutes(10),
+                buildComboBolusCargo(now.minusMinutes(10), 25001, 5000, 5000, 120))
+        )
+        items.forEach { historyLogRepo.insert(it) }
+
+        val config = buildConfig(enabledProcessors = setOf(ProcessorType.BOLUS))
+        val coordinator = buildCoordinator(config)
+        val result = coordinator.syncAll()
+
+        assertTrue("Expected Success, got $result", result is SyncResult.Success)
+        assertEquals(1, (result as SyncResult.Success).uploadedCount)
+
+        val treatmentRequests = server.requestsForPath("/api/v1/treatments")
+        val type = object : TypeToken<List<Map<String, Any>>>() {}.type
+        val treatments: List<Map<String, Any>> = gson.fromJson(treatmentRequests[0].body, type)
+        assertEquals(1, treatments.size)
+
+        val combo = treatments[0]
+        assertEquals("Combo Bolus", combo["eventType"])
+        assertEquals(5.0, combo["insulin"])           // Immediate portion
+        assertEquals(10.0, combo["enteredinsulin"])    // Total insulin
+        assertEquals(50.0, combo["splitNow"])          // 50% now
+        assertEquals(50.0, combo["splitExt"])          // 50% extended
+        assertEquals(120.0, combo["duration"])          // 120 min
+        assertEquals(2.5, combo["relative"])            // 5U / 120min * 60 = 2.5 U/hr
+        assertEquals("25001", combo["pumpId"])
+    }
+
+    @Test
+    fun fullPipeline_standardBolus_noComboFields() = runBlocking {
+        val now = LocalDateTime.now()
+        // Standard bolus: 3U, no extended portion
+        val items = listOf(
+            buildHistoryLogItem(26001, now.minusMinutes(5),
+                buildBolusCargo(now.minusMinutes(5), 26001, 3000))
+        )
+        items.forEach { historyLogRepo.insert(it) }
+
+        val config = buildConfig(enabledProcessors = setOf(ProcessorType.BOLUS))
+        val coordinator = buildCoordinator(config)
+        val result = coordinator.syncAll()
+
+        assertTrue("Expected Success, got $result", result is SyncResult.Success)
+
+        val treatmentRequests = server.requestsForPath("/api/v1/treatments")
+        val type = object : TypeToken<List<Map<String, Any>>>() {}.type
+        val treatments: List<Map<String, Any>> = gson.fromJson(treatmentRequests[0].body, type)
+
+        val bolus = treatments[0]
+        assertEquals("Bolus", bolus["eventType"])
+        assertEquals(3.0, bolus["insulin"])
+        // Combo fields should not be present for standard boluses
+        assertNull(bolus["enteredinsulin"])
+        assertNull(bolus["splitNow"])
+        assertNull(bolus["splitExt"])
+        assertNull(bolus["relative"])
+    }
 }

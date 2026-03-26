@@ -10,6 +10,7 @@ import com.jwoglom.controlx2.db.historylog.HistoryLogRepo
 import com.jwoglom.controlx2.db.nightscout.NightscoutSyncStateDatabase
 import com.jwoglom.controlx2.sync.nightscout.api.NightscoutApi
 import com.jwoglom.controlx2.sync.nightscout.models.NightscoutEntry
+import com.jwoglom.controlx2.sync.nightscout.models.NightscoutProfile
 import com.jwoglom.controlx2.sync.nightscout.models.NightscoutTreatment
 import com.jwoglom.controlx2.sync.nightscout.models.NightscoutAnnouncement
 import com.jwoglom.controlx2.sync.nightscout.models.NightscoutDeviceStatus
@@ -275,6 +276,10 @@ class MockNightscoutApi : NightscoutApi {
 
     override suspend fun uploadDeviceStatus(status: NightscoutDeviceStatus): Result<Boolean> {
         uploadedDeviceStatus.add(status)
+        return Result.success(true)
+    }
+
+    override suspend fun uploadProfile(profile: NightscoutProfile): Result<Boolean> {
         return Result.success(true)
     }
 

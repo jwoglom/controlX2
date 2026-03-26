@@ -3,6 +3,7 @@ package com.jwoglom.controlx2.sync.nightscout.api
 import com.jwoglom.controlx2.sync.nightscout.models.NightscoutDeviceStatus
 import com.jwoglom.controlx2.sync.nightscout.models.NightscoutAnnouncement
 import com.jwoglom.controlx2.sync.nightscout.models.NightscoutEntry
+import com.jwoglom.controlx2.sync.nightscout.models.NightscoutProfile
 import com.jwoglom.controlx2.sync.nightscout.models.NightscoutTreatment
 
 /**
@@ -41,6 +42,12 @@ interface NightscoutApi {
      * GET /api/v1/treatments?eventType=X&count=1
      */
     suspend fun getLastTreatment(eventType: String): Result<NightscoutTreatment?>
+
+    /**
+     * Upload profile to Nightscout
+     * POST /api/v1/profile
+     */
+    suspend fun uploadProfile(profile: NightscoutProfile): Result<Boolean>
 
     /**
      * Get latest announcements
