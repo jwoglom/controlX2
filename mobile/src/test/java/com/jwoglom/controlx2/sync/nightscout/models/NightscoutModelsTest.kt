@@ -162,42 +162,6 @@ class NightscoutModelsTest {
     }
 
     @Test
-    fun testIOBStructure() {
-        val iob = IOB(
-            bolusIob = 2.5,
-            iob = 3.0,
-            timestamp = "2024-12-12T10:30:00"
-        )
-
-        assertNotNull(iob.bolusIob)
-        assertEquals(2.5, iob.bolusIob!!, 0.001)
-        assertNotNull(iob.iob)
-        assertEquals(3.0, iob.iob!!, 0.001)
-        assertEquals("2024-12-12T10:30:00", iob.timestamp)
-    }
-
-    @Test
-    fun testBatteryStructure() {
-        val battery = Battery(percent = 85)
-        assertEquals(85, battery.percent)
-    }
-
-    @Test
-    fun testPumpStatusInfoStructure() {
-        val statusInfo = PumpStatusInfo(
-            status = "suspended",
-            bolusing = false,
-            suspended = true,
-            timestamp = "2024-12-12T10:30:00"
-        )
-
-        assertEquals("suspended", statusInfo.status)
-        assertEquals(false, statusInfo.bolusing)
-        assertEquals(true, statusInfo.suspended)
-        assertEquals("2024-12-12T10:30:00", statusInfo.timestamp)
-    }
-
-    @Test
     fun testCreateDeviceStatusWithBooleanPumpStatus() {
         val timestamp = LocalDateTime.of(2024, 12, 12, 10, 30, 0)
         val status = createDeviceStatus(

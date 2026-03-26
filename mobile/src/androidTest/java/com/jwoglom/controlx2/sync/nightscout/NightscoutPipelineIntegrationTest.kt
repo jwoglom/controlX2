@@ -69,6 +69,7 @@ class NightscoutPipelineIntegrationTest {
 
     class TestNightscoutServer : NanoHTTPD("127.0.0.1", SERVER_PORT) {
         val capturedRequests = CopyOnWriteArrayList<CapturedRequest>()
+        val failingPaths = CopyOnWriteArrayList<String>()
 
         override fun serve(session: IHTTPSession): Response {
             val bodySize = (session.headers["content-length"] ?: "0").toIntOrNull() ?: 0
@@ -87,13 +88,24 @@ class NightscoutPipelineIntegrationTest {
                 )
             )
 
+            // Return 500 for configured failing paths
+            if (failingPaths.any { session.uri.startsWith(it) }) {
+                return newFixedLengthResponse(
+                    Response.Status.INTERNAL_ERROR, "application/json",
+                    """{"status":500,"message":"Simulated server error"}"""
+                )
+            }
+
             return newFixedLengthResponse(Response.Status.OK, "application/json", "[]")
         }
 
         fun requestsForPath(pathPrefix: String) =
             capturedRequests.filter { it.path.startsWith(pathPrefix) }
 
-        fun reset() = capturedRequests.clear()
+        fun reset() {
+            capturedRequests.clear()
+            failingPaths.clear()
+        }
     }
 
     // --- Fields ---------------------------------------------------------------
@@ -1046,5 +1058,208 @@ class NightscoutPipelineIntegrationTest {
         assertNull(bolus["splitNow"])
         assertNull(bolus["splitExt"])
         assertNull(bolus["relative"])
+    }
+
+    // =========================================================================
+    // Broad integration tests: per-processor cursors, failure isolation, profile
+    // =========================================================================
+
+    @Test
+    fun fullPipeline_perProcessorCursors_isolateFailures() = runBlocking {
+        // Scenario: treatments endpoint fails, entries endpoint succeeds.
+        // CGM processor should advance its cursor. Bolus processor should NOT.
+        val now = LocalDateTime.now()
+        val items = listOf(
+            buildHistoryLogItem(30001, now.minusMinutes(10),
+                buildCgmCargo(now.minusMinutes(10), 30001, 120)),
+            buildHistoryLogItem(30002, now.minusMinutes(5),
+                buildBolusCargo(now.minusMinutes(5), 30002, 2000))
+        )
+        items.forEach { historyLogRepo.insert(it) }
+
+        // Make treatments endpoint fail (bolus uploads will fail)
+        server.failingPaths.add("/api/v1/treatments")
+
+        val config = buildConfig(
+            enabledProcessors = setOf(ProcessorType.CGM_READING, ProcessorType.BOLUS)
+        )
+        val coordinator = buildCoordinator(config)
+        val result = coordinator.syncAll()
+
+        // Sync should still succeed (CGM worked)
+        assertTrue("Expected Success, got $result", result is SyncResult.Success)
+
+        // CGM entries should have been uploaded
+        val entryRequests = server.requestsForPath("/api/v1/entries")
+        assertTrue("CGM entries should have been uploaded", entryRequests.isNotEmpty())
+
+        // Bolus treatment request was attempted but failed
+        val treatmentRequests = server.requestsForPath("/api/v1/treatments")
+        assertTrue("Bolus upload should have been attempted", treatmentRequests.isNotEmpty())
+
+        // Now verify cursors: CGM should be advanced, bolus should NOT be
+        val cgmCursor = syncStateDb.nightscoutProcessorStateDao()
+            .getByType(ProcessorType.CGM_READING.name)
+        val bolusCursor = syncStateDb.nightscoutProcessorStateDao()
+            .getByType(ProcessorType.BOLUS.name)
+
+        assertNotNull("CGM cursor should exist", cgmCursor)
+        assertEquals("CGM cursor should be at latest seqId", 30002L, cgmCursor!!.lastProcessedSeqId)
+
+        // Bolus cursor should NOT have been created (processor threw on HTTP 500)
+        assertNull("Bolus cursor should not advance on failure", bolusCursor)
+
+        // --- Second sync: fix the server, bolus should retry ---
+        server.failingPaths.clear()
+        server.reset()
+
+        // Add new CGM data
+        listOf(
+            buildHistoryLogItem(30003, now.minusMinutes(2),
+                buildCgmCargo(now.minusMinutes(2), 30003, 130))
+        ).forEach { historyLogRepo.insert(it) }
+
+        val result2 = coordinator.syncAll()
+        assertTrue("Expected Success on retry", result2 is SyncResult.Success)
+
+        // CGM should only process the new reading (30003)
+        val entryRequests2 = server.requestsForPath("/api/v1/entries")
+        if (entryRequests2.isNotEmpty()) {
+            val entryType = object : TypeToken<List<Map<String, Any>>>() {}.type
+            val entries: List<Map<String, Any>> = gson.fromJson(entryRequests2[0].body, entryType)
+            assertEquals("Only new CGM reading should be processed", 1, entries.size)
+            assertEquals(130.0, entries[0]["sgv"])
+        }
+
+        // Bolus should retry the failed item (30002)
+        val treatmentRequests2 = server.requestsForPath("/api/v1/treatments")
+        assertTrue("Bolus should retry on second sync", treatmentRequests2.isNotEmpty())
+        val treatmentType = object : TypeToken<List<Map<String, Any>>>() {}.type
+        val treatments: List<Map<String, Any>> = gson.fromJson(treatmentRequests2[0].body, treatmentType)
+        assertTrue("Retried bolus should include seqId 30002",
+            treatments.any { it["pumpId"] == "30002" })
+    }
+
+    @Test
+    fun fullPipeline_realisticBatch_allProcessorsIndependent() = runBlocking {
+        // Realistic scenario: CGM + bolus + basal + device status in one batch
+        val now = LocalDateTime.now()
+        val items = listOf(
+            buildHistoryLogItem(31001, now.minusMinutes(20),
+                buildCgmCargo(now.minusMinutes(20), 31001, 105)),
+            buildHistoryLogItem(31002, now.minusMinutes(15),
+                buildCgmCargo(now.minusMinutes(15), 31002, 115)),
+            buildHistoryLogItem(31003, now.minusMinutes(10),
+                buildBolusCargo(now.minusMinutes(10), 31003, 3500)),
+            buildHistoryLogItem(31004, now.minusMinutes(8),
+                buildBasalCargo(now.minusMinutes(8), 31004, 900)),
+            buildHistoryLogItem(31005, now.minusMinutes(5),
+                buildDailyBasalCargo(now.minusMinutes(5), 31005, 88, 2.5f)),
+            buildHistoryLogItem(31006, now.minusMinutes(3),
+                buildCgmCargo(now.minusMinutes(3), 31006, 125))
+        )
+        items.forEach { historyLogRepo.insert(it) }
+
+        val config = buildConfig()
+        val coordinator = buildCoordinator(config)
+        val result = coordinator.syncAll()
+
+        assertTrue("Expected Success", result is SyncResult.Success)
+        val success = result as SyncResult.Success
+        assertEquals(6, success.processedCount)
+
+        // Verify all endpoints received data
+        val entryRequests = server.requestsForPath("/api/v1/entries")
+        val treatmentRequests = server.requestsForPath("/api/v1/treatments")
+        val statusRequests = server.requestsForPath("/api/v1/devicestatus")
+
+        assertTrue("Entries should be uploaded", entryRequests.isNotEmpty())
+        assertTrue("Treatments should be uploaded", treatmentRequests.isNotEmpty())
+        assertTrue("Device status should be uploaded", statusRequests.isNotEmpty())
+
+        // Verify CGM entries have trend directions
+        val entryType = object : TypeToken<List<Map<String, Any>>>() {}.type
+        val entries: List<Map<String, Any>> = gson.fromJson(entryRequests[0].body, entryType)
+        assertEquals(3, entries.size)
+        // Third entry (125) should have a direction calculated from prior readings
+        assertNotNull("Last CGM entry should have trend direction", entries[2]["direction"])
+
+        // Verify each processor got its own cursor
+        val processorDao = syncStateDb.nightscoutProcessorStateDao()
+        val allStates = processorDao.getAll()
+        val processorNames = allStates.map { it.processorType }.toSet()
+
+        // All enabled processors should have cursor states
+        assertTrue("CGM_READING cursor should exist",
+            processorNames.contains(ProcessorType.CGM_READING.name))
+        assertTrue("BOLUS cursor should exist",
+            processorNames.contains(ProcessorType.BOLUS.name))
+        assertTrue("DEVICE_STATUS cursor should exist",
+            processorNames.contains(ProcessorType.DEVICE_STATUS.name))
+
+        // All cursors should point to the latest seqId
+        allStates.forEach { state ->
+            assertEquals(
+                "Cursor for ${state.processorType} should be at latest seqId",
+                31006L, state.lastProcessedSeqId
+            )
+        }
+
+        // --- Second sync with no new data: nothing should be re-uploaded ---
+        server.reset()
+        val result2 = coordinator.syncAll()
+        assertTrue("Should be NoData on second sync",
+            result2 is SyncResult.NoData)
+        assertTrue("No requests on second sync",
+            server.capturedRequests.isEmpty())
+    }
+
+    @Test
+    fun fullPipeline_profileUpload_sentToProfileEndpoint() = runBlocking {
+        val config = buildConfig()
+        val coordinator = buildCoordinator(config)
+
+        val profile = com.jwoglom.controlx2.sync.nightscout.models.NightscoutProfile(
+            defaultProfile = "Default",
+            store = mapOf(
+                "Default" to com.jwoglom.controlx2.sync.nightscout.models.ProfileStore(
+                    dia = 5.0,
+                    timezone = "America/New_York",
+                    units = "mg/dl",
+                    carbRatio = listOf(
+                        com.jwoglom.controlx2.sync.nightscout.models.TimeValue("00:00", 15.0, 0)
+                    ),
+                    sensitivity = listOf(
+                        com.jwoglom.controlx2.sync.nightscout.models.TimeValue("00:00", 50.0, 0)
+                    ),
+                    basal = listOf(
+                        com.jwoglom.controlx2.sync.nightscout.models.TimeValue("00:00", 0.8, 0),
+                        com.jwoglom.controlx2.sync.nightscout.models.TimeValue("06:00", 1.2, 21600)
+                    ),
+                    targetLow = listOf(
+                        com.jwoglom.controlx2.sync.nightscout.models.TimeValue("00:00", 100.0, 0)
+                    ),
+                    targetHigh = listOf(
+                        com.jwoglom.controlx2.sync.nightscout.models.TimeValue("00:00", 120.0, 0)
+                    )
+                )
+            ),
+            startDate = "2024-12-12T00:00:00.000Z"
+        )
+
+        val success = coordinator.uploadProfile(profile)
+        assertTrue("Profile upload should succeed", success)
+
+        val profileRequests = server.requestsForPath("/api/v1/profile")
+        assertEquals("One request to profile endpoint", 1, profileRequests.size)
+        assertEquals("POST", profileRequests[0].method)
+
+        // Verify profile JSON structure
+        val body = profileRequests[0].body
+        assertTrue("Should contain defaultProfile", body.contains("\"defaultProfile\""))
+        assertTrue("Should contain store", body.contains("\"store\""))
+        assertTrue("Should contain basal rates", body.contains("\"basal\""))
+        assertTrue("Should contain DIA", body.contains("\"dia\""))
+        assertTrue("Should contain timezone", body.contains("America/New_York"))
     }
 }
