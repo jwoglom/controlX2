@@ -196,4 +196,51 @@ class NightscoutModelsTest {
         assertEquals(true, statusInfo.suspended)
         assertEquals("2024-12-12T10:30:00", statusInfo.timestamp)
     }
+
+    @Test
+    fun testCreateDeviceStatusWithBooleanPumpStatus() {
+        val timestamp = LocalDateTime.of(2024, 12, 12, 10, 30, 0)
+        val status = createDeviceStatus(
+            timestamp = timestamp,
+            batteryPercent = 80,
+            iob = 2.0,
+            suspended = true,
+            bolusing = false,
+            uploaderBattery = 65,
+            device = "t:slim X2"
+        )
+
+        assertEquals("t:slim X2", status.device)
+        assertEquals(65, status.uploaderBattery)
+        assertNotNull(status.pump?.status)
+        assertEquals(true, status.pump?.status?.suspended)
+        assertEquals(false, status.pump?.status?.bolusing)
+        assertEquals("suspended", status.pump?.status?.status)
+    }
+
+    @Test
+    fun testCreateDeviceStatusNormalStatus() {
+        val timestamp = LocalDateTime.of(2024, 12, 12, 10, 30, 0)
+        val status = createDeviceStatus(
+            timestamp = timestamp,
+            batteryPercent = 80,
+            suspended = false
+        )
+
+        assertNotNull(status.pump?.status)
+        assertEquals(false, status.pump?.status?.suspended)
+        assertEquals("normal", status.pump?.status?.status)
+    }
+
+    @Test
+    fun testCreateDeviceStatusNoStatusFlags() {
+        val timestamp = LocalDateTime.of(2024, 12, 12, 10, 30, 0)
+        val status = createDeviceStatus(
+            timestamp = timestamp,
+            batteryPercent = 80
+        )
+
+        // When no status flags are provided, status should be null
+        assertNull(status.pump?.status)
+    }
 }

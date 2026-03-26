@@ -2,6 +2,7 @@ package com.jwoglom.controlx2.sync.nightscout
 
 import android.content.Context
 import android.content.SharedPreferences
+import android.os.BatteryManager
 import android.os.Handler
 import android.os.Looper
 import com.jwoglom.controlx2.Prefs
@@ -143,8 +144,13 @@ class NightscoutSyncWorker(
             val syncStateDao = nsDb.nightscoutSyncStateDao()
             val processorStateDao = nsDb.nightscoutProcessorStateDao()
 
+            val batteryManager = context.getSystemService(Context.BATTERY_SERVICE) as? BatteryManager
+            val phoneBattery = batteryManager?.getIntProperty(BatteryManager.BATTERY_PROPERTY_CAPACITY)
+                ?.takeIf { it in 0..100 }
+
             val configWithModel = config.copy(
-                pumpModelName = Prefs(context).pumpModelName() ?: "Tandem Pump"
+                pumpModelName = Prefs(context).pumpModelName() ?: "Tandem Pump",
+                uploaderBattery = phoneBattery
             )
 
             val coordinator = NightscoutSyncCoordinator(
