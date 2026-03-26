@@ -4,6 +4,7 @@ import android.content.Context
 import android.content.SharedPreferences
 import android.os.Handler
 import android.os.Looper
+import com.jwoglom.controlx2.Prefs
 import com.jwoglom.controlx2.db.historylog.HistoryLogDatabase
 import com.jwoglom.controlx2.db.historylog.HistoryLogRepo
 import com.jwoglom.controlx2.db.nightscout.NightscoutSyncStateDatabase
@@ -138,14 +139,20 @@ class NightscoutSyncWorker(
                 normalizedUrl,
                 config.apiSecret
             )
-            val syncStateDao = NightscoutSyncStateDatabase.getDatabase(context)
-                .nightscoutSyncStateDao()
+            val nsDb = NightscoutSyncStateDatabase.getDatabase(context)
+            val syncStateDao = nsDb.nightscoutSyncStateDao()
+            val processorStateDao = nsDb.nightscoutProcessorStateDao()
+
+            val configWithModel = config.copy(
+                pumpModelName = Prefs(context).pumpModelName() ?: "Tandem Pump"
+            )
 
             val coordinator = NightscoutSyncCoordinator(
                 historyLogRepo,
                 nightscoutClient,
                 syncStateDao,
-                config,
+                processorStateDao,
+                configWithModel,
                 pumpSid
             )
 
