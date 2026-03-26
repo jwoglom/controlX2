@@ -798,7 +798,14 @@ class MainActivity : ComponentActivity() {
             synchronized(dataStore.idpManager) {
                 val updated = (dataStore.idpManager.value ?: IDPManager()).processMessage(message)
                 // re-create to trigger state update via object change
-                dataStore.idpManager.value = IDPManager(updated)
+                val newIdpManager = IDPManager(updated)
+                dataStore.idpManager.value = newIdpManager
+
+                // Upload profile to Nightscout when all profile data is loaded
+                if (newIdpManager.isComplete) {
+                    com.jwoglom.controlx2.sync.nightscout.NightscoutSyncWorker
+                        .uploadProfileIfRunning(newIdpManager)
+                }
             }
         }
         when (message) {
