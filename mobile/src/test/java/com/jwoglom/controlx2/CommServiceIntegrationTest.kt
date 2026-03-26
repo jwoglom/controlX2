@@ -155,9 +155,10 @@ class CommServiceIntegrationTest {
 
     /**
      * Start service in normal mode, trigger INIT_PUMP_COMM via onStartCommand,
-     * and simulate a connected pump by setting internal state via reflection.
-     * This avoids calling the real onPumpConnected() which has Thread.sleep loops
-     * and complex external dependencies (NightscoutSyncWorker, HistoryLogFetcher, etc).
+     * and simulate a connected pump using the @VisibleForTesting bridge method.
+     * This calls initializeConnection() which sets up real state (session, SID,
+     * isConnected) without Thread.sleep loops or external dependencies
+     * (NightscoutSyncWorker, HistoryLogFetcher, etc).
      */
     private fun startServiceAndConnectPump() {
         startServiceNormal()
@@ -170,30 +171,8 @@ class CommServiceIntegrationTest {
         // Our mock captured the pump reference via getInstance()
         assertNotNull("Pump should have been captured via TandemBluetoothHandler.getInstance()", capturedPump)
 
-        // Use reflection to simulate connected state on the Pump inner class
-        val pumpCommHandlerField = CommService::class.java.getDeclaredField("pumpCommHandler")
-        pumpCommHandlerField.isAccessible = true
-        val handler = pumpCommHandlerField.get(service)!!
-
-        val pumpField = handler.javaClass.getDeclaredField("pump")
-        pumpField.isAccessible = true
-        val pump = pumpField.get(handler)!!
-
-        // Set pump.isConnected = true
-        val isConnectedField = pump.javaClass.getDeclaredField("isConnected")
-        isConnectedField.isAccessible = true
-        isConnectedField.set(pump, true)
-
-        // Set pump.lastPeripheral = mockPeripheral
-        val lastPeripheralField = pump.javaClass.getDeclaredField("lastPeripheral")
-        lastPeripheralField.isAccessible = true
-        lastPeripheralField.set(pump, mockPeripheral)
-
-        // Create and set a PumpSession so isPumpReadyForHistoryFetch() works
-        val session = com.jwoglom.controlx2.pump.PumpSession.open(capturedPump!!, mockPeripheral)
-        val currentSessionField = handler.javaClass.getDeclaredField("currentSession")
-        currentSessionField.isAccessible = true
-        currentSessionField.set(handler, session)
+        // Use the @VisibleForTesting method to set up connected state
+        service.simulateConnectedPump(mockPeripheral)
 
         messageBus.clear()
     }
