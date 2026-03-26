@@ -527,7 +527,7 @@ class NightscoutPipelineIntegrationTest {
         val type = object : TypeToken<List<Map<String, Any>>>() {}.type
         val statuses: List<Map<String, Any>> = gson.fromJson(statusRequests[0].body, type)
         assertEquals(1, statuses.size)
-        assertEquals("Tandem Pump", statuses[0]["device"])
+        assertEquals("ControlX2", statuses[0]["device"])
 
         @Suppress("UNCHECKED_CAST")
         val pump = statuses[0]["pump"] as? Map<String, Any>
