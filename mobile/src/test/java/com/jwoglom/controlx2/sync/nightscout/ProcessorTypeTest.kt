@@ -26,7 +26,7 @@ class ProcessorTypeTest {
     @Test
     fun testAll() {
         val all = ProcessorType.all()
-        assertEquals(10, all.size)
+        assertEquals(11, all.size)
         assertTrue(all.contains(ProcessorType.CGM_READING))
         assertTrue(all.contains(ProcessorType.BOLUS))
         assertTrue(all.contains(ProcessorType.BASAL))
@@ -36,6 +36,7 @@ class ProcessorTypeTest {
         assertTrue(all.contains(ProcessorType.CGM_ALERT))
         assertTrue(all.contains(ProcessorType.USER_MODE))
         assertTrue(all.contains(ProcessorType.CARTRIDGE))
+        assertTrue(all.contains(ProcessorType.CARB))
         assertTrue(all.contains(ProcessorType.DEVICE_STATUS))
     }
 
@@ -50,6 +51,7 @@ class ProcessorTypeTest {
         assertEquals("CGM Alerts", ProcessorType.CGM_ALERT.displayName)
         assertEquals("User Mode", ProcessorType.USER_MODE.displayName)
         assertEquals("Cartridge", ProcessorType.CARTRIDGE.displayName)
+        assertEquals("Carbs", ProcessorType.CARB.displayName)
         assertEquals("Device Status", ProcessorType.DEVICE_STATUS.displayName)
     }
 
