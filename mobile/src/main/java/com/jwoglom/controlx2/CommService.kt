@@ -130,6 +130,11 @@ class CommService : Service() {
         messageBus = bus
     }
 
+    @androidx.annotation.VisibleForTesting
+    internal fun simulateConnectedPump(peripheral: BluetoothPeripheral) {
+        pumpCommHandler!!.simulateConnectedPump(peripheral)
+    }
+
     private var serviceStatusAcknowledged = false
     private val serviceStatusTask = object : Runnable {
         override fun run() {
@@ -162,7 +167,7 @@ class CommService : Service() {
         private lateinit var pump: Pump
         private lateinit var tandemBTHandler: TandemBluetoothHandler
         var currentSession: PumpSession? = null
-            private set
+            internal set
 
         fun getPumpSid(): Int? {
             return if (this::pump.isInitialized) pump.pumpSid else null
@@ -170,6 +175,11 @@ class CommService : Service() {
 
         fun isPumpReadyForHistoryFetch(): Boolean {
             return currentSession?.isActive == true
+        }
+
+        @androidx.annotation.VisibleForTesting
+        fun simulateConnectedPump(peripheral: BluetoothPeripheral) {
+            pump.initializeConnection(peripheral)
         }
 
         private fun ensurePumpUnbondedForFreshInit(filterToBluetoothMac: String?): Boolean {
@@ -442,20 +452,36 @@ class CommService : Service() {
                 super.onInitialPumpConnection(peripheral)
             }
 
-            override fun onPumpConnected(peripheral: BluetoothPeripheral?) {
+            @androidx.annotation.VisibleForTesting
+            fun initializeConnection(peripheral: BluetoothPeripheral) {
                 lastPeripheral = peripheral
 
-                extractPumpSid(peripheral?.name ?: "")?.let {
+                extractPumpSid(peripheral.name ?: "")?.let {
                     pumpSid = it
                     Prefs(applicationContext).setCurrentPumpSid(it)
                 }
 
-                val session = PumpSession.open(this, peripheral!!)
-                currentSession = session
+                val session = PumpSession.open(this, peripheral)
+                this@PumpCommHandler.currentSession = session
+
+                isConnected = true
+                Timber.i("service initializeConnection: $this")
+                sendWearCommMessage("/from-pump/pump-connected",
+                    peripheral.name!!.toByteArray()
+                )
+                // Sync glucose unit preference to wear app
+                val glucoseUnit = Prefs(applicationContext).glucoseUnit()
+                if (glucoseUnit != null) {
+                    sendWearCommMessage("/to-wear/glucose-unit", glucoseUnit.name.toByteArray())
+                }
+                currentPumpData.connectionTime = Instant.now()
+            }
+
+            private fun initializeHistoryAndSync() {
                 historyLogFetcher = HistoryLogFetcher(
                     historyLogRepo = this@CommService.historyLogRepo,
                     pumpSid = pumpSid!!,
-                    pumpSession = session,
+                    pumpSession = this@PumpCommHandler.currentSession!!,
                     autoFetchEnabled = { Prefs(applicationContext).autoFetchHistoryLogs() },
                     broadcastCallback = { item -> this@CommService.broadcastHistoryLogItem(item) }
                 )
@@ -469,7 +495,9 @@ class CommService : Service() {
                     applicationContext.getSharedPreferences("controlx2", Context.MODE_PRIVATE),
                     pumpSid!!
                 )
+            }
 
+            private fun waitForResponseStabilization() {
                 var numResponses = -99999
                 while (PumpState.processedResponseMessages != numResponses) {
                     numResponses = PumpState.processedResponseMessages
@@ -477,6 +505,9 @@ class CommService : Service() {
                     Timber.i("service onPumpConnected -- waiting for ${wait}ms to avoid race conditions: (processedResponseMessages: ${PumpState.processedResponseMessages})")
                     Thread.sleep(wait.toLong())
                 }
+            }
+
+            private fun sendBaseCommandsIfNeeded(peripheral: BluetoothPeripheral) {
                 Timber.i("service onPumpConnected -- checking for base messages (processedResponseMessages: ${PumpState.processedResponseMessages})")
                 if (!lastResponseMessage.containsKey(Pair(Characteristic.CURRENT_STATUS, ApiVersionRequest().opCode()))) {
                     Timber.i("service onPumpConnected -- sending ApiVersionRequest")
@@ -488,17 +519,13 @@ class CommService : Service() {
                     this.sendCommand(peripheral, TimeSinceResetRequest())
                 }
                 Thread.sleep(250)
-                isConnected = true
-                Timber.i("service onPumpConnected: $this")
-                sendWearCommMessage("/from-pump/pump-connected",
-                    peripheral?.name!!.toByteArray()
-                )
-                // Sync glucose unit preference to wear app
-                val glucoseUnit = Prefs(applicationContext).glucoseUnit()
-                if (glucoseUnit != null) {
-                    sendWearCommMessage("/to-wear/glucose-unit", glucoseUnit.name.toByteArray())
-                }
-                currentPumpData.connectionTime = Instant.now()
+            }
+
+            override fun onPumpConnected(peripheral: BluetoothPeripheral?) {
+                initializeConnection(peripheral!!)
+                initializeHistoryAndSync()
+                waitForResponseStabilization()
+                sendBaseCommandsIfNeeded(peripheral)
                 updateNotification("Connected to pump")
             }
 
