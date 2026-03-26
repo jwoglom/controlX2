@@ -1254,12 +1254,30 @@ class NightscoutPipelineIntegrationTest {
         assertEquals("One request to profile endpoint", 1, profileRequests.size)
         assertEquals("POST", profileRequests[0].method)
 
-        // Verify profile JSON structure
-        val body = profileRequests[0].body
-        assertTrue("Should contain defaultProfile", body.contains("\"defaultProfile\""))
-        assertTrue("Should contain store", body.contains("\"store\""))
-        assertTrue("Should contain basal rates", body.contains("\"basal\""))
-        assertTrue("Should contain DIA", body.contains("\"dia\""))
-        assertTrue("Should contain timezone", body.contains("America/New_York"))
+        // Parse the uploaded profile JSON and verify structure
+        val listType = object : TypeToken<List<Map<String, Any>>>() {}.type
+        val profiles: List<Map<String, Any>> = gson.fromJson(profileRequests[0].body, listType)
+        assertEquals(1, profiles.size)
+
+        val uploaded = profiles[0]
+        assertEquals("Default", uploaded["defaultProfile"])
+        assertEquals("2024-12-12T00:00:00.000Z", uploaded["startDate"])
+
+        @Suppress("UNCHECKED_CAST")
+        val store = uploaded["store"] as Map<String, Any>
+        @Suppress("UNCHECKED_CAST")
+        val defaultStore = store["Default"] as Map<String, Any>
+
+        assertEquals(5.0, defaultStore["dia"])
+        assertEquals("America/New_York", defaultStore["timezone"])
+        assertEquals("mg/dl", defaultStore["units"])
+
+        @Suppress("UNCHECKED_CAST")
+        val basal = defaultStore["basal"] as List<Map<String, Any>>
+        assertEquals(2, basal.size)
+        assertEquals("00:00", basal[0]["time"])
+        assertEquals(0.8, basal[0]["value"])
+        assertEquals("06:00", basal[1]["time"])
+        assertEquals(1.2, basal[1]["value"])
     }
 }
