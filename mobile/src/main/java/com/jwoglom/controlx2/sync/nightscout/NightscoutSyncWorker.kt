@@ -81,6 +81,49 @@ class NightscoutSyncWorker(
     }
 
     /**
+     * Upload pump profile to Nightscout.
+     * Call when IDPManager profile data becomes complete.
+     */
+    fun uploadProfile(idpManager: com.jwoglom.pumpx2.pump.messages.builders.IDPManager) {
+        scope.launch {
+            try {
+                val profile = NightscoutProfileConverter.convert(idpManager)
+                if (profile == null) {
+                    Timber.d("IDPManager data incomplete, skipping profile upload")
+                    return@launch
+                }
+
+                val config = NightscoutSyncConfig.load(prefs)
+                if (!config.enabled || !config.isValid()) {
+                    Timber.d("Nightscout sync disabled, skipping profile upload")
+                    return@launch
+                }
+
+                val normalizedUrl = normalizeNightscoutUrl(config.nightscoutUrl) ?: return@launch
+                val nightscoutClient = NightscoutClient(normalizedUrl, config.apiSecret)
+
+                val nsDb = NightscoutSyncStateDatabase.getDatabase(context)
+                val configWithModel = config.copy(
+                    pumpModelName = Prefs(context).pumpModelName() ?: "Tandem Pump"
+                )
+
+                val coordinator = NightscoutSyncCoordinator(
+                    HistoryLogRepo(HistoryLogDatabase.getDatabase(context).historyLogDao()),
+                    nightscoutClient,
+                    nsDb.nightscoutSyncStateDao(),
+                    nsDb.nightscoutProcessorStateDao(),
+                    configWithModel,
+                    pumpSid
+                )
+
+                coordinator.uploadProfile(profile)
+            } catch (e: Exception) {
+                Timber.e(e, "Error uploading profile to Nightscout")
+            }
+        }
+    }
+
+    /**
      * Schedule the next sync
      */
     private fun scheduleNextSync(intervalMinutes: Int) {
@@ -250,6 +293,14 @@ class NightscoutSyncWorker(
          */
         fun stopIfRunning() {
             instance?.stop()
+        }
+
+        /**
+         * Upload pump profile to Nightscout if the worker is running.
+         * Safe to call even if the worker hasn't been started.
+         */
+        fun uploadProfileIfRunning(idpManager: com.jwoglom.pumpx2.pump.messages.builders.IDPManager) {
+            instance?.uploadProfile(idpManager)
         }
     }
 }
