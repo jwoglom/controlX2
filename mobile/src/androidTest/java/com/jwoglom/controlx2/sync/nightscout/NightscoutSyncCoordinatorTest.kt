@@ -67,6 +67,7 @@ class NightscoutSyncCoordinatorTest {
             historyLogRepo,
             mockApi,
             syncStateDb.nightscoutSyncStateDao(),
+            syncStateDb.nightscoutProcessorStateDao(),
             config,
             pumpSid = 123
         )
@@ -87,6 +88,7 @@ class NightscoutSyncCoordinatorTest {
             historyLogRepo,
             mockApi,
             syncStateDb.nightscoutSyncStateDao(),
+            syncStateDb.nightscoutProcessorStateDao(),
             config,
             pumpSid = 123
         )
@@ -107,6 +109,7 @@ class NightscoutSyncCoordinatorTest {
             historyLogRepo,
             mockApi,
             syncStateDb.nightscoutSyncStateDao(),
+            syncStateDb.nightscoutProcessorStateDao(),
             config,
             pumpSid = 123
         )
@@ -139,6 +142,7 @@ class NightscoutSyncCoordinatorTest {
             historyLogRepo,
             mockApi,
             syncStateDb.nightscoutSyncStateDao(),
+            syncStateDb.nightscoutProcessorStateDao(),
             config,
             pumpSid = 123
         )
@@ -174,6 +178,7 @@ class NightscoutSyncCoordinatorTest {
             historyLogRepo,
             mockApi,
             syncStateDb.nightscoutSyncStateDao(),
+            syncStateDb.nightscoutProcessorStateDao(),
             config,
             pumpSid = 123
         )
@@ -217,6 +222,7 @@ class NightscoutSyncCoordinatorTest {
             historyLogRepo,
             mockApi,
             syncStateDb.nightscoutSyncStateDao(),
+            syncStateDb.nightscoutProcessorStateDao(),
             config,
             pumpSid = 123
         )

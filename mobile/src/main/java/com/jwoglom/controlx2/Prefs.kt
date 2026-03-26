@@ -221,6 +221,17 @@ class Prefs(val context: Context) {
         prefs().edit().putString("dashboard-chart-time-range", timeRange).commit()
     }
 
+    /**
+     * Pump model name for Nightscout device identification
+     */
+    fun pumpModelName(): String? {
+        return prefs().getString("pump-model-name", null)
+    }
+
+    fun setPumpModelName(name: String) {
+        prefs().edit().putString("pump-model-name", name).commit()
+    }
+
     fun prefs(): SharedPreferences {
         return context.getSharedPreferences("WearX2", WearableListenerService.MODE_PRIVATE)
     }

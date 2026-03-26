@@ -535,6 +535,13 @@ class CommService : Service() {
                 sendWearCommMessage("/from-pump/pump-model",
                     model!!.name.toByteArray()
                 )
+
+                val modelName = when (model) {
+                    KnownDeviceModel.TSLIM_X2 -> "t:slim X2"
+                    KnownDeviceModel.MOBI -> "Tandem Mobi"
+                    else -> "Tandem Pump"
+                }
+                Prefs(this@CommService).setPumpModelName(modelName)
             }
 
             override fun onPumpDisconnected(

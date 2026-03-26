@@ -1,6 +1,8 @@
 package com.jwoglom.controlx2.sync.nightscout
 
 import com.jwoglom.controlx2.db.historylog.HistoryLogRepo
+import com.jwoglom.controlx2.db.nightscout.NightscoutProcessorState
+import com.jwoglom.controlx2.db.nightscout.NightscoutProcessorStateDao
 import com.jwoglom.controlx2.db.nightscout.NightscoutSyncStateDao
 import com.jwoglom.controlx2.db.nightscout.NightscoutSyncState
 import com.jwoglom.controlx2.sync.nightscout.api.NightscoutApi
@@ -19,6 +21,7 @@ class NightscoutSyncCoordinator(
     private val historyLogRepo: HistoryLogRepo,
     private val nightscoutApi: NightscoutApi,
     private val syncStateDao: NightscoutSyncStateDao,
+    private val processorStateDao: NightscoutProcessorStateDao,
     private val config: NightscoutSyncConfig,
     private val pumpSid: Int
 ) {
@@ -97,8 +100,9 @@ class NightscoutSyncCoordinator(
         Timber.i("Syncing ${allLogs.size} history logs (seqId $startSeqId..$endSeqId)")
 
         var totalUploaded = 0
+        val latestSeqId = allLogs.maxOf { it.seqId }
 
-        // SEQUENTIAL processing (not parallel!)
+        // SEQUENTIAL processing (not parallel!) with per-processor cursors
         for (processorType in processorOrder) {
             val processor = processorMap[processorType] ?: continue
 
@@ -107,13 +111,27 @@ class NightscoutSyncCoordinator(
                 continue
             }
 
-            // Filter logs for this processor's supported types
+            // Get this processor's individual cursor, falling back to global cursor
+            val processorState = processorStateDao.getByType(processorType.name)
+            val processorLastSeqId = processorState?.lastProcessedSeqId
+                ?: syncState.lastProcessedSeqId
+
+            // Filter logs for this processor's supported types AND above its cursor
             val relevantLogs = allLogs.filter { log ->
-                processor.supportedTypeIds().contains(log.typeId)
-            }.sortedBy { it.seqId }  // Ensure chronological order
+                processor.supportedTypeIds().contains(log.typeId) &&
+                    log.seqId > processorLastSeqId
+            }.sortedBy { it.seqId }
 
             if (relevantLogs.isEmpty()) {
                 Timber.d("No logs for processor ${processorType.name}")
+                // Still advance cursor to latest so it doesn't re-scan
+                processorStateDao.upsert(
+                    NightscoutProcessorState(
+                        processorType = processorType.name,
+                        lastProcessedSeqId = latestSeqId,
+                        lastSuccessTime = LocalDateTime.now()
+                    )
+                )
                 continue
             }
 
@@ -121,15 +139,23 @@ class NightscoutSyncCoordinator(
                 val uploadedCount = processor.process(relevantLogs, config)
                 totalUploaded += uploadedCount
 
+                // Success: advance this processor's cursor
+                processorStateDao.upsert(
+                    NightscoutProcessorState(
+                        processorType = processorType.name,
+                        lastProcessedSeqId = latestSeqId,
+                        lastSuccessTime = LocalDateTime.now()
+                    )
+                )
+
                 Timber.i("${processorType.name}: processed ${relevantLogs.size} logs, uploaded $uploadedCount items")
             } catch (e: Exception) {
                 Timber.e(e, "Error processing ${processorType.name}")
-                // Continue with next processor (don't fail entire sync)
+                // Do NOT advance this processor's cursor -- it will retry next sync
             }
         }
 
-        // Update sync state with last processed sequence ID
-        val latestSeqId = allLogs.maxOf { it.seqId }
+        // Update global sync state (used as fallback minimum for new processors)
         syncStateDao.updateLastProcessed(latestSeqId, LocalDateTime.now())
         Timber.i("Updated sync state: lastProcessedSeqId=$latestSeqId")
 
