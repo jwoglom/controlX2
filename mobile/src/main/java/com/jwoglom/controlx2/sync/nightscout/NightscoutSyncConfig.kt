@@ -23,7 +23,10 @@ data class NightscoutSyncConfig(
     val initialLookbackHours: Int = 24,
 
     // Pump model name for Nightscout device identification
-    val pumpModelName: String = "Tandem Pump"
+    val pumpModelName: String = "Tandem Pump",
+
+    // Phone battery percentage (populated at sync time, not persisted)
+    val uploaderBattery: Int? = null
 ) {
     companion object {
         private const val PREF_ENABLED = "nightscout_enabled"

@@ -8,12 +8,14 @@ import com.jwoglom.controlx2.sync.nightscout.api.NightscoutApi
 import com.jwoglom.controlx2.sync.nightscout.models.createDeviceStatus
 import com.jwoglom.pumpx2.pump.messages.response.historyLog.DailyBasalHistoryLog
 import com.jwoglom.pumpx2.pump.messages.response.historyLog.HistoryLogParser
+import com.jwoglom.pumpx2.pump.messages.response.historyLog.PumpingResumedHistoryLog
+import com.jwoglom.pumpx2.pump.messages.response.historyLog.PumpingSuspendedHistoryLog
 import timber.log.Timber
 
 /**
  * Process device status updates for Nightscout upload
  *
- * Aggregates battery, IOB, and reservoir data from all logs in the batch
+ * Aggregates battery, IOB, and pump status from all logs in the batch
  * to build a composite device status, preventing data loss when the latest
  * log doesn't contain all fields.
  */
@@ -26,7 +28,9 @@ class ProcessDeviceStatus(
 
     override fun supportedTypeIds(): Set<Int> {
         return setOfNotNull(
-            HistoryLogParser.LOG_MESSAGE_CLASS_TO_ID[DailyBasalHistoryLog::class.java]
+            HistoryLogParser.LOG_MESSAGE_CLASS_TO_ID[DailyBasalHistoryLog::class.java],
+            HistoryLogParser.LOG_MESSAGE_CLASS_TO_ID[PumpingSuspendedHistoryLog::class.java],
+            HistoryLogParser.LOG_MESSAGE_CLASS_TO_ID[PumpingResumedHistoryLog::class.java]
         )
     }
 
@@ -44,6 +48,7 @@ class ProcessDeviceStatus(
         var latestBattery: Int? = null
         var latestIob: Double? = null
         var latestReservoir: Double? = null
+        var suspended: Boolean? = null
 
         for (log in sortedLogs) {
             try {
@@ -53,13 +58,19 @@ class ProcessDeviceStatus(
                         latestBattery = parsed.batteryChargePercent.toInt()
                         latestIob = parsed.iob.toDouble()
                     }
+                    is PumpingSuspendedHistoryLog -> {
+                        suspended = true
+                    }
+                    is PumpingResumedHistoryLog -> {
+                        suspended = false
+                    }
                 }
             } catch (e: Exception) {
                 Timber.e(e, "${processorName()}: Failed to parse log seqId=${log.seqId}")
             }
         }
 
-        if (latestBattery == null && latestIob == null && latestReservoir == null) {
+        if (latestBattery == null && latestIob == null && latestReservoir == null && suspended == null) {
             Timber.d("${processorName()}: No meaningful device status data")
             return 0
         }
@@ -70,9 +81,10 @@ class ProcessDeviceStatus(
             batteryPercent = latestBattery,
             reservoirUnits = latestReservoir,
             iob = latestIob,
-            pumpStatus = null,
-            uploaderBattery = null,
-            device = config.pumpModelName
+            uploaderBattery = config.uploaderBattery,
+            device = config.pumpModelName,
+            suspended = suspended,
+            bolusing = null
         )
 
         val result = nightscoutApi.uploadDeviceStatus(deviceStatus)
