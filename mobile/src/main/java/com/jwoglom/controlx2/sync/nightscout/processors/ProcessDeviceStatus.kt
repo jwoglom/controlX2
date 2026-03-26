@@ -82,7 +82,6 @@ class ProcessDeviceStatus(
             reservoirUnits = latestReservoir,
             iob = latestIob,
             uploaderBattery = config.uploaderBattery,
-            device = config.pumpModelName,
             suspended = suspended,
             bolusing = null
         )
