@@ -11,6 +11,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.wear.compose.material.Chip
 import androidx.wear.compose.material.Icon
@@ -31,7 +32,7 @@ fun LandingModeActionsRow(onExerciseClick: () -> Unit, onSleepClick: () -> Unit)
             Chip(
                 onClick = onExerciseClick,
                 label = { Icon(Icons.AutoMirrored.Filled.DirectionsRun, contentDescription = "Exercise") },
-                secondaryLabel = { Text(if (controlIQMode == UserMode.EXERCISE) "ON" else "OFF") },
+                secondaryLabel = { Text(if (controlIQMode == UserMode.EXERCISE) "ON" else "OFF", modifier = Modifier.fillMaxWidth(), textAlign = TextAlign.Center) },
                 modifier = Modifier.fillMaxWidth()
             )
         }
@@ -40,7 +41,7 @@ fun LandingModeActionsRow(onExerciseClick: () -> Unit, onSleepClick: () -> Unit)
             Chip(
                 onClick = onSleepClick,
                 label = { Icon(Icons.Filled.KingBed, contentDescription = "Sleep") },
-                secondaryLabel = { Text(if (controlIQMode == UserMode.SLEEP) "ON" else "OFF") },
+                secondaryLabel = { Text(if (controlIQMode == UserMode.SLEEP) "ON" else "OFF", modifier = Modifier.fillMaxWidth(), textAlign = TextAlign.Center) },
                 modifier = Modifier.fillMaxWidth()
             )
         }

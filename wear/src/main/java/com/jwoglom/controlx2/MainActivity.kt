@@ -286,7 +286,6 @@ class MainActivity : ComponentActivity(), MessageClient.OnMessageReceivedListene
         Timber.i("wear onConnected: $bundle")
         sendMessage("/to-phone/connected", "wear_launched".toByteArray())
         sendMessage("/to-phone/is-pump-connected", "onConnected".toByteArray())
-        messageClient.addListener(this)
     }
 
     override fun onStop() {
@@ -312,30 +311,25 @@ class MainActivity : ComponentActivity(), MessageClient.OnMessageReceivedListene
         Timber.i("wear sendMessage: $path ${String(message)}")
         val nodeClient = Wearable.getNodeClient(this)
 
-
         fun inner(node: Node) {
             messageClient.sendMessage(node.id, path, message)
                 .addOnSuccessListener {
-                    Timber.i("Wear message sent: ${path} ${String(message)} to ${node.displayName}")
+                    Timber.d("Wear message sent: ${path} to ${node.displayName}")
                 }
                 .addOnFailureListener {
                     Timber.w("wear sendMessage callback: ${it}")
                 }
         }
-        if (path.startsWith("/to-wear")) {
-            nodeClient.localNode
-                .addOnSuccessListener { localNode ->
-                    Timber.d("wear sendMessage local: ${localNode}")
-                    inner(localNode)
-                }
-        }
-        nodeClient.connectedNodes
-            .addOnSuccessListener { nodes ->
-                Timber.d("wear sendMessage nodes: ${nodes}")
-                nodes.forEach { node ->
+
+        // Send to connected nodes, filtering out the local node to avoid echo
+        nodeClient.localNode.addOnSuccessListener { localNode ->
+            val localNodeId = localNode.id
+            nodeClient.connectedNodes.addOnSuccessListener { nodes ->
+                nodes.filter { it.id != localNodeId }.forEach { node ->
                     inner(node)
                 }
             }
+        }
     }
 
     private fun inWaitingState(): Boolean {
@@ -503,7 +497,7 @@ class MainActivity : ComponentActivity(), MessageClient.OnMessageReceivedListene
     }
 
     override fun onMessageReceived(messageEvent: MessageEvent) {
-        Timber.i("wear onMessageReceived: ${messageEvent.path} ${String(messageEvent.data)}")
+        Timber.d("wear onMessageReceived: ${messageEvent.path}")
         when (messageEvent.path) {
             "/to-wear/connected" -> {
                 if (inWaitingState()) {
@@ -516,6 +510,9 @@ class MainActivity : ComponentActivity(), MessageClient.OnMessageReceivedListene
             }
             "/to-wear/bolus-min-notify-threshold" -> {
                 dataStore.bolusMinNotifyThreshold.value = String(messageEvent.data).toDoubleOrNull()
+            }
+            "/to-wear/wear-auto-approve-timeout" -> {
+                dataStore.wearAutoApproveTimeout.value = String(messageEvent.data).toIntOrNull() ?: 0
             }
             "/to-wear/glucose-unit" -> {
                 val unitName = String(messageEvent.data)

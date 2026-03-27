@@ -1,5 +1,8 @@
 package com.jwoglom.controlx2.sync.xdrip
 
+import com.jwoglom.controlx2.sync.xdrip.models.XdripDeviceStatusPayload
+import com.jwoglom.controlx2.sync.xdrip.models.XdripSgvPayload
+import com.jwoglom.controlx2.sync.xdrip.models.XdripTreatmentPayload
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -20,6 +23,7 @@ class XdripBroadcastSenderTest {
 
         assertEquals(1, sent.size)
         assertEquals(XdripBroadcastSender.ACTION_NEW_SGV, sent[0].first)
+        assertEquals(XdripSgvPayload.EXTRA_KEY, sent[0].second)
     }
 
     @Test
@@ -38,6 +42,8 @@ class XdripBroadcastSenderTest {
         assertTrue(sender.sendDeviceStatus("{\"a\":2}", minimumIntervalSeconds = 5))
 
         assertEquals(2, sent.size)
+        assertEquals(XdripBroadcastSender.ACTION_NEW_DEVICE_STATUS, sent[0].first)
+        assertEquals(XdripDeviceStatusPayload.EXTRA_KEY, sent[0].second)
     }
 
     @Test
@@ -52,5 +58,21 @@ class XdripBroadcastSenderTest {
         assertEquals(2, sent.size)
         assertEquals(XdripBroadcastSender.ACTION_NEW_TREATMENT, sent[0].first)
         assertEquals(XdripBroadcastSender.ACTION_NEW_FOOD, sent[1].first)
+        assertEquals(XdripTreatmentPayload.EXTRA_KEY, sent[0].second)
+        assertEquals(XdripTreatmentPayload.EXTRA_KEY, sent[1].second)
+    }
+
+    @Test
+    fun sendTreatments_doesNotSendNewFoodWhenDisabled() {
+        val sent = mutableListOf<Triple<String, String, String>>()
+        val sender = XdripBroadcastSender(
+            sendBroadcastFn = { action, extra, payload -> sent.add(Triple(action, extra, payload)) }
+        )
+
+        assertTrue(sender.sendTreatments("[{\"eventType\":\"Bolus\"}]", alsoSendNewFood = false))
+
+        assertEquals(1, sent.size)
+        assertEquals(XdripBroadcastSender.ACTION_NEW_TREATMENT, sent[0].first)
+        assertEquals(XdripTreatmentPayload.EXTRA_KEY, sent[0].second)
     }
 }

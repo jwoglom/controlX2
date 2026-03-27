@@ -25,6 +25,7 @@ import com.jwoglom.pumpx2.pump.messages.request.currentStatus.CurrentBolusStatus
 import com.jwoglom.pumpx2.pump.messages.response.control.InitiateBolusResponse
 import com.jwoglom.pumpx2.pump.messages.response.currentStatus.CurrentBolusStatusResponse
 import com.jwoglom.pumpx2.shared.Hex
+import com.jwoglom.controlx2.Prefs
 import timber.log.Timber
 import java.time.Instant
 
@@ -39,6 +40,7 @@ class BolusNotificationBroadcastReceiver : BroadcastReceiver() {
         val notifId = getCurrentNotificationId(context)
         when (action) {
             "INITIATE" -> {
+                CommService.cancelAutoApproveStatic(context)
                 validateBolusInfo(intent, context)?.let { intentRequest ->
                     Timber.w("BolusNotificationBroadcastReceiver performing $intentRequest")
                     val secretKey = prefs(context)?.getString("initiateBolusSecret", "") ?: ""
@@ -201,7 +203,19 @@ class BolusNotificationBroadcastReceiver : BroadcastReceiver() {
                                 "The ${bolusSummaryText(initiateRequest)} $statusText"
                             )
                             
-                            if (currentBolusId != 0) {
+                            if (bolusCompleted || currentBolusId == 0) {
+                                val dismissIntent =
+                                    Intent(context, BolusNotificationBroadcastReceiver::class.java).apply {
+                                        putExtra("action", "DISMISS")
+                                    }
+                                val dismissPendingIntent = PendingIntent.getBroadcast(
+                                    context,
+                                    2004,
+                                    dismissIntent,
+                                    PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_ONE_SHOT
+                                )
+                                notificationBuilder.addAction(R.drawable.confirm, "Done", dismissPendingIntent)
+                            } else {
                                 val cancelIntent =
                                     Intent(context, BolusNotificationBroadcastReceiver::class.java).apply {
                                         putExtra("action", "CANCEL")
@@ -239,6 +253,7 @@ class BolusNotificationBroadcastReceiver : BroadcastReceiver() {
                 }
             }
             "REJECT" -> {
+                CommService.cancelAutoApproveStatic(context)
                 stopBolusStatusUpdates(context)
                 reply(
                     context, notifId, confirmBolusRequestBaseNotification(
@@ -249,6 +264,11 @@ class BolusNotificationBroadcastReceiver : BroadcastReceiver() {
                 )
                 resetBolusPrefs(context)
                 sendMessageWhenReady(messageBus, "/to-wear/bolus-rejected", "from_phone".toByteArray(), context)
+            }
+            "DISMISS" -> {
+                val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+                notificationManager.cancel(notifId)
+                resetBolusPrefs(context)
             }
             "CANCEL" -> {
                 stopBolusStatusUpdates(context)
@@ -373,8 +393,14 @@ class BolusNotificationBroadcastReceiver : BroadcastReceiver() {
 
         val nowMillis = Instant.now().toEpochMilli()
 
-        // Bolus expires after 1 minute
-        if (nowMillis - initiateMillis > 60 * 1000) {
+        // Bolus expires after 1 minute, or after auto-approve timeout + 30s buffer
+        val autoApproveTimeout = Prefs(context!!).wearBolusAutoApproveTimeoutSeconds()
+        val expiryMs = if (autoApproveTimeout > 0) {
+            (autoApproveTimeout + 30) * 1000L
+        } else {
+            60 * 1000L
+        }
+        if (nowMillis - initiateMillis > expiryMs) {
             return nowMillis - initiateMillis
         }
 

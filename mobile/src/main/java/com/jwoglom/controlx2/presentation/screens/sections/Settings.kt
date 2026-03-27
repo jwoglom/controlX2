@@ -74,7 +74,8 @@ fun Settings(
     sendMessage: (String, ByteArray) -> Unit,
     sendPumpCommands: (SendType, List<Message>) -> Unit,
     navigateToDebugOptions: () -> Unit = {},
-    navigateToNightscoutSettings: () -> Unit = {}
+    navigateToNightscoutSettings: () -> Unit = {},
+    navigateToXdripSettings: () -> Unit = {}
 ) {
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
@@ -262,6 +263,23 @@ fun Settings(
                     },
                     modifier = Modifier.clickable {
                         navigateToNightscoutSettings()
+                    }
+                )
+                Divider()
+            }
+
+            item {
+                ListItem(
+                    headlineContent = { Text("xDrip") },
+                    supportingContent = { Text("Configure xDrip broadcasts for pump and CGM data.") },
+                    leadingContent = {
+                        Icon(
+                            Icons.Filled.Refresh,
+                            contentDescription = "xDrip icon",
+                        )
+                    },
+                    modifier = Modifier.clickable {
+                        navigateToXdripSettings()
                     }
                 )
                 Divider()

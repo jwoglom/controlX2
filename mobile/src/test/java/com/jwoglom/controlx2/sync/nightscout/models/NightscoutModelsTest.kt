@@ -162,38 +162,114 @@ class NightscoutModelsTest {
     }
 
     @Test
-    fun testIOBStructure() {
-        val iob = IOB(
-            bolusIob = 2.5,
-            iob = 3.0,
-            timestamp = "2024-12-12T10:30:00"
-        )
-
-        assertNotNull(iob.bolusIob)
-        assertEquals(2.5, iob.bolusIob!!, 0.001)
-        assertNotNull(iob.iob)
-        assertEquals(3.0, iob.iob!!, 0.001)
-        assertEquals("2024-12-12T10:30:00", iob.timestamp)
-    }
-
-    @Test
-    fun testBatteryStructure() {
-        val battery = Battery(percent = 85)
-        assertEquals(85, battery.percent)
-    }
-
-    @Test
-    fun testPumpStatusInfoStructure() {
-        val statusInfo = PumpStatusInfo(
-            status = "suspended",
-            bolusing = false,
+    fun testCreateDeviceStatusWithBooleanPumpStatus() {
+        val timestamp = LocalDateTime.of(2024, 12, 12, 10, 30, 0)
+        val status = createDeviceStatus(
+            timestamp = timestamp,
+            batteryPercent = 80,
+            iob = 2.0,
             suspended = true,
-            timestamp = "2024-12-12T10:30:00"
+            bolusing = false,
+            uploaderBattery = 65,
+            device = "t:slim X2"
         )
 
-        assertEquals("suspended", statusInfo.status)
-        assertEquals(false, statusInfo.bolusing)
-        assertEquals(true, statusInfo.suspended)
-        assertEquals("2024-12-12T10:30:00", statusInfo.timestamp)
+        assertEquals("t:slim X2", status.device)
+        assertEquals(65, status.uploaderBattery)
+        assertNotNull(status.pump?.status)
+        assertEquals(true, status.pump?.status?.suspended)
+        assertEquals(false, status.pump?.status?.bolusing)
+        assertEquals("suspended", status.pump?.status?.status)
+    }
+
+    @Test
+    fun testCreateDeviceStatusNormalStatus() {
+        val timestamp = LocalDateTime.of(2024, 12, 12, 10, 30, 0)
+        val status = createDeviceStatus(
+            timestamp = timestamp,
+            batteryPercent = 80,
+            suspended = false
+        )
+
+        assertNotNull(status.pump?.status)
+        assertEquals(false, status.pump?.status?.suspended)
+        assertEquals("normal", status.pump?.status?.status)
+    }
+
+    @Test
+    fun testCreateDeviceStatusNoStatusFlags() {
+        val timestamp = LocalDateTime.of(2024, 12, 12, 10, 30, 0)
+        val status = createDeviceStatus(
+            timestamp = timestamp,
+            batteryPercent = 80
+        )
+
+        // When no status flags are provided, status should be null
+        assertNull(status.pump?.status)
+    }
+
+    @Test
+    fun testCarbCorrectionTreatment() {
+        val timestamp = LocalDateTime.of(2024, 12, 12, 10, 30, 0)
+        val treatment = NightscoutTreatment.fromTimestamp(
+            eventType = "Carb Correction",
+            timestamp = timestamp,
+            seqId = 77777L,
+            carbs = 30.0
+        )
+
+        assertEquals("Carb Correction", treatment.eventType)
+        assertEquals(30.0, treatment.carbs!!, 0.001)
+        assertNull(treatment.insulin)
+        assertEquals("77777", treatment.pumpId)
+        assertEquals("ControlX2", treatment.enteredBy)
+    }
+
+    @Test
+    fun testComboBolusTreatment() {
+        val timestamp = LocalDateTime.of(2024, 12, 12, 10, 30, 0)
+        // 10U total: 5U now (50%) + 5U over 120min (50%)
+        // relative rate = 5U / 120min * 60 = 2.5 U/hr
+        val treatment = NightscoutTreatment.fromTimestamp(
+            eventType = "Combo Bolus",
+            timestamp = timestamp,
+            seqId = 88888L,
+            insulin = 5.0,           // immediate portion only
+            duration = 120,           // extended duration
+            enteredInsulin = 10.0,   // total
+            splitNow = 50,
+            splitExt = 50,
+            relative = 2.5           // U/hr
+        )
+
+        assertEquals("Combo Bolus", treatment.eventType)
+        assertEquals(5.0, treatment.insulin!!, 0.001)
+        assertEquals(10.0, treatment.enteredInsulin!!, 0.001)
+        assertEquals(50, treatment.splitNow)
+        assertEquals(50, treatment.splitExt)
+        assertEquals(120, treatment.duration)
+        assertEquals(2.5, treatment.relative!!, 0.001)
+        assertEquals("88888", treatment.pumpId)
+    }
+
+    @Test
+    fun testComboBolusSplitsSumTo100() {
+        val timestamp = LocalDateTime.of(2024, 12, 12, 10, 30, 0)
+        // 70/30 split: 7U now, 3U extended
+        val treatment = NightscoutTreatment.fromTimestamp(
+            eventType = "Combo Bolus",
+            timestamp = timestamp,
+            seqId = 99999L,
+            insulin = 7.0,
+            duration = 60,
+            enteredInsulin = 10.0,
+            splitNow = 70,
+            splitExt = 30,
+            relative = 3.0  // 3U / 60min * 60 = 3.0 U/hr
+        )
+
+        assertEquals(70, treatment.splitNow)
+        assertEquals(30, treatment.splitExt)
+        assertEquals(100, treatment.splitNow!! + treatment.splitExt!!)
     }
 }

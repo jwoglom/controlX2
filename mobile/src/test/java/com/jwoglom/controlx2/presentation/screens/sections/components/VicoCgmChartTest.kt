@@ -3,6 +3,7 @@ package com.jwoglom.controlx2.presentation.screens.sections.components
 import com.jwoglom.controlx2.db.historylog.HistoryLogItem
 import com.jwoglom.controlx2.db.historylog.itemLruCache
 import com.jwoglom.pumpx2.pump.messages.response.historyLog.BasalRateChangeHistoryLog
+import com.jwoglom.pumpx2.pump.messages.response.historyLog.CgmDataFsl3HistoryLog
 import com.jwoglom.pumpx2.pump.messages.response.historyLog.DexcomG6CGMHistoryLog
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -56,6 +57,28 @@ class VicoCgmChartTest {
         } finally {
             TimeZone.setDefault(originalTimeZone)
         }
+    }
+
+    @Test
+    fun toCgmDataPoint_readsLibreFsl3ViaPumpX2Parse() {
+        // tconnectsync FSL3_DATA_EVENT_1 (26 bytes); bytes 16–17 patched to LE 149 for PumpX2 1.8.8 (Python fixture had different field packing at 16–17).
+        val cargo = byteArrayOf(
+            0x01, 0xe0.toByte(), 0x22, 0x3d, 0x2d, 0xd9.toByte(), 0x00, 0x0b, 0xfc.toByte(),
+            0x3e, 0x00, 0x00, 0x20, 0x00, 0x00, 0x95.toByte(),
+            0x95.toByte(), 0x00,
+            0x22, 0x3d, 0x2d, 0xd9.toByte(), 0x00, 0x00, 0x23, 0xe0.toByte()
+        )
+        val item = HistoryLogItem(
+            seqId = 785470L,
+            pumpSid = 0,
+            typeId = CgmDataFsl3HistoryLog().typeId(),
+            cargo = cargo,
+            pumpTime = LocalDateTime.of(2026, 3, 15, 13, 12, 57)
+        )
+
+        val point = item.toCgmDataPoint()
+
+        assertEquals(149f, point?.value)
     }
 
     @Test

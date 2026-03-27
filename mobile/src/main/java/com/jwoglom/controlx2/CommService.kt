@@ -125,6 +125,16 @@ class CommService : Service() {
     private lateinit var messageBus: MessageBus
     private var httpDebugApiService: HttpDebugApiService? = null
 
+    @androidx.annotation.VisibleForTesting
+    internal fun setMessageBusForTesting(bus: MessageBus) {
+        messageBus = bus
+    }
+
+    @androidx.annotation.VisibleForTesting
+    internal fun simulateConnectedPump(peripheral: BluetoothPeripheral) {
+        pumpCommHandler!!.simulateConnectedPump(peripheral)
+    }
+
     private var serviceStatusAcknowledged = false
     private val serviceStatusTask = object : Runnable {
         override fun run() {
@@ -157,7 +167,7 @@ class CommService : Service() {
         private lateinit var pump: Pump
         private lateinit var tandemBTHandler: TandemBluetoothHandler
         var currentSession: PumpSession? = null
-            private set
+            internal set
 
         fun getPumpSid(): Int? {
             return if (this::pump.isInitialized) pump.pumpSid else null
@@ -165,6 +175,11 @@ class CommService : Service() {
 
         fun isPumpReadyForHistoryFetch(): Boolean {
             return currentSession?.isActive == true
+        }
+
+        @androidx.annotation.VisibleForTesting
+        fun simulateConnectedPump(peripheral: BluetoothPeripheral) {
+            pump.initializeConnection(peripheral)
         }
 
         private fun ensurePumpUnbondedForFreshInit(filterToBluetoothMac: String?): Boolean {
@@ -437,20 +452,36 @@ class CommService : Service() {
                 super.onInitialPumpConnection(peripheral)
             }
 
-            override fun onPumpConnected(peripheral: BluetoothPeripheral?) {
+            @androidx.annotation.VisibleForTesting
+            fun initializeConnection(peripheral: BluetoothPeripheral) {
                 lastPeripheral = peripheral
 
-                extractPumpSid(peripheral?.name ?: "")?.let {
+                extractPumpSid(peripheral.name ?: "")?.let {
                     pumpSid = it
                     Prefs(applicationContext).setCurrentPumpSid(it)
                 }
 
-                val session = PumpSession.open(this, peripheral!!)
-                currentSession = session
+                val session = PumpSession.open(this, peripheral)
+                this@PumpCommHandler.currentSession = session
+
+                isConnected = true
+                Timber.i("service initializeConnection: $this")
+                sendWearCommMessage("/from-pump/pump-connected",
+                    peripheral.name!!.toByteArray()
+                )
+                // Sync glucose unit preference to wear app
+                val glucoseUnit = Prefs(applicationContext).glucoseUnit()
+                if (glucoseUnit != null) {
+                    sendWearCommMessage("/to-wear/glucose-unit", glucoseUnit.name.toByteArray())
+                }
+                currentPumpData.connectionTime = Instant.now()
+            }
+
+            private fun initializeHistoryAndSync() {
                 historyLogFetcher = HistoryLogFetcher(
                     historyLogRepo = this@CommService.historyLogRepo,
                     pumpSid = pumpSid!!,
-                    pumpSession = session,
+                    pumpSession = this@PumpCommHandler.currentSession!!,
                     autoFetchEnabled = { Prefs(applicationContext).autoFetchHistoryLogs() },
                     broadcastCallback = { item -> this@CommService.broadcastHistoryLogItem(item) }
                 )
@@ -464,7 +495,9 @@ class CommService : Service() {
                     applicationContext.getSharedPreferences("controlx2", Context.MODE_PRIVATE),
                     pumpSid!!
                 )
+            }
 
+            private fun waitForResponseStabilization() {
                 var numResponses = -99999
                 while (PumpState.processedResponseMessages != numResponses) {
                     numResponses = PumpState.processedResponseMessages
@@ -472,6 +505,9 @@ class CommService : Service() {
                     Timber.i("service onPumpConnected -- waiting for ${wait}ms to avoid race conditions: (processedResponseMessages: ${PumpState.processedResponseMessages})")
                     Thread.sleep(wait.toLong())
                 }
+            }
+
+            private fun sendBaseCommandsIfNeeded(peripheral: BluetoothPeripheral) {
                 Timber.i("service onPumpConnected -- checking for base messages (processedResponseMessages: ${PumpState.processedResponseMessages})")
                 if (!lastResponseMessage.containsKey(Pair(Characteristic.CURRENT_STATUS, ApiVersionRequest().opCode()))) {
                     Timber.i("service onPumpConnected -- sending ApiVersionRequest")
@@ -483,17 +519,13 @@ class CommService : Service() {
                     this.sendCommand(peripheral, TimeSinceResetRequest())
                 }
                 Thread.sleep(250)
-                isConnected = true
-                Timber.i("service onPumpConnected: $this")
-                sendWearCommMessage("/from-pump/pump-connected",
-                    peripheral?.name!!.toByteArray()
-                )
-                // Sync glucose unit preference to wear app
-                val glucoseUnit = Prefs(applicationContext).glucoseUnit()
-                if (glucoseUnit != null) {
-                    sendWearCommMessage("/to-wear/glucose-unit", glucoseUnit.name.toByteArray())
-                }
-                currentPumpData.connectionTime = Instant.now()
+            }
+
+            override fun onPumpConnected(peripheral: BluetoothPeripheral?) {
+                initializeConnection(peripheral!!)
+                initializeHistoryAndSync()
+                waitForResponseStabilization()
+                sendBaseCommandsIfNeeded(peripheral)
                 updateNotification("Connected to pump")
             }
 
@@ -503,6 +535,13 @@ class CommService : Service() {
                 sendWearCommMessage("/from-pump/pump-model",
                     model!!.name.toByteArray()
                 )
+
+                val modelName = when (model) {
+                    KnownDeviceModel.TSLIM_X2 -> "t:slim X2"
+                    KnownDeviceModel.MOBI -> "Tandem Mobi"
+                    else -> "Tandem Pump"
+                }
+                Prefs(this@CommService).setPumpModelName(modelName)
             }
 
             override fun onPumpDisconnected(
@@ -1149,7 +1188,8 @@ class CommService : Service() {
 
     override fun onBind(intent: Intent?) = null
 
-    private fun handleMessageReceived(path: String, data: ByteArray, sourceNodeId: String) {
+    @androidx.annotation.VisibleForTesting
+    internal fun handleMessageReceived(path: String, data: ByteArray, sourceNodeId: String) {
         // Ignore noisy loopback logs for pump-originated broadcasts.
         if (!path.startsWith("/from-pump/")) {
             Timber.d("service messageReceived: $path ${String(data)} from $sourceNodeId")
@@ -1601,7 +1641,10 @@ class CommService : Service() {
         }
 
         val minNotifyThreshold = Prefs(this).bolusConfirmationInsulinThreshold()
+        val autoApproveTimeout = if (source == BolusRequestSource.WEAR)
+            Prefs(this).wearBolusAutoApproveTimeoutSeconds() else 0
         sendWearCommMessage("/to-wear/bolus-min-notify-threshold", "$minNotifyThreshold".toByteArray())
+        sendWearCommMessage("/to-wear/wear-auto-approve-timeout", "$autoApproveTimeout".toByteArray())
 
         if (InsulinUnit.from1000To1(request.totalVolume) >= minNotifyThreshold || minNotifyThreshold == 0.0) {
             Timber.i("Requesting permission for bolus because $units >= minNotifyThreshold=$minNotifyThreshold")
@@ -1609,7 +1652,8 @@ class CommService : Service() {
             val builder = confirmBolusRequestBaseNotification(
                 this,
                 "Bolus Request",
-                "$units units. Press Confirm to deliver."
+                if (autoApproveTimeout > 0) "$units units. Auto-approving in ${autoApproveTimeout}s unless canceled."
+                else "$units units. Press Confirm to deliver."
             )
                 .setSound(RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION))
                 .setVibrate(longArrayOf(500L, 500L, 500L, 500L, 500L, 500L, 500L, 500L, 500L, 500L))
@@ -1621,6 +1665,15 @@ class CommService : Service() {
             val notif = builder.build()
             Timber.i("bolus notification $bolusNotificationId $builder $notif")
             makeNotif(bolusNotificationId, notif)
+
+            // Broadcast to phone UI for in-app dialog
+            sendWearCommMessage("/to-phone/bolus-confirm-dialog",
+                "${Hex.encodeHexString(PumpMessageSerializer.toBytes(request))}|${source.id}|$autoApproveTimeout".toByteArray())
+
+            // Schedule auto-approve if timeout is set
+            if (autoApproveTimeout > 0) {
+                scheduleAutoApprove(autoApproveTimeout, getConfirmIntent())
+            }
         } else {
             Timber.i("Sending immediate bolus request because $units is less than minNotifyThreshold=$minNotifyThreshold")
 
@@ -1638,6 +1691,40 @@ class CommService : Service() {
             // wait to avoid prefs not being saved
             Thread.sleep(250)
             confirmPendingIntent.send()
+        }
+    }
+
+    private fun scheduleAutoApprove(timeoutSeconds: Int, confirmIntent: PendingIntent) {
+        cancelAutoApproveStatic(this)
+        val handler = Handler(Looper.getMainLooper())
+        _autoApproveHandler = handler
+        val runnable = Runnable {
+            Timber.i("Auto-approving bolus after ${timeoutSeconds}s timeout")
+            try {
+                confirmIntent.send()
+            } catch (e: PendingIntent.CanceledException) {
+                Timber.w("Auto-approve PendingIntent already cancelled (bolus was manually handled)")
+            }
+            _autoApproveRunnable = null
+            _autoApproveHandler = null
+        }
+        _autoApproveRunnable = runnable
+        handler.postDelayed(runnable, timeoutSeconds * 1000L)
+    }
+
+    companion object {
+        @Volatile
+        private var _autoApproveHandler: Handler? = null
+        @Volatile
+        private var _autoApproveRunnable: Runnable? = null
+
+        fun cancelAutoApproveStatic(context: Context?) {
+            _autoApproveRunnable?.let { runnable ->
+                _autoApproveHandler?.removeCallbacks(runnable)
+                Timber.i("Auto-approve timer cancelled")
+            }
+            _autoApproveRunnable = null
+            _autoApproveHandler = null
         }
     }
 

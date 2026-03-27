@@ -41,16 +41,11 @@ class HybridMessageBus(
         override fun onMessageReceived(path: String, data: ByteArray, sourceNodeId: String) {
             //Timber.d("HybridMessageBus: Message from Wear transport: $path")
 
-            // Only forward /to-phone/* messages from Wear transport
-            // Other messages (like /from-pump/*) will come via Broadcast transport instead
-            if (path.startsWith("/to-phone/")) {
-                //Timber.d("HybridMessageBus: Re-broadcasting /to-phone/* from Wear locally")
-                broadcastBus.sendMessage(path, data, MessageBusSender.WEAR_UI)
-
-                // Also notify listeners directly (for any components listening to Wear messages)
+            // Messages from the watch: forward to all listeners.
+            // /to-phone/* and /to-pump/* are actionable watch-originated messages.
+            // /from-pump/* arrives via Broadcast transport instead.
+            if (path.startsWith("/to-phone/") || path.startsWith("/to-pump/")) {
                 notifyListeners(path, data, sourceNodeId)
-            } else {
-                //Timber.d("HybridMessageBus: Ignoring non-/to-phone/* message from Wear transport (will come via Broadcast): $path")
             }
         }
     }
@@ -73,48 +68,22 @@ class HybridMessageBus(
         //Timber.i("HybridMessageBus.sendMessage: $path (sender: $sender)")
 
         when {
-            // Messages TO CommService from Mobile UI
-            path.startsWith("/to-phone/") && sender == MessageBusSender.MOBILE_UI -> {
-                //Timber.d("Routing /to-phone/* from Mobile UI → Broadcast only")
-                broadcastBus.sendMessage(path, data, sender)
-            }
-
-            // Messages TO CommService+Mobile UI from Wear UI
-            path.startsWith("/to-phone/") && sender == MessageBusSender.WEAR_UI -> {
-                //Timber.d("Routing /to-phone/* from Wear UI → Wear only (will re-broadcast on phone)")
-                wearBus.sendMessage(path, data, sender)
-            }
-
-            // Messages TO Wear from Mobile UI or CommService
+            // Phone → Watch: Wear transport only
             path.startsWith("/to-wear/") -> {
-                //Timber.d("Routing /to-wear/* → Wear only")
                 wearBus.sendMessage(path, data, sender)
             }
 
-            // Messages TO Pump from Mobile UI
-            path.startsWith("/to-pump/") && sender == MessageBusSender.MOBILE_UI -> {
-                //Timber.d("Routing /to-pump/* from Mobile UI → Broadcast only")
-                broadcastBus.sendMessage(path, data, sender)
-            }
-
-            // Messages TO Pump from Wear UI
-            path.startsWith("/to-pump/") && sender == MessageBusSender.WEAR_UI -> {
-                //Timber.d("Routing /to-pump/* from Wear UI → Wear only")
-                wearBus.sendMessage(path, data, sender)
-            }
-
-            // Messages FROM Pump (broadcast to all UIs)
+            // Pump responses: broadcast locally + send to watch
             path.startsWith("/from-pump/") -> {
-                //Timber.d("Routing /from-pump/* → Both transports (broadcast to all)")
                 broadcastBus.sendMessage(path, data, sender)
                 wearBus.sendMessage(path, data, sender)
             }
 
+            // /to-phone/*, /to-pump/*, and anything else: broadcast locally only.
+            // Watch-originated messages arrive via wearProxyListener (inbound),
+            // not via sendMessage (outbound).
             else -> {
-                // Unknown pattern - send via both for safety
-                //Timber.w("Unknown message pattern: $path (sender: $sender) - sending via both transports")
                 broadcastBus.sendMessage(path, data, sender)
-                wearBus.sendMessage(path, data, sender)
             }
         }
     }

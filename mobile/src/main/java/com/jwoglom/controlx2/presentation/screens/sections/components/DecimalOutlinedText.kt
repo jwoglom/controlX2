@@ -1,6 +1,7 @@
 package com.jwoglom.controlx2.presentation.screens.sections.components
 
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
@@ -14,10 +15,12 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.input.KeyboardCapitalization
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.TextFieldValue
 import com.jwoglom.controlx2.presentation.util.onFocusSelectAll
-import com.jwoglom.controlx2.shared.util.twoDecimalPlaces
+import java.text.DecimalFormatSymbols
+import java.util.Locale
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -25,6 +28,9 @@ fun DecimalOutlinedText(
     title: String,
     value: String?,
     onValueChange: (String) -> Unit,
+    onSubmitRequested: (() -> Unit)? = null,
+    imeAction: ImeAction = ImeAction.Done,
+    keyboardActions: KeyboardActions? = null,
     modifier: Modifier = Modifier
 ) {
     var error = false
@@ -33,6 +39,7 @@ fun DecimalOutlinedText(
     var textFieldValue = remember {
         mutableStateOf(TextFieldValue(value ?: ""))
     }
+    val localeDecimalSeparator = DecimalFormatSymbols.getInstance(Locale.getDefault()).decimalSeparator
 
     LaunchedEffect (value) {
         textFieldValue.value = textFieldValue.value.copy(text = value ?: "")
@@ -43,8 +50,23 @@ fun DecimalOutlinedText(
         onValueChange = { it: TextFieldValue ->
             textFieldValue.value = it
             val text = it.text
-            var filtered = text.filter { (it in '0'..'9') || it == '.' }
-            val dotIndex = filtered.lastIndexOf('.')
+
+            val acceptedDecimalSeparators = setOf('.', ',', localeDecimalSeparator)
+            val normalized = buildString {
+                var decimalSeen = false
+                text.forEach { char ->
+                    when {
+                        char in '0'..'9' -> append(char)
+                        char in acceptedDecimalSeparators && !decimalSeen -> {
+                            append('.')
+                            decimalSeen = true
+                        }
+                    }
+                }
+            }
+
+            var filtered = normalized
+            val dotIndex = filtered.indexOf('.')
             if (dotIndex >= 0 && filtered.length - dotIndex > decimalPlaces + 1) {
                 filtered = filtered.substring(0, dotIndex + decimalPlaces + 1)
             }
@@ -55,11 +77,18 @@ fun DecimalOutlinedText(
             autoCorrect = false,
             capitalization = KeyboardCapitalization.None,
             keyboardType = KeyboardType.Number,
+            imeAction = imeAction,
+        ),
+        keyboardActions = keyboardActions ?: KeyboardActions(
+            onDone = {
+                onSubmitRequested?.invoke()
+            }
         ),
         label = {
             Text(title)
         },
         isError = error,
+        singleLine = true,
         colors = OutlinedTextFieldDefaults.colors(
             focusedTextColor = MaterialTheme.colorScheme.onSurface,
             unfocusedTextColor = MaterialTheme.colorScheme.onSurface

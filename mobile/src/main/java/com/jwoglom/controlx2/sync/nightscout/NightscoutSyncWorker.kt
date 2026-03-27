@@ -2,8 +2,10 @@ package com.jwoglom.controlx2.sync.nightscout
 
 import android.content.Context
 import android.content.SharedPreferences
+import android.os.BatteryManager
 import android.os.Handler
 import android.os.Looper
+import com.jwoglom.controlx2.Prefs
 import com.jwoglom.controlx2.db.historylog.HistoryLogDatabase
 import com.jwoglom.controlx2.db.historylog.HistoryLogRepo
 import com.jwoglom.controlx2.db.nightscout.NightscoutSyncStateDatabase
@@ -79,6 +81,49 @@ class NightscoutSyncWorker(
     }
 
     /**
+     * Upload pump profile to Nightscout.
+     * Call when IDPManager profile data becomes complete.
+     */
+    fun uploadProfile(idpManager: com.jwoglom.pumpx2.pump.messages.builders.IDPManager) {
+        scope.launch {
+            try {
+                val profile = NightscoutProfileConverter.convert(idpManager)
+                if (profile == null) {
+                    Timber.d("IDPManager data incomplete, skipping profile upload")
+                    return@launch
+                }
+
+                val config = NightscoutSyncConfig.load(prefs)
+                if (!config.enabled || !config.isValid()) {
+                    Timber.d("Nightscout sync disabled, skipping profile upload")
+                    return@launch
+                }
+
+                val normalizedUrl = normalizeNightscoutUrl(config.nightscoutUrl) ?: return@launch
+                val nightscoutClient = NightscoutClient(normalizedUrl, config.apiSecret)
+
+                val nsDb = NightscoutSyncStateDatabase.getDatabase(context)
+                val configWithModel = config.copy(
+                    pumpModelName = Prefs(context).pumpModelName() ?: "Tandem Pump"
+                )
+
+                val coordinator = NightscoutSyncCoordinator(
+                    HistoryLogRepo(HistoryLogDatabase.getDatabase(context).historyLogDao()),
+                    nightscoutClient,
+                    nsDb.nightscoutSyncStateDao(),
+                    nsDb.nightscoutProcessorStateDao(),
+                    configWithModel,
+                    pumpSid
+                )
+
+                coordinator.uploadProfile(profile)
+            } catch (e: Exception) {
+                Timber.e(e, "Error uploading profile to Nightscout")
+            }
+        }
+    }
+
+    /**
      * Schedule the next sync
      */
     private fun scheduleNextSync(intervalMinutes: Int) {
@@ -138,14 +183,25 @@ class NightscoutSyncWorker(
                 normalizedUrl,
                 config.apiSecret
             )
-            val syncStateDao = NightscoutSyncStateDatabase.getDatabase(context)
-                .nightscoutSyncStateDao()
+            val nsDb = NightscoutSyncStateDatabase.getDatabase(context)
+            val syncStateDao = nsDb.nightscoutSyncStateDao()
+            val processorStateDao = nsDb.nightscoutProcessorStateDao()
+
+            val batteryManager = context.getSystemService(Context.BATTERY_SERVICE) as? BatteryManager
+            val phoneBattery = batteryManager?.getIntProperty(BatteryManager.BATTERY_PROPERTY_CAPACITY)
+                ?.takeIf { it in 0..100 }
+
+            val configWithModel = config.copy(
+                pumpModelName = Prefs(context).pumpModelName() ?: "Tandem Pump",
+                uploaderBattery = phoneBattery
+            )
 
             val coordinator = NightscoutSyncCoordinator(
                 historyLogRepo,
                 nightscoutClient,
                 syncStateDao,
-                config,
+                processorStateDao,
+                configWithModel,
                 pumpSid
             )
 
@@ -237,6 +293,14 @@ class NightscoutSyncWorker(
          */
         fun stopIfRunning() {
             instance?.stop()
+        }
+
+        /**
+         * Upload pump profile to Nightscout if the worker is running.
+         * Safe to call even if the worker hasn't been started.
+         */
+        fun uploadProfileIfRunning(idpManager: com.jwoglom.pumpx2.pump.messages.builders.IDPManager) {
+            instance?.uploadProfile(idpManager)
         }
     }
 }

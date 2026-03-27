@@ -31,11 +31,14 @@ import com.jwoglom.controlx2.shared.util.SendType
 import com.jwoglom.controlx2.shared.util.snakeCaseToSpace
 import com.jwoglom.controlx2.shared.util.twoDecimalPlaces
 import com.jwoglom.controlx2.shared.util.twoDecimalPlaces1000Unit
+import com.jwoglom.pumpx2.pump.PumpState
 import com.jwoglom.pumpx2.pump.messages.Message
+import com.jwoglom.pumpx2.pump.messages.builders.LastBolusStatusRequestBuilder
 import com.jwoglom.pumpx2.pump.messages.calculator.BolusCalcUnits
 import com.jwoglom.pumpx2.pump.messages.calculator.BolusParameters
+import com.jwoglom.pumpx2.pump.messages.models.ApiVersion
+import com.jwoglom.pumpx2.pump.messages.models.KnownApiVersion
 import com.jwoglom.pumpx2.pump.messages.request.currentStatus.CurrentBolusStatusRequest
-import com.jwoglom.pumpx2.pump.messages.request.currentStatus.LastBolusStatusV2Request
 import com.jwoglom.pumpx2.pump.messages.response.control.CancelBolusResponse
 import com.jwoglom.pumpx2.pump.messages.response.currentStatus.BolusCalcDataSnapshotResponse
 import com.jwoglom.pumpx2.pump.messages.response.currentStatus.CurrentBolusStatusResponse
@@ -324,11 +327,17 @@ fun ApprovedDialogRegion(
             )
         },
         dismissButton = {
-            TextButton(
-                onClick = onCancel,
-                modifier = Modifier.padding(top = 16.dp)
-            ) {
-                Text("Cancel Bolus Delivery")
+            val bolusStillActive = bolusCurrentResponse.value?.let {
+                it.bolusId != 0 && (it.status == CurrentBolusStatusResponse.CurrentBolusStatus.REQUESTING ||
+                    it.status == CurrentBolusStatusResponse.CurrentBolusStatus.DELIVERING)
+            } ?: false
+            if (bolusStillActive) {
+                TextButton(
+                    onClick = onCancel,
+                    modifier = Modifier.padding(top = 16.dp)
+                ) {
+                    Text("Cancel Bolus Delivery")
+                }
             }
         },
         confirmButton = {
@@ -336,7 +345,14 @@ fun ApprovedDialogRegion(
                 onClick = onClose,
                 modifier = Modifier.padding(top = 16.dp)
             ) {
-                Text("OK")
+                Text(
+                    if (bolusCurrentResponse.value?.bolusId == 0 ||
+                        bolusCurrentResponse.value?.status?.let {
+                            it != CurrentBolusStatusResponse.CurrentBolusStatus.REQUESTING &&
+                            it != CurrentBolusStatusResponse.CurrentBolusStatus.DELIVERING
+                        } == true
+                    ) "Done" else "OK"
+                )
             }
         }
     )
@@ -387,11 +403,14 @@ fun CancelledDialogRegion(
     val bolusInitiateResponse = dataStore.bolusInitiateResponse.observeAsState()
     val lastBolusStatusResponse = dataStore.lastBolusStatusResponse.observeAsState()
 
+    fun apiVersion(): ApiVersion = PumpState.getPumpAPIVersion() ?: KnownApiVersion.API_V2_5.get()
+    fun lastBolusStatusRequest(): Message = LastBolusStatusRequestBuilder.create(apiVersion())
+
     LaunchedEffect (bolusCancelResponse.value, Unit) {
         Timber.d("showCancelledDialog querying LastBolusStatus")
-        sendPumpCommands(SendType.STANDARD, listOf(LastBolusStatusV2Request()))
+        sendPumpCommands(SendType.STANDARD, listOf(lastBolusStatusRequest()))
         mainHandler.postDelayed({
-            sendPumpCommands(SendType.STANDARD, listOf(LastBolusStatusV2Request()))
+            sendPumpCommands(SendType.STANDARD, listOf(lastBolusStatusRequest()))
         }, 500)
     }
 
@@ -411,7 +430,7 @@ fun CancelledDialogRegion(
                 Timber.d("showCancelledDialog lastBolusStatus postDelayed")
                 sendPumpCommands(
                     SendType.STANDARD,
-                    listOf(LastBolusStatusV2Request())
+                    listOf(lastBolusStatusRequest())
                 )
             }, 500)
         }

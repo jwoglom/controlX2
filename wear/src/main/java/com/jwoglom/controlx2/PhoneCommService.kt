@@ -120,7 +120,7 @@ class PhoneCommService : Service() {
     }
 
     private fun handleMessageReceived(path: String, data: ByteArray, sourceNodeId: String) {
-        Timber.i("wear service handleMessageReceived $path: ${String(data)} from $sourceNodeId")
+        Timber.d("wear service handleMessageReceived $path from $sourceNodeId")
         when (path) {
             "/to-wear/open-activity" -> {
                 startActivity(

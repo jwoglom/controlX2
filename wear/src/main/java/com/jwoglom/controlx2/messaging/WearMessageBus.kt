@@ -47,19 +47,15 @@ class WearMessageBus(private val context: Context) : MessageBus, MessageClient.O
                 }
         }
 
-        // Send to local node if path starts with /to-wear
-        if (path.startsWith("/to-wear")) {
-            nodeClient.localNode.addOnSuccessListener { localNode ->
-                sendToNode(localNode)
+        // Send to connected nodes, filtering out the local node to avoid echo
+        nodeClient.localNode.addOnSuccessListener { localNode ->
+            val localNodeId = localNode.id
+            nodeClient.connectedNodes.addOnSuccessListener { nodes ->
+                nodes.filter { it.id != localNodeId }.forEach { node ->
+                    sendToNode(node)
+                }
+                updateConnectionState()
             }
-        }
-
-        // Send to all connected nodes (phone)
-        nodeClient.connectedNodes.addOnSuccessListener { nodes ->
-            nodes.forEach { node ->
-                sendToNode(node)
-            }
-            updateConnectionState()
         }
     }
 

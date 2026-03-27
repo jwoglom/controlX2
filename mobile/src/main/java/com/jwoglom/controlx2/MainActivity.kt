@@ -49,6 +49,7 @@ import com.jwoglom.controlx2.presentation.screens.sections.messagePairToJson
 import com.jwoglom.controlx2.presentation.screens.sections.verbosePumpMessage
 import com.jwoglom.controlx2.presentation.util.ShouldLogToFile
 import com.jwoglom.controlx2.shared.PumpMessageSerializer
+import com.jwoglom.pumpx2.shared.Hex
 import com.jwoglom.controlx2.shared.enums.BasalStatus
 import com.jwoglom.controlx2.shared.enums.CGMSessionState
 import com.jwoglom.controlx2.shared.enums.GlucoseUnit
@@ -134,10 +135,14 @@ class MainActivity : ComponentActivity() {
         const val EXTRA_TEMP_RATE_PERCENT = "percent"
         const val EXTRA_TEMP_RATE_HOURS = "hours"
         const val EXTRA_TEMP_RATE_MINUTES = "minutes"
+
+        private const val REQUEST_BT_PERMISSIONS = 2
     }
 
     private lateinit var messageBus: MessageBus
     private val sheetLaunchRequestState = mutableStateOf<SheetLaunchRequest?>(null)
+    private var btPermissionsRequestInFlight = false
+    private var notificationPermissionRequestInFlight = false
 
     private val applicationScope = CoroutineScope(SupervisorJob())
     private val historyLogDb by lazy { HistoryLogDatabase.getDatabase(this) }
@@ -212,29 +217,8 @@ class MainActivity : ComponentActivity() {
         })
         // Show warning dialog if Play Services missing (non-blocking)
         checkPlayServicesAndInitialize()
-        checkNotificationPermissions()
-
 
         startCommServiceWithPreconditions()
-    }
-
-    private fun checkNotificationPermissions() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            if (checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED &&
-                ActivityCompat.shouldShowRequestPermissionRationale(
-                    this,
-                    Manifest.permission.POST_NOTIFICATIONS
-                )
-            ) {
-
-                val REQUEST_POST_NOTIFICATIONS = 10023;
-                ActivityCompat.requestPermissions(
-                    this,
-                    arrayOf(Manifest.permission.POST_NOTIFICATIONS),
-                    REQUEST_POST_NOTIFICATIONS
-                )
-            }
-        }
     }
 
     private val writeCharacteristicFailedCallback: (String) -> Unit = { uuid ->
@@ -266,6 +250,8 @@ class MainActivity : ComponentActivity() {
             Timber.i("BTPermissionsCheck not started because TOS not accepted")
         } else if (!Prefs(applicationContext).serviceEnabled()) {
             Timber.i("BTPermissionsCheck not started because service not enabled")
+        } else if (notificationPermissionRequestInFlight || btPermissionsRequestInFlight) {
+            Timber.i("BTPermissionsCheck not started because a permission request is already in flight")
         } else {
             startBTPermissionsCheck()
         }
@@ -296,6 +282,8 @@ class MainActivity : ComponentActivity() {
             Timber.i("commService not started because first TOS not accepted")
         } else if (!Prefs(applicationContext).serviceEnabled()) {
             Timber.i("commService not started because service not enabled")
+        } else if (notificationPermissionRequestInFlight) {
+            Timber.i("commService not started because notification permission request is in flight")
         } else if (!hasCommServicePermissions()) {
             Timber.i("commService not started because required permissions are not granted yet")
             startBTPermissionsCheck()
@@ -481,6 +469,47 @@ class MainActivity : ComponentActivity() {
     }
 
 
+    private var bolusConfirmDialog: AlertDialog? = null
+
+    private fun showBolusConfirmDialog(units: String, requestBytes: ByteArray, source: String, autoApproveTimeout: Int) {
+        bolusConfirmDialog?.dismiss()
+
+        val message = if (autoApproveTimeout > 0) {
+            "$units units from $source. Will auto-approve in ${autoApproveTimeout}s unless canceled."
+        } else {
+            "$units units from $source. Press Confirm to deliver."
+        }
+
+        bolusConfirmDialog = AlertDialog.Builder(this)
+            .setTitle("Bolus Request")
+            .setMessage(message)
+            .setPositiveButton("Confirm ${units}u") { dialog, _ ->
+                val intent = Intent(applicationContext, BolusNotificationBroadcastReceiver::class.java).apply {
+                    putExtra("action", "INITIATE")
+                    putExtra("request", requestBytes)
+                }
+                val confirmPendingIntent = android.app.PendingIntent.getBroadcast(
+                    this, 2001, intent,
+                    android.app.PendingIntent.FLAG_IMMUTABLE or android.app.PendingIntent.FLAG_ONE_SHOT
+                )
+                confirmPendingIntent.send()
+                dialog.dismiss()
+            }
+            .setNegativeButton("Reject") { dialog, _ ->
+                val intent = Intent(applicationContext, BolusNotificationBroadcastReceiver::class.java).apply {
+                    putExtra("action", "REJECT")
+                }
+                val rejectPendingIntent = android.app.PendingIntent.getBroadcast(
+                    this, 2000, intent,
+                    android.app.PendingIntent.FLAG_IMMUTABLE or android.app.PendingIntent.FLAG_ONE_SHOT
+                )
+                rejectPendingIntent.send()
+                dialog.dismiss()
+            }
+            .setCancelable(false)
+            .show()
+    }
+
     // Message received from Wear or CommService via MessageBus
     private fun handleMessageReceived(path: String, data: ByteArray, sourceNodeId: String) {
         Timber.i("phone messageReceived: $path: ${String(data)} from $sourceNodeId")
@@ -490,24 +519,19 @@ class MainActivity : ComponentActivity() {
                 when (String(data)) {
                     "skip_notif_permission" -> {
                         startBTPermissionsCheck()
-                        startCommServiceWithPreconditions()
                         dataStore.pumpSetupStage.value =
                             dataStore.pumpSetupStage.value?.nextStage(PumpSetupStage.WAITING_PUMPX2_INIT)
                     }
                     else -> {
-                        requestNotificationCallback = { isGranted ->
+                        launchNotificationPermissionRequest { isGranted ->
                             if (isGranted) {
                                 startBTPermissionsCheck()
-                                startCommServiceWithPreconditions()
                                 dataStore.pumpSetupStage.value =
                                     dataStore.pumpSetupStage.value?.nextStage(PumpSetupStage.WAITING_PUMPX2_INIT)
                             } else {
                                 dataStore.pumpSetupStage.value =
                                     dataStore.pumpSetupStage.value?.nextStage(PumpSetupStage.PERMISSIONS_NOT_GRANTED)
                             }
-                        }
-                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                            requestNotificationPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
                         }
                     }
                 }
@@ -527,24 +551,19 @@ class MainActivity : ComponentActivity() {
                 when (String(data)) {
                     "skip_notif_permission" -> {
                         startBTPermissionsCheck()
-                        startCommServiceWithPreconditions()
                         dataStore.pumpSetupStage.value =
                             dataStore.pumpSetupStage.value?.nextStage(PumpSetupStage.WAITING_PUMP_FINDER_INIT)
                     }
                     else -> {
-                        requestNotificationCallback = { isGranted ->
+                        launchNotificationPermissionRequest { isGranted ->
                             if (isGranted) {
                                 startBTPermissionsCheck()
-                                startCommServiceWithPreconditions()
                                 dataStore.pumpSetupStage.value =
                                     dataStore.pumpSetupStage.value?.nextStage(PumpSetupStage.WAITING_PUMP_FINDER_INIT)
                             } else {
                                 dataStore.pumpSetupStage.value =
                                     dataStore.pumpSetupStage.value?.nextStage(PumpSetupStage.PERMISSIONS_NOT_GRANTED)
                             }
-                        }
-                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                            requestNotificationPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
                         }
                     }
                 }
@@ -684,6 +703,24 @@ class MainActivity : ComponentActivity() {
                 }
             }
 
+            "/to-phone/bolus-confirm-dialog" -> {
+                val parts = String(data).split("|")
+                if (parts.size >= 3) {
+                    val requestHex = parts[0]
+                    val source = parts[1]
+                    val autoApproveTimeout = parts[2].toIntOrNull() ?: 0
+                    val requestBytes = Hex.decodeHex(requestHex)
+                    val request = PumpMessageSerializer.fromBytes(requestBytes) as? com.jwoglom.pumpx2.pump.messages.request.control.InitiateBolusRequest
+                    if (request != null) {
+                        val units = com.jwoglom.controlx2.shared.util.twoDecimalPlaces(
+                            com.jwoglom.pumpx2.pump.messages.models.InsulinUnit.from1000To1(request.totalVolume))
+                        runOnUiThread {
+                            showBolusConfirmDialog(units, requestBytes, source, autoApproveTimeout)
+                        }
+                    }
+                }
+            }
+
             "/from-pump/receive-message" -> {
                 val pumpMessage = PumpMessageSerializer.fromBytes(data)
                 onPumpMessageReceived(pumpMessage, false)
@@ -761,7 +798,14 @@ class MainActivity : ComponentActivity() {
             synchronized(dataStore.idpManager) {
                 val updated = (dataStore.idpManager.value ?: IDPManager()).processMessage(message)
                 // re-create to trigger state update via object change
-                dataStore.idpManager.value = IDPManager(updated)
+                val newIdpManager = IDPManager(updated)
+                dataStore.idpManager.value = newIdpManager
+
+                // Upload profile to Nightscout when all profile data is loaded
+                if (newIdpManager.isComplete) {
+                    com.jwoglom.controlx2.sync.nightscout.NightscoutSyncWorker
+                        .uploadProfileIfRunning(newIdpManager)
+                }
             }
         }
         when (message) {
@@ -921,6 +965,7 @@ class MainActivity : ComponentActivity() {
             }
             is InitiateBolusResponse -> {
                 dataStore.bolusInitiateResponse.value = message
+                runOnUiThread { bolusConfirmDialog?.dismiss() }
             }
             is CancelBolusResponse -> {
                 if (dataStore.bolusCancelResponse.value == null || message.wasCancelled()) {
@@ -1003,11 +1048,16 @@ class MainActivity : ComponentActivity() {
      */
 
     private fun startBTPermissionsCheck() {
+        if (btPermissionsRequestInFlight) {
+            Timber.i("startBTPermissionsCheck skipped because a Bluetooth permission request is already in flight")
+            return
+        }
+
         val missingPermissions = getMissingPermissions(getRequiredPermissions())
         if (missingPermissions.isNotEmpty()) {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-                val ACCESS_LOCATION_REQUEST = 2
-                requestPermissions(missingPermissions, ACCESS_LOCATION_REQUEST)
+                btPermissionsRequestInFlight = true
+                requestPermissions(missingPermissions, REQUEST_BT_PERMISSIONS)
             }
             return
         }
@@ -1151,6 +1201,13 @@ class MainActivity : ComponentActivity() {
     ) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
 
+        if (requestCode != REQUEST_BT_PERMISSIONS) {
+            Timber.i("Ignoring onRequestPermissionsResult for unrelated requestCode=$requestCode")
+            return
+        }
+
+        btPermissionsRequestInFlight = false
+
         // Check if all permission were granted
         var allGranted = true
         for (result in grantResults) {
@@ -1183,7 +1240,29 @@ class MainActivity : ComponentActivity() {
     private val requestNotificationPermission = registerForActivityResult(
         ActivityResultContracts.RequestPermission()
     ) { isGranted: Boolean ->
-        requestNotificationCallback(isGranted)
+        notificationPermissionRequestInFlight = false
+        val callback = requestNotificationCallback
+        requestNotificationCallback = {}
+        callback(isGranted)
+    }
+
+    private fun launchNotificationPermissionRequest(callback: (Boolean) -> Unit) {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) {
+            callback(true)
+            return
+        }
+        if (checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED) {
+            callback(true)
+            return
+        }
+        if (notificationPermissionRequestInFlight) {
+            Timber.i("Notification permission request already in flight")
+            return
+        }
+
+        notificationPermissionRequestInFlight = true
+        requestNotificationCallback = callback
+        requestNotificationPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
     }
 
 

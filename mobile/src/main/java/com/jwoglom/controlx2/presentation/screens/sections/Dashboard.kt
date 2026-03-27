@@ -275,7 +275,9 @@ val dashboardCommands = listOf(
     HistoryLogStatusRequest(),
     // update notification badge
     *NotificationBundle.allRequests().toTypedArray()
-)
+).filter { msg ->
+    !msg.props().minApi.get().greaterThan(apiVersion())
+}
 
 val dashboardFields = listOf(
     dataStore.batteryPercent,

@@ -4,17 +4,21 @@ import com.jwoglom.controlx2.db.historylog.HistoryLogItem
 import com.jwoglom.controlx2.db.historylog.HistoryLogRepo
 import com.jwoglom.controlx2.sync.nightscout.NightscoutSyncConfig
 import com.jwoglom.controlx2.sync.nightscout.ProcessorType
+import com.jwoglom.controlx2.sync.nightscout.TrendArrowCalculator
 import com.jwoglom.controlx2.sync.nightscout.api.NightscoutApi
 import com.jwoglom.controlx2.sync.nightscout.models.NightscoutEntry
 import com.jwoglom.pumpx2.pump.messages.response.historyLog.DexcomG6CGMHistoryLog
 import com.jwoglom.pumpx2.pump.messages.response.historyLog.DexcomG7CGMHistoryLog
 import com.jwoglom.pumpx2.pump.messages.response.historyLog.HistoryLogParser
 import timber.log.Timber
+import java.time.LocalDateTime
 
 /**
  * Process CGM readings (glucose values) for Nightscout upload
  *
- * Handles both Dexcom G6 and G7 CGM readings
+ * Handles both Dexcom G6 and G7 CGM readings, and calculates trend
+ * direction arrows from recent readings since the pump history logs
+ * don't include trend data.
  */
 class ProcessCGMReading(
     nightscoutApi: NightscoutApi,
@@ -38,19 +42,38 @@ class ProcessCGMReading(
             return 0
         }
 
-        // Convert history logs to Nightscout entries
-        val entries = logs.mapNotNull { item ->
+        // Parse all readings first for trend calculation
+        val parsedReadings = logs.mapNotNull { item ->
             try {
-                cgmToNightscoutEntry(item)
+                val (sgv, _) = extractGlucose(item) ?: return@mapNotNull null
+                if (sgv <= 0) return@mapNotNull null
+                Triple(item, item.pumpTime, sgv)
             } catch (e: Exception) {
-                Timber.e(e, "Failed to convert CGM reading seqId=${item.seqId}")
+                Timber.e(e, "Failed to parse CGM reading seqId=${item.seqId}")
                 null
             }
-        }
+        }.sortedBy { it.second }
 
-        if (entries.isEmpty()) {
+        if (parsedReadings.isEmpty()) {
             Timber.d("${processorName()}: No entries to upload")
             return 0
+        }
+
+        // Build entries with trend directions calculated from sliding window
+        val entries = parsedReadings.mapIndexed { index, (item, timestamp, sgv) ->
+            // Use up to the last 3 readings ending at this one for trend calculation
+            val windowStart = maxOf(0, index - 2)
+            val window = parsedReadings.subList(windowStart, index + 1)
+                .map { it.second to it.third }
+
+            val direction = TrendArrowCalculator.calculateDirection(window)
+
+            NightscoutEntry.fromTimestamp(
+                timestamp = timestamp,
+                sgv = sgv,
+                direction = direction,
+                seqId = item.seqId
+            )
         }
 
         // Upload to Nightscout
@@ -61,37 +84,14 @@ class ProcessCGMReading(
         }
     }
 
-    private fun cgmToNightscoutEntry(item: HistoryLogItem): NightscoutEntry? {
-        val parsed = item.parse()
-
-        val (glucoseValue, direction) = when (parsed) {
-            is DexcomG6CGMHistoryLog -> {
-                val value = parsed.currentGlucoseDisplayValue
-                // G6 doesn't provide trend direction in history logs
-                value to null
-            }
-            is DexcomG7CGMHistoryLog -> {
-                val value = parsed.currentGlucoseDisplayValue
-                // G7 doesn't provide trend direction in history logs
-                value to null
-            }
+    private fun extractGlucose(item: HistoryLogItem): Pair<Int, Nothing?>? {
+        return when (val parsed = item.parse()) {
+            is DexcomG6CGMHistoryLog -> parsed.currentGlucoseDisplayValue to null
+            is DexcomG7CGMHistoryLog -> parsed.currentGlucoseDisplayValue to null
             else -> {
                 Timber.w("Unexpected CGM type: ${parsed.javaClass.simpleName}")
-                return null
+                null
             }
         }
-
-        // Skip invalid readings
-        if (glucoseValue <= 0) {
-            Timber.d("Skipping invalid glucose value: $glucoseValue")
-            return null
-        }
-
-        return NightscoutEntry.fromTimestamp(
-            timestamp = item.pumpTime,
-            sgv = glucoseValue,
-            direction = direction,
-            seqId = item.seqId
-        )
     }
 }

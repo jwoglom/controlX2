@@ -105,4 +105,15 @@ data class XdripSyncConfig(
     fun enabledPayloads(): Set<XdripPayloadGroup> {
         return XdripPayloadGroup.all().filterTo(mutableSetOf()) { isPayloadEnabled(it) }
     }
+
+    /**
+     * Returns whether changing from [oldConfig] to this config requires app/service reload.
+     *
+     * xDrip payload toggles and minimum-interval fields are consumed at runtime, so they do not
+     * require restart. We only reload when global xDrip sync is toggled on/off so lifecycle setup
+     * can be re-initialized deterministically.
+     */
+    fun requiresReloadComparedTo(oldConfig: XdripSyncConfig): Boolean {
+        return oldConfig.enabled != enabled
+    }
 }

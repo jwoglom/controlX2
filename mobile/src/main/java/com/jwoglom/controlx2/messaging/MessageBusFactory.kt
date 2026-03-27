@@ -22,7 +22,18 @@ object MessageBusFactory {
      * @param context Android context
      * @return MessageBus implementation (HybridMessageBus, BroadcastMessageBus, or LocalMessageBus)
      */
+    @Volatile
+    private var messageBusInstance: MessageBus? = null
+
     fun createMessageBus(context: Context): MessageBus {
+        return messageBusInstance ?: synchronized(this) {
+            messageBusInstance ?: createMessageBusInternal(context).also {
+                messageBusInstance = it
+            }
+        }
+    }
+
+    private fun createMessageBusInternal(context: Context): MessageBus {
         return when {
             shouldUseWearOs(context) -> {
                 Timber.i("MessageBusFactory: Using HybridMessageBus (Wear OS + Broadcast for cross-process)")
@@ -152,6 +163,11 @@ object MessageBusFactory {
      */
     @Volatile
     private var forcedMode: Boolean? = null
+
+    @androidx.annotation.VisibleForTesting
+    fun setInstanceForTesting(bus: MessageBus?) {
+        messageBusInstance = bus
+    }
 
     fun forceWearOsMode(enabled: Boolean) {
         forcedMode = enabled

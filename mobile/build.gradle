@@ -67,6 +67,12 @@ android {
                 if (!project.gradle.startParameter.taskNames.any { it.contains('Roborazzi') }) {
                     exclude '**/snapshots/**'
                 }
+                // Exclude bcprov-jdk14 from unit test classpath to avoid
+                // BouncyCastle JAR signer conflict with Robolectric's
+                // android-all framework JAR (which bundles its own BC).
+                // bcprov-jdk18on is added as testImplementation to provide
+                // BouncyCastle classes without the JAR signer conflict.
+                classpath = classpath.filter { !it.name.startsWith('bcprov-jdk14') }
             }
         }
     }
@@ -158,6 +164,12 @@ dependencies {
     testImplementation "androidx.compose.ui:ui-test-junit4:$compose_version"
     testImplementation "androidx.compose.ui:ui-test-manifest:$compose_version"
     testImplementation 'androidx.activity:activity-ktx:1.10.1'
+    testImplementation 'org.robolectric:robolectric:4.14.1'
+    testImplementation 'androidx.test:core:1.6.1'
+    testImplementation 'androidx.test:runner:1.6.2'
+    testImplementation 'io.mockk:mockk:1.13.13'
+    testImplementation 'org.jetbrains.kotlinx:kotlinx-coroutines-test:1.7.3'
+    testImplementation 'org.bouncycastle:bcprov-jdk18on:1.77'
     androidTestImplementation 'androidx.test.ext:junit:1.2.1'
     androidTestImplementation 'androidx.test.espresso:espresso-core:3.6.1'
     androidTestImplementation "androidx.compose.ui:ui-test-junit4:$compose_version"
@@ -194,5 +206,3 @@ dependencies {
     // See: https://developer.android.com/distribute/best-practices/launch/distribute-wear
 }
 
-// Apply Vico NaN fix patch
-apply from: 'vico-patch.gradle'
