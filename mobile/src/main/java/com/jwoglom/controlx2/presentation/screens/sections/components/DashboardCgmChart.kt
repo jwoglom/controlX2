@@ -22,13 +22,14 @@ import com.jwoglom.pumpx2.pump.messages.response.historyLog.CgmDataFsl2HistoryLo
 import com.jwoglom.pumpx2.pump.messages.response.historyLog.CgmDataFsl3HistoryLog
 import com.jwoglom.pumpx2.pump.messages.response.historyLog.CgmDataGxHistoryLog
 import com.jwoglom.pumpx2.pump.messages.response.historyLog.DexcomG6CGMHistoryLog
+import com.jwoglom.pumpx2.pump.messages.response.historyLog.DexcomG7CGMHistoryLog
 import com.jwoglom.pumpx2.pump.messages.response.historyLog.HistoryLog
 import androidx.compose.material3.Surface
 import androidx.compose.ui.graphics.Color
 
 val CgmReadingHistoryLogs = listOf(
     DexcomG6CGMHistoryLog::class.java,
-    com.jwoglom.pumpx2.pump.messages.response.historyLog.DexcomG7CGMHistoryLog::class.java,
+    DexcomG7CGMHistoryLog::class.java,
     CgmDataGxHistoryLog::class.java,
     CgmDataFsl2HistoryLog::class.java,
     CgmDataFsl3HistoryLog::class.java
