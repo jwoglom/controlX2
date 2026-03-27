@@ -189,3 +189,131 @@ Then use the standard commands documented in the "Running & testing" section abo
 - `compileSdk` is 36; ensure platform 36 is installed (the current `.codex/setup.sh` handles this automatically).
 - The root `build.gradle` reads `local.properties` eagerly at configuration time. If `local.properties` is missing, Gradle will fail immediately. Always run `.codex/setup.sh` first.
 - Paparazzi screenshot tests run as part of `testDebugUnitTest` and produce reports at `{module}/build/reports/paparazzi/debug/index.html`.
+
+## Claude Code cloud-specific instructions
+
+### Environment prerequisites
+- The VM has JDK 21 pre-installed and a repo-local Android SDK at `.android-sdk/` with only `cmdline-tools` pre-installed.
+- The environment routes all outbound traffic through an authenticated HTTP proxy configured via `JAVA_TOOL_OPTIONS`. The proxy credentials (user/password) are embedded in that env var.
+
+### Bootstrapping Gradle and the Android SDK
+
+**1. Configure Gradle proxy settings** — Gradle needs explicit proxy config in `~/.gradle/gradle.properties`. Extract the proxy credentials from `JAVA_TOOL_OPTIONS` and write them:
+
+```bash
+PROXY_USER=$(echo "$JAVA_TOOL_OPTIONS" | grep -oP '(?<=-Dhttp.proxyUser=)[^ ]+')
+PROXY_PASS=$(echo "$JAVA_TOOL_OPTIONS" | grep -oP '(?<=-Dhttp.proxyPassword=)[^ ]+')
+
+cat > ~/.gradle/gradle.properties << EOF
+systemProp.http.proxyHost=21.0.0.17
+systemProp.http.proxyPort=15004
+systemProp.https.proxyHost=21.0.0.17
+systemProp.https.proxyPort=15004
+systemProp.http.proxyUser=$PROXY_USER
+systemProp.http.proxyPassword=$PROXY_PASS
+systemProp.https.proxyUser=$PROXY_USER
+systemProp.https.proxyPassword=$PROXY_PASS
+systemProp.http.nonProxyHosts=localhost|127.0.0.1
+systemProp.jdk.http.auth.tunneling.disabledSchemes=
+systemProp.jdk.http.auth.proxying.disabledSchemes=
+org.gradle.jvmargs=-Xmx4g -Dhttp.nonProxyHosts=localhost|127.0.0.1
+EOF
+```
+
+> **Important:** The default `JAVA_TOOL_OPTIONS` includes `*.googleapis.com|*.google.com` in `http.nonProxyHosts`, which bypasses the proxy for Google domains. This breaks the Android SDK manager (which downloads from `dl.google.com`). The Gradle properties above override this with a minimal nonProxyHosts list.
+
+**2. Install Android SDK components manually** — The `sdkmanager` CLI also fails to download through the proxy because it inherits the broken `nonProxyHosts` from `JAVA_TOOL_OPTIONS`. Download build-tools and platform JARs directly using `curl`:
+
+```bash
+PROXY="http://${PROXY_USER}:${PROXY_PASS}@21.0.0.17:15004"
+SDK=.android-sdk
+
+# Download build-tools 35.0.0
+curl -x "$PROXY" -sL "https://dl.google.com/android/repository/build-tools_r35_linux.zip" -o /tmp/bt35.zip
+mkdir -p "$SDK/build-tools/35.0.0"
+unzip -qo /tmp/bt35.zip -d "$SDK/build-tools/35.0.0/"
+# The zip extracts into a subdirectory (e.g. android-15/) — move contents up
+mv "$SDK/build-tools/35.0.0/android-"*/* "$SDK/build-tools/35.0.0/"
+
+# Download platforms
+curl -x "$PROXY" -sL "https://dl.google.com/android/repository/platform-35_r02.zip" -o /tmp/p35.zip
+curl -x "$PROXY" -sL "https://dl.google.com/android/repository/platform-36_r02.zip" -o /tmp/p36.zip
+unzip -qo /tmp/p35.zip -d "$SDK/platforms/"
+unzip -qo /tmp/p36.zip -d "$SDK/platforms/"
+```
+
+**3. Create `package.xml` files** — AGP requires these metadata files to recognize SDK components:
+
+```bash
+# build-tools/35.0.0/package.xml
+cat > "$SDK/build-tools/35.0.0/package.xml" << 'XML'
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<ns2:repository xmlns:ns2="http://schemas.android.com/repository/android/common/02" xmlns:ns7="http://schemas.android.com/sdk/android/repo/repository2/03">
+    <localPackage path="build-tools;35.0.0" obsolete="false">
+        <type-details xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:type="ns7:genericDetailsType"/>
+        <revision><major>35</major><minor>0</minor><micro>0</micro></revision>
+        <display-name>Android SDK Build-Tools 35</display-name>
+    </localPackage>
+</ns2:repository>
+XML
+
+# platforms/android-35/package.xml
+cat > "$SDK/platforms/android-35/package.xml" << 'XML'
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<ns2:repository xmlns:ns2="http://schemas.android.com/repository/android/common/02" xmlns:ns7="http://schemas.android.com/sdk/android/repo/repository2/03">
+    <localPackage path="platforms;android-35" obsolete="false">
+        <type-details xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:type="ns7:platformDetailsType"><api-level>35</api-level><codename></codename></type-details>
+        <revision><major>2</major></revision>
+        <display-name>Android SDK Platform 35</display-name>
+    </localPackage>
+</ns2:repository>
+XML
+
+# platforms/android-36/package.xml
+cat > "$SDK/platforms/android-36/package.xml" << 'XML'
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<ns2:repository xmlns:ns2="http://schemas.android.com/repository/android/common/02" xmlns:ns7="http://schemas.android.com/sdk/android/repo/repository2/03">
+    <localPackage path="platforms;android-36" obsolete="false">
+        <type-details xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:type="ns7:platformDetailsType"><api-level>36</api-level><codename></codename></type-details>
+        <revision><major>2</major></revision>
+        <display-name>Android SDK Platform 36</display-name>
+    </localPackage>
+</ns2:repository>
+XML
+```
+
+**4. Configure Robolectric for offline mode** — Robolectric downloads instrumented Android JARs at test time, which also fails through the proxy. Download them manually and configure offline mode:
+
+```bash
+# Download the instrumented JARs Robolectric needs
+mkdir -p ~/.robolectric
+curl -x "$PROXY" -sL "https://repo1.maven.org/maven2/org/robolectric/android-all-instrumented/14-robolectric-10818077-i7/android-all-instrumented-14-robolectric-10818077-i7.jar" \
+  -o ~/.robolectric/android-all-instrumented-14-robolectric-10818077-i7.jar
+curl -x "$PROXY" -sL "https://repo1.maven.org/maven2/org/robolectric/android-all-instrumented/15-robolectric-12650502-i7/android-all-instrumented-15-robolectric-12650502-i7.jar" \
+  -o ~/.robolectric/android-all-instrumented-15-robolectric-12650502-i7.jar
+```
+
+Then add Robolectric offline system properties to `mobile/build.gradle` inside `testOptions > unitTests > all`:
+```groovy
+systemProperty 'robolectric.offline', 'true'
+systemProperty 'robolectric.dependency.dir', "${System.getProperty('user.home')}/.robolectric"
+```
+
+### Running builds and tests
+```bash
+export ANDROID_HOME=/home/user/controlX2/.android-sdk
+
+# Compile
+./gradlew :mobile:compileDebugKotlin
+
+# Run CommService integration tests
+./gradlew :mobile:testDebugUnitTest --tests "com.jwoglom.controlx2.CommServiceIntegrationTest"
+
+# Full test suite
+./gradlew :mobile:testDebugUnitTest
+```
+
+### Key gotchas
+- The `JAVA_TOOL_OPTIONS` env var is read-only and set at container level. You cannot override its `nonProxyHosts` — instead, set the correct values in `~/.gradle/gradle.properties` which Gradle picks up as system properties for its own JVM.
+- SDK component URLs can be found by downloading the repository manifest: `curl -x "$PROXY" -sL "https://dl.google.com/android/repository/repository2-3.xml"` and searching for the package path.
+- If Robolectric tests fail with `MavenArtifactFetcher` / `407 Proxy Authentication Required`, the offline mode JARs are missing or the system property wasn't applied. Check that the JAR filenames match exactly what Robolectric requests (visible in `--info` output).

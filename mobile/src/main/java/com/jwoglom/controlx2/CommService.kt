@@ -57,7 +57,6 @@ import com.jwoglom.pumpx2.pump.bluetooth.PumpReadyState
 import com.jwoglom.pumpx2.pump.bluetooth.TandemBluetoothHandler
 import com.jwoglom.pumpx2.pump.bluetooth.TandemConfig
 import com.jwoglom.pumpx2.pump.bluetooth.TandemPump
-import com.jwoglom.pumpx2.pump.bluetooth.TandemPumpFinder
 import com.jwoglom.pumpx2.pump.messages.Packetize
 import com.jwoglom.pumpx2.pump.messages.bluetooth.Characteristic
 import com.jwoglom.pumpx2.pump.messages.bluetooth.CharacteristicUUID
@@ -107,15 +106,17 @@ import timber.log.Timber
 import java.security.Security
 import java.time.Duration
 import java.time.Instant
-import java.util.Collections
+import com.jwoglom.controlx2.pump.CommServiceCallbacks
+import com.jwoglom.controlx2.pump.PumpCommState
+import com.jwoglom.controlx2.pump.PumpFinderCommHandler
 import java.util.UUID
 import java.util.function.Supplier
 
 
 const val CacheSeconds = 30
 
-class CommService : Service() {
-    private val supervisorJob = SupervisorJob()
+class CommService : Service(), CommServiceCallbacks {
+    override val supervisorJob = SupervisorJob()
     private val scope = CoroutineScope(supervisorJob + Dispatchers.Main.immediate)
 
     private var serviceLooper: Looper? = null
@@ -123,7 +124,8 @@ class CommService : Service() {
     private var pumpFinderCommHandler: PumpFinderCommHandler? = null
 
     private lateinit var messageBus: MessageBus
-    private var httpDebugApiService: HttpDebugApiService? = null
+    override var httpDebugApiService: HttpDebugApiService? = null
+        private set
 
     @androidx.annotation.VisibleForTesting
     internal fun setMessageBusForTesting(bus: MessageBus) {
@@ -152,13 +154,11 @@ class CommService : Service() {
         }
     }
 
-    private var lastResponseMessage: MutableMap<Pair<Characteristic, Byte>, Pair<com.jwoglom.pumpx2.pump.messages.Message, Instant>> = Collections.synchronizedMap(mutableMapOf())
-    private var debugPromptResponseCounts: MutableMap<Pair<Characteristic, Byte>, Int> = Collections.synchronizedMap(mutableMapOf())
-    private var historyLogCache: MutableMap<Long, HistoryLog> = Collections.synchronizedMap(mutableMapOf())
-    private var lastTimeSinceReset: TimeSinceResetResponse? = null
+    @androidx.annotation.VisibleForTesting
+    override val pumpCommState = PumpCommState()
 
     val historyLogDb by lazy { HistoryLogDatabase.getDatabase(this) }
-    val historyLogRepo by lazy { HistoryLogRepo(historyLogDb.historyLogDao()) }
+    override val historyLogRepo by lazy { HistoryLogRepo(historyLogDb.historyLogDao()) }
     private var historyLogFetcher: HistoryLogFetcher? = null
     private var historyLogSyncWorker: HistoryLogSyncWorker? = null
 
@@ -286,7 +286,7 @@ class CommService : Service() {
                 message: com.jwoglom.pumpx2.pump.messages.Message?
             ) {
                 message?.let {
-                    lastResponseMessage.put(Pair(it.characteristic, it.opCode()), Pair(it, Instant.now()))
+                    pumpCommState.lastResponseMessage.put(Pair(it.characteristic, it.opCode()), Pair(it, Instant.now()))
                     val source = if (consumeDebugPromptResponse(it.characteristic, it.opCode())) {
                         SendType.DEBUG_PROMPT
                     } else {
@@ -330,7 +330,7 @@ class CommService : Service() {
                     is HistoryLogStreamResponse -> {
                         message.historyLogs.forEach {
                             Timber.i("HISTORY-LOG-MESSAGE(${it.sequenceNum}): $it")
-                            historyLogCache[it.sequenceNum] = it
+                            pumpCommState.historyLogCache[it.sequenceNum] = it
                             scope.launch {
                                 historyLogFetcher?.onStreamResponse(it)
                             }
@@ -511,12 +511,12 @@ class CommService : Service() {
 
             private fun sendBaseCommandsIfNeeded(peripheral: BluetoothPeripheral) {
                 Timber.i("service onPumpConnected -- checking for base messages (processedResponseMessages: ${PumpState.processedResponseMessages})")
-                if (!lastResponseMessage.containsKey(Pair(Characteristic.CURRENT_STATUS, ApiVersionRequest().opCode()))) {
+                if (!pumpCommState.lastResponseMessage.containsKey(Pair(Characteristic.CURRENT_STATUS, ApiVersionRequest().opCode()))) {
                     Timber.i("service onPumpConnected -- sending ApiVersionRequest")
                     this.sendCommand(peripheral, ApiVersionRequest())
                 }
 
-                if (!lastResponseMessage.containsKey(Pair(Characteristic.CURRENT_STATUS, TimeSinceResetResponse().opCode()))) {
+                if (!pumpCommState.lastResponseMessage.containsKey(Pair(Characteristic.CURRENT_STATUS, TimeSinceResetResponse().opCode()))) {
                     Timber.i("service onPumpConnected -- sending TimeSinceResetResponse")
                     this.sendCommand(peripheral, TimeSinceResetRequest())
                 }
@@ -554,13 +554,13 @@ class CommService : Service() {
                 currentSession?.close()
                 currentSession = null
                 lastPeripheral = null
-                lastResponseMessage.clear()
+                pumpCommState.lastResponseMessage.clear()
                 historyLogFetcher?.cancel()
                 historyLogFetcher = null
                 historyLogSyncWorker?.stop()
                 historyLogSyncWorker = null
-                lastTimeSinceReset = null
-                debugPromptResponseCounts.clear()
+                pumpCommState.lastTimeSinceReset = null
+                pumpCommState.debugPromptResponseCounts.clear()
                 isConnected = false
                 sendWearCommMessage("/from-pump/pump-disconnected",
                     peripheral?.name!!.toByteArray()
@@ -664,8 +664,8 @@ class CommService : Service() {
         }
 
         private fun onReceiveTimeSinceResetResponse(response: TimeSinceResetResponse?) {
-            Timber.i("lastTimeSinceReset = $response")
-            lastTimeSinceReset = response
+            Timber.i("pumpCommState.lastTimeSinceReset = $response")
+            pumpCommState.lastTimeSinceReset = response
         }
 
         private fun pumpConnectedPrecondition(checkConnected: Boolean = true): Boolean {
@@ -775,9 +775,9 @@ class CommService : Service() {
                 CommServiceCodes.SEND_PUMP_COMMANDS_BUST_CACHE_BULK.ordinal -> {
                     Timber.i("pumpCommHandler send commands bust cache raw: ${String(msg.obj as ByteArray)}")
                     PumpMessageSerializer.fromBulkBytes(msg.obj as ByteArray).forEach {
-                        if (lastResponseMessage.containsKey(Pair(it.characteristic, it.responseOpCode)) && !isBolusCommand(it)) {
+                        if (pumpCommState.lastResponseMessage.containsKey(Pair(it.characteristic, it.responseOpCode)) && !isBolusCommand(it)) {
                             Timber.i("pumpCommHandler busted cache: $it")
-                            lastResponseMessage.remove(Pair(it.characteristic, it.responseOpCode))
+                            pumpCommState.lastResponseMessage.remove(Pair(it.characteristic, it.responseOpCode))
                         }
                         if (isBolusCommand(it)) {
                             Timber.e("SEND_PUMP_COMMAND blocked bolus command")
@@ -790,8 +790,8 @@ class CommService : Service() {
                 CommServiceCodes.CACHED_PUMP_COMMANDS_BULK.ordinal -> {
                     Timber.i("pumpCommHandler cached pump commands raw: ${String(msg.obj as ByteArray)}")
                     PumpMessageSerializer.fromBulkBytes(msg.obj as ByteArray).forEach {
-                        if (lastResponseMessage.containsKey(Pair(it.characteristic, it.responseOpCode)) && !isBolusCommand(it)) {
-                            val response = lastResponseMessage.get(Pair(it.characteristic, it.responseOpCode))
+                        if (pumpCommState.lastResponseMessage.containsKey(Pair(it.characteristic, it.responseOpCode)) && !isBolusCommand(it)) {
+                            val response = pumpCommState.lastResponseMessage.get(Pair(it.characteristic, it.responseOpCode))
                             val ageSeconds = Duration.between(response?.second, Instant.now()).seconds
                             if (ageSeconds <= CacheSeconds) {
                                 Timber.i("pumpCommHandler cached hit: $response")
@@ -886,18 +886,18 @@ class CommService : Service() {
                     }
                 }
                 CommServiceCodes.DEBUG_GET_MESSAGE_CACHE.ordinal -> {
-                    Timber.i("pumpCommHandler debug get message cache: $lastResponseMessage")
-                    sendWearCommMessage("/from-pump/debug-message-cache", PumpMessageSerializer.toDebugMessageCacheBytes(lastResponseMessage.values))
+                    Timber.i("pumpCommHandler debug get message cache: $pumpCommState.lastResponseMessage")
+                    sendWearCommMessage("/from-pump/debug-message-cache", PumpMessageSerializer.toDebugMessageCacheBytes(pumpCommState.lastResponseMessage.values))
                 }
                 CommServiceCodes.DEBUG_GET_HISTORYLOG_CACHE.ordinal -> {
-                    Timber.i("pumpCommHandler debug get historylog cache: $historyLogCache")
-                    if (historyLogCache.size <= 100) {
+                    Timber.i("pumpCommHandler debug get historylog cache: $pumpCommState.historyLogCache")
+                    if (pumpCommState.historyLogCache.size <= 100) {
                         sendWearCommMessage(
                             "/from-pump/debug-historylog-cache",
-                            PumpMessageSerializer.toDebugHistoryLogCacheBytes(historyLogCache)
+                            PumpMessageSerializer.toDebugHistoryLogCacheBytes(pumpCommState.historyLogCache)
                         )
                     } else {
-                        historyLogCache.entries.toList().chunked(100).forEach {
+                        pumpCommState.historyLogCache.entries.toList().chunked(100).forEach {
                             sendWearCommMessage(
                                 "/from-pump/debug-historylog-cache",
                                 PumpMessageSerializer.toDebugHistoryLogCacheBytes(it.associate {
@@ -919,94 +919,9 @@ class CommService : Service() {
         }
     }
 
-    private inner class PumpFinderCommHandler(looper: Looper) : Handler(looper) {
+    // PumpFinderCommHandler extracted to pump/PumpFinderCommHandler.kt
 
-        private lateinit var pumpFinder: PumpFinder
-        private var pumpFinderActive = false
-        private var foundPumps = mutableListOf<String>()
-
-        private inner class PumpFinder() : TandemPumpFinder(applicationContext, null) {
-            init {
-                Timber.i("PumpFinder init")
-            }
-
-            override fun toString(): String {
-                return "PumpFinder(pumpFinderActive=${pumpFinderActive},foundPumps=${foundPumps.joinToString(";")})"
-            }
-
-            override fun onDiscoveredPump(
-                peripheral: BluetoothPeripheral?,
-                scanResult: ScanResult?,
-                readyState: PumpReadyState
-            ) {
-                val name = when {
-                    peripheral?.name.isNullOrEmpty() -> "NO NAME"
-                    else -> peripheral?.name
-                }
-                val key = "${name}=${peripheral?.address}"
-                sendWearCommMessage(
-                    "/from-pump/pump-finder-pump-discovered",
-                    "${key};;${readyState.name}".toByteArray()
-                )
-                // Keep emitting ready-state transitions, but only add each pump once to selection list.
-                if (!foundPumps.contains(key)) {
-                    foundPumps.add(key)
-                    sendWearCommMessage("/from-pump/pump-finder-found-pumps",
-                        foundPumps.joinToString(";").toByteArray()
-                    )
-                }
-            }
-
-            override fun onBluetoothState(bluetoothEnabled: Boolean) {
-                sendWearCommMessage(
-                    "/from-pump/pump-finder-bluetooth-state",
-                    "${bluetoothEnabled}".toByteArray()
-                )
-            }
-        }
-
-        override fun handleMessage(msg: Message) {
-            when (msg.what) {
-                CommServiceCodes.INIT_PUMP_FINDER_COMM.ordinal -> {
-                    Timber.i("pumpFinderCommHandler: init_pump_comm")
-                    try {
-                        pumpFinder = PumpFinder()
-                    } catch (e: SecurityException) {
-                        Timber.e("pumpFinderCommHandler: SecurityException starting pump $e")
-                    }
-                    while (true) {
-                        try {
-                            Timber.i("pumpFinderCommHandler: Starting scan...")
-                            pumpFinder.startScan()
-                            pumpFinderActive = true
-                            break
-                        } catch (e: SecurityException) {
-                            Timber.e("pumpFinderCommHandler: Waiting for BT permissions $e")
-                            Thread.sleep(500)
-                        }
-                    }
-                }
-                CommServiceCodes.STOP_PUMP_FINDER_COMM.ordinal -> {
-                    pumpFinder.stop()
-                    pumpFinderActive = false
-                    foundPumps.clear()
-                }
-                CommServiceCodes.CHECK_PUMP_FINDER_FOUND_PUMPS.ordinal -> {
-                    if (pumpFinderActive) {
-                        sendWearCommMessage("/from-pump/pump-finder-found-pumps",
-                            foundPumps.joinToString(";").toByteArray()
-                        )
-                    }
-                }
-            }
-        }
-
-        fun sendWearCommMessage(path: String, message: ByteArray) {
-            this@CommService.sendWearCommMessage(path, message)
-        }
-    }
-
-    fun sendWearCommMessage(path: String, message: ByteArray) {
+    override fun sendWearCommMessage(path: String, message: ByteArray) {
         Timber.i("service sendMessage: $path ${String(message)}")
         messageBus.sendMessage(path, message, MessageBusSender.COMM_SERVICE)
     }
@@ -1173,7 +1088,7 @@ class CommService : Service() {
         httpDebugApiService?.start()
 
         if (Prefs(applicationContext).pumpFinderServiceEnabled()) {
-            pumpFinderCommHandler = PumpFinderCommHandler(serviceLooper!!)
+            pumpFinderCommHandler = PumpFinderCommHandler(serviceLooper!!, this)
         } else {
             pumpCommHandler = PumpCommHandler(serviceLooper!!)
 
@@ -1332,8 +1247,16 @@ class CommService : Service() {
         }
     }
 
-    fun broadcastHistoryLogItem(item: HistoryLogItem) {
+    override fun broadcastHistoryLogItem(item: HistoryLogItem) {
         httpDebugApiService?.onHistoryLogInsertedCallback?.invoke(item)
+    }
+
+    override fun markConnectionTime() {
+        currentPumpData.connectionTime = Instant.now()
+    }
+
+    override fun showToast(text: String, duration: Int) {
+        Toast.makeText(this, text, duration).show()
     }
 
     private var started = false
@@ -1390,7 +1313,7 @@ class CommService : Service() {
     }
 
 
-    fun updateNotification(statusText: String? = null) {
+    override fun updateNotification(statusText: String?) {
         if (statusText != null) {
             currentPumpData.statusText = statusText
         }
@@ -1421,7 +1344,7 @@ class CommService : Service() {
         return """{"statusText":"${currentPumpData.statusText}","connectionTime":"${currentPumpData.connectionTime}","lastMessageTime":"${currentPumpData.lastMessageTime}","batteryPercent":${currentPumpData.batteryPercent},"iobUnits":${currentPumpData.iobUnits},"cartridgeRemainingUnits":${currentPumpData.cartridgeRemainingUnits}}"""
     }
 
-    fun updateNotificationWithPumpData(message: com.jwoglom.pumpx2.pump.messages.Message) {
+    override fun updateNotificationWithPumpData(message: com.jwoglom.pumpx2.pump.messages.Message) {
         var changed = false
         when (message) {
             is CurrentBatteryAbstractResponse -> {
@@ -1507,10 +1430,10 @@ class CommService : Service() {
     private fun sendPumpCommDebugMessages(pumpMsgBytes: ByteArray) {
         try {
             val messages = PumpMessageSerializer.fromBulkBytes(pumpMsgBytes)
-            synchronized(debugPromptResponseCounts) {
+            synchronized(pumpCommState.debugPromptResponseCounts) {
                 messages.forEach {
                     val key = Pair(it.characteristic, it.responseOpCode)
-                    debugPromptResponseCounts[key] = (debugPromptResponseCounts[key] ?: 0) + 1
+                    pumpCommState.debugPromptResponseCounts[key] = (pumpCommState.debugPromptResponseCounts[key] ?: 0) + 1
                 }
             }
             Timber.i("Registered ${messages.size} debug-prompt request(s) for stream tagging")
@@ -1535,16 +1458,7 @@ class CommService : Service() {
     }
 
     private fun consumeDebugPromptResponse(characteristic: Characteristic, opCode: Byte): Boolean {
-        val key = Pair(characteristic, opCode)
-        synchronized(debugPromptResponseCounts) {
-            val current = debugPromptResponseCounts[key] ?: return false
-            if (current <= 1) {
-                debugPromptResponseCounts.remove(key)
-            } else {
-                debugPromptResponseCounts[key] = current - 1
-            }
-            return true
-        }
+        return pumpCommState.consumeDebugPromptResponse(characteristic, opCode)
     }
     private fun sendPumpCommBolusMessage(initiateConfirmedBolusBytes: ByteArray) {
         pumpCommHandler?.obtainMessage()?.also { msg ->
