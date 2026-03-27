@@ -375,6 +375,7 @@ class HistoryLogFetcherIntegrationTest {
 
         val dbCount = repo.getCount(TEST_PUMP_SID).firstOrNull()
         assertEquals("Duplicate should be ignored (INSERT IGNORE)", 1L, dbCount)
+        assertEquals("Second stream delivery should not broadcast again", 1, broadcastedItems.size)
     }
 
     @Test
