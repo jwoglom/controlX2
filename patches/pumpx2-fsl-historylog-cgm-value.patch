@@ -1,0 +1,68 @@
+diff --git a/messages/src/main/java/com/jwoglom/pumpx2/pump/messages/response/historyLog/CgmDataFsl2HistoryLog.java b/messages/src/main/java/com/jwoglom/pumpx2/pump/messages/response/historyLog/CgmDataFsl2HistoryLog.java
+index 7d216a6..58ef329 100644
+--- a/messages/src/main/java/com/jwoglom/pumpx2/pump/messages/response/historyLog/CgmDataFsl2HistoryLog.java
++++ b/messages/src/main/java/com/jwoglom/pumpx2/pump/messages/response/historyLog/CgmDataFsl2HistoryLog.java
+@@ -11,6 +11,11 @@ import com.jwoglom.pumpx2.pump.messages.helpers.Bytes;
+ )
+ public class CgmDataFsl2HistoryLog extends HistoryLog {
+ 
++    /**
++     * Display glucose in mg/dL (same byte layout as {@link CgmDataGxHistoryLog} after the 10-byte header).
++     */
++    private int value;
++
+     public CgmDataFsl2HistoryLog() {}
+     public CgmDataFsl2HistoryLog(long pumpTimeSec, long sequenceNum) {
+         super(pumpTimeSec, sequenceNum);
+@@ -26,7 +31,7 @@ public class CgmDataFsl2HistoryLog extends HistoryLog {
+         Validate.isTrue(raw.length == 26);
+         this.cargo = raw;
+         parseBase(raw);
+-
++        this.value = Bytes.readShort(raw, 16);
+     }
+ 
+     public static byte[] buildCargo(long pumpTimeSec, long sequenceNum) {
+@@ -35,4 +40,8 @@ public class CgmDataFsl2HistoryLog extends HistoryLog {
+             Bytes.toUint32(pumpTimeSec),
+             Bytes.toUint32(sequenceNum)));
+     }
++
++    public int getValue() {
++        return value;
++    }
+ }
+diff --git a/messages/src/main/java/com/jwoglom/pumpx2/pump/messages/response/historyLog/CgmDataFsl3HistoryLog.java b/messages/src/main/java/com/jwoglom/pumpx2/pump/messages/response/historyLog/CgmDataFsl3HistoryLog.java
+index 279a1f6..ab4f9fe 100644
+--- a/messages/src/main/java/com/jwoglom/pumpx2/pump/messages/response/historyLog/CgmDataFsl3HistoryLog.java
++++ b/messages/src/main/java/com/jwoglom/pumpx2/pump/messages/response/historyLog/CgmDataFsl3HistoryLog.java
+@@ -11,6 +11,11 @@ import com.jwoglom.pumpx2.pump.messages.helpers.Bytes;
+ )
+ public class CgmDataFsl3HistoryLog extends HistoryLog {
+ 
++    /**
++     * Display glucose in mg/dL (same byte layout as {@link CgmDataGxHistoryLog} after the 10-byte header).
++     */
++    private int value;
++
+     public CgmDataFsl3HistoryLog() {}
+     public CgmDataFsl3HistoryLog(long pumpTimeSec, long sequenceNum) {
+         super(pumpTimeSec, sequenceNum);
+@@ -26,7 +31,7 @@ public class CgmDataFsl3HistoryLog extends HistoryLog {
+         Validate.isTrue(raw.length == 26);
+         this.cargo = raw;
+         parseBase(raw);
+-
++        this.value = Bytes.readShort(raw, 16);
+     }
+ 
+     public static byte[] buildCargo(long pumpTimeSec, long sequenceNum) {
+@@ -35,4 +40,8 @@ public class CgmDataFsl3HistoryLog extends HistoryLog {
+             Bytes.toUint32(pumpTimeSec),
+             Bytes.toUint32(sequenceNum)));
+     }
++
++    public int getValue() {
++        return value;
++    }
+ }
