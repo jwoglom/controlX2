@@ -178,13 +178,11 @@ class CommServiceIntegrationTest {
     }
 
     /**
-     * Access the lastResponseMessage cache on CommService via reflection.
+     * Access the lastResponseMessage cache on CommService via pumpCommState.
      */
     @Suppress("UNCHECKED_CAST")
     private fun getLastResponseMessageCache(): MutableMap<Pair<Characteristic, Byte>, Pair<com.jwoglom.pumpx2.pump.messages.Message, Instant>> {
-        val field = CommService::class.java.getDeclaredField("lastResponseMessage")
-        field.isAccessible = true
-        return field.get(service) as MutableMap<Pair<Characteristic, Byte>, Pair<com.jwoglom.pumpx2.pump.messages.Message, Instant>>
+        return service.pumpCommState.lastResponseMessage
     }
 
     /**
