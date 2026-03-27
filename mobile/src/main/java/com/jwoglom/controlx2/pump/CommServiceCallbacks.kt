@@ -1,6 +1,7 @@
 package com.jwoglom.controlx2.pump
 
 import android.content.Context
+import android.content.SharedPreferences
 import com.jwoglom.controlx2.HttpDebugApiService
 import com.jwoglom.controlx2.db.historylog.HistoryLogItem
 import com.jwoglom.controlx2.db.historylog.HistoryLogRepo
@@ -22,4 +23,6 @@ interface CommServiceCallbacks {
     fun broadcastHistoryLogItem(item: HistoryLogItem)
     fun markConnectionTime()
     fun showToast(text: String, duration: Int)
+    fun getWearPrefs(): SharedPreferences?
+    fun sendPumpCommMessages(pumpMsgBytes: ByteArray)
 }
