@@ -2152,7 +2152,7 @@ fun triggerSetMaxBasalLimitRequestMessage(
     input.inputType = InputType.TYPE_CLASS_NUMBER
     builder.setView(input)
     builder.setPositiveButton("Send") { dialog, _ ->
-        sendPumpCommands(SendType.DEBUG_PROMPT, listOf(SetMaxBasalLimitRequest(input.text.toString().toInt())))
+        sendPumpCommands(SendType.DEBUG_PROMPT, listOf(SetMaxBasalLimitRequest(input.text.toString().toLong())))
         dialog.dismiss()
     }
     builder.setNegativeButton("Cancel") { dialog, _ -> dialog.cancel() }

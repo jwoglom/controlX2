@@ -312,7 +312,7 @@ fun SafetyLimitsActions(
                         if (milliunits in SetMaxBasalLimitRequest.MIN_BASAL_LIMIT_MILLIUNITS..SetMaxBasalLimitRequest.MAX_BASAL_LIMIT_MILLIUNITS) {
                             sendPumpCommands(
                                 SendType.STANDARD,
-                                listOf(SetMaxBasalLimitRequest(milliunits))
+                                listOf(SetMaxBasalLimitRequest(milliunits.toLong()))
                             )
                             showMaxBasalDialog = false
                             refreshScope.launch {

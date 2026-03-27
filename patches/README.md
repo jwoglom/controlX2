@@ -2,18 +2,11 @@
 
 This directory contains patches for third-party dependencies.
 
-## PumpX2 FSL CGM value (`pumpx2-fsl-historylog-cgm-value.patch`)
+## PumpX2 FSL CGM (resolved in v1.8.8+)
 
-### Problem
-`CgmDataFsl2HistoryLog` and `CgmDataFsl3HistoryLog` in PumpX2 only called `parseBase()` and exposed no field for display glucose, so apps had to read raw cargo bytes.
+PumpX2 **v1.8.8** adds full Gx-style parsing for `CgmDataFsl2HistoryLog` / `CgmDataFsl3HistoryLog` (`getValue()` at the same cargo offset/endianness as `CgmDataGxHistoryLog`: little-endian int16 via `Bytes.readShort` at offset 16). ControlX2 uses `pumpx2_version = "1.8.8"` and reads FSL glucose via `parsed.value` after `parse()`.
 
-### Solution
-In the **pumpX2** repository, apply the patch (or merge the equivalent change), bump the root `version`, tag, and publish to JitPack. **After** that release exists, bump ControlX2’s `pumpx2_version` in `build.gradle` to match; until then ControlX2 stays on the latest published PumpX2 and reads FSL glucose from cargo in `VicoCgmChart` (same layout as below).
-
-**Endianness / layout (tconnectsync alignment):** Tandem web / tconnectsync expose FSL2/FSL3 display glucose as `currentglucosedisplayvalue` at **byte offset 14** in the 26-byte record as a **big-endian** signed int16 (`0x00 0x95` → 149). PumpX2’s existing `Bytes.readShort` is **little-endian** and matches **Gx** at offset **16**, not FSL. The patch adds `Bytes.readSignedShortBigEndian` and parses FSL2/FSL3 with that at offset 14.
-
-### Local testing before JitPack
-Use `use_local_pumpx2=true` in `local.properties` and `./gradlew publishToMavenLocal` from pumpX2 so `~/.m2` contains matching artifacts for your bumped version.
+**Note:** Some Python / web tooling may label fields differently from the on-wire layout; trust the PumpX2 parser for BLE/history-log bytes.
 
 ## Vico NaN Fix (`vico-core-nan-fix.patch`)
 
