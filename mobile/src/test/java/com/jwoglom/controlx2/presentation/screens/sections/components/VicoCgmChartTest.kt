@@ -60,15 +60,7 @@ class VicoCgmChartTest {
     }
 
     @Test
-    fun cgmMgDlFromCgmDataStyleCargo_readsSignedInt16AtOffset16() {
-        val cargo = ByteArray(26) { 0 }
-        cargo[16] = 0x95.toByte()
-        cargo[17] = 0x00.toByte()
-        assertEquals(149, cgmMgDlFromCgmDataStyleCargo(cargo))
-    }
-
-    @Test
-    fun toCgmDataPoint_readsLibreFsl3FromGxCompatibleCargoLayout() {
+    fun toCgmDataPoint_readsLibreFsl3ViaPumpX2Parse() {
         val pumpWallClock = LocalDateTime.of(2026, 3, 11, 12, 0)
         val rawPumpInstant = pumpWallClock.toInstant(ZoneOffset.UTC)
         val pumpEpochStart = Instant.parse("2008-01-01T00:00:00Z")

@@ -143,27 +143,14 @@ internal fun HistoryLog.toChartTimestampSeconds(): Long {
     return pumpTimeToLocalTz(Dates.fromJan12008EpochSecondsToDate(pumpTimeSec)).epochSecond
 }
 
-/**
- * Dexcom Gx, Libre FSL2, and Libre FSL3 CGM history logs share the same 26-byte cargo layout;
- * mg/dL is a signed int16 at bytes 16–17 (same as [CgmDataGxHistoryLog.parse]).
- */
-internal fun cgmMgDlFromCgmDataStyleCargo(cargo: ByteArray?): Int? {
-    if (cargo == null || cargo.size < 18) return null
-    val b0 = cargo[16].toInt() and 0xff
-    val b1 = cargo[17].toInt() and 0xff
-    val unsigned = b0 or (b1 shl 8)
-    val signed = if (unsigned > 32767) unsigned - 65536 else unsigned
-    return if (signed > 0) signed else null
-}
-
 internal fun HistoryLogItem.toCgmDataPoint(): CgmDataPoint? {
     val parsed = parse()
     val value = when (parsed) {
         is DexcomG6CGMHistoryLog -> parsed.currentGlucoseDisplayValue.toFloat()
         is DexcomG7CGMHistoryLog -> parsed.currentGlucoseDisplayValue.toFloat()
         is CgmDataGxHistoryLog -> parsed.value.toFloat()
-        is CgmDataFsl2HistoryLog, is CgmDataFsl3HistoryLog ->
-            cgmMgDlFromCgmDataStyleCargo(parsed.getCargo())?.toFloat()
+        is CgmDataFsl2HistoryLog -> parsed.value.toFloat()
+        is CgmDataFsl3HistoryLog -> parsed.value.toFloat()
         else -> null
     }
 

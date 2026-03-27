@@ -2,6 +2,17 @@
 
 This directory contains patches for third-party dependencies.
 
+## PumpX2 FSL CGM value (`pumpx2-fsl-historylog-cgm-value.patch`)
+
+### Problem
+`CgmDataFsl2HistoryLog` and `CgmDataFsl3HistoryLog` in PumpX2 only called `parseBase()` and exposed no field for display glucose, so apps had to read raw cargo bytes.
+
+### Solution
+In the **pumpX2** repository, apply the patch (or merge the equivalent change), bump the root `version` (e.g. to `1.8.8`), publish to JitPack, then ControlX2’s `pumpx2_version` in `build.gradle` can resolve it. The patch adds `value` populated with `Bytes.readShort(raw, 16)` (same offset as `CgmDataGxHistoryLog`) and a `getValue()` accessor.
+
+### Until JitPack has the new tag
+Use `use_local_pumpx2=true` in `local.properties` and `./gradlew publishToMavenLocal` from pumpX2 so `~/.m2` contains `pumpx2-messages-1.8.8.jar` (and matching `pumpx2-android` / `pumpx2-shared`).
+
 ## Vico NaN Fix (`vico-core-nan-fix.patch`)
 
 ### Problem
