@@ -65,6 +65,8 @@ android {
                 // bcprov-jdk18on is added as testImplementation to provide
                 // BouncyCastle classes without the JAR signer conflict.
                 classpath = classpath.filter { !it.name.startsWith('bcprov-jdk14') }
+                systemProperty 'robolectric.offline', 'true'
+                systemProperty 'robolectric.dependency.dir', "${System.getProperty('user.home')}/.robolectric"
             }
         }
     }
