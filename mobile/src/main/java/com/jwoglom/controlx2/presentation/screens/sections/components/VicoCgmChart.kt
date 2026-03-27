@@ -70,7 +70,6 @@ import com.jwoglom.controlx2.presentation.theme.ModeColors
 import com.jwoglom.controlx2.shared.enums.GlucoseUnit
 import com.jwoglom.controlx2.shared.util.GlucoseConverter
 import com.jwoglom.controlx2.shared.util.pumpTimeToLocalTz
-import com.jwoglom.pumpx2.pump.messages.helpers.Bytes
 import com.jwoglom.pumpx2.pump.messages.helpers.Dates
 import com.jwoglom.pumpx2.pump.messages.models.InsulinUnit
 import com.jwoglom.pumpx2.pump.messages.response.currentStatus.ControlIQInfoAbstractResponse.UserModeType
@@ -144,31 +143,15 @@ internal fun HistoryLog.toChartTimestampSeconds(): Long {
     return pumpTimeToLocalTz(Dates.fromJan12008EpochSecondsToDate(pumpTimeSec)).epochSecond
 }
 
-/**
- * FSL2/FSL3 display glucose per tconnectsync / Tandem web (`currentglucosedisplayvalue`): **big-endian**
- * signed int16 at **byte offset 14** in the 26-byte history-log cargo. This differs from
- * [CgmDataGxHistoryLog], which uses **little-endian** at offset 16 ([Bytes.readShort] in PumpX2).
- *
- * Until PumpX2 exposes this on [CgmDataFsl2HistoryLog] / [CgmDataFsl3HistoryLog] (see
- * `patches/pumpx2-fsl-historylog-cgm-value.patch`), read from cargo here.
- */
-internal fun cgmDisplayMgDlFromFslHistoryCargo(cargo: ByteArray?): Float? {
-    if (cargo == null || cargo.size < 16) return null
-    val hi = cargo[14].toInt() and 0xff
-    val lo = cargo[15].toInt() and 0xff
-    var v = (hi shl 8) or lo
-    if (v >= 0x8000) v -= 65536
-    return if (v > 0) v.toFloat() else null
-}
-
 internal fun HistoryLogItem.toCgmDataPoint(): CgmDataPoint? {
     val parsed = parse()
+    // PumpX2 1.8.8+: FSL2/FSL3 use the same post-header layout as Gx (see parse() in pumpx2-messages).
     val value = when (parsed) {
         is DexcomG6CGMHistoryLog -> parsed.currentGlucoseDisplayValue.toFloat()
         is DexcomG7CGMHistoryLog -> parsed.currentGlucoseDisplayValue.toFloat()
         is CgmDataGxHistoryLog -> parsed.value.toFloat()
-        is CgmDataFsl2HistoryLog -> cgmDisplayMgDlFromFslHistoryCargo(parsed.getCargo())
-        is CgmDataFsl3HistoryLog -> cgmDisplayMgDlFromFslHistoryCargo(parsed.getCargo())
+        is CgmDataFsl2HistoryLog -> parsed.value.toFloat()
+        is CgmDataFsl3HistoryLog -> parsed.value.toFloat()
         else -> null
     }
 

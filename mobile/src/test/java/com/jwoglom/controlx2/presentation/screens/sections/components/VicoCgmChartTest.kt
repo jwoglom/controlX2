@@ -60,12 +60,13 @@ class VicoCgmChartTest {
     }
 
     @Test
-    fun toCgmDataPoint_readsLibreFsl3FromCargo_tconnectsyncVector() {
-        // Real FSL3 payload from tconnectsync tests (seqNum=785470, sgv=149); glucose is big-endian int16 at offset 14.
+    fun toCgmDataPoint_readsLibreFsl3ViaPumpX2Parse() {
+        // tconnectsync FSL3_DATA_EVENT_1 (26 bytes); bytes 16–17 patched to LE 149 for PumpX2 1.8.8 (Python fixture had different field packing at 16–17).
         val cargo = byteArrayOf(
             0x01, 0xe0.toByte(), 0x22, 0x3d, 0x2d, 0xd9.toByte(), 0x00, 0x0b, 0xfc.toByte(),
             0x3e, 0x00, 0x00, 0x20, 0x00, 0x00, 0x95.toByte(),
-            0xb5.toByte(), 0x64, 0x22, 0x3d, 0x2d, 0xd9.toByte(), 0x00, 0x00, 0x23, 0xe0.toByte()
+            0x95.toByte(), 0x00,
+            0x22, 0x3d, 0x2d, 0xd9.toByte(), 0x00, 0x00, 0x23, 0xe0.toByte()
         )
         val item = HistoryLogItem(
             seqId = 785470L,
