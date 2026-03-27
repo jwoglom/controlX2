@@ -911,6 +911,29 @@ fun Debug(
             }
 
             item {
+                var qualifyingEventToastsEnabled by remember { mutableStateOf(Prefs(context).qualifyingEventToastsEnabled()) }
+                ListItem(
+                    headlineContent = { Text(if (qualifyingEventToastsEnabled) "Disable Qualifying Event Toasts" else "Enable Qualifying Event Toasts") },
+                    supportingContent = { Text("Show toast notifications when CommService receives qualifying events.") },
+                    leadingContent = {
+                        Icon(
+                            if (qualifyingEventToastsEnabled) Icons.Filled.Check else Icons.Filled.Close,
+                            contentDescription = null,
+                        )
+                    },
+                    modifier = Modifier.clickable {
+                        qualifyingEventToastsEnabled = !qualifyingEventToastsEnabled
+                        Prefs(context).setQualifyingEventToastsEnabled(qualifyingEventToastsEnabled)
+                        Toast.makeText(
+                            context,
+                            "Qualifying event toasts ${if (qualifyingEventToastsEnabled) "enabled" else "disabled"}",
+                            Toast.LENGTH_SHORT
+                        ).show()
+                    }
+                )
+            }
+
+            item {
                 var httpDebugApiEnabled by remember { mutableStateOf(Prefs(context).httpDebugApiEnabled()) }
                 ListItem(
                     headlineContent = { Text(if (httpDebugApiEnabled) "Disable HTTP Debug API" else "Enable HTTP Debug API") },
