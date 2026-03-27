@@ -60,25 +60,24 @@ class VicoCgmChartTest {
     }
 
     @Test
-    fun toCgmDataPoint_readsLibreFsl3ViaPumpX2Parse() {
-        val pumpWallClock = LocalDateTime.of(2026, 3, 11, 12, 0)
-        val rawPumpInstant = pumpWallClock.toInstant(ZoneOffset.UTC)
-        val pumpEpochStart = Instant.parse("2008-01-01T00:00:00Z")
-        val pumpTimeSec = Duration.between(pumpEpochStart, rawPumpInstant).seconds
-        val cargo = CgmDataFsl3HistoryLog.buildCargo(pumpTimeSec, 99L).copyOf()
-        cargo[16] = 0x8c.toByte()
-        cargo[17] = 0x00.toByte()
+    fun toCgmDataPoint_readsLibreFsl3ViaPumpX2Parse_tconnectsyncVector() {
+        // Real FSL3 payload from tconnectsync tests (seqNum=785470, sgv=149); glucose is big-endian int16 at offset 14.
+        val cargo = byteArrayOf(
+            0x01, 0xe0.toByte(), 0x22, 0x3d, 0x2d, 0xd9.toByte(), 0x00, 0x0b, 0xfc.toByte(),
+            0x3e, 0x00, 0x00, 0x20, 0x00, 0x00, 0x95.toByte(),
+            0xb5.toByte(), 0x64, 0x22, 0x3d, 0x2d, 0xd9.toByte(), 0x00, 0x00, 0x23, 0xe0.toByte()
+        )
         val item = HistoryLogItem(
-            seqId = 99L,
+            seqId = 785470L,
             pumpSid = 0,
             typeId = CgmDataFsl3HistoryLog().typeId(),
             cargo = cargo,
-            pumpTime = pumpWallClock
+            pumpTime = LocalDateTime.of(2026, 3, 15, 13, 12, 57)
         )
 
         val point = item.toCgmDataPoint()
 
-        assertEquals(140f, point?.value)
+        assertEquals(149f, point?.value)
     }
 
     @Test

@@ -145,6 +145,8 @@ internal fun HistoryLog.toChartTimestampSeconds(): Long {
 
 internal fun HistoryLogItem.toCgmDataPoint(): CgmDataPoint? {
     val parsed = parse()
+    // Gx/Dexcom: little-endian int16 via PumpX2. FSL2/FSL3: big-endian at offset 14 (tconnectsync /
+    // Tandem web currentglucosedisplayvalue); see PumpX2 CgmDataFsl*HistoryLog + Bytes.readSignedShortBigEndian.
     val value = when (parsed) {
         is DexcomG6CGMHistoryLog -> parsed.currentGlucoseDisplayValue.toFloat()
         is DexcomG7CGMHistoryLog -> parsed.currentGlucoseDisplayValue.toFloat()
