@@ -60,7 +60,7 @@ class VicoCgmChartTest {
     }
 
     @Test
-    fun toCgmDataPoint_readsLibreFsl3ViaPumpX2Parse_tconnectsyncVector() {
+    fun toCgmDataPoint_readsLibreFsl3FromCargo_tconnectsyncVector() {
         // Real FSL3 payload from tconnectsync tests (seqNum=785470, sgv=149); glucose is big-endian int16 at offset 14.
         val cargo = byteArrayOf(
             0x01, 0xe0.toByte(), 0x22, 0x3d, 0x2d, 0xd9.toByte(), 0x00, 0x0b, 0xfc.toByte(),

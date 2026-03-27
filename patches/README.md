@@ -8,12 +8,12 @@ This directory contains patches for third-party dependencies.
 `CgmDataFsl2HistoryLog` and `CgmDataFsl3HistoryLog` in PumpX2 only called `parseBase()` and exposed no field for display glucose, so apps had to read raw cargo bytes.
 
 ### Solution
-In the **pumpX2** repository, apply the patch (or merge the equivalent change), bump the root `version` (e.g. to `1.8.9`), publish to JitPack, then ControlX2’s `pumpx2_version` in `build.gradle` can resolve it.
+In the **pumpX2** repository, apply the patch (or merge the equivalent change), bump the root `version`, tag, and publish to JitPack. **After** that release exists, bump ControlX2’s `pumpx2_version` in `build.gradle` to match; until then ControlX2 stays on the latest published PumpX2 and reads FSL glucose from cargo in `VicoCgmChart` (same layout as below).
 
 **Endianness / layout (tconnectsync alignment):** Tandem web / tconnectsync expose FSL2/FSL3 display glucose as `currentglucosedisplayvalue` at **byte offset 14** in the 26-byte record as a **big-endian** signed int16 (`0x00 0x95` → 149). PumpX2’s existing `Bytes.readShort` is **little-endian** and matches **Gx** at offset **16**, not FSL. The patch adds `Bytes.readSignedShortBigEndian` and parses FSL2/FSL3 with that at offset 14.
 
-### Until JitPack has the new tag
-Use `use_local_pumpx2=true` in `local.properties` and `./gradlew publishToMavenLocal` from pumpX2 so `~/.m2` contains matching `pumpx2-messages`, `pumpx2-android`, and `pumpx2-shared` for the bumped version.
+### Local testing before JitPack
+Use `use_local_pumpx2=true` in `local.properties` and `./gradlew publishToMavenLocal` from pumpX2 so `~/.m2` contains matching artifacts for your bumped version.
 
 ## Vico NaN Fix (`vico-core-nan-fix.patch`)
 
