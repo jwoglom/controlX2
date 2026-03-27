@@ -3,6 +3,7 @@ package com.jwoglom.controlx2.presentation.screens.sections.components
 import com.jwoglom.controlx2.db.historylog.HistoryLogItem
 import com.jwoglom.controlx2.db.historylog.itemLruCache
 import com.jwoglom.pumpx2.pump.messages.response.historyLog.BasalRateChangeHistoryLog
+import com.jwoglom.pumpx2.pump.messages.response.historyLog.CgmDataFsl3HistoryLog
 import com.jwoglom.pumpx2.pump.messages.response.historyLog.DexcomG6CGMHistoryLog
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -56,6 +57,36 @@ class VicoCgmChartTest {
         } finally {
             TimeZone.setDefault(originalTimeZone)
         }
+    }
+
+    @Test
+    fun cgmMgDlFromCgmDataStyleCargo_readsSignedInt16AtOffset16() {
+        val cargo = ByteArray(26) { 0 }
+        cargo[16] = 0x95.toByte()
+        cargo[17] = 0x00.toByte()
+        assertEquals(149, cgmMgDlFromCgmDataStyleCargo(cargo))
+    }
+
+    @Test
+    fun toCgmDataPoint_readsLibreFsl3FromGxCompatibleCargoLayout() {
+        val pumpWallClock = LocalDateTime.of(2026, 3, 11, 12, 0)
+        val rawPumpInstant = pumpWallClock.toInstant(ZoneOffset.UTC)
+        val pumpEpochStart = Instant.parse("2008-01-01T00:00:00Z")
+        val pumpTimeSec = Duration.between(pumpEpochStart, rawPumpInstant).seconds
+        val cargo = CgmDataFsl3HistoryLog.buildCargo(pumpTimeSec, 99L).copyOf()
+        cargo[16] = 0x8c.toByte()
+        cargo[17] = 0x00.toByte()
+        val item = HistoryLogItem(
+            seqId = 99L,
+            pumpSid = 0,
+            typeId = CgmDataFsl3HistoryLog().typeId(),
+            cargo = cargo,
+            pumpTime = pumpWallClock
+        )
+
+        val point = item.toCgmDataPoint()
+
+        assertEquals(140f, point?.value)
     }
 
     @Test

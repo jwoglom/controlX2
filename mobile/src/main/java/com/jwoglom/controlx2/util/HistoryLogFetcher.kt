@@ -206,6 +206,10 @@ class HistoryLogFetcher(
 
     suspend fun onStreamResponse(log: HistoryLog) {
         streamResponseLock.withLock {
+            if (recentSeqIds.get(log.sequenceNum) != null) {
+                Timber.d("HistoryLogFetcher onStreamResponse skip duplicate ${log.sequenceNum}")
+                return@withLock
+            }
             Timber.d("HistoryLogFetcher onStreamResponse ${log.sequenceNum}")
             val item = HistoryLogItem(
                 seqId = log.sequenceNum,
