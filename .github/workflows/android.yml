@@ -35,6 +35,12 @@ jobs:
           echo $ENCODED_STRING | base64 -di > release.keystore
 
 
+      - name: Download Robolectric jars
+        run: |
+          mkdir -p ~/.robolectric
+          curl -L -o ~/.robolectric/android-all-instrumented-14-robolectric-10818077-i7.jar \
+            https://repo1.maven.org/maven2/org/robolectric/android-all-instrumented/14-robolectric-10818077-i7/android-all-instrumented-14-robolectric-10818077-i7.jar
+
       - name: Assemble Release
         run: |
           ./gradlew build assembleRelease \
