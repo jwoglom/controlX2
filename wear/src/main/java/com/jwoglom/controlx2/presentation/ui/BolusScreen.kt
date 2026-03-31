@@ -536,6 +536,8 @@ fun BolusScreen(
 
 
 fun resetBolusDataStoreState(dataStore: DataStore) {
+    dataStore.bolusCalcDataSnapshot.value = null
+    dataStore.bolusCalcLastBG.value = null
     dataStore.bolusPermissionResponse.value = null
     dataStore.bolusCancelResponse.value = null
     dataStore.bolusInitiateResponse.value = null

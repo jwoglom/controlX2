@@ -177,6 +177,18 @@ class Prefs(val context: Context) {
         prefs().edit().putString("glucose-unit", unit?.name).commit()
     }
 
+
+    /**
+     * Whether to show qualifying event toasts from CommService.
+     */
+    fun qualifyingEventToastsEnabled(): Boolean {
+        return prefs().getBoolean("qualifying-event-toasts-enabled", false)
+    }
+
+    fun setQualifyingEventToastsEnabled(b: Boolean) {
+        prefs().edit().putBoolean("qualifying-event-toasts-enabled", b).commit()
+    }
+
     /**
      * Whether the HTTP Debug API is enabled
      */

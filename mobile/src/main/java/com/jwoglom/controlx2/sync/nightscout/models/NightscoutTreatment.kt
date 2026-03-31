@@ -65,7 +65,10 @@ data class NightscoutTreatment(
     val splitExt: Int? = null,  // Percentage delivered over extended period (0-100)
 
     @SerializedName("relative")
-    val relative: Double? = null  // Extended portion rate in U/hr
+    val relative: Double? = null,  // Extended portion rate in U/hr
+
+    @SerializedName("percent")
+    val percent: Int? = null  // Temp basal percent change from profile (-50 = half, 0 = normal, 100 = double)
 ) {
     companion object {
         fun fromTimestamp(
@@ -82,7 +85,8 @@ data class NightscoutTreatment(
             enteredInsulin: Double? = null,
             splitNow: Int? = null,
             splitExt: Int? = null,
-            relative: Double? = null
+            relative: Double? = null,
+            percent: Int? = null
         ): NightscoutTreatment {
             // Nightscout expects timezone-aware timestamps and matching epoch/offset from one instant.
             val nightscoutTimestamp = NightscoutTimestampPolicy.fromPumpTime(timestamp, "treatment")
@@ -102,7 +106,8 @@ data class NightscoutTreatment(
                 enteredInsulin = enteredInsulin,
                 splitNow = splitNow,
                 splitExt = splitExt,
-                relative = relative
+                relative = relative,
+                percent = percent
             )
         }
     }

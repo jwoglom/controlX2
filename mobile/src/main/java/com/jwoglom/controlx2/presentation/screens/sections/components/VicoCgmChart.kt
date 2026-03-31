@@ -72,13 +72,27 @@ import com.jwoglom.controlx2.shared.util.GlucoseConverter
 import com.jwoglom.controlx2.shared.util.pumpTimeToLocalTz
 import com.jwoglom.pumpx2.pump.messages.helpers.Dates
 import com.jwoglom.pumpx2.pump.messages.models.InsulinUnit
+import com.jwoglom.pumpx2.pump.messages.response.currentStatus.ControlIQInfoAbstractResponse.UserModeType
 import com.jwoglom.pumpx2.pump.messages.response.currentStatus.LastBolusStatusAbstractResponse
+import com.jwoglom.pumpx2.pump.messages.response.historyLog.BasalDeliveryHistoryLog
+import com.jwoglom.pumpx2.pump.messages.response.historyLog.BasalRateChangeHistoryLog
 import com.jwoglom.pumpx2.pump.messages.response.historyLog.BolusDeliveryHistoryLog
 import com.jwoglom.pumpx2.pump.messages.response.historyLog.DexcomG6CGMHistoryLog
 import com.jwoglom.pumpx2.pump.messages.response.historyLog.DexcomG7CGMHistoryLog
+import com.jwoglom.pumpx2.pump.messages.response.historyLog.CgmDataFsl2HistoryLog
+import com.jwoglom.pumpx2.pump.messages.response.historyLog.CgmDataFsl3HistoryLog
 import com.jwoglom.pumpx2.pump.messages.response.historyLog.CgmDataGxHistoryLog
+import com.jwoglom.pumpx2.pump.messages.response.historyLog.CarbEnteredHistoryLog
+import com.jwoglom.pumpx2.pump.messages.response.historyLog.ControlIQUserModeChangeHistoryLog
+import com.jwoglom.pumpx2.pump.messages.response.historyLog.DailyBasalHistoryLog
 import com.jwoglom.pumpx2.pump.messages.response.historyLog.HistoryLog
 import com.jwoglom.pumpx2.pump.messages.response.historyLog.HistoryLogParser
+import com.jwoglom.pumpx2.pump.messages.response.historyLog.HypoMinimizerResumeHistoryLog
+import com.jwoglom.pumpx2.pump.messages.response.historyLog.HypoMinimizerSuspendHistoryLog
+import com.jwoglom.pumpx2.pump.messages.response.historyLog.PumpingResumedHistoryLog
+import com.jwoglom.pumpx2.pump.messages.response.historyLog.PumpingSuspendedHistoryLog
+import com.jwoglom.pumpx2.pump.messages.response.historyLog.TempRateActivatedHistoryLog
+import com.jwoglom.pumpx2.pump.messages.response.historyLog.TempRateCompletedHistoryLog
 import com.patrykandpatrick.vico.compose.cartesian.CartesianChartHost
 import com.patrykandpatrick.vico.compose.cartesian.layer.rememberColumnCartesianLayer
 import com.patrykandpatrick.vico.compose.cartesian.layer.rememberLineCartesianLayer
@@ -105,11 +119,13 @@ import com.patrykandpatrick.vico.core.cartesian.CartesianChart
 import com.patrykandpatrick.vico.core.cartesian.CartesianChart.PersistentMarkerScope
 import com.patrykandpatrick.vico.core.cartesian.layer.CartesianLayerDimensions
 import com.patrykandpatrick.vico.core.cartesian.layer.CartesianLayerMargins
+import com.patrykandpatrick.vico.core.cartesian.layer.ColumnCartesianLayer
 import com.patrykandpatrick.vico.core.common.Insets
 import com.patrykandpatrick.vico.core.common.component.Component
 import com.patrykandpatrick.vico.core.common.component.TextComponent
 import com.patrykandpatrick.vico.core.common.data.ExtraStore
 import java.time.Instant
+import java.time.ZoneId
 import java.util.Locale
 import kotlin.math.max
 import kotlin.math.min
@@ -129,10 +145,13 @@ internal fun HistoryLog.toChartTimestampSeconds(): Long {
 
 internal fun HistoryLogItem.toCgmDataPoint(): CgmDataPoint? {
     val parsed = parse()
+    // PumpX2 1.8.8+: FSL2/FSL3 use the same post-header layout as Gx (see parse() in pumpx2-messages).
     val value = when (parsed) {
         is DexcomG6CGMHistoryLog -> parsed.currentGlucoseDisplayValue.toFloat()
         is DexcomG7CGMHistoryLog -> parsed.currentGlucoseDisplayValue.toFloat()
         is CgmDataGxHistoryLog -> parsed.value.toFloat()
+        is CgmDataFsl2HistoryLog -> parsed.value.toFloat()
+        is CgmDataFsl3HistoryLog -> parsed.value.toFloat()
         else -> null
     }
 
@@ -269,7 +288,7 @@ internal fun hoverTimestampForPosition(
     )
 }
 
-internal fun com.jwoglom.pumpx2.pump.messages.response.historyLog.BasalDeliveryHistoryLog.toBasalDataPoint(): BasalDataPoint? {
+internal fun BasalDeliveryHistoryLog.toBasalDataPoint(): BasalDataPoint? {
     val commandedRateUnits = commandedRate / 1000f
     return BasalDataPoint(
         timestamp = toChartTimestampSeconds(),
@@ -279,19 +298,19 @@ internal fun com.jwoglom.pumpx2.pump.messages.response.historyLog.BasalDeliveryH
     )
 }
 
-internal fun com.jwoglom.pumpx2.pump.messages.response.historyLog.BasalRateChangeHistoryLog.toBasalDataPoint(): BasalDataPoint? {
+internal fun BasalRateChangeHistoryLog.toBasalDataPoint(): BasalDataPoint? {
     val effectiveRate = when (getChangeType()) {
-        com.jwoglom.pumpx2.pump.messages.response.historyLog.BasalRateChangeHistoryLog.ChangeType.TIMED_SEGMENT,
-        com.jwoglom.pumpx2.pump.messages.response.historyLog.BasalRateChangeHistoryLog.ChangeType.NEW_PROFILE,
-        com.jwoglom.pumpx2.pump.messages.response.historyLog.BasalRateChangeHistoryLog.ChangeType.TEMP_RATE_END,
-        com.jwoglom.pumpx2.pump.messages.response.historyLog.BasalRateChangeHistoryLog.ChangeType.PUMP_RESUMED -> {
+        BasalRateChangeHistoryLog.ChangeType.TIMED_SEGMENT,
+        BasalRateChangeHistoryLog.ChangeType.NEW_PROFILE,
+        BasalRateChangeHistoryLog.ChangeType.TEMP_RATE_END,
+        BasalRateChangeHistoryLog.ChangeType.PUMP_RESUMED -> {
             if (commandBasalRate > 0f) commandBasalRate else baseBasalRate
         }
-        com.jwoglom.pumpx2.pump.messages.response.historyLog.BasalRateChangeHistoryLog.ChangeType.TEMP_RATE_START -> {
+        BasalRateChangeHistoryLog.ChangeType.TEMP_RATE_START -> {
             commandBasalRate
         }
-        com.jwoglom.pumpx2.pump.messages.response.historyLog.BasalRateChangeHistoryLog.ChangeType.PUMP_SUSPENDED,
-        com.jwoglom.pumpx2.pump.messages.response.historyLog.BasalRateChangeHistoryLog.ChangeType.PUMP_SHUT_DOWN,
+        BasalRateChangeHistoryLog.ChangeType.PUMP_SUSPENDED,
+        BasalRateChangeHistoryLog.ChangeType.PUMP_SHUT_DOWN,
         null -> {
             commandBasalRate
         }
@@ -302,7 +321,7 @@ internal fun com.jwoglom.pumpx2.pump.messages.response.historyLog.BasalRateChang
     return BasalDataPoint(
         timestamp = toChartTimestampSeconds(),
         rate = effectiveRate,
-        isTemp = getChangeType() == com.jwoglom.pumpx2.pump.messages.response.historyLog.BasalRateChangeHistoryLog.ChangeType.TEMP_RATE_START,
+        isTemp = getChangeType() == BasalRateChangeHistoryLog.ChangeType.TEMP_RATE_START,
         duration = null
     )
 }
@@ -610,15 +629,15 @@ private fun rememberBasalData(
 ): BasalChartData {
     // Use all basal-related history log types so logging and charting reflect actual delivery records.
     val basalClasses = listOf(
-        com.jwoglom.pumpx2.pump.messages.response.historyLog.BasalDeliveryHistoryLog::class.java,
-        com.jwoglom.pumpx2.pump.messages.response.historyLog.BasalRateChangeHistoryLog::class.java,
-        com.jwoglom.pumpx2.pump.messages.response.historyLog.TempRateActivatedHistoryLog::class.java,
-        com.jwoglom.pumpx2.pump.messages.response.historyLog.TempRateCompletedHistoryLog::class.java,
-        com.jwoglom.pumpx2.pump.messages.response.historyLog.PumpingSuspendedHistoryLog::class.java,
-        com.jwoglom.pumpx2.pump.messages.response.historyLog.PumpingResumedHistoryLog::class.java,
-        com.jwoglom.pumpx2.pump.messages.response.historyLog.HypoMinimizerSuspendHistoryLog::class.java,
-        com.jwoglom.pumpx2.pump.messages.response.historyLog.HypoMinimizerResumeHistoryLog::class.java,
-        com.jwoglom.pumpx2.pump.messages.response.historyLog.DailyBasalHistoryLog::class.java
+        BasalDeliveryHistoryLog::class.java,
+        BasalRateChangeHistoryLog::class.java,
+        TempRateActivatedHistoryLog::class.java,
+        TempRateCompletedHistoryLog::class.java,
+        PumpingSuspendedHistoryLog::class.java,
+        PumpingResumedHistoryLog::class.java,
+        HypoMinimizerSuspendHistoryLog::class.java,
+        HypoMinimizerResumeHistoryLog::class.java,
+        DailyBasalHistoryLog::class.java
     )
 
     val basalHistoryLogs = historyLogViewModel?.latestItemsForTypes(
@@ -637,12 +656,12 @@ private fun rememberBasalData(
         var parseFailureCount = 0
         val sampleFailureSeqIds = mutableListOf<Long>()
 
-        rawLogs.forEach { dao: com.jwoglom.controlx2.db.historylog.HistoryLogItem ->
+        rawLogs.forEach { dao: HistoryLogItem ->
             try {
                 val parsed = dao.parse()
 
                 when (parsed) {
-                    is com.jwoglom.pumpx2.pump.messages.response.historyLog.BasalDeliveryHistoryLog -> {
+                    is BasalDeliveryHistoryLog -> {
                         val timestamp = parsed.toChartTimestampSeconds()
                         rawEntries += BasalHistoryDebugEntry(
                             seqId = dao.seqId,
@@ -653,7 +672,7 @@ private fun rememberBasalData(
                             ?.takeIf { it.timestamp in lookbackStartTimeSeconds..currentTimeSeconds }
                             ?.let(events::add)
                     }
-                    is com.jwoglom.pumpx2.pump.messages.response.historyLog.BasalRateChangeHistoryLog -> {
+                    is BasalRateChangeHistoryLog -> {
                         val timestamp = parsed.toChartTimestampSeconds()
                         rawEntries += BasalHistoryDebugEntry(
                             seqId = dao.seqId,
@@ -664,49 +683,49 @@ private fun rememberBasalData(
                             ?.takeIf { it.timestamp in lookbackStartTimeSeconds..currentTimeSeconds }
                             ?.let(events::add)
                     }
-                    is com.jwoglom.pumpx2.pump.messages.response.historyLog.TempRateActivatedHistoryLog -> {
+                    is TempRateActivatedHistoryLog -> {
                         rawEntries += BasalHistoryDebugEntry(
                             seqId = dao.seqId,
                             timestamp = parsed.toChartTimestampSeconds(),
                             details = "type=TempRateActivatedHistoryLog percent=${parsed.percent} duration=${parsed.duration} tempRateId=${parsed.tempRateId}"
                         )
                     }
-                    is com.jwoglom.pumpx2.pump.messages.response.historyLog.TempRateCompletedHistoryLog -> {
+                    is TempRateCompletedHistoryLog -> {
                         rawEntries += BasalHistoryDebugEntry(
                             seqId = dao.seqId,
                             timestamp = parsed.toChartTimestampSeconds(),
                             details = "type=TempRateCompletedHistoryLog tempRateId=${parsed.tempRateId} timeLeft=${parsed.timeLeft}"
                         )
                     }
-                    is com.jwoglom.pumpx2.pump.messages.response.historyLog.PumpingSuspendedHistoryLog -> {
+                    is PumpingSuspendedHistoryLog -> {
                         rawEntries += BasalHistoryDebugEntry(
                             seqId = dao.seqId,
                             timestamp = parsed.toChartTimestampSeconds(),
                             details = "type=PumpingSuspendedHistoryLog reason=${parsed.reason} reasonId=${parsed.reasonId} insulinAmount=${parsed.insulinAmount}"
                         )
                     }
-                    is com.jwoglom.pumpx2.pump.messages.response.historyLog.PumpingResumedHistoryLog -> {
+                    is PumpingResumedHistoryLog -> {
                         rawEntries += BasalHistoryDebugEntry(
                             seqId = dao.seqId,
                             timestamp = parsed.toChartTimestampSeconds(),
                             details = "type=PumpingResumedHistoryLog insulinAmount=${parsed.insulinAmount}"
                         )
                     }
-                    is com.jwoglom.pumpx2.pump.messages.response.historyLog.HypoMinimizerSuspendHistoryLog -> {
+                    is HypoMinimizerSuspendHistoryLog -> {
                         rawEntries += BasalHistoryDebugEntry(
                             seqId = dao.seqId,
                             timestamp = parsed.toChartTimestampSeconds(),
                             details = "type=HypoMinimizerSuspendHistoryLog"
                         )
                     }
-                    is com.jwoglom.pumpx2.pump.messages.response.historyLog.HypoMinimizerResumeHistoryLog -> {
+                    is HypoMinimizerResumeHistoryLog -> {
                         rawEntries += BasalHistoryDebugEntry(
                             seqId = dao.seqId,
                             timestamp = parsed.toChartTimestampSeconds(),
                             details = "type=HypoMinimizerResumeHistoryLog"
                         )
                     }
-                    is com.jwoglom.pumpx2.pump.messages.response.historyLog.DailyBasalHistoryLog -> {
+                    is DailyBasalHistoryLog -> {
                         rawEntries += BasalHistoryDebugEntry(
                             seqId = dao.seqId,
                             timestamp = parsed.toChartTimestampSeconds(),
@@ -726,7 +745,7 @@ private fun rememberBasalData(
             } catch (e: Exception) {
                 rawEntries += BasalHistoryDebugEntry(
                     seqId = dao.seqId,
-                    timestamp = dao.pumpTime.atZone(java.time.ZoneId.systemDefault()).toEpochSecond(),
+                    timestamp = dao.pumpTime.atZone(ZoneId.systemDefault()).toEpochSecond(),
                     details = "parseFailure=${e.javaClass.simpleName}:${e.message ?: ""}"
                 )
                 parseFailureCount++
@@ -794,7 +813,7 @@ private fun rememberCarbData(
 ): List<CarbEvent> {
     // Carbs are recorded in CarbEnteredHistoryLog
     val carbHistoryLogs = historyLogViewModel?.latestItemsForTypes(
-        listOf(com.jwoglom.pumpx2.pump.messages.response.historyLog.CarbEnteredHistoryLog::class.java),
+        listOf(CarbEnteredHistoryLog::class.java),
         (timeRange.hours * 2) + 10
     )?.observeAsState()
 
@@ -802,7 +821,7 @@ private fun rememberCarbData(
         carbHistoryLogs?.value?.mapNotNull { dao ->
             try {
                 val parsed = dao.parse()
-                if (parsed is com.jwoglom.pumpx2.pump.messages.response.historyLog.CarbEnteredHistoryLog) {
+                if (parsed is CarbEnteredHistoryLog) {
                     val carbs = parsed.carbs.toInt()
 
                     if (carbs > 0) {
@@ -829,7 +848,7 @@ private fun rememberModeData(
 ): List<ModeEvent> {
     // Use ControlIQUserModeChangeHistoryLog to track mode changes
     val modeClasses = listOf(
-        com.jwoglom.pumpx2.pump.messages.response.historyLog.ControlIQUserModeChangeHistoryLog::class.java
+        ControlIQUserModeChangeHistoryLog::class.java
     )
 
     val modeHistoryLogs = historyLogViewModel?.latestItemsForTypes(
@@ -838,18 +857,18 @@ private fun rememberModeData(
     )?.observeAsState()
 
     return remember(modeHistoryLogs?.value, timeRange) {
-        modeHistoryLogs?.value?.mapNotNull { dao: com.jwoglom.controlx2.db.historylog.HistoryLogItem ->
+        modeHistoryLogs?.value?.mapNotNull { dao: HistoryLogItem ->
             try {
                 val parsed = dao.parse()
-                if (parsed is com.jwoglom.pumpx2.pump.messages.response.historyLog.ControlIQUserModeChangeHistoryLog) {
+                if (parsed is ControlIQUserModeChangeHistoryLog) {
                     // Get the current user mode using the typed accessor
                     val userModeId = parsed.currentUserMode
-                    val userModeType = com.jwoglom.pumpx2.pump.messages.response.currentStatus.ControlIQInfoAbstractResponse.UserModeType.fromId(userModeId)
-                    
+                    val userModeType = UserModeType.fromId(userModeId)
+
                     // Map UserModeType to TherapyMode
                     val mode = when (userModeType) {
-                        com.jwoglom.pumpx2.pump.messages.response.currentStatus.ControlIQInfoAbstractResponse.UserModeType.SLEEP -> TherapyMode.SLEEP
-                        com.jwoglom.pumpx2.pump.messages.response.currentStatus.ControlIQInfoAbstractResponse.UserModeType.EXERCISE -> TherapyMode.EXERCISE
+                        UserModeType.SLEEP -> TherapyMode.SLEEP
+                        UserModeType.EXERCISE -> TherapyMode.EXERCISE
                         else -> TherapyMode.STANDARD
                     }
 
@@ -1656,7 +1675,7 @@ fun VicoCgmChart(
             rangeProvider = cgmLineRangeProvider
         )
         val basalColumnLayer = rememberColumnCartesianLayer(
-            columnProvider = com.patrykandpatrick.vico.core.cartesian.layer.ColumnCartesianLayer.ColumnProvider.series(
+            columnProvider = ColumnCartesianLayer.ColumnProvider.series(
                 rememberLineComponent(
                     fill(InsulinColors.Basal),
                     thickness = 28.dp

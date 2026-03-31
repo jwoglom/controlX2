@@ -144,6 +144,7 @@ fun BolusWindow(
     fun refresh() = refreshScope.launch {
         refreshing = true
 
+        baseFields.forEach { field -> field.value = null }
         sendPumpCommands(SendType.BUST_CACHE, commands)
     }
 
@@ -552,6 +553,8 @@ fun rawToInt(s: String?): Int? {
 fun resetBolusDataStoreState(dataStore: DataStore) {
     Timber.d("bolusCalc resetBolusDataStoreState")
     PumpStateSupplier.inProgressBolusId = Supplier { null }
+    dataStore.bolusCalcDataSnapshot.value = null
+    dataStore.bolusCalcLastBG.value = null
     dataStore.bolusPermissionResponse.value = null
     dataStore.bolusCancelResponse.value = null
     dataStore.bolusInitiateResponse.value = null

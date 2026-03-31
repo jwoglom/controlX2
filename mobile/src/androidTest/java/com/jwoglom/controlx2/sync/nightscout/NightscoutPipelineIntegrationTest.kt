@@ -21,6 +21,8 @@ import com.jwoglom.pumpx2.pump.messages.response.historyLog.DexcomG6CGMHistoryLo
 import com.jwoglom.pumpx2.pump.messages.response.historyLog.HistoryLogParser
 import com.jwoglom.pumpx2.pump.messages.response.historyLog.PumpingResumedHistoryLog
 import com.jwoglom.pumpx2.pump.messages.response.historyLog.PumpingSuspendedHistoryLog
+import com.jwoglom.pumpx2.pump.messages.response.historyLog.TempRateActivatedHistoryLog
+import com.jwoglom.pumpx2.pump.messages.response.historyLog.TempRateCompletedHistoryLog
 import com.jwoglom.pumpx2.pump.messages.response.historyLog.TubingFilledHistoryLog
 import fi.iki.elonen.NanoHTTPD
 import kotlinx.coroutines.runBlocking
@@ -340,6 +342,33 @@ class NightscoutPipelineIntegrationTest {
         )
     }
 
+    // --- Temp rate cargo builders -----------------------------------------------
+
+    private fun buildTempRateActivatedCargo(
+        pumpTime: LocalDateTime,
+        seqId: Long,
+        percent: Float,
+        durationHours: Float,
+        tempRateId: Int
+    ): ByteArray {
+        val pts = toPumpTimeSec(pumpTime)
+        return TempRateActivatedHistoryLog.buildCargo(
+            pts, seqId, percent, durationHours, tempRateId
+        )
+    }
+
+    private fun buildTempRateCompletedCargo(
+        pumpTime: LocalDateTime,
+        seqId: Long,
+        tempRateId: Int,
+        timeLeftSeconds: Long
+    ): ByteArray {
+        val pts = toPumpTimeSec(pumpTime)
+        return TempRateCompletedHistoryLog.buildCargo(
+            pts, seqId, tempRateId, timeLeftSeconds
+        )
+    }
+
     // =========================================================================
     // TESTS
     // =========================================================================
@@ -437,6 +466,103 @@ class NightscoutPipelineIntegrationTest {
         assertEquals("Temp Basal", treatments[0]["eventType"])
         assertEquals(0.8, treatments[0]["rate"])
         assertEquals(0.8, treatments[0]["absolute"])
+        // Single basal event gets default 5-minute duration
+        assertEquals(5.0, treatments[0]["duration"])
+    }
+
+    @Test
+    fun fullPipeline_basalDelivery_durationCalculatedFromConsecutiveEvents() = runBlocking {
+        val now = LocalDateTime.now()
+        val items = listOf(
+            buildHistoryLogItem(3010, now.minusMinutes(20),
+                buildBasalCargo(now.minusMinutes(20), 3010, 800)),
+            buildHistoryLogItem(3011, now.minusMinutes(15),
+                buildBasalCargo(now.minusMinutes(15), 3011, 900)),
+            buildHistoryLogItem(3012, now.minusMinutes(5),
+                buildBasalCargo(now.minusMinutes(5), 3012, 1200))
+        )
+        items.forEach { historyLogRepo.insert(it) }
+
+        val config = buildConfig(enabledProcessors = setOf(ProcessorType.BASAL))
+        val coordinator = buildCoordinator(config)
+        val result = coordinator.syncAll()
+
+        assertTrue("Expected Success, got $result", result is SyncResult.Success)
+
+        val treatmentRequests = server.requestsForPath("/api/v1/treatments")
+        val type = object : TypeToken<List<Map<String, Any>>>() {}.type
+        val treatments: List<Map<String, Any>> = gson.fromJson(treatmentRequests[0].body, type)
+
+        assertEquals(3, treatments.size)
+
+        // First event: 20min ago to 15min ago = 5 min duration
+        assertEquals(0.8, treatments[0]["rate"])
+        assertEquals(5.0, treatments[0]["duration"])
+
+        // Second event: 15min ago to 5min ago = 10 min duration
+        assertEquals(0.9, treatments[1]["rate"])
+        assertEquals(10.0, treatments[1]["duration"])
+
+        // Last event: gets default 5-minute duration
+        assertEquals(1.2, treatments[2]["rate"])
+        assertEquals(5.0, treatments[2]["duration"])
+    }
+
+    @Test
+    fun fullPipeline_tempRateActivated_uploadedWithPercent() = runBlocking {
+        val now = LocalDateTime.now()
+        val items = listOf(
+            buildHistoryLogItem(3020, now.minusMinutes(30),
+                buildTempRateActivatedCargo(now.minusMinutes(30), 3020, 120f, 0.5f, 42))
+        )
+        items.forEach { historyLogRepo.insert(it) }
+
+        val config = buildConfig(enabledProcessors = setOf(ProcessorType.BASAL))
+        val coordinator = buildCoordinator(config)
+        val result = coordinator.syncAll()
+
+        assertTrue("Expected Success, got $result", result is SyncResult.Success)
+
+        val treatmentRequests = server.requestsForPath("/api/v1/treatments")
+        val type = object : TypeToken<List<Map<String, Any>>>() {}.type
+        val treatments: List<Map<String, Any>> = gson.fromJson(treatmentRequests[0].body, type)
+
+        assertEquals(1, treatments.size)
+        assertEquals("Temp Basal", treatments[0]["eventType"])
+        // Nightscout percent: change from baseline (120% pump = +20% change)
+        assertEquals(20.0, treatments[0]["percent"])
+        // Duration: 0.5 hours = 30 minutes
+        assertEquals(30.0, treatments[0]["duration"])
+        assertTrue((treatments[0]["notes"] as String).contains("120"))
+    }
+
+    @Test
+    fun fullPipeline_tempRateActivatedWithCompletion_normalEnd() = runBlocking {
+        val now = LocalDateTime.now()
+        val items = listOf(
+            buildHistoryLogItem(3030, now.minusMinutes(30),
+                buildTempRateActivatedCargo(now.minusMinutes(30), 3030, 150f, 0.5f, 55)),
+            buildHistoryLogItem(3031, now.minusMinutes(1),
+                buildTempRateCompletedCargo(now.minusMinutes(1), 3031, 55, 0))
+        )
+        items.forEach { historyLogRepo.insert(it) }
+
+        val config = buildConfig(enabledProcessors = setOf(ProcessorType.BASAL))
+        val coordinator = buildCoordinator(config)
+        val result = coordinator.syncAll()
+
+        assertTrue("Expected Success, got $result", result is SyncResult.Success)
+
+        val treatmentRequests = server.requestsForPath("/api/v1/treatments")
+        val type = object : TypeToken<List<Map<String, Any>>>() {}.type
+        val treatments: List<Map<String, Any>> = gson.fromJson(treatmentRequests[0].body, type)
+
+        assertEquals(1, treatments.size)
+        assertEquals("Temp Basal", treatments[0]["eventType"])
+        // Nightscout percent: 150% pump = +50% change
+        assertEquals(50.0, treatments[0]["percent"])
+        // Duration: 0.5 hours = 30 minutes, timeLeft = 0 so full duration
+        assertEquals(30.0, treatments[0]["duration"])
     }
 
     @Test
