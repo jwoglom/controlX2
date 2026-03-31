@@ -85,21 +85,35 @@ class ProcessBasal(
                 }
             }
 
+            // Nightscout percent convention: change from profile baseline
+            // e.g. -50 = half, 0 = no change, 100 = double
+            // Tandem percent: actual percentage (e.g. 120 = 120% of profile)
+            val nightscoutPercent = (activated.percent - 100).toInt()
+
             treatments.add(NightscoutTreatment.fromTimestamp(
                 eventType = "Temp Basal",
                 timestamp = item.pumpTime,
                 seqId = item.seqId,
                 rate = null,
                 absolute = null,
+                percent = nightscoutPercent,
                 duration = actualDurationMinutes,
                 notes = notes
             ))
         }
 
-        // Process BasalDelivery and BasalRateChange logs
-        for (item in otherLogs) {
+        // Process BasalDelivery and BasalRateChange logs with calculated durations
+        val sortedOther = otherLogs.sortedBy { it.pumpTime }
+        for (i in sortedOther.indices) {
+            val item = sortedOther[i]
+            val durationMinutes = if (i < sortedOther.lastIndex) {
+                java.time.Duration.between(item.pumpTime, sortedOther[i + 1].pumpTime)
+                    .toMinutes().toInt().coerceIn(1, 120)
+            } else {
+                5 // default for last/only event
+            }
             try {
-                basalToNightscoutTreatment(item)?.let { treatments.add(it) }
+                basalToNightscoutTreatment(item, durationMinutes)?.let { treatments.add(it) }
             } catch (e: Exception) {
                 Timber.e(e, "Failed to convert basal seqId=${item.seqId}")
             }
@@ -117,7 +131,7 @@ class ProcessBasal(
         }
     }
 
-    private fun basalToNightscoutTreatment(item: HistoryLogItem): NightscoutTreatment? {
+    private fun basalToNightscoutTreatment(item: HistoryLogItem, durationMinutes: Int): NightscoutTreatment? {
         val parsed = item.parse()
 
         return when (parsed) {
@@ -143,7 +157,7 @@ class ProcessBasal(
                     seqId = item.seqId,
                     rate = commandedRate,
                     absolute = commandedRate,
-                    duration = null,
+                    duration = durationMinutes,
                     notes = notes
                 )
             }
@@ -160,7 +174,7 @@ class ProcessBasal(
                     seqId = item.seqId,
                     rate = parsed.commandBasalRate.toDouble(),
                     absolute = parsed.commandBasalRate.toDouble(),
-                    duration = null,
+                    duration = durationMinutes,
                     notes = notes
                 )
             }
