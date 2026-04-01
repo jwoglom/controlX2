@@ -196,7 +196,7 @@ internal fun AddSegmentDialogPreview() {
             0, // maxBolusAmount
             false // bolusCalculatorEnabled
         )
-        val mockProfile = IDPManager.Profile(mockResponse, false)
+        val mockProfile = IDPManager.Profile(mockResponse, false, 0)
 
         AddSegmentDialog(
             profile = mockProfile,
