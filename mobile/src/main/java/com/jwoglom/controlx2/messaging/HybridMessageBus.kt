@@ -43,9 +43,9 @@ class HybridMessageBus(
             //Timber.d("HybridMessageBus: Message from Wear transport: $path")
 
             // Messages from the watch: forward to all listeners.
-            // /to-phone/* and /to-pump/* are actionable watch-originated messages.
+            // /to-server/* and /to-pump/* are actionable watch-originated messages.
             // /from-pump/* arrives via Broadcast transport instead.
-            if (path.startsWith(MessagePaths.PREFIX_TO_PHONE) || path.startsWith(MessagePaths.PREFIX_TO_PUMP)) {
+            if (path.startsWith(MessagePaths.PREFIX_TO_SERVER) || path.startsWith(MessagePaths.PREFIX_TO_PUMP)) {
                 notifyListeners(path, data, sourceNodeId)
             }
         }
@@ -70,7 +70,7 @@ class HybridMessageBus(
 
         when {
             // Phone → Watch: Wear transport only
-            path.startsWith(MessagePaths.PREFIX_TO_WEAR) -> {
+            path.startsWith(MessagePaths.PREFIX_TO_CLIENT) -> {
                 wearBus.sendMessage(path, data, sender)
             }
 
@@ -80,7 +80,7 @@ class HybridMessageBus(
                 wearBus.sendMessage(path, data, sender)
             }
 
-            // /to-phone/*, /to-pump/*, and anything else: broadcast locally only.
+            // /to-server/*, /to-pump/*, and anything else: broadcast locally only.
             // Watch-originated messages arrive via wearProxyListener (inbound),
             // not via sendMessage (outbound).
             else -> {

@@ -143,10 +143,10 @@ fun Settings(
                             coroutineScope.launch {
                                 delay(250)
                                 // reload service, if running
-                                sendMessage(MessagePaths.TO_PHONE_FORCE_RELOAD, "".toByteArray())
+                                sendMessage(MessagePaths.TO_SERVER_FORCE_RELOAD, "".toByteArray())
                                 delay(250)
                                 // reload main activity as fallback
-                                sendMessage(MessagePaths.TO_PHONE_APP_RELOAD, "".toByteArray())
+                                sendMessage(MessagePaths.TO_SERVER_APP_RELOAD, "".toByteArray())
                             }
                         }
                     )
@@ -170,7 +170,7 @@ fun Settings(
 //                                withContext(Dispatchers.IO) {
 //                                    delay(250)
 //                                }
-//                                sendMessage(MessagePaths.TO_PHONE_FORCE_RELOAD, "".toByteArray())
+//                                sendMessage(MessagePaths.TO_SERVER_FORCE_RELOAD, "".toByteArray())
 //                            }
 //                        }
 //                    )
@@ -190,7 +190,7 @@ fun Settings(
 //                                withContext(Dispatchers.IO) {
 //                                    delay(250)
 //                                }
-//                                sendMessage(MessagePaths.TO_PHONE_FORCE_RELOAD, "".toByteArray())
+//                                sendMessage(MessagePaths.TO_SERVER_FORCE_RELOAD, "".toByteArray())
 //                            }
 //                        }
 //                    )
@@ -209,7 +209,7 @@ fun Settings(
                         )
                     },
                     modifier = Modifier.clickable {
-                        sendMessage(MessagePaths.TO_PHONE_FORCE_RELOAD, "".toByteArray())
+                        sendMessage(MessagePaths.TO_SERVER_FORCE_RELOAD, "".toByteArray())
                     }
                 )
                 Divider()
@@ -356,7 +356,7 @@ fun Settings(
                         Prefs(context).setPumpFinderServiceEnabled(true)
                         Prefs(context).setCurrentPumpSid(-1)
                         PumpState.resetState(context)
-                        sendMessage(MessagePaths.TO_PHONE_APP_RELOAD, "".toByteArray())
+                        sendMessage(MessagePaths.TO_SERVER_APP_RELOAD, "".toByteArray())
                     }
                 ) {
                     Text("Disconnect")

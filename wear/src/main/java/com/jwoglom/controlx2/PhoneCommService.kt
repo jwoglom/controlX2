@@ -123,7 +123,7 @@ class PhoneCommService : Service() {
     private fun handleMessageReceived(path: String, data: ByteArray, sourceNodeId: String) {
         Timber.d("wear service handleMessageReceived $path from $sourceNodeId")
         when (path) {
-            MessagePaths.TO_WEAR_OPEN_ACTIVITY -> {
+            MessagePaths.TO_CLIENT_OPEN_ACTIVITY -> {
                 startActivity(
                     Intent(applicationContext, MainActivity::class.java)
                         .addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP)
@@ -139,19 +139,19 @@ class PhoneCommService : Service() {
                 StatePrefs(this).connected = Pair(connected.name, Instant.now())
                 updateNotification()
             }
-            MessagePaths.TO_WEAR_BLOCKED_BOLUS_SIGNATURE -> {
+            MessagePaths.TO_CLIENT_BLOCKED_BOLUS_SIGNATURE -> {
                 Timber.w("PhoneCommService: blocked bolus signature")
                 Intent(applicationContext, MainActivity::class.java)
                     .addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP)
                     .putExtra("route", Screen.BolusBlocked.route)
             }
-            MessagePaths.TO_WEAR_BOLUS_NOT_ENABLED -> {
+            MessagePaths.TO_CLIENT_BOLUS_NOT_ENABLED -> {
                 Timber.w("PhoneCommService: bolus not enabled")
                 Intent(applicationContext, MainActivity::class.java)
                     .addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP)
                     .putExtra("route", Screen.BolusNotEnabled.route)
             }
-            MessagePaths.TO_WEAR_SERVICE_RECEIVE_MESSAGE -> {
+            MessagePaths.TO_CLIENT_SERVICE_RECEIVE_MESSAGE -> {
                 serviceScope.launch {
                     val pumpMessage = withContext(Dispatchers.Default) {
                         PumpMessageSerializer.fromBytes(data)
@@ -159,7 +159,7 @@ class PhoneCommService : Service() {
                     onPumpMessageReceived(pumpMessage, false)
                 }
             }
-            MessagePaths.TO_WEAR_GLUCOSE_UNIT -> {
+            MessagePaths.TO_CLIENT_GLUCOSE_UNIT -> {
                 val unitName = String(data)
                 val unit = com.jwoglom.controlx2.shared.enums.GlucoseUnit.fromName(unitName)
                 if (unit != null) {

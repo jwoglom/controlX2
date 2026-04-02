@@ -257,7 +257,7 @@ class PumpCommHandler(
                     it is ControlIQIOBResponse ||
                     it is CurrentEGVGuiDataResponse
                 ) {
-                    callbacks.sendWearCommMessage(MessagePaths.TO_WEAR_SERVICE_RECEIVE_MESSAGE, PumpMessageSerializer.toBytes(message))
+                    callbacks.sendWearCommMessage(MessagePaths.TO_CLIENT_SERVICE_RECEIVE_MESSAGE, PumpMessageSerializer.toBytes(message))
                 }
             }
 
@@ -416,7 +416,7 @@ class PumpCommHandler(
             )
             val glucoseUnit = Prefs(callbacks.getApplicationContext()).glucoseUnit()
             if (glucoseUnit != null) {
-                callbacks.sendWearCommMessage(MessagePaths.TO_WEAR_GLUCOSE_UNIT, glucoseUnit.name.toByteArray())
+                callbacks.sendWearCommMessage(MessagePaths.TO_CLIENT_GLUCOSE_UNIT, glucoseUnit.name.toByteArray())
             }
             callbacks.markConnectionTime()
         }
@@ -761,21 +761,21 @@ class PumpCommHandler(
                 val pumpMsg = confirmedBolus.right
                 if (!messageOk) {
                     Timber.w("pumpCommHandler bolus invalid signature")
-                    callbacks.sendWearCommMessage(MessagePaths.TO_WEAR_BOLUS_BLOCKED_SIGNATURE, "WearCommHandler".toByteArray())
+                    callbacks.sendWearCommMessage(MessagePaths.TO_CLIENT_BOLUS_BLOCKED_SIGNATURE, "WearCommHandler".toByteArray())
                 } else if (!isBolusCommand(pumpMsg)) {
                     Timber.e("SEND_PUMP_COMMAND_BOLUS not a bolus command: $pumpMsg")
                 } else if (pumpConnectedPrecondition()) {
                     Timber.i("pumpCommHandler send bolus command with valid signature: $pumpMsg")
                     if (!Prefs(callbacks.getApplicationContext()).insulinDeliveryActions()) {
                         Timber.e("No insulin delivery messages enabled -- blocking bolus command $pumpMsg")
-                        callbacks.sendWearCommMessage(MessagePaths.TO_WEAR_BOLUS_NOT_ENABLED, "from_self".toByteArray())
+                        callbacks.sendWearCommMessage(MessagePaths.TO_CLIENT_BOLUS_NOT_ENABLED, "from_self".toByteArray())
                         return
                     }
                     try {
                         pump.command(pumpMsg as InitiateBolusRequest)
                     } catch (e: Packetize.ActionsAffectingInsulinDeliveryNotEnabledInPumpX2Exception) {
                         Timber.e(e)
-                        callbacks.sendWearCommMessage(MessagePaths.TO_WEAR_BOLUS_NOT_ENABLED, "from_pumpx2_lib".toByteArray())
+                        callbacks.sendWearCommMessage(MessagePaths.TO_CLIENT_BOLUS_NOT_ENABLED, "from_pumpx2_lib".toByteArray())
                     }
                 }
             }

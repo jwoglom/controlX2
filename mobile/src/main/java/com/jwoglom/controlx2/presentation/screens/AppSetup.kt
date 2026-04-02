@@ -90,10 +90,10 @@ fun AppSetup(
             Button(
                 onClick = {
                     Prefs(context).setAppSetupComplete(true)
-                    sendMessage(MessagePaths.TO_PHONE_REFRESH_HISTORY_LOG_SYNC, "".toByteArray())
+                    sendMessage(MessagePaths.TO_SERVER_REFRESH_HISTORY_LOG_SYNC, "".toByteArray())
                     // Do not restart the app at the end of setup; restarting here can race pump
                     // bootstrap and leave CommService in a null-peripheral startup loop.
-                    sendMessage(MessagePaths.TO_PHONE_REQUEST_SERVICE_STATUS, "".toByteArray())
+                    sendMessage(MessagePaths.TO_SERVER_REQUEST_SERVICE_STATUS, "".toByteArray())
                     navController?.navigate(Screen.Landing.route)
                 }
             ) {
@@ -121,7 +121,7 @@ fun AppSetup(
 //                            coroutineScope.launch {
 //                                delay(250)
 //                                sendMessage(
-//                                    MessagePaths.TO_PHONE_APP_RELOAD,
+//                                    MessagePaths.TO_SERVER_APP_RELOAD,
 //                                    "".toByteArray()
 //                                )
 //                            }
@@ -134,7 +134,7 @@ fun AppSetup(
 //                    coroutineScope.launch {
 //                        delay(250)
 //                        sendMessage(
-//                            MessagePaths.TO_PHONE_APP_RELOAD,
+//                            MessagePaths.TO_SERVER_APP_RELOAD,
 //                            "".toByteArray()
 //                        )
 //                    }
@@ -162,7 +162,7 @@ fun AppSetup(
                                 coroutineScope.launch {
                                     delay(250)
                                     sendMessage(
-                                        MessagePaths.TO_PHONE_APP_RELOAD,
+                                        MessagePaths.TO_SERVER_APP_RELOAD,
                                         "".toByteArray()
                                     )
                                 }
@@ -179,7 +179,7 @@ fun AppSetup(
                         coroutineScope.launch {
                             delay(250)
                             sendMessage(
-                                MessagePaths.TO_PHONE_APP_RELOAD,
+                                MessagePaths.TO_SERVER_APP_RELOAD,
                                 "".toByteArray()
                             )
                         }
@@ -343,9 +343,9 @@ fun AppSetup(
                                     showGlucoseUnitDialog = false
                                     // Sync glucose unit to wear app and trigger reload
                                     coroutineScope.launch {
-                                        sendMessage(MessagePaths.TO_WEAR_GLUCOSE_UNIT, unit.name.toByteArray())
+                                        sendMessage(MessagePaths.TO_CLIENT_GLUCOSE_UNIT, unit.name.toByteArray())
                                         delay(250)
-                                        sendMessage(MessagePaths.TO_PHONE_APP_RELOAD, "".toByteArray())
+                                        sendMessage(MessagePaths.TO_SERVER_APP_RELOAD, "".toByteArray())
                                     }
                                 }
                                 .padding(vertical = 12.dp),
@@ -384,7 +384,7 @@ fun AppSetup(
                     showInsulinWarningDialog = false
                     coroutineScope.launch {
                         delay(250)
-                        sendMessage(MessagePaths.TO_PHONE_APP_RELOAD, "".toByteArray())
+                        sendMessage(MessagePaths.TO_SERVER_APP_RELOAD, "".toByteArray())
                     }
                 }) {
                     Text("Enable")

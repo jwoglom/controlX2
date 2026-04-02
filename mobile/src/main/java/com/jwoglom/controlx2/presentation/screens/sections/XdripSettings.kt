@@ -62,9 +62,9 @@ fun XdripSettings(
         if (newConfig.requiresReloadComparedTo(oldConfig)) {
             coroutineScope.launch {
                 delay(250)
-                sendMessage(MessagePaths.TO_PHONE_FORCE_RELOAD, "".toByteArray())
+                sendMessage(MessagePaths.TO_SERVER_FORCE_RELOAD, "".toByteArray())
                 delay(250)
-                sendMessage(MessagePaths.TO_PHONE_APP_RELOAD, "".toByteArray())
+                sendMessage(MessagePaths.TO_SERVER_APP_RELOAD, "".toByteArray())
             }
         }
 

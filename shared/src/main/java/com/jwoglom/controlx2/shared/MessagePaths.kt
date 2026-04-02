@@ -1,53 +1,56 @@
 package com.jwoglom.controlx2.shared
 
-/**
- * Constants for all message paths used in phone-watch-pump communication.
- * Centralizes string literals to prevent typos and enable future renames.
- */
+// Constants for all message paths used in phone-watch-pump communication.
+//
+// Naming convention (role-based, not device-specific):
+// - /to-server/  -- commands sent TO the pump-host device (whichever device manages the BT pump connection)
+// - /to-client/  -- data/events sent TO the client device (the device not directly connected to the pump)
+// - /to-pump/    -- commands sent TO the pump (unchanged, always refers to the physical pump)
+// - /from-pump/  -- events FROM the pump (unchanged, always refers to the physical pump)
 object MessagePaths {
     // Prefix constants (used in startsWith checks)
-    const val PREFIX_TO_PHONE = "/to-phone/"
-    const val PREFIX_TO_WEAR = "/to-wear/"
+    const val PREFIX_TO_SERVER = "/to-server/"
+    const val PREFIX_TO_CLIENT = "/to-client/"
     const val PREFIX_TO_PUMP = "/to-pump/"
     const val PREFIX_FROM_PUMP = "/from-pump/"
 
-    // === /to-phone/* — commands sent TO the phone (pump-host device) ===
-    const val TO_PHONE_APP_RELOAD = "/to-phone/app-reload"
-    const val TO_PHONE_BOLUS_CANCEL = "/to-phone/bolus-cancel"
-    const val TO_PHONE_BOLUS_CONFIRM_DIALOG = "/to-phone/bolus-confirm-dialog"
-    const val TO_PHONE_BOLUS_REQUEST_PHONE = "/to-phone/bolus-request-phone"
-    const val TO_PHONE_BOLUS_REQUEST_WEAR = "/to-phone/bolus-request-wear"
-    const val TO_PHONE_CHECK_PUMP_FINDER_FOUND_PUMPS = "/to-phone/check-pump-finder-found-pumps"
-    const val TO_PHONE_COMM_STARTED = "/to-phone/comm-started"
-    const val TO_PHONE_CONNECTED = "/to-phone/connected"
-    const val TO_PHONE_FORCE_RELOAD = "/to-phone/force-reload"
-    const val TO_PHONE_INITIATE_CONFIRMED_BOLUS = "/to-phone/initiate-confirmed-bolus"
-    const val TO_PHONE_IS_PUMP_CONNECTED = "/to-phone/is-pump-connected"
-    const val TO_PHONE_PUMP_FINDER_STARTED = "/to-phone/pump-finder-started"
-    const val TO_PHONE_REFRESH_HISTORY_LOG_SYNC = "/to-phone/refresh-history-log-sync"
-    const val TO_PHONE_REQUEST_SERVICE_STATUS = "/to-phone/request-service-status"
-    const val TO_PHONE_RESTART_PUMP_FINDER = "/to-phone/restart-pump-finder"
-    const val TO_PHONE_SERVICE_STATUS_ACKNOWLEDGED = "/to-phone/service-status-acknowledged"
-    const val TO_PHONE_SET_PAIRING_CODE = "/to-phone/set-pairing-code"
-    const val TO_PHONE_START_COMM = "/to-phone/start-comm"
-    const val TO_PHONE_START_PUMP_FINDER = "/to-phone/start-pump-finder"
-    const val TO_PHONE_STOP_COMM = "/to-phone/stop-comm"
-    const val TO_PHONE_STOP_PUMP_FINDER = "/to-phone/stop-pump-finder"
-    const val TO_PHONE_WRITE_CHARACTERISTIC_FAILED_CALLBACK = "/to-phone/write-characteristic-failed-callback"
+    // === /to-server/* — commands sent TO the pump-host device ===
+    const val TO_SERVER_APP_RELOAD = "/to-server/app-reload"
+    const val TO_SERVER_BOLUS_CANCEL = "/to-server/bolus-cancel"
+    const val TO_SERVER_BOLUS_CONFIRM_DIALOG = "/to-server/bolus-confirm-dialog"
+    const val TO_SERVER_BOLUS_REQUEST_PHONE = "/to-server/bolus-request-phone"
+    const val TO_SERVER_BOLUS_REQUEST_WEAR = "/to-server/bolus-request-wear"
+    const val TO_SERVER_CHECK_PUMP_FINDER_FOUND_PUMPS = "/to-server/check-pump-finder-found-pumps"
+    const val TO_SERVER_COMM_STARTED = "/to-server/comm-started"
+    const val TO_SERVER_CONNECTED = "/to-server/connected"
+    const val TO_SERVER_FORCE_RELOAD = "/to-server/force-reload"
+    const val TO_SERVER_INITIATE_CONFIRMED_BOLUS = "/to-server/initiate-confirmed-bolus"
+    const val TO_SERVER_IS_PUMP_CONNECTED = "/to-server/is-pump-connected"
+    const val TO_SERVER_PUMP_FINDER_STARTED = "/to-server/pump-finder-started"
+    const val TO_SERVER_REFRESH_HISTORY_LOG_SYNC = "/to-server/refresh-history-log-sync"
+    const val TO_SERVER_REQUEST_SERVICE_STATUS = "/to-server/request-service-status"
+    const val TO_SERVER_RESTART_PUMP_FINDER = "/to-server/restart-pump-finder"
+    const val TO_SERVER_SERVICE_STATUS_ACKNOWLEDGED = "/to-server/service-status-acknowledged"
+    const val TO_SERVER_SET_PAIRING_CODE = "/to-server/set-pairing-code"
+    const val TO_SERVER_START_COMM = "/to-server/start-comm"
+    const val TO_SERVER_START_PUMP_FINDER = "/to-server/start-pump-finder"
+    const val TO_SERVER_STOP_COMM = "/to-server/stop-comm"
+    const val TO_SERVER_STOP_PUMP_FINDER = "/to-server/stop-pump-finder"
+    const val TO_SERVER_WRITE_CHARACTERISTIC_FAILED_CALLBACK = "/to-server/write-characteristic-failed-callback"
 
-    // === /to-wear/* — data/events sent TO the client device ===
-    const val TO_WEAR_BLOCKED_BOLUS_SIGNATURE = "/to-wear/blocked-bolus-signature"
-    // NOTE: PumpCommHandler uses this variant — consider unifying with TO_WEAR_BLOCKED_BOLUS_SIGNATURE
-    const val TO_WEAR_BOLUS_BLOCKED_SIGNATURE = "/to-wear/bolus-blocked-signature"
-    const val TO_WEAR_BOLUS_MIN_NOTIFY_THRESHOLD = "/to-wear/bolus-min-notify-threshold"
-    const val TO_WEAR_BOLUS_NOT_ENABLED = "/to-wear/bolus-not-enabled"
-    const val TO_WEAR_BOLUS_REJECTED = "/to-wear/bolus-rejected"
-    const val TO_WEAR_CONNECTED = "/to-wear/connected"
-    const val TO_WEAR_GLUCOSE_UNIT = "/to-wear/glucose-unit"
-    const val TO_WEAR_INITIATE_CONFIRMED_BOLUS = "/to-wear/initiate-confirmed-bolus"
-    const val TO_WEAR_OPEN_ACTIVITY = "/to-wear/open-activity"
-    const val TO_WEAR_SERVICE_RECEIVE_MESSAGE = "/to-wear/service-receive-message"
-    const val TO_WEAR_WEAR_AUTO_APPROVE_TIMEOUT = "/to-wear/wear-auto-approve-timeout"
+    // === /to-client/* — data/events sent TO the client device ===
+    const val TO_CLIENT_BLOCKED_BOLUS_SIGNATURE = "/to-client/blocked-bolus-signature"
+    // NOTE: PumpCommHandler uses this variant - consider unifying with TO_CLIENT_BLOCKED_BOLUS_SIGNATURE
+    const val TO_CLIENT_BOLUS_BLOCKED_SIGNATURE = "/to-client/bolus-blocked-signature"
+    const val TO_CLIENT_BOLUS_MIN_NOTIFY_THRESHOLD = "/to-client/bolus-min-notify-threshold"
+    const val TO_CLIENT_BOLUS_NOT_ENABLED = "/to-client/bolus-not-enabled"
+    const val TO_CLIENT_BOLUS_REJECTED = "/to-client/bolus-rejected"
+    const val TO_CLIENT_CONNECTED = "/to-client/connected"
+    const val TO_CLIENT_GLUCOSE_UNIT = "/to-client/glucose-unit"
+    const val TO_CLIENT_INITIATE_CONFIRMED_BOLUS = "/to-client/initiate-confirmed-bolus"
+    const val TO_CLIENT_OPEN_ACTIVITY = "/to-client/open-activity"
+    const val TO_CLIENT_SERVICE_RECEIVE_MESSAGE = "/to-client/service-receive-message"
+    const val TO_CLIENT_WEAR_AUTO_APPROVE_TIMEOUT = "/to-client/wear-auto-approve-timeout"
 
     // === /to-pump/* — commands sent TO the pump ===
     const val TO_PUMP_CACHED_COMMANDS = "/to-pump/cached-commands"

@@ -113,7 +113,7 @@ class MainActivity : ComponentActivity(), MessageClient.OnMessageReceivedListene
             }
 
             val sendPhoneConnectionCheck: () -> Unit = {
-                this.sendMessage(MessagePaths.TO_PHONE_IS_PUMP_CONNECTED, "phone_connection_check".toByteArray())
+                this.sendMessage(MessagePaths.TO_SERVER_IS_PUMP_CONNECTED, "phone_connection_check".toByteArray())
             }
 
             val sendPhoneBolusRequest: (Int, BolusParameters, BolusCalcUnits, BolusCalcDataSnapshotResponse, TimeSinceResetResponse) -> Unit = { bolusId, params, unitBreakdown, dataSnapshot, timeSinceReset ->
@@ -181,11 +181,11 @@ class MainActivity : ComponentActivity(), MessageClient.OnMessageReceivedListene
                 )
 
                 Timber.i("sendPhoneBolusRequest: numUnits=$numUnits numCarbs=$numCarbs bgValue=$bgValue foodVolume=$foodVolume corrVolume=$corrVolume iobUnits=$iobUnits: bolusRequest=$bolusRequest preCommands=$preCommands")
-                this.sendMessage(MessagePaths.TO_PHONE_BOLUS_REQUEST_WEAR, PumpMessageSerializer.toBytes(bolusRequest))
+                this.sendMessage(MessagePaths.TO_SERVER_BOLUS_REQUEST_WEAR, PumpMessageSerializer.toBytes(bolusRequest))
             }
 
             val sendPhoneBolusCancel: () -> Unit = {
-                this.sendMessage(MessagePaths.TO_PHONE_BOLUS_CANCEL, "".toByteArray())
+                this.sendMessage(MessagePaths.TO_SERVER_BOLUS_CANCEL, "".toByteArray())
             }
 
             val sendPhoneOpenActivity: () -> Unit = {
@@ -212,7 +212,7 @@ class MainActivity : ComponentActivity(), MessageClient.OnMessageReceivedListene
             }
 
             val sendPhoneCommand: (String) -> Unit = {cmd ->
-                this.sendMessage("${MessagePaths.PREFIX_TO_PHONE}$cmd", "".toByteArray())
+                this.sendMessage("${MessagePaths.PREFIX_TO_SERVER}$cmd", "".toByteArray())
             }
 
             WearApp(
@@ -262,7 +262,7 @@ class MainActivity : ComponentActivity(), MessageClient.OnMessageReceivedListene
         super.onResume()
         messageClient.addListener(this)
 
-        sendMessage(MessagePaths.TO_PHONE_IS_PUMP_CONNECTED, "onResume".toByteArray())
+        sendMessage(MessagePaths.TO_SERVER_IS_PUMP_CONNECTED, "onResume".toByteArray())
     }
 
     override fun onNewIntent(intent: Intent) {
@@ -285,8 +285,8 @@ class MainActivity : ComponentActivity(), MessageClient.OnMessageReceivedListene
 
     fun onConnected(bundle: Bundle?) {
         Timber.i("wear onConnected: $bundle")
-        sendMessage(MessagePaths.TO_PHONE_CONNECTED, "wear_launched".toByteArray())
-        sendMessage(MessagePaths.TO_PHONE_IS_PUMP_CONNECTED, "onConnected".toByteArray())
+        sendMessage(MessagePaths.TO_SERVER_CONNECTED, "wear_launched".toByteArray())
+        sendMessage(MessagePaths.TO_SERVER_IS_PUMP_CONNECTED, "onConnected".toByteArray())
     }
 
     override fun onStop() {
@@ -500,22 +500,22 @@ class MainActivity : ComponentActivity(), MessageClient.OnMessageReceivedListene
     override fun onMessageReceived(messageEvent: MessageEvent) {
         Timber.d("wear onMessageReceived: ${messageEvent.path}")
         when (messageEvent.path) {
-            MessagePaths.TO_WEAR_CONNECTED -> {
+            MessagePaths.TO_CLIENT_CONNECTED -> {
                 if (inWaitingState()) {
                     runOnUiThread {
                         navController.navigateClearBackStack(Screen.WaitingToFindPump.route)
                     }
-                    sendMessage(MessagePaths.TO_PHONE_IS_PUMP_CONNECTED, "on-phone-connected".toByteArray())
+                    sendMessage(MessagePaths.TO_SERVER_IS_PUMP_CONNECTED, "on-phone-connected".toByteArray())
                 }
                 dataStore.connectionStatus.value = "Waiting to find pump"
             }
-            MessagePaths.TO_WEAR_BOLUS_MIN_NOTIFY_THRESHOLD -> {
+            MessagePaths.TO_CLIENT_BOLUS_MIN_NOTIFY_THRESHOLD -> {
                 dataStore.bolusMinNotifyThreshold.value = String(messageEvent.data).toDoubleOrNull()
             }
-            MessagePaths.TO_WEAR_WEAR_AUTO_APPROVE_TIMEOUT -> {
+            MessagePaths.TO_CLIENT_WEAR_AUTO_APPROVE_TIMEOUT -> {
                 dataStore.wearAutoApproveTimeout.value = String(messageEvent.data).toIntOrNull() ?: 0
             }
-            MessagePaths.TO_WEAR_GLUCOSE_UNIT -> {
+            MessagePaths.TO_CLIENT_GLUCOSE_UNIT -> {
                 val unitName = String(messageEvent.data)
                 val unit = com.jwoglom.controlx2.shared.enums.GlucoseUnit.fromName(unitName)
                 if (unit != null) {
@@ -524,7 +524,7 @@ class MainActivity : ComponentActivity(), MessageClient.OnMessageReceivedListene
                     com.jwoglom.controlx2.util.UpdateComplication(this, com.jwoglom.controlx2.util.WearX2Complication.CGM_READING)
                 }
             }
-            MessagePaths.TO_WEAR_INITIATE_CONFIRMED_BOLUS -> {
+            MessagePaths.TO_CLIENT_INITIATE_CONFIRMED_BOLUS -> {
                 uiScope.launch {
                     if (inWaitingState()) {
                         Timber.e("in invalid state for initiate-confirmed-bolus")
@@ -551,22 +551,22 @@ class MainActivity : ComponentActivity(), MessageClient.OnMessageReceivedListene
                     }
 
                     Timber.i("sending initiate-confirmed-bolus from wearable to phone")
-                    sendMessage(MessagePaths.TO_PHONE_INITIATE_CONFIRMED_BOLUS, messageEvent.data)
+                    sendMessage(MessagePaths.TO_SERVER_INITIATE_CONFIRMED_BOLUS, messageEvent.data)
                 }
             }
-            MessagePaths.TO_WEAR_BLOCKED_BOLUS_SIGNATURE -> {
+            MessagePaths.TO_CLIENT_BLOCKED_BOLUS_SIGNATURE -> {
                 Timber.w("blocked bolus signature")
                 runOnUiThread {
                     navController.navigate(Screen.BolusBlocked.route)
                 }
             }
-            MessagePaths.TO_WEAR_BOLUS_NOT_ENABLED -> {
+            MessagePaths.TO_CLIENT_BOLUS_NOT_ENABLED -> {
                 Timber.w("bolus not enabled")
                 runOnUiThread {
                     navController.navigate(Screen.BolusNotEnabled.route)
                 }
             }
-            MessagePaths.TO_WEAR_BOLUS_REJECTED -> {
+            MessagePaths.TO_CLIENT_BOLUS_REJECTED -> {
                 Timber.w("bolus rejected")
                 runOnUiThread {
                     resetBolusDataStoreState(dataStore)
@@ -578,7 +578,7 @@ class MainActivity : ComponentActivity(), MessageClient.OnMessageReceivedListene
                     runOnUiThread {
                         navController.navigateClearBackStack(Screen.ConnectingToPump.route)
                     }
-                    sendMessage(MessagePaths.TO_PHONE_IS_PUMP_CONNECTED, "on-pump-model".toByteArray())
+                    sendMessage(MessagePaths.TO_SERVER_IS_PUMP_CONNECTED, "on-pump-model".toByteArray())
                 }
                 dataStore.connectionStatus.value = "Connecting to pump"
             }
@@ -587,7 +587,7 @@ class MainActivity : ComponentActivity(), MessageClient.OnMessageReceivedListene
                     runOnUiThread {
                         navController.navigateClearBackStack(Screen.PairingToPump.route)
                     }
-                    sendMessage(MessagePaths.TO_PHONE_IS_PUMP_CONNECTED, "on-entered-pairing-code".toByteArray())
+                    sendMessage(MessagePaths.TO_SERVER_IS_PUMP_CONNECTED, "on-entered-pairing-code".toByteArray())
                 }
                 dataStore.connectionStatus.value = "Pairing to pump"
             }
@@ -596,7 +596,7 @@ class MainActivity : ComponentActivity(), MessageClient.OnMessageReceivedListene
                     runOnUiThread {
                         navController.navigateClearBackStack(Screen.MissingPairingCode.route)
                     }
-                    sendMessage(MessagePaths.TO_PHONE_IS_PUMP_CONNECTED, "on-missing-pairing-code".toByteArray())
+                    sendMessage(MessagePaths.TO_SERVER_IS_PUMP_CONNECTED, "on-missing-pairing-code".toByteArray())
                 }
                 dataStore.connectionStatus.value = "Missing pairing code"
             }

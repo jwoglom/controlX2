@@ -61,9 +61,9 @@ class BolusNotificationBroadcastReceiver : BroadcastReceiver() {
 
                     val bolusSource = prefs(context)?.getString("initiateBolusSource", "") ?: ""
                     if (bolusSource == "wear") {
-                        sendMessageWhenReady(messageBus, MessagePaths.TO_WEAR_INITIATE_CONFIRMED_BOLUS, rawBytes, context)
+                        sendMessageWhenReady(messageBus, MessagePaths.TO_CLIENT_INITIATE_CONFIRMED_BOLUS, rawBytes, context)
                     } else if (bolusSource == "phone") {
-                        sendMessageWhenReady(messageBus, MessagePaths.TO_PHONE_INITIATE_CONFIRMED_BOLUS, rawBytes, context)
+                        sendMessageWhenReady(messageBus, MessagePaths.TO_SERVER_INITIATE_CONFIRMED_BOLUS, rawBytes, context)
                     }
                     if (!PumpState.actionsAffectingInsulinDeliveryEnabled()) {
                         // The same message will appear on the wearable
@@ -264,7 +264,7 @@ class BolusNotificationBroadcastReceiver : BroadcastReceiver() {
                     )
                 )
                 resetBolusPrefs(context)
-                sendMessageWhenReady(messageBus, MessagePaths.TO_WEAR_BOLUS_REJECTED, "from_phone".toByteArray(), context)
+                sendMessageWhenReady(messageBus, MessagePaths.TO_CLIENT_BOLUS_REJECTED, "from_phone".toByteArray(), context)
             }
             "DISMISS" -> {
                 val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager

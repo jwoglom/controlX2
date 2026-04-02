@@ -44,7 +44,7 @@ fun FirstLaunch(
                     Prefs(context).setTosAccepted(true)
                     Prefs(context).setServiceEnabled(true)
                     Prefs(context).setPumpFinderServiceEnabled(true)
-                    sendMessage(MessagePaths.TO_PHONE_START_PUMP_FINDER, "".toByteArray())
+                    sendMessage(MessagePaths.TO_SERVER_START_PUMP_FINDER, "".toByteArray())
                 }
             ) {
                 Text("Agree")
