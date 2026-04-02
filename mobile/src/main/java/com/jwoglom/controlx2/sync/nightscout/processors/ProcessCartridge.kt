@@ -70,7 +70,7 @@ class ProcessCartridge(
             is CartridgeFilledHistoryLog -> {
                 NightscoutTreatment.fromTimestamp(
                     eventType = "Insulin Change",
-                    timestamp = item.pumpTime,
+                    timestamp = item.pumpTimeLocal(),
                     seqId = item.seqId,
                     notes = "Cartridge filled with ${parsed.insulinDisplay}U (actual: ${parsed.insulinActual}U)"
                 )
@@ -78,7 +78,7 @@ class ProcessCartridge(
             is TubingFilledHistoryLog -> {
                 NightscoutTreatment.fromTimestamp(
                     eventType = "Site Change",
-                    timestamp = item.pumpTime,
+                    timestamp = item.pumpTimeLocal(),
                     seqId = item.seqId,
                     notes = "Tubing filled/primed with ${parsed.primeSize}U"
                 )
@@ -86,7 +86,7 @@ class ProcessCartridge(
             is CannulaFilledHistoryLog -> {
                 NightscoutTreatment.fromTimestamp(
                     eventType = "Site Change",
-                    timestamp = item.pumpTime,
+                    timestamp = item.pumpTimeLocal(),
                     seqId = item.seqId,
                     notes = "Cannula filled/primed with ${parsed.primeSize}U"
                 )

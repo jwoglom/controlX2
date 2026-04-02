@@ -89,7 +89,7 @@ class HistoryLogDummyDao(val data: MutableList<HistoryLogItem>) : HistoryLogDao 
                     typeId = typeId,
                     count = items.size.toLong(),
                     latestSeqId = items.maxOfOrNull { it.seqId },
-                    latestPumpTime = items.maxOfOrNull { it.pumpTime }
+                    latestPumpTimeSec = items.maxOfOrNull { it.pumpTimeSec }
                 )
             }
     }

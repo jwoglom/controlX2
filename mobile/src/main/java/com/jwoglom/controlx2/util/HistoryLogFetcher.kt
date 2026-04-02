@@ -226,6 +226,7 @@ class HistoryLogFetcher(
                 pumpSid = pumpSid,
                 typeId = log.typeId(),
                 cargo = log.cargo,
+                pumpTimeSec = log.pumpTimeSec,
                 pumpTime = LocalDateTime.ofInstant(log.pumpTimeSecInstant, ZoneId.systemDefault()),
                 addedTime = LocalDateTime.now()
             )

@@ -5,8 +5,10 @@ import androidx.room.Entity
 import androidx.room.Ignore
 import com.jwoglom.pumpx2.pump.messages.response.historyLog.HistoryLog
 import com.jwoglom.pumpx2.pump.messages.response.historyLog.HistoryLogParser
+import com.jwoglom.pumpx2.pump.messages.helpers.Dates
 import java.time.LocalDateTime
 import java.time.ZoneId
+import java.time.ZoneOffset
 
 val itemLruCache = LruCache<Pair<Long, Int>, HistoryLog>(500)
 
@@ -38,6 +40,16 @@ class HistoryLogItem(
         pumpTime=LocalDateTime.ofInstant(message.pumpTimeSecInstant, ZoneId.systemDefault()),
         addedTime=addedTime
     )
+
+    /**
+     * Derive local wall-clock time from [pumpTimeSec].
+     * Use this instead of the deprecated [pumpTime] field.
+     */
+    @Ignore
+    fun pumpTimeLocal(): LocalDateTime =
+        LocalDateTime.ofEpochSecond(
+            pumpTimeSec + Dates.JANUARY_1_2008_UNIX_EPOCH, 0, ZoneOffset.UTC
+        )
 
     @Ignore
     fun parse(): HistoryLog {

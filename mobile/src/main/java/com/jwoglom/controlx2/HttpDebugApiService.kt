@@ -550,8 +550,8 @@ class HttpDebugApiService(private val context: Context, private val port: Int = 
                 json.put("totalCount", count)
                 json.put("oldestSeqId", oldest?.seqId)
                 json.put("newestSeqId", latest?.seqId)
-                json.put("oldestPumpTime", oldest?.pumpTime?.toString())
-                json.put("newestPumpTime", latest?.pumpTime?.toString())
+                json.put("oldestPumpTime", oldest?.pumpTimeLocal()?.toString())
+                json.put("newestPumpTime", latest?.pumpTimeLocal()?.toString())
                 json.put("oldestAddedTime", oldest?.addedTime?.toString())
                 json.put("newestAddedTime", latest?.addedTime?.toString())
 
@@ -580,7 +580,13 @@ class HttpDebugApiService(private val context: Context, private val port: Int = 
                     obj.put("typeName", typeNameFromTypeId(stat.typeId))
                     obj.put("count", stat.count)
                     obj.put("latestSeqId", stat.latestSeqId)
-                    obj.put("latestPumpTime", stat.latestPumpTime?.toString())
+                    obj.put("latestPumpTimeSec", stat.latestPumpTimeSec)
+                    obj.put("latestPumpTime", stat.latestPumpTimeSec?.let {
+                        java.time.LocalDateTime.ofEpochSecond(
+                            it + com.jwoglom.pumpx2.pump.messages.helpers.Dates.JANUARY_1_2008_UNIX_EPOCH,
+                            0, java.time.ZoneOffset.UTC
+                        ).toString()
+                    })
                     typeStatsArray.put(obj)
                 }
 
@@ -773,8 +779,8 @@ class HttpDebugApiService(private val context: Context, private val port: Int = 
 
         private fun filterByTimeRange(items: List<HistoryLogItem>, min: LocalDateTime?, max: LocalDateTime?): List<HistoryLogItem> {
             return items.filter { item ->
-                val afterMin = min?.let { item.pumpTime >= it } ?: true
-                val beforeMax = max?.let { item.pumpTime <= it } ?: true
+                val afterMin = min?.let { item.pumpTimeLocal() >= it } ?: true
+                val beforeMax = max?.let { item.pumpTimeLocal() <= it } ?: true
                 afterMin && beforeMax
             }
         }
@@ -1012,7 +1018,8 @@ class HttpDebugApiService(private val context: Context, private val port: Int = 
         json.put("pumpSid", item.pumpSid)
         json.put("typeId", item.typeId)
         json.put("cargoHex", item.cargo.joinToString("") { "%02x".format(it) })
-        json.put("pumpTime", item.pumpTime.toString())
+        json.put("pumpTime", item.pumpTimeLocal().toString())
+        json.put("pumpTimeSec", item.pumpTimeSec)
         json.put("addedTime", item.addedTime.toString())
 
         if (format == "parsed") {

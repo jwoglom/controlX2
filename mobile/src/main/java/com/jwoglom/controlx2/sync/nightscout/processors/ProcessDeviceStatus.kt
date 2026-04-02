@@ -43,7 +43,7 @@ class ProcessDeviceStatus(
         }
 
         // Sort chronologically and accumulate composite state from all logs
-        val sortedLogs = logs.sortedBy { it.pumpTime }
+        val sortedLogs = logs.sortedBy { it.pumpTimeLocal() }
 
         var latestBattery: Int? = null
         var latestIob: Double? = null
@@ -75,7 +75,7 @@ class ProcessDeviceStatus(
             return 0
         }
 
-        val latestTimestamp = sortedLogs.last().pumpTime
+        val latestTimestamp = sortedLogs.last().pumpTimeLocal()
         val deviceStatus = createDeviceStatus(
             timestamp = latestTimestamp,
             batteryPercent = latestBattery,

@@ -236,7 +236,7 @@ class NightscoutSyncCoordinator(
         // Case 3: First-time sync - use lookbackHours
         val lookbackTime = LocalDateTime.now().minusHours(syncState.lookbackHours.toLong())
         val logs = historyLogRepo.getAll(pumpSid).first()
-        val startSeqId = logs.firstOrNull { it.pumpTime >= lookbackTime }?.seqId ?: 0L
+        val startSeqId = logs.firstOrNull { it.pumpTimeLocal() >= lookbackTime }?.seqId ?: 0L
 
         val latestLog = historyLogRepo.getLatest(pumpSid).first()
         val endSeqId = latestLog?.seqId ?: Long.MAX_VALUE
@@ -254,8 +254,8 @@ class NightscoutSyncCoordinator(
     ): Pair<Long, Long> {
         val logs = historyLogRepo.getAll(pumpSid).first()
 
-        val startSeqId = logs.firstOrNull { it.pumpTime >= startTime }?.seqId ?: 0L
-        val endSeqId = logs.lastOrNull { it.pumpTime <= endTime }?.seqId ?: Long.MAX_VALUE
+        val startSeqId = logs.firstOrNull { it.pumpTimeLocal() >= startTime }?.seqId ?: 0L
+        val endSeqId = logs.lastOrNull { it.pumpTimeLocal() <= endTime }?.seqId ?: Long.MAX_VALUE
 
         Timber.d("Retroactive sync range: seqId $startSeqId..$endSeqId for time $startTime..$endTime")
         return startSeqId to endSeqId

@@ -92,7 +92,7 @@ class ProcessBasal(
 
             treatments.add(NightscoutTreatment.fromTimestamp(
                 eventType = "Temp Basal",
-                timestamp = item.pumpTime,
+                timestamp = item.pumpTimeLocal(),
                 seqId = item.seqId,
                 rate = null,
                 absolute = null,
@@ -103,11 +103,11 @@ class ProcessBasal(
         }
 
         // Process BasalDelivery and BasalRateChange logs with calculated durations
-        val sortedOther = otherLogs.sortedBy { it.pumpTime }
+        val sortedOther = otherLogs.sortedBy { it.pumpTimeLocal() }
         for (i in sortedOther.indices) {
             val item = sortedOther[i]
             val durationMinutes = if (i < sortedOther.lastIndex) {
-                java.time.Duration.between(item.pumpTime, sortedOther[i + 1].pumpTime)
+                java.time.Duration.between(item.pumpTimeLocal(), sortedOther[i + 1].pumpTimeLocal())
                     .toMinutes().toInt().coerceIn(1, 120)
             } else {
                 5 // default for last/only event
@@ -153,7 +153,7 @@ class ProcessBasal(
 
                 NightscoutTreatment.fromTimestamp(
                     eventType = "Temp Basal",
-                    timestamp = item.pumpTime,
+                    timestamp = item.pumpTimeLocal(),
                     seqId = item.seqId,
                     rate = commandedRate,
                     absolute = commandedRate,
@@ -170,7 +170,7 @@ class ProcessBasal(
 
                 NightscoutTreatment.fromTimestamp(
                     eventType = "Temp Basal",
-                    timestamp = item.pumpTime,
+                    timestamp = item.pumpTimeLocal(),
                     seqId = item.seqId,
                     rate = parsed.commandBasalRate.toDouble(),
                     absolute = parsed.commandBasalRate.toDouble(),
