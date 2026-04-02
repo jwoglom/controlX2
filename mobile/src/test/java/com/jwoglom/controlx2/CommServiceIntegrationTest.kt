@@ -55,7 +55,7 @@ import java.time.Instant
  * They test behavior (message in → message out) rather than implementation details.
  */
 @RunWith(AndroidJUnit4::class)
-@Config(sdk = [34])
+@Config(sdk = [35])
 class CommServiceIntegrationTest {
 
     private lateinit var context: Context
