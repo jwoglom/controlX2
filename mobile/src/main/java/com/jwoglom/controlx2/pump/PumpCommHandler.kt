@@ -299,7 +299,7 @@ class PumpCommHandler(
             events: MutableSet<QualifyingEvent>?
         ) {
             Timber.i("onReceiveQualifyingEvent: $events")
-            if (Prefs(applicationContext).qualifyingEventToastsEnabled()) {
+            if (Prefs(callbacks.getApplicationContext()).qualifyingEventToastsEnabled()) {
                 callbacks.showToast("Events: $events", Toast.LENGTH_SHORT)
             }
             if (events != null && QualifyingEvent.PUMP_COMMUNICATIONS_SUSPENDED in events) {
