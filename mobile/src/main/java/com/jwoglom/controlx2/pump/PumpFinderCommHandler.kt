@@ -5,6 +5,7 @@ import android.os.Handler
 import android.os.Looper
 import android.os.Message
 import com.jwoglom.controlx2.shared.CommServiceCodes
+import com.jwoglom.controlx2.shared.MessagePaths
 import com.jwoglom.pumpx2.pump.bluetooth.PumpReadyState
 import com.jwoglom.pumpx2.pump.bluetooth.TandemPumpFinder
 import com.welie.blessed.BluetoothPeripheral
@@ -46,13 +47,13 @@ class PumpFinderCommHandler(
             }
             val key = "${name}=${peripheral?.address}"
             callbacks.sendWearCommMessage(
-                "/from-pump/pump-finder-pump-discovered",
+                MessagePaths.FROM_PUMP_PUMP_FINDER_PUMP_DISCOVERED,
                 "${key};;${readyState.name}".toByteArray()
             )
             // Keep emitting ready-state transitions, but only add each pump once to selection list.
             if (!foundPumps.contains(key)) {
                 foundPumps.add(key)
-                callbacks.sendWearCommMessage("/from-pump/pump-finder-found-pumps",
+                callbacks.sendWearCommMessage(MessagePaths.FROM_PUMP_PUMP_FINDER_FOUND_PUMPS,
                     foundPumps.joinToString(";").toByteArray()
                 )
             }
@@ -60,7 +61,7 @@ class PumpFinderCommHandler(
 
         override fun onBluetoothState(bluetoothEnabled: Boolean) {
             callbacks.sendWearCommMessage(
-                "/from-pump/pump-finder-bluetooth-state",
+                MessagePaths.FROM_PUMP_PUMP_FINDER_BLUETOOTH_STATE,
                 "${bluetoothEnabled}".toByteArray()
             )
         }
@@ -94,7 +95,7 @@ class PumpFinderCommHandler(
             }
             CommServiceCodes.CHECK_PUMP_FINDER_FOUND_PUMPS.ordinal -> {
                 if (pumpFinderActive) {
-                    callbacks.sendWearCommMessage("/from-pump/pump-finder-found-pumps",
+                    callbacks.sendWearCommMessage(MessagePaths.FROM_PUMP_PUMP_FINDER_FOUND_PUMPS,
                         foundPumps.joinToString(";").toByteArray()
                     )
                 }

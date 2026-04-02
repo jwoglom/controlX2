@@ -44,6 +44,7 @@ import com.jwoglom.controlx2.presentation.components.Line
 import com.jwoglom.controlx2.presentation.components.ServiceDisabledMessage
 import com.jwoglom.controlx2.presentation.navigation.Screen
 import com.jwoglom.controlx2.presentation.theme.ControlX2Theme
+import com.jwoglom.controlx2.shared.MessagePaths
 import com.jwoglom.controlx2.shared.enums.GlucoseUnit
 import com.jwoglom.controlx2.shared.util.twoDecimalPlaces
 import kotlinx.coroutines.launch
@@ -89,10 +90,10 @@ fun AppSetup(
             Button(
                 onClick = {
                     Prefs(context).setAppSetupComplete(true)
-                    sendMessage("/to-phone/refresh-history-log-sync", "".toByteArray())
+                    sendMessage(MessagePaths.TO_PHONE_REFRESH_HISTORY_LOG_SYNC, "".toByteArray())
                     // Do not restart the app at the end of setup; restarting here can race pump
                     // bootstrap and leave CommService in a null-peripheral startup loop.
-                    sendMessage("/to-phone/request-service-status", "".toByteArray())
+                    sendMessage(MessagePaths.TO_PHONE_REQUEST_SERVICE_STATUS, "".toByteArray())
                     navController?.navigate(Screen.Landing.route)
                 }
             ) {
@@ -120,7 +121,7 @@ fun AppSetup(
 //                            coroutineScope.launch {
 //                                delay(250)
 //                                sendMessage(
-//                                    "/to-phone/app-reload",
+//                                    MessagePaths.TO_PHONE_APP_RELOAD,
 //                                    "".toByteArray()
 //                                )
 //                            }
@@ -133,7 +134,7 @@ fun AppSetup(
 //                    coroutineScope.launch {
 //                        delay(250)
 //                        sendMessage(
-//                            "/to-phone/app-reload",
+//                            MessagePaths.TO_PHONE_APP_RELOAD,
 //                            "".toByteArray()
 //                        )
 //                    }
@@ -161,7 +162,7 @@ fun AppSetup(
                                 coroutineScope.launch {
                                     delay(250)
                                     sendMessage(
-                                        "/to-phone/app-reload",
+                                        MessagePaths.TO_PHONE_APP_RELOAD,
                                         "".toByteArray()
                                     )
                                 }
@@ -178,7 +179,7 @@ fun AppSetup(
                         coroutineScope.launch {
                             delay(250)
                             sendMessage(
-                                "/to-phone/app-reload",
+                                MessagePaths.TO_PHONE_APP_RELOAD,
                                 "".toByteArray()
                             )
                         }
@@ -342,9 +343,9 @@ fun AppSetup(
                                     showGlucoseUnitDialog = false
                                     // Sync glucose unit to wear app and trigger reload
                                     coroutineScope.launch {
-                                        sendMessage("/to-wear/glucose-unit", unit.name.toByteArray())
+                                        sendMessage(MessagePaths.TO_WEAR_GLUCOSE_UNIT, unit.name.toByteArray())
                                         delay(250)
-                                        sendMessage("/to-phone/app-reload", "".toByteArray())
+                                        sendMessage(MessagePaths.TO_PHONE_APP_RELOAD, "".toByteArray())
                                     }
                                 }
                                 .padding(vertical = 12.dp),
@@ -383,7 +384,7 @@ fun AppSetup(
                     showInsulinWarningDialog = false
                     coroutineScope.launch {
                         delay(250)
-                        sendMessage("/to-phone/app-reload", "".toByteArray())
+                        sendMessage(MessagePaths.TO_PHONE_APP_RELOAD, "".toByteArray())
                     }
                 }) {
                     Text("Enable")

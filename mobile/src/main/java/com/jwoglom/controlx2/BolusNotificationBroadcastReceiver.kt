@@ -15,6 +15,7 @@ import com.jwoglom.controlx2.shared.InitiateConfirmedBolusSerializer
 import com.jwoglom.controlx2.shared.messaging.MessageBus
 import com.jwoglom.controlx2.shared.messaging.MessageBusSender
 import com.jwoglom.controlx2.shared.PumpMessageSerializer
+import com.jwoglom.controlx2.shared.MessagePaths
 import com.jwoglom.controlx2.shared.util.shortTimeAgo
 import com.jwoglom.controlx2.shared.util.twoDecimalPlaces
 import com.jwoglom.pumpx2.pump.PumpState
@@ -60,9 +61,9 @@ class BolusNotificationBroadcastReceiver : BroadcastReceiver() {
 
                     val bolusSource = prefs(context)?.getString("initiateBolusSource", "") ?: ""
                     if (bolusSource == "wear") {
-                        sendMessageWhenReady(messageBus, "/to-wear/initiate-confirmed-bolus", rawBytes, context)
+                        sendMessageWhenReady(messageBus, MessagePaths.TO_WEAR_INITIATE_CONFIRMED_BOLUS, rawBytes, context)
                     } else if (bolusSource == "phone") {
-                        sendMessageWhenReady(messageBus, "/to-phone/initiate-confirmed-bolus", rawBytes, context)
+                        sendMessageWhenReady(messageBus, MessagePaths.TO_PHONE_INITIATE_CONFIRMED_BOLUS, rawBytes, context)
                     }
                     if (!PumpState.actionsAffectingInsulinDeliveryEnabled()) {
                         // The same message will appear on the wearable
@@ -263,7 +264,7 @@ class BolusNotificationBroadcastReceiver : BroadcastReceiver() {
                     )
                 )
                 resetBolusPrefs(context)
-                sendMessageWhenReady(messageBus, "/to-wear/bolus-rejected", "from_phone".toByteArray(), context)
+                sendMessageWhenReady(messageBus, MessagePaths.TO_WEAR_BOLUS_REJECTED, "from_phone".toByteArray(), context)
             }
             "DISMISS" -> {
                 val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
@@ -280,7 +281,7 @@ class BolusNotificationBroadcastReceiver : BroadcastReceiver() {
                 repeat (5) { attempt ->
                     sendMessageWhenReady(
                         messageBus,
-                        "/to-pump/command",
+                        MessagePaths.TO_PUMP_COMMAND,
                         cancelBytes,
                         context,
                         delayMs = attempt * 100L // Stagger retries: 0ms, 100ms, 200ms, 300ms, 400ms
@@ -491,7 +492,7 @@ class BolusNotificationBroadcastReceiver : BroadcastReceiver() {
                     Timber.d("BolusNotificationBroadcastReceiver requesting bolus status update (request $requestCount)")
                     sendMessageWhenReady(
                         messageBus,
-                        "/to-pump/commands-bust-cache",
+                        MessagePaths.TO_PUMP_COMMANDS_BUST_CACHE,
                         PumpMessageSerializer.toBulkBytes(listOf(CurrentBolusStatusRequest())),
                         context,
                         delayMs = 0

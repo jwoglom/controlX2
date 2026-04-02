@@ -54,6 +54,7 @@ import com.jwoglom.controlx2.presentation.util.formatLogLineCount
 import com.jwoglom.controlx2.presentation.util.getSupportBundleSummary
 import com.jwoglom.controlx2.presentation.util.sendSupportBundleEmail
 import com.jwoglom.controlx2.presentation.util.shareSupportBundle
+import com.jwoglom.controlx2.shared.MessagePaths
 import com.jwoglom.controlx2.shared.util.SendType
 import com.jwoglom.controlx2.util.AppVersionCheck
 import com.jwoglom.controlx2.util.AppVersionInfo
@@ -142,10 +143,10 @@ fun Settings(
                             coroutineScope.launch {
                                 delay(250)
                                 // reload service, if running
-                                sendMessage("/to-phone/force-reload", "".toByteArray())
+                                sendMessage(MessagePaths.TO_PHONE_FORCE_RELOAD, "".toByteArray())
                                 delay(250)
                                 // reload main activity as fallback
-                                sendMessage("/to-phone/app-reload", "".toByteArray())
+                                sendMessage(MessagePaths.TO_PHONE_APP_RELOAD, "".toByteArray())
                             }
                         }
                     )
@@ -169,7 +170,7 @@ fun Settings(
 //                                withContext(Dispatchers.IO) {
 //                                    delay(250)
 //                                }
-//                                sendMessage("/to-phone/force-reload", "".toByteArray())
+//                                sendMessage(MessagePaths.TO_PHONE_FORCE_RELOAD, "".toByteArray())
 //                            }
 //                        }
 //                    )
@@ -189,7 +190,7 @@ fun Settings(
 //                                withContext(Dispatchers.IO) {
 //                                    delay(250)
 //                                }
-//                                sendMessage("/to-phone/force-reload", "".toByteArray())
+//                                sendMessage(MessagePaths.TO_PHONE_FORCE_RELOAD, "".toByteArray())
 //                            }
 //                        }
 //                    )
@@ -208,7 +209,7 @@ fun Settings(
                         )
                     },
                     modifier = Modifier.clickable {
-                        sendMessage("/to-phone/force-reload", "".toByteArray())
+                        sendMessage(MessagePaths.TO_PHONE_FORCE_RELOAD, "".toByteArray())
                     }
                 )
                 Divider()
@@ -355,7 +356,7 @@ fun Settings(
                         Prefs(context).setPumpFinderServiceEnabled(true)
                         Prefs(context).setCurrentPumpSid(-1)
                         PumpState.resetState(context)
-                        sendMessage("/to-phone/app-reload", "".toByteArray())
+                        sendMessage(MessagePaths.TO_PHONE_APP_RELOAD, "".toByteArray())
                     }
                 ) {
                     Text("Disconnect")

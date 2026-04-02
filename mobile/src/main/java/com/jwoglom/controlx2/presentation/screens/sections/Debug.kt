@@ -130,6 +130,7 @@ import com.jwoglom.controlx2.db.historylog.HistoryLogViewModel
 import com.jwoglom.controlx2.presentation.components.HeaderLine
 import com.jwoglom.controlx2.presentation.components.HistoryLogSyncProgressBar
 import com.jwoglom.controlx2.presentation.theme.ControlX2Theme
+import com.jwoglom.controlx2.shared.MessagePaths
 import com.jwoglom.controlx2.shared.enums.GlucoseUnit
 import com.jwoglom.controlx2.shared.util.SendType
 import com.jwoglom.controlx2.shared.util.shortTimeAgo
@@ -237,7 +238,7 @@ fun Debug(
                             Prefs(context).setServiceEnabled(false)
                             coroutineScope.launch {
                                 delay(250)
-                                sendMessage("/to-phone/force-reload", "".toByteArray())
+                                sendMessage(MessagePaths.TO_PHONE_FORCE_RELOAD, "".toByteArray())
                             }
                         }
                     )
@@ -446,7 +447,7 @@ fun Debug(
                         onDismissRequest = { showMessageCache = false }
                     ) {
                         LaunchedEffect(Unit) {
-                            sendMessage("/to-pump/debug-message-cache", "".toByteArray())
+                            sendMessage(MessagePaths.TO_PUMP_DEBUG_MESSAGE_CACHE, "".toByteArray())
                         }
 
                         val debugMessageCache = ds.debugMessageCache.observeAsState()
@@ -587,7 +588,7 @@ fun Debug(
                         )
                     },
                     modifier = Modifier.clickable {
-                        sendMessage("/to-pump/debug-historylog-cache", "".toByteArray())
+                        sendMessage(MessagePaths.TO_PUMP_DEBUG_HISTORYLOG_CACHE, "".toByteArray())
                         Handler(Looper.getMainLooper()).postDelayed({
                             showHistoryLogs = true
                         }, 500)
@@ -713,7 +714,7 @@ fun Debug(
                                                 .fillMaxWidth()
                                                 .padding(16.dp)
                                                 .clickable {
-                                                    sendMessage("/to-pump/debug-historylog-cache", "".toByteArray())
+                                                    sendMessage(MessagePaths.TO_PUMP_DEBUG_HISTORYLOG_CACHE, "".toByteArray())
                                                 }
                                         )
                                     }
@@ -773,7 +774,7 @@ fun Debug(
                                 Prefs(context).setOnlySnoopBluetoothEnabled(false)
                                 coroutineScope.launch {
                                     delay(250)
-                                    sendMessage("/to-phone/force-reload", "".toByteArray())
+                                    sendMessage(MessagePaths.TO_PHONE_FORCE_RELOAD, "".toByteArray())
                                 }
                             }
                         )
@@ -791,7 +792,7 @@ fun Debug(
                                 Prefs(context).setOnlySnoopBluetoothEnabled(true)
                                 coroutineScope.launch {
                                     delay(250)
-                                    sendMessage("/to-phone/force-reload", "".toByteArray())
+                                    sendMessage(MessagePaths.TO_PHONE_FORCE_RELOAD, "".toByteArray())
                                 }
                             }
                         )

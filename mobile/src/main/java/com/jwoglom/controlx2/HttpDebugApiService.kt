@@ -6,6 +6,7 @@ import com.jwoglom.controlx2.db.historylog.HistoryLogDatabase
 import com.jwoglom.controlx2.db.historylog.HistoryLogItem
 import com.jwoglom.controlx2.db.historylog.HistoryLogRepo
 import com.jwoglom.controlx2.db.historylog.HistoryLogTypeStats
+import com.jwoglom.controlx2.shared.MessagePaths
 import com.jwoglom.controlx2.shared.PumpMessageSerializer
 import com.jwoglom.controlx2.shared.util.SendType
 import com.jwoglom.controlx2.util.AppVersionInfo
@@ -165,11 +166,11 @@ class HttpDebugApiService(private val context: Context, private val port: Int = 
      */
     fun onMessagingReceived(path: String, data: ByteArray, sourceNodeId: String) {
         when {
-            path == "/from-pump/pump-connected" -> {
+            path == MessagePaths.FROM_PUMP_PUMP_CONNECTED -> {
                 this.pumpConnected.set(true)
                 this.pumpConnectedWaiters.forEach { it.complete(true) }
             }
-            path == "/from-pump/pump-disconnected" -> {
+            path == MessagePaths.FROM_PUMP_PUMP_DISCONNECTED -> {
                 this.pumpConnected.set(false)
             }
         }

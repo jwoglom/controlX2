@@ -1,5 +1,6 @@
 package com.jwoglom.controlx2.messaging
 
+import com.jwoglom.controlx2.shared.MessagePaths
 import com.jwoglom.controlx2.shared.messaging.ConnectionState
 import com.jwoglom.controlx2.shared.messaging.MessageBus
 import com.jwoglom.controlx2.shared.messaging.MessageBusSender
@@ -44,7 +45,7 @@ class HybridMessageBus(
             // Messages from the watch: forward to all listeners.
             // /to-phone/* and /to-pump/* are actionable watch-originated messages.
             // /from-pump/* arrives via Broadcast transport instead.
-            if (path.startsWith("/to-phone/") || path.startsWith("/to-pump/")) {
+            if (path.startsWith(MessagePaths.PREFIX_TO_PHONE) || path.startsWith(MessagePaths.PREFIX_TO_PUMP)) {
                 notifyListeners(path, data, sourceNodeId)
             }
         }
@@ -69,12 +70,12 @@ class HybridMessageBus(
 
         when {
             // Phone → Watch: Wear transport only
-            path.startsWith("/to-wear/") -> {
+            path.startsWith(MessagePaths.PREFIX_TO_WEAR) -> {
                 wearBus.sendMessage(path, data, sender)
             }
 
             // Pump responses: broadcast locally + send to watch
-            path.startsWith("/from-pump/") -> {
+            path.startsWith(MessagePaths.PREFIX_FROM_PUMP) -> {
                 broadcastBus.sendMessage(path, data, sender)
                 wearBus.sendMessage(path, data, sender)
             }
