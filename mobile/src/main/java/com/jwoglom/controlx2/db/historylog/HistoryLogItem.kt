@@ -22,6 +22,9 @@ class HistoryLogItem(
     val pumpSid: Int = 0,
     val typeId: Int,
     val cargo: ByteArray,
+    // Raw pump clock: local wall-clock seconds since 2008-01-01 00:00:00 as reported by the pump.
+    val pumpTimeSec: Long = 0,
+    @Deprecated("Replaced with pumpTimeSec. This field has ambiguous timezone encoding.")
     val pumpTime: LocalDateTime,
     val addedTime: LocalDateTime = LocalDateTime.now()
 ) {
@@ -31,6 +34,7 @@ class HistoryLogItem(
         pumpSid=0,
         typeId=message.typeId(),
         cargo=message.cargo,
+        pumpTimeSec=message.pumpTimeSec,
         pumpTime=LocalDateTime.ofInstant(message.pumpTimeSecInstant, ZoneId.systemDefault()),
         addedTime=addedTime
     )

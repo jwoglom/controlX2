@@ -138,10 +138,10 @@ interface HistoryLogDao {
         SELECT * FROM $HistoryLogTable
         WHERE pumpSid = :pumpSid
         AND typeId IN(:typeIds)
-        AND pumpTime >= :startTime
+        AND pumpTimeSec >= :minPumpTimeSec
         ORDER BY seqId ASC
     """)
-    fun getItemsForTypesSince(pumpSid: Int, typeIds: List<Int>, startTime: LocalDateTime): Flow<List<HistoryLogItem>>
+    fun getItemsForTypesSince(pumpSid: Int, typeIds: List<Int>, minPumpTimeSec: Long): Flow<List<HistoryLogItem>>
 
     @Insert(onConflict = OnConflictStrategy.IGNORE)
     suspend fun insert(historyLogItem: HistoryLogItem)

@@ -2,8 +2,6 @@ package com.jwoglom.controlx2.db.historylog
 
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flowOf
-import java.time.LocalDateTime
-
 
 class HistoryLogDummyDao(val data: MutableList<HistoryLogItem>) : HistoryLogDao {
     override fun getCount(pumpSid: Int): Flow<Long?> = flowOf(
@@ -54,8 +52,8 @@ class HistoryLogDummyDao(val data: MutableList<HistoryLogItem>) : HistoryLogDao 
             .sortedBy { it.seqId }
     )
 
-    override fun getItemsForTypesSince(pumpSid: Int, typeIds: List<Int>, startTime: LocalDateTime): Flow<List<HistoryLogItem>> = flowOf(
-        data.filter { it.pumpSid == pumpSid && it.typeId in typeIds && !it.pumpTime.isBefore(startTime) }
+    override fun getItemsForTypesSince(pumpSid: Int, typeIds: List<Int>, minPumpTimeSec: Long): Flow<List<HistoryLogItem>> = flowOf(
+        data.filter { it.pumpSid == pumpSid && it.typeId in typeIds && it.pumpTimeSec >= minPumpTimeSec }
             .sortedBy { it.seqId }
     )
 

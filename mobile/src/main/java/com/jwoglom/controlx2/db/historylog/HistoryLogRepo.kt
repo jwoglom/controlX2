@@ -50,8 +50,8 @@ class HistoryLogRepo(private val historyLogDao: HistoryLogDao) {
         return historyLogDao.getRangeForType(pumpSid, typeId, seqIdMin, seqIdMax)
     }
 
-    fun getItemsForTypesSince(pumpSid: Int, typeIds: List<Int>, startTime: LocalDateTime): Flow<List<HistoryLogItem>> {
-        return historyLogDao.getItemsForTypesSince(pumpSid, typeIds, startTime)
+    fun getItemsForTypesSince(pumpSid: Int, typeIds: List<Int>, minPumpTimeSec: Long): Flow<List<HistoryLogItem>> {
+        return historyLogDao.getItemsForTypesSince(pumpSid, typeIds, minPumpTimeSec)
     }
 
     @Suppress("RedundantSuspendModifier")
@@ -61,12 +61,14 @@ class HistoryLogRepo(private val historyLogDao: HistoryLogDao) {
         historyLogDao.insert(historyLogItem)
     }
 
+    @Suppress("DEPRECATION")
     suspend fun insert(historyLog: HistoryLog, pumpSid: Int) {
         val historyLogItem = HistoryLogItem(
             seqId = historyLog.sequenceNum,
             pumpSid = pumpSid,
             typeId = historyLog.typeId(),
             cargo = historyLog.cargo,
+            pumpTimeSec = historyLog.pumpTimeSec,
             pumpTime = LocalDateTime.ofInstant(historyLog.pumpTimeSecInstant, ZoneId.systemDefault()),
             addedTime = LocalDateTime.now()
         )

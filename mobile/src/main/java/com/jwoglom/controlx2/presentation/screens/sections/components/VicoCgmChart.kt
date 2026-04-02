@@ -125,7 +125,6 @@ import com.patrykandpatrick.vico.core.common.component.Component
 import com.patrykandpatrick.vico.core.common.component.TextComponent
 import com.patrykandpatrick.vico.core.common.data.ExtraStore
 import java.time.Instant
-import java.time.LocalDateTime
 import java.time.ZoneId
 import java.util.Locale
 import kotlin.math.max
@@ -641,12 +640,14 @@ private fun rememberBasalData(
         DailyBasalHistoryLog::class.java
     )
 
-    val basalQueryStartTime = remember(startTimeSeconds) {
-        Instant.ofEpochSecond(startTimeSeconds - BASAL_LOOKBACK_SECONDS)
-    }
+    val dataStore = LocalDataStore.current
+    val currentPumpTimeSec = dataStore.timeSinceResetResponse.observeAsState().value?.currentTime
+        ?: HistoryLogViewModel.estimateCurrentPumpTimeSec()
+    val rangeSeconds = currentTimeSeconds - startTimeSeconds
+    val minPumpTimeSec = currentPumpTimeSec - rangeSeconds - BASAL_LOOKBACK_SECONDS
     val basalHistoryLogs = historyLogViewModel?.itemsForTypesSince(
         basalClasses,
-        basalQueryStartTime
+        minPumpTimeSec
     )?.observeAsState()
 
     val basalChartData = remember(basalHistoryLogs?.value, timeRange, startTimeSeconds, currentTimeSeconds) {
