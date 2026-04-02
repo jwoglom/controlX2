@@ -55,7 +55,7 @@ import com.jwoglom.controlx2.presentation.theme.ControlX2Theme
 import com.jwoglom.controlx2.presentation.util.LifecycleStateObserver
 import com.jwoglom.controlx2.shared.presentation.intervalOf
 import com.jwoglom.controlx2.shared.util.SendType
-import com.jwoglom.controlx2.util.determinePumpModel
+import com.jwoglom.controlx2.shared.util.determinePumpModel
 import com.jwoglom.pumpx2.pump.messages.Message
 import com.jwoglom.pumpx2.pump.PumpState
 import com.jwoglom.pumpx2.pump.messages.models.ApiVersion

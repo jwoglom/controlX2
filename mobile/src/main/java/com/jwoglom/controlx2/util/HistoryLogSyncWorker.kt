@@ -2,6 +2,7 @@ package com.jwoglom.controlx2.util
 
 import android.os.Handler
 import android.os.Looper
+import com.jwoglom.controlx2.pump.PumpHistoryLogSyncWorker
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -14,13 +15,13 @@ import timber.log.Timber
 class HistoryLogSyncWorker(
     private val intervalMinutes: Int = 5,
     private val requestSync: () -> Unit
-) {
+) : PumpHistoryLogSyncWorker {
     private val handler = Handler(Looper.getMainLooper())
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private var syncRunnable: Runnable? = null
     private var isRunning = false
 
-    fun start() {
+    override fun start() {
         if (isRunning) {
             Timber.v("HistoryLogSyncWorker already running")
             return
@@ -29,14 +30,14 @@ class HistoryLogSyncWorker(
         scheduleNextSync()
     }
 
-    fun stop() {
+    override fun stop() {
         if (!isRunning) return
         isRunning = false
         syncRunnable?.let { handler.removeCallbacks(it) }
         syncRunnable = null
     }
 
-    fun triggerImmediateSync() {
+    override fun triggerImmediateSync() {
         scope.launch {
             try {
                 requestSync()

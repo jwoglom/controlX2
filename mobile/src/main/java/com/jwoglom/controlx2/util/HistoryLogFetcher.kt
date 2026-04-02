@@ -3,6 +3,7 @@ package com.jwoglom.controlx2.util
 import android.util.LruCache
 import com.jwoglom.controlx2.db.historylog.HistoryLogItem
 import com.jwoglom.controlx2.db.historylog.HistoryLogRepo
+import com.jwoglom.controlx2.pump.PumpHistoryLogFetcher
 import com.jwoglom.controlx2.pump.PumpSession
 import com.jwoglom.pumpx2.pump.messages.request.currentStatus.HistoryLogRequest
 import com.jwoglom.pumpx2.pump.messages.response.currentStatus.HistoryLogStatusResponse
@@ -34,7 +35,7 @@ class HistoryLogFetcher(
     private val requestDelayMs: Long = 1000,
     private val pollIntervalMs: Long = 500,
     private val fetchGroupTimeoutMs: Long = FetchGroupTimeoutMs.toLong()
-) {
+) : PumpHistoryLogFetcher {
     private var recentSeqIds = LruCache<Long, Long>(256)
     private var latestSeqId: Long = 0
 
@@ -59,7 +60,7 @@ class HistoryLogFetcher(
         broadcastCallback = broadcastCallback
     )
 
-    fun cancel() {
+    override fun cancel() {
         cancelled = true
     }
 
@@ -138,7 +139,7 @@ class HistoryLogFetcher(
             i = startI - 1
         }
     }
-    suspend fun onStatusResponse(message: HistoryLogStatusResponse, scope: CoroutineScope) {
+    override suspend fun onStatusResponse(message: HistoryLogStatusResponse, scope: CoroutineScope) {
         if (!shouldContinue()) return
         statusResponseLock.withLock {
             Timber.i("HistoryLogFetcher.onStatusResponse<lock>")
@@ -214,7 +215,7 @@ class HistoryLogFetcher(
         }
     }
 
-    suspend fun onStreamResponse(log: HistoryLog) {
+    override suspend fun onStreamResponse(log: HistoryLog) {
         streamResponseLock.withLock {
             if (recentSeqIds.get(log.sequenceNum) != null) {
                 Timber.d("HistoryLogFetcher onStreamResponse skip duplicate ${log.sequenceNum}")
