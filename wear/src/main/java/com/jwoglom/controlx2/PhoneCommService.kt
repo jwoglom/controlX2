@@ -24,6 +24,7 @@ import com.jwoglom.controlx2.presentation.navigation.Screen
 import com.jwoglom.controlx2.shared.messaging.MessageBus
 import com.jwoglom.controlx2.shared.messaging.MessageListener
 import com.jwoglom.controlx2.shared.PumpMessageSerializer
+import com.jwoglom.controlx2.shared.MessagePaths
 import com.jwoglom.controlx2.shared.util.setupTimber
 import com.jwoglom.controlx2.util.ConnectedState
 import com.jwoglom.controlx2.util.StatePrefs
@@ -122,35 +123,35 @@ class PhoneCommService : Service() {
     private fun handleMessageReceived(path: String, data: ByteArray, sourceNodeId: String) {
         Timber.d("wear service handleMessageReceived $path from $sourceNodeId")
         when (path) {
-            "/to-wear/open-activity" -> {
+            MessagePaths.TO_WEAR_OPEN_ACTIVITY -> {
                 startActivity(
                     Intent(applicationContext, MainActivity::class.java)
                         .addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP)
                 )
             }
-            "/from-pump/pump-connected" -> {
+            MessagePaths.FROM_PUMP_PUMP_CONNECTED -> {
                 connected = ConnectedState.PHONE_CONNECTED_PUMP_CONNECTED
                 StatePrefs(this).connected = Pair(connected.name, Instant.now())
                 updateNotification()
             }
-            "/from-pump/pump-disconnected" -> {
+            MessagePaths.FROM_PUMP_PUMP_DISCONNECTED -> {
                 connected = ConnectedState.PHONE_CONNECTED_PUMP_DISCONNECTED
                 StatePrefs(this).connected = Pair(connected.name, Instant.now())
                 updateNotification()
             }
-            "/to-wear/blocked-bolus-signature" -> {
+            MessagePaths.TO_WEAR_BLOCKED_BOLUS_SIGNATURE -> {
                 Timber.w("PhoneCommService: blocked bolus signature")
                 Intent(applicationContext, MainActivity::class.java)
                     .addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP)
                     .putExtra("route", Screen.BolusBlocked.route)
             }
-            "/to-wear/bolus-not-enabled" -> {
+            MessagePaths.TO_WEAR_BOLUS_NOT_ENABLED -> {
                 Timber.w("PhoneCommService: bolus not enabled")
                 Intent(applicationContext, MainActivity::class.java)
                     .addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP)
                     .putExtra("route", Screen.BolusNotEnabled.route)
             }
-            "/to-wear/service-receive-message" -> {
+            MessagePaths.TO_WEAR_SERVICE_RECEIVE_MESSAGE -> {
                 serviceScope.launch {
                     val pumpMessage = withContext(Dispatchers.Default) {
                         PumpMessageSerializer.fromBytes(data)
@@ -158,7 +159,7 @@ class PhoneCommService : Service() {
                     onPumpMessageReceived(pumpMessage, false)
                 }
             }
-            "/to-wear/glucose-unit" -> {
+            MessagePaths.TO_WEAR_GLUCOSE_UNIT -> {
                 val unitName = String(data)
                 val unit = com.jwoglom.controlx2.shared.enums.GlucoseUnit.fromName(unitName)
                 if (unit != null) {

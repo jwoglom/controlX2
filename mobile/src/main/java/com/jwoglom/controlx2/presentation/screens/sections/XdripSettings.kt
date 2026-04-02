@@ -31,6 +31,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavHostController
 import com.jwoglom.controlx2.Prefs
+import com.jwoglom.controlx2.shared.MessagePaths
 import com.jwoglom.controlx2.presentation.components.HeaderLine
 import com.jwoglom.controlx2.sync.xdrip.XdripBroadcastSender
 import com.jwoglom.controlx2.sync.xdrip.XdripPayloadGroup
@@ -61,9 +62,9 @@ fun XdripSettings(
         if (newConfig.requiresReloadComparedTo(oldConfig)) {
             coroutineScope.launch {
                 delay(250)
-                sendMessage("/to-phone/force-reload", "".toByteArray())
+                sendMessage(MessagePaths.TO_PHONE_FORCE_RELOAD, "".toByteArray())
                 delay(250)
-                sendMessage("/to-phone/app-reload", "".toByteArray())
+                sendMessage(MessagePaths.TO_PHONE_APP_RELOAD, "".toByteArray())
             }
         }
 

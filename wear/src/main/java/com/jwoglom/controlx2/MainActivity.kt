@@ -25,6 +25,7 @@ import com.jwoglom.controlx2.presentation.WearApp
 import com.jwoglom.controlx2.presentation.navigation.Screen
 import com.jwoglom.controlx2.presentation.ui.resetBolusDataStoreState
 import com.jwoglom.controlx2.shared.InitiateConfirmedBolusSerializer
+import com.jwoglom.controlx2.shared.MessagePaths
 import com.jwoglom.controlx2.shared.PumpMessageSerializer
 import com.jwoglom.controlx2.shared.PumpQualifyingEventsSerializer
 import com.jwoglom.controlx2.shared.enums.BasalStatus
@@ -112,7 +113,7 @@ class MainActivity : ComponentActivity(), MessageClient.OnMessageReceivedListene
             }
 
             val sendPhoneConnectionCheck: () -> Unit = {
-                this.sendMessage("/to-phone/is-pump-connected", "phone_connection_check".toByteArray())
+                this.sendMessage(MessagePaths.TO_PHONE_IS_PUMP_CONNECTED, "phone_connection_check".toByteArray())
             }
 
             val sendPhoneBolusRequest: (Int, BolusParameters, BolusCalcUnits, BolusCalcDataSnapshotResponse, TimeSinceResetResponse) -> Unit = { bolusId, params, unitBreakdown, dataSnapshot, timeSinceReset ->
@@ -180,11 +181,11 @@ class MainActivity : ComponentActivity(), MessageClient.OnMessageReceivedListene
                 )
 
                 Timber.i("sendPhoneBolusRequest: numUnits=$numUnits numCarbs=$numCarbs bgValue=$bgValue foodVolume=$foodVolume corrVolume=$corrVolume iobUnits=$iobUnits: bolusRequest=$bolusRequest preCommands=$preCommands")
-                this.sendMessage("/to-phone/bolus-request-wear", PumpMessageSerializer.toBytes(bolusRequest))
+                this.sendMessage(MessagePaths.TO_PHONE_BOLUS_REQUEST_WEAR, PumpMessageSerializer.toBytes(bolusRequest))
             }
 
             val sendPhoneBolusCancel: () -> Unit = {
-                this.sendMessage("/to-phone/bolus-cancel", "".toByteArray())
+                this.sendMessage(MessagePaths.TO_PHONE_BOLUS_CANCEL, "".toByteArray())
             }
 
             val sendPhoneOpenActivity: () -> Unit = {
@@ -211,7 +212,7 @@ class MainActivity : ComponentActivity(), MessageClient.OnMessageReceivedListene
             }
 
             val sendPhoneCommand: (String) -> Unit = {cmd ->
-                this.sendMessage("/to-phone/$cmd", "".toByteArray())
+                this.sendMessage("${MessagePaths.PREFIX_TO_PHONE}$cmd", "".toByteArray())
             }
 
             WearApp(
@@ -261,7 +262,7 @@ class MainActivity : ComponentActivity(), MessageClient.OnMessageReceivedListene
         super.onResume()
         messageClient.addListener(this)
 
-        sendMessage("/to-phone/is-pump-connected", "onResume".toByteArray())
+        sendMessage(MessagePaths.TO_PHONE_IS_PUMP_CONNECTED, "onResume".toByteArray())
     }
 
     override fun onNewIntent(intent: Intent) {
@@ -284,8 +285,8 @@ class MainActivity : ComponentActivity(), MessageClient.OnMessageReceivedListene
 
     fun onConnected(bundle: Bundle?) {
         Timber.i("wear onConnected: $bundle")
-        sendMessage("/to-phone/connected", "wear_launched".toByteArray())
-        sendMessage("/to-phone/is-pump-connected", "onConnected".toByteArray())
+        sendMessage(MessagePaths.TO_PHONE_CONNECTED, "wear_launched".toByteArray())
+        sendMessage(MessagePaths.TO_PHONE_IS_PUMP_CONNECTED, "onConnected".toByteArray())
     }
 
     override fun onStop() {
@@ -300,11 +301,11 @@ class MainActivity : ComponentActivity(), MessageClient.OnMessageReceivedListene
     }
 
     private fun sendPumpCommand(msg: Message) {
-        sendMessage("/to-pump/command", PumpMessageSerializer.toBytes(msg))
+        sendMessage(MessagePaths.TO_PUMP_COMMAND, PumpMessageSerializer.toBytes(msg))
     }
 
     private fun sendPumpCommands(type: SendType, msgs: List<Message>) {
-        sendMessage("/to-pump/${type.slug}", PumpMessageSerializer.toBulkBytes(msgs))
+        sendMessage("${MessagePaths.PREFIX_TO_PUMP}${type.slug}", PumpMessageSerializer.toBulkBytes(msgs))
     }
 
     private fun sendMessage(path: String, message: ByteArray) {
@@ -499,22 +500,22 @@ class MainActivity : ComponentActivity(), MessageClient.OnMessageReceivedListene
     override fun onMessageReceived(messageEvent: MessageEvent) {
         Timber.d("wear onMessageReceived: ${messageEvent.path}")
         when (messageEvent.path) {
-            "/to-wear/connected" -> {
+            MessagePaths.TO_WEAR_CONNECTED -> {
                 if (inWaitingState()) {
                     runOnUiThread {
                         navController.navigateClearBackStack(Screen.WaitingToFindPump.route)
                     }
-                    sendMessage("/to-phone/is-pump-connected", "on-phone-connected".toByteArray())
+                    sendMessage(MessagePaths.TO_PHONE_IS_PUMP_CONNECTED, "on-phone-connected".toByteArray())
                 }
                 dataStore.connectionStatus.value = "Waiting to find pump"
             }
-            "/to-wear/bolus-min-notify-threshold" -> {
+            MessagePaths.TO_WEAR_BOLUS_MIN_NOTIFY_THRESHOLD -> {
                 dataStore.bolusMinNotifyThreshold.value = String(messageEvent.data).toDoubleOrNull()
             }
-            "/to-wear/wear-auto-approve-timeout" -> {
+            MessagePaths.TO_WEAR_WEAR_AUTO_APPROVE_TIMEOUT -> {
                 dataStore.wearAutoApproveTimeout.value = String(messageEvent.data).toIntOrNull() ?: 0
             }
-            "/to-wear/glucose-unit" -> {
+            MessagePaths.TO_WEAR_GLUCOSE_UNIT -> {
                 val unitName = String(messageEvent.data)
                 val unit = com.jwoglom.controlx2.shared.enums.GlucoseUnit.fromName(unitName)
                 if (unit != null) {
@@ -523,7 +524,7 @@ class MainActivity : ComponentActivity(), MessageClient.OnMessageReceivedListene
                     com.jwoglom.controlx2.util.UpdateComplication(this, com.jwoglom.controlx2.util.WearX2Complication.CGM_READING)
                 }
             }
-            "/to-wear/initiate-confirmed-bolus" -> {
+            MessagePaths.TO_WEAR_INITIATE_CONFIRMED_BOLUS -> {
                 uiScope.launch {
                     if (inWaitingState()) {
                         Timber.e("in invalid state for initiate-confirmed-bolus")
@@ -550,56 +551,56 @@ class MainActivity : ComponentActivity(), MessageClient.OnMessageReceivedListene
                     }
 
                     Timber.i("sending initiate-confirmed-bolus from wearable to phone")
-                    sendMessage("/to-phone/initiate-confirmed-bolus", messageEvent.data)
+                    sendMessage(MessagePaths.TO_PHONE_INITIATE_CONFIRMED_BOLUS, messageEvent.data)
                 }
             }
-            "/to-wear/blocked-bolus-signature" -> {
+            MessagePaths.TO_WEAR_BLOCKED_BOLUS_SIGNATURE -> {
                 Timber.w("blocked bolus signature")
                 runOnUiThread {
                     navController.navigate(Screen.BolusBlocked.route)
                 }
             }
-            "/to-wear/bolus-not-enabled" -> {
+            MessagePaths.TO_WEAR_BOLUS_NOT_ENABLED -> {
                 Timber.w("bolus not enabled")
                 runOnUiThread {
                     navController.navigate(Screen.BolusNotEnabled.route)
                 }
             }
-            "/to-wear/bolus-rejected" -> {
+            MessagePaths.TO_WEAR_BOLUS_REJECTED -> {
                 Timber.w("bolus rejected")
                 runOnUiThread {
                     resetBolusDataStoreState(dataStore)
                     navController.navigate(Screen.BolusRejectedOnPhone.route)
                 }
             }
-            "/from-pump/pump-model" -> {
+            MessagePaths.FROM_PUMP_PUMP_MODEL -> {
                 if (inWaitingState()) {
                     runOnUiThread {
                         navController.navigateClearBackStack(Screen.ConnectingToPump.route)
                     }
-                    sendMessage("/to-phone/is-pump-connected", "on-pump-model".toByteArray())
+                    sendMessage(MessagePaths.TO_PHONE_IS_PUMP_CONNECTED, "on-pump-model".toByteArray())
                 }
                 dataStore.connectionStatus.value = "Connecting to pump"
             }
-            "/from-pump/entered-pairing-code" -> {
+            MessagePaths.FROM_PUMP_ENTERED_PAIRING_CODE -> {
                 if (inWaitingState()) {
                     runOnUiThread {
                         navController.navigateClearBackStack(Screen.PairingToPump.route)
                     }
-                    sendMessage("/to-phone/is-pump-connected", "on-entered-pairing-code".toByteArray())
+                    sendMessage(MessagePaths.TO_PHONE_IS_PUMP_CONNECTED, "on-entered-pairing-code".toByteArray())
                 }
                 dataStore.connectionStatus.value = "Pairing to pump"
             }
-            "/from-pump/missing-pairing-code" -> {
+            MessagePaths.FROM_PUMP_MISSING_PAIRING_CODE -> {
                 if (inWaitingState()) {
                     runOnUiThread {
                         navController.navigateClearBackStack(Screen.MissingPairingCode.route)
                     }
-                    sendMessage("/to-phone/is-pump-connected", "on-missing-pairing-code".toByteArray())
+                    sendMessage(MessagePaths.TO_PHONE_IS_PUMP_CONNECTED, "on-missing-pairing-code".toByteArray())
                 }
                 dataStore.connectionStatus.value = "Missing pairing code"
             }
-            "/from-pump/pump-connected" -> {
+            MessagePaths.FROM_PUMP_PUMP_CONNECTED -> {
                 if (inWaitingState()) {
                     runOnUiThread {
                         setTurnScreenOn(true)
@@ -608,7 +609,7 @@ class MainActivity : ComponentActivity(), MessageClient.OnMessageReceivedListene
                 }
                 dataStore.connectionStatus.value = ""
             }
-            "/from-pump/pump-disconnected" -> {
+            MessagePaths.FROM_PUMP_PUMP_DISCONNECTED -> {
                 if (inWaitingState()) {
                     runOnUiThread {
                         navController.navigateClearBackStack(Screen.PumpDisconnectedReconnecting.route)
@@ -623,10 +624,10 @@ class MainActivity : ComponentActivity(), MessageClient.OnMessageReceivedListene
                 }
                 dataStore.connectionStatus.value = "Reconnecting"
             }
-            "/from-pump/pump-critical-error" -> {
+            MessagePaths.FROM_PUMP_PUMP_CRITICAL_ERROR -> {
                 dataStore.connectionStatus.value = "Error: ${String(messageEvent.data)}"
             }
-            "/from-pump/receive-qualifying-event" -> {
+            MessagePaths.FROM_PUMP_RECEIVE_QUALIFYING_EVENT -> {
                 uiScope.launch {
                     val pumpEvents = withContext(Dispatchers.Default) {
                         PumpQualifyingEventsSerializer.fromBytes(messageEvent.data)
@@ -634,7 +635,7 @@ class MainActivity : ComponentActivity(), MessageClient.OnMessageReceivedListene
                     onPumpQualifyingEventReceived(pumpEvents)
                 }
             }
-            "/from-pump/receive-message" -> {
+            MessagePaths.FROM_PUMP_RECEIVE_MESSAGE -> {
                 uiScope.launch {
                     if (inWaitingState()) {
                         navController.navigateClearBackStack(initialRoute)
@@ -645,7 +646,7 @@ class MainActivity : ComponentActivity(), MessageClient.OnMessageReceivedListene
                     onPumpMessageReceived(pumpMessage, false)
                 }
             }
-            "/from-pump/receive-cached-message" -> {
+            MessagePaths.FROM_PUMP_RECEIVE_CACHED_MESSAGE -> {
                 uiScope.launch {
                     if (inWaitingState()) {
                         navController.navigateClearBackStack(initialRoute)

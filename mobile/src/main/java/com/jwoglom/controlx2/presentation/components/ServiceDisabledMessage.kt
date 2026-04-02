@@ -27,6 +27,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import com.jwoglom.controlx2.LocalDataStore
+import com.jwoglom.controlx2.shared.MessagePaths
 import com.jwoglom.controlx2.Prefs
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.delay
@@ -57,10 +58,10 @@ fun ServiceDisabledMessage(
                     coroutineScope.launch {
                         delay(250)
                         // reload service, if running
-                        sendMessage("/to-phone/force-reload", "".toByteArray())
+                        sendMessage(MessagePaths.TO_PHONE_FORCE_RELOAD, "".toByteArray())
                         delay(250)
                         // reload main activity as fallback
-                        sendMessage("/to-phone/app-reload", "".toByteArray())
+                        sendMessage(MessagePaths.TO_PHONE_APP_RELOAD, "".toByteArray())
                     }
                 }
             ) {

@@ -13,6 +13,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.navigation.NavHostController
 import com.jwoglom.controlx2.Prefs
+import com.jwoglom.controlx2.shared.MessagePaths
 import com.jwoglom.controlx2.presentation.components.DialogScreen
 import com.jwoglom.controlx2.presentation.navigation.Screen
 import com.jwoglom.controlx2.presentation.screens.sections.components.VersionInfo
@@ -43,7 +44,7 @@ fun FirstLaunch(
                     Prefs(context).setTosAccepted(true)
                     Prefs(context).setServiceEnabled(true)
                     Prefs(context).setPumpFinderServiceEnabled(true)
-                    sendMessage("/to-phone/start-pump-finder", "".toByteArray())
+                    sendMessage(MessagePaths.TO_PHONE_START_PUMP_FINDER, "".toByteArray())
                 }
             ) {
                 Text("Agree")
