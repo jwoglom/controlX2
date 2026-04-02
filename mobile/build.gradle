@@ -4,7 +4,7 @@ plugins {
     id 'org.jetbrains.kotlin.plugin.compose'
     id 'hu.supercluster.paperwork'
     id 'com.google.devtools.ksp'
-    id 'app.cash.paparazzi' version '1.3.4'
+    id 'io.github.takahirom.roborazzi'
 }
 
 android {
@@ -58,7 +58,15 @@ android {
     testOptions {
         unitTests {
             includeAndroidResources = true
+            returnDefaultValues = true
             all {
+                jvmArgs '-noverify'
+                maxHeapSize = '4g'
+                systemProperty 'robolectric.pixelCopyRenderMode', 'hardware'
+                // Snapshot tests require Java 21 + Roborazzi tasks; exclude from normal testDebugUnitTest
+                if (!project.gradle.startParameter.taskNames.any { it.contains('Roborazzi') }) {
+                    exclude '**/snapshots/**'
+                }
                 // Exclude bcprov-jdk14 from unit test classpath to avoid
                 // BouncyCastle JAR signer conflict with Robolectric's
                 // android-all framework JAR (which bundles its own BC).
@@ -73,6 +81,9 @@ android {
         }
     }
 }
+
+// Roborazzi preview tests are defined manually in
+// src/test/java/.../snapshots/ComposePreviewSnapshotTests.kt
 
 paperwork {
     set = [
@@ -153,9 +164,12 @@ dependencies {
     debugImplementation "androidx.customview:customview-poolingcontainer:1.0.0"
 
     testImplementation 'junit:junit:4.13.2'
-    testImplementation 'org.robolectric:robolectric:4.14.1'
-    testImplementation 'androidx.test:core:1.6.1'
     testImplementation 'androidx.test.ext:junit:1.2.1'
+    testImplementation "androidx.compose.ui:ui-test-junit4:$compose_version"
+    testImplementation "androidx.compose.ui:ui-test-manifest:$compose_version"
+    testImplementation 'androidx.activity:activity-ktx:1.10.1'
+    testImplementation 'org.robolectric:robolectric:4.16.1'
+    testImplementation 'androidx.test:core:1.6.1'
     testImplementation 'androidx.test:runner:1.6.2'
     testImplementation 'io.mockk:mockk:1.13.13'
     testImplementation 'org.jetbrains.kotlinx:kotlinx-coroutines-test:1.7.3'
@@ -176,9 +190,16 @@ dependencies {
     testImplementation("androidx.room:room-testing:$room_version")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3")
 
-    // SLF4J for Paparazzi tests (pumpx2 library uses it)
+    // SLF4J (pumpx2 library uses it)
     testImplementation 'org.slf4j:slf4j-api:2.0.16'
     testImplementation 'org.slf4j:slf4j-simple:2.0.16'
+
+    // Roborazzi snapshot testing
+    testImplementation 'io.github.takahirom.roborazzi:roborazzi:1.58.0'
+    testImplementation 'io.github.takahirom.roborazzi:roborazzi-compose:1.58.0'
+    testImplementation 'io.github.takahirom.roborazzi:roborazzi-junit-rule:1.58.0'
+    testImplementation 'io.github.takahirom.roborazzi:roborazzi-compose-preview-scanner-support:1.58.0'
+    testImplementation 'io.github.sergio-sastre.ComposablePreviewScanner:android:0.8.1'
 
     // HTTP server for debug API
     implementation 'org.nanohttpd:nanohttpd:2.3.1'

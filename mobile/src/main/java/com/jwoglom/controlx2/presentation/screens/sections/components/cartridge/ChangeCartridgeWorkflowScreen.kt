@@ -256,7 +256,7 @@ private fun BasalStatus?.isSuspendedForCartridgeWorkflow(): Boolean {
 
 @Preview(showBackground = true)
 @Composable
-private fun ChangeCartridgeWorkflowScreenPreview() {
+fun ChangeCartridgeWorkflowScreenPreview() {
     ControlX2Theme {
         Surface(color = Color.White) {
             ChangeCartridgeWorkflowScreen(
