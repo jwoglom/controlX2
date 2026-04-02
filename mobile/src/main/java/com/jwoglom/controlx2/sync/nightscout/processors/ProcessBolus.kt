@@ -89,7 +89,7 @@ class ProcessBolus(
 
         return NightscoutTreatment.fromTimestamp(
             eventType = "Bolus",
-            timestamp = item.pumpTime,
+            timestamp = item.pumpTimeLocal(),
             seqId = item.seqId,
             insulin = totalInsulin,
             notes = notes
@@ -126,7 +126,7 @@ class ProcessBolus(
 
         return NightscoutTreatment.fromTimestamp(
             eventType = "Combo Bolus",
-            timestamp = item.pumpTime,
+            timestamp = item.pumpTimeLocal(),
             seqId = item.seqId,
             insulin = immediateInsulin,
             duration = extendedDurationMinutes,

@@ -79,7 +79,7 @@ class ProcessAlarm(
 
                 NightscoutTreatment.fromTimestamp(
                     eventType = "Announcement",
-                    timestamp = item.pumpTime,
+                    timestamp = item.pumpTimeLocal(),
                     seqId = item.seqId,
                     reason = reason,
                     notes = "Pump alarm activated, ID: ${parsed.alarmId}"
@@ -95,7 +95,7 @@ class ProcessAlarm(
 
                 NightscoutTreatment.fromTimestamp(
                     eventType = "Announcement",
-                    timestamp = item.pumpTime,
+                    timestamp = item.pumpTimeLocal(),
                     seqId = item.seqId,
                     reason = reason,
                     notes = "Pump alarm cleared, ID: ${parsed.alarmId}"
@@ -111,7 +111,7 @@ class ProcessAlarm(
 
                 NightscoutTreatment.fromTimestamp(
                     eventType = "Announcement",
-                    timestamp = item.pumpTime,
+                    timestamp = item.pumpTimeLocal(),
                     seqId = item.seqId,
                     reason = reason,
                     notes = "Pump alert activated, ID: ${parsed.alertId}"
@@ -127,7 +127,7 @@ class ProcessAlarm(
 
                 NightscoutTreatment.fromTimestamp(
                     eventType = "Announcement",
-                    timestamp = item.pumpTime,
+                    timestamp = item.pumpTimeLocal(),
                     seqId = item.seqId,
                     reason = reason,
                     notes = "Pump alert cleared, ID: ${parsed.alertId}"

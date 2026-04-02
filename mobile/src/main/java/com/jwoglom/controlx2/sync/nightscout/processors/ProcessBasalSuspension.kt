@@ -69,7 +69,7 @@ class ProcessBasalSuspension(
                 val insulinAmount = parsed.insulinAmount / 1000.0
                 NightscoutTreatment.fromTimestamp(
                     eventType = "Temp Basal",
-                    timestamp = item.pumpTime,
+                    timestamp = item.pumpTimeLocal(),
                     seqId = item.seqId,
                     rate = 0.0,
                     absolute = 0.0,
@@ -81,7 +81,7 @@ class ProcessBasalSuspension(
             is HypoMinimizerSuspendHistoryLog -> {
                 NightscoutTreatment.fromTimestamp(
                     eventType = "Temp Basal",
-                    timestamp = item.pumpTime,
+                    timestamp = item.pumpTimeLocal(),
                     seqId = item.seqId,
                     rate = 0.0,
                     absolute = 0.0,

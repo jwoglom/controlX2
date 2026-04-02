@@ -747,7 +747,7 @@ private fun rememberBasalData(
             } catch (e: Exception) {
                 rawEntries += BasalHistoryDebugEntry(
                     seqId = dao.seqId,
-                    timestamp = dao.pumpTime.atZone(ZoneId.systemDefault()).toEpochSecond(),
+                    timestamp = dao.pumpTimeLocal().atZone(ZoneId.systemDefault()).toEpochSecond(),
                     details = "parseFailure=${e.javaClass.simpleName}:${e.message ?: ""}"
                 )
                 parseFailureCount++

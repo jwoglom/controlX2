@@ -11,7 +11,6 @@ import com.jwoglom.pumpx2.pump.messages.response.historyLog.DexcomG6CGMHistoryLo
 import com.jwoglom.pumpx2.pump.messages.response.historyLog.DexcomG7CGMHistoryLog
 import com.jwoglom.pumpx2.pump.messages.response.historyLog.HistoryLogParser
 import timber.log.Timber
-import java.time.LocalDateTime
 
 /**
  * Process CGM readings (glucose values) for Nightscout upload
@@ -47,7 +46,7 @@ class ProcessCGMReading(
             try {
                 val (sgv, _) = extractGlucose(item) ?: return@mapNotNull null
                 if (sgv <= 0) return@mapNotNull null
-                Triple(item, item.pumpTime, sgv)
+                Triple(item, item.pumpTimeLocal(), sgv)
             } catch (e: Exception) {
                 Timber.e(e, "Failed to parse CGM reading seqId=${item.seqId}")
                 null

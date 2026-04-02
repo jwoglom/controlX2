@@ -82,7 +82,7 @@ class ProcessUserMode(
 
                 NightscoutTreatment.fromTimestamp(
                     eventType = eventType,
-                    timestamp = item.pumpTime,
+                    timestamp = item.pumpTimeLocal(),
                     seqId = item.seqId,
                     duration = null,
                     reason = "Control-IQ mode changed to $modeName",

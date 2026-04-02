@@ -83,7 +83,7 @@ class ProcessCGMAlert(
 
                 NightscoutTreatment.fromTimestamp(
                     eventType = "Announcement",
-                    timestamp = item.pumpTime,
+                    timestamp = item.pumpTimeLocal(),
                     seqId = item.seqId,
                     reason = reason,
                     notes = "CGM alert activated, ID: ${parsed.alertId}"
@@ -99,7 +99,7 @@ class ProcessCGMAlert(
 
                 NightscoutTreatment.fromTimestamp(
                     eventType = "Announcement",
-                    timestamp = item.pumpTime,
+                    timestamp = item.pumpTimeLocal(),
                     seqId = item.seqId,
                     reason = reason,
                     notes = "CGM alert cleared, ID: ${parsed.alertId}"
@@ -115,7 +115,7 @@ class ProcessCGMAlert(
 
                 NightscoutTreatment.fromTimestamp(
                     eventType = "Announcement",
-                    timestamp = item.pumpTime,
+                    timestamp = item.pumpTimeLocal(),
                     seqId = item.seqId,
                     reason = reason,
                     notes = "Dexcom alert activated, ID: ${parsed.alertId}"
@@ -131,7 +131,7 @@ class ProcessCGMAlert(
 
                 NightscoutTreatment.fromTimestamp(
                     eventType = "Announcement",
-                    timestamp = item.pumpTime,
+                    timestamp = item.pumpTimeLocal(),
                     seqId = item.seqId,
                     reason = reason,
                     notes = "Dexcom alert cleared, ID: ${parsed.alertId}"
@@ -147,7 +147,7 @@ class ProcessCGMAlert(
 
                 NightscoutTreatment.fromTimestamp(
                     eventType = "Announcement",
-                    timestamp = item.pumpTime,
+                    timestamp = item.pumpTimeLocal(),
                     seqId = item.seqId,
                     reason = reason,
                     notes = "FreeStyle Libre alert activated, ID: ${parsed.alertId}"
@@ -163,7 +163,7 @@ class ProcessCGMAlert(
 
                 NightscoutTreatment.fromTimestamp(
                     eventType = "Announcement",
-                    timestamp = item.pumpTime,
+                    timestamp = item.pumpTimeLocal(),
                     seqId = item.seqId,
                     reason = reason,
                     notes = "FreeStyle Libre alert cleared, ID: ${parsed.alertId}"

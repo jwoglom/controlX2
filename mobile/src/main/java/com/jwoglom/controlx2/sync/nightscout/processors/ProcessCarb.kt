@@ -74,7 +74,7 @@ class ProcessCarb(
 
         return NightscoutTreatment.fromTimestamp(
             eventType = "Carb Correction",
-            timestamp = item.pumpTime,
+            timestamp = item.pumpTimeLocal(),
             seqId = item.seqId,
             carbs = carbs.toDouble(),
             notes = "Carb entry: ${carbs}g"

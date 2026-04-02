@@ -69,7 +69,7 @@ class ProcessBasalResume(
                 val insulinAmount = parsed.insulinAmount / 1000.0
                 NightscoutTreatment.fromTimestamp(
                     eventType = "Note",
-                    timestamp = item.pumpTime,
+                    timestamp = item.pumpTimeLocal(),
                     seqId = item.seqId,
                     reason = "Pumping resumed",
                     notes = "Pumping resumed, IOB: ${insulinAmount}U"
@@ -78,7 +78,7 @@ class ProcessBasalResume(
             is HypoMinimizerResumeHistoryLog -> {
                 NightscoutTreatment.fromTimestamp(
                     eventType = "Note",
-                    timestamp = item.pumpTime,
+                    timestamp = item.pumpTimeLocal(),
                     seqId = item.seqId,
                     reason = "Hypo Minimizer resume",
                     notes = "Hypo Minimizer resume, reason code: ${parsed.reason}"
