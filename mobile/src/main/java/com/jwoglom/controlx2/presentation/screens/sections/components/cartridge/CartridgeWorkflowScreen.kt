@@ -114,7 +114,7 @@ fun PrimaryActionButton(
 
 @Preview(showBackground = true)
 @Composable
-private fun CartridgeWorkflowScreenPreview() {
+fun CartridgeWorkflowScreenPreview() {
     ControlX2Theme {
         Surface(modifier = Modifier.fillMaxSize(), color = Color.White) {
             CartridgeWorkflowScreen(

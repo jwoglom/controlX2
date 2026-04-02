@@ -274,7 +274,7 @@ private fun BasalStatus?.isSuspendedForCartridgeWorkflow(): Boolean {
 
 @Preview(showBackground = true)
 @Composable
-private fun FillTubingWorkflowScreenPreview() {
+fun FillTubingWorkflowScreenPreview() {
     ControlX2Theme {
         Surface(color = Color.White) {
             FillTubingWorkflowScreen(

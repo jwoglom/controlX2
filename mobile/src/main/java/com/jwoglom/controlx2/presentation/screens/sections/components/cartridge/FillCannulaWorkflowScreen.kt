@@ -255,7 +255,7 @@ private fun BasalStatus?.isSuspendedForCartridgeWorkflow(): Boolean {
 
 @Preview(showBackground = true)
 @Composable
-private fun FillCannulaWorkflowScreenPreview() {
+fun FillCannulaWorkflowScreenPreview() {
     ControlX2Theme {
         Surface(color = Color.White) {
             FillCannulaWorkflowScreen(

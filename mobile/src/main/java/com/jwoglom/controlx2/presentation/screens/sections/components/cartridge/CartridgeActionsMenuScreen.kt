@@ -124,7 +124,7 @@ private fun MenuActionItem(
 
 @Preview(showBackground = true)
 @Composable
-private fun CartridgeActionsMenuScreenPreview() {
+fun CartridgeActionsMenuScreenPreview() {
     ControlX2Theme {
         Surface(color = Color.White) {
             CartridgeActionsMenuScreen(

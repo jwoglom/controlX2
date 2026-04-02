@@ -4,7 +4,7 @@ plugins {
     id 'hu.supercluster.paperwork'
     id 'org.jetbrains.kotlin.android'
     id 'org.jetbrains.kotlin.plugin.compose'
-    id 'app.cash.paparazzi'
+    id 'io.github.takahirom.roborazzi'
 }
 
 android {
@@ -48,8 +48,27 @@ android {
         compose = true
         buildConfig true
     }
-
+    testOptions {
+        unitTests {
+            includeAndroidResources = true
+            returnDefaultValues = true
+            all {
+                jvmArgs '-noverify'
+                maxHeapSize = '4g'
+                systemProperty 'robolectric.pixelCopyRenderMode', 'hardware'
+                // Snapshot tests require Java 21 + Roborazzi tasks; exclude from normal testDebugUnitTest
+                if (!project.gradle.startParameter.taskNames.any { it.contains('Roborazzi') }) {
+                    exclude '**/snapshots/**'
+                    // Wear has no non-snapshot tests; prevent Gradle 9.x from failing on empty test suite
+                    failOnNoDiscoveredTests.set(false)
+                }
+            }
+        }
+    }
 }
+
+// Roborazzi preview tests are defined manually in
+// src/test/java/.../snapshots/ComposePreviewSnapshotTests.kt
 
 paperwork {
     set = [
@@ -129,8 +148,21 @@ dependencies {
     implementation "androidx.wear.watchface:watchface-editor:${project.androidx_watchface_version}"
     implementation "androidx.wear.watchface:watchface-complications-rendering:${project.androidx_watchface_version}"
 
-    // SLF4J for Paparazzi tests (pumpx2 library uses it)
+    // SLF4J (pumpx2 library uses it)
     testImplementation 'org.slf4j:slf4j-api:2.0.16'
     testImplementation 'org.slf4j:slf4j-simple:2.0.16'
+
+    // Roborazzi snapshot testing
+    testImplementation 'junit:junit:4.13.2'
+    testImplementation 'androidx.test.ext:junit:1.2.1'
+    testImplementation "androidx.compose.ui:ui-test-junit4:$compose_version"
+    testImplementation "androidx.compose.ui:ui-test-manifest:$compose_version"
+    testImplementation 'androidx.activity:activity-ktx:1.10.1'
+    testImplementation 'io.github.takahirom.roborazzi:roborazzi:1.58.0'
+    testImplementation 'io.github.takahirom.roborazzi:roborazzi-compose:1.58.0'
+    testImplementation 'io.github.takahirom.roborazzi:roborazzi-junit-rule:1.58.0'
+    testImplementation 'io.github.takahirom.roborazzi:roborazzi-compose-preview-scanner-support:1.58.0'
+    testImplementation 'io.github.sergio-sastre.ComposablePreviewScanner:android:0.8.1'
+    testImplementation 'org.robolectric:robolectric:4.16.1'
 
 }
