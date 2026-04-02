@@ -429,6 +429,23 @@ class CommService : Service(), CommServiceCallbacks {
         httpDebugApiService?.onPumpCriticalError(error, source = source)
     }
 
+    // --- Bolus response broadcasting ---
+    override fun broadcastBolusInitiateResponse(responseBytes: ByteArray) {
+        val intent = android.content.Intent(applicationContext, BolusNotificationBroadcastReceiver::class.java).apply {
+            putExtra("action", "INITIATE_RESPONSE")
+            putExtra("response", responseBytes)
+        }
+        applicationContext.sendBroadcast(intent)
+    }
+
+    override fun broadcastBolusStatusUpdate(statusBytes: ByteArray) {
+        val intent = android.content.Intent(applicationContext, BolusNotificationBroadcastReceiver::class.java).apply {
+            putExtra("action", "STATUS_UPDATE")
+            putExtra("status", statusBytes)
+        }
+        applicationContext.sendBroadcast(intent)
+    }
+
     // --- History log factories ---
     override fun createHistoryLogFetcher(
         pumpSid: Int,

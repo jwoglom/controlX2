@@ -22,3 +22,4 @@ rootProject.name = "ControlX2"
 include ':mobile'
 include ':wear'
 include ':shared'
+include ':pumpcomm'

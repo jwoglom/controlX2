@@ -50,6 +50,10 @@ interface CommServiceCallbacks {
     fun onPumpMessageReceived(message: com.jwoglom.pumpx2.pump.messages.Message, source: SendType)
     fun onPumpCriticalError(error: TandemError, source: SendType)
 
+    // --- Bolus response broadcasting (replaces direct BolusNotificationBroadcastReceiver reference) ---
+    fun broadcastBolusInitiateResponse(responseBytes: ByteArray)
+    fun broadcastBolusStatusUpdate(statusBytes: ByteArray)
+
     // --- History log factories (replaces direct HistoryLogFetcher/HistoryLogSyncWorker/HistoryLogRepo) ---
     fun createHistoryLogFetcher(
         pumpSid: Int,

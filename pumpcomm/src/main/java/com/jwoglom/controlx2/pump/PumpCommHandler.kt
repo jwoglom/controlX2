@@ -547,11 +547,7 @@ class PumpCommHandler(
     }
 
     private fun onReceiveInitiateBolusResponse(response: InitiateBolusResponse?) {
-        val intent = android.content.Intent(callbacks.getApplicationContext(), com.jwoglom.controlx2.BolusNotificationBroadcastReceiver::class.java).apply {
-            putExtra("action", "INITIATE_RESPONSE")
-            putExtra("response", PumpMessageSerializer.toBytes(response))
-        }
-        callbacks.getApplicationContext().sendBroadcast(intent)
+        callbacks.broadcastBolusInitiateResponse(PumpMessageSerializer.toBytes(response))
     }
 
     private var lastBolusStatusId: Int? = null
@@ -562,11 +558,7 @@ class PumpCommHandler(
                 (response.bolusId == 0 && lastBolusStatusId != null && lastBolusStatusId != 0)
 
             if (shouldBroadcast) {
-                val intent = android.content.Intent(callbacks.getApplicationContext(), com.jwoglom.controlx2.BolusNotificationBroadcastReceiver::class.java).apply {
-                    putExtra("action", "STATUS_UPDATE")
-                    putExtra("status", PumpMessageSerializer.toBytes(response))
-                }
-                callbacks.getApplicationContext().sendBroadcast(intent)
+                callbacks.broadcastBolusStatusUpdate(PumpMessageSerializer.toBytes(response))
             }
 
             lastBolusStatusId = response.bolusId

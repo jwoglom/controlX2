@@ -1,0 +1,60 @@
+plugins {
+    id 'com.android.library'
+    id 'org.jetbrains.kotlin.android'
+}
+
+android {
+    namespace 'com.jwoglom.controlx2.pumpcomm'
+    compileSdk 36
+
+    defaultConfig {
+        minSdk 26
+        targetSdk 35
+
+        testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
+        consumerProguardFiles "consumer-rules.pro"
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled false
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+        }
+    }
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_11
+        targetCompatibility JavaVersion.VERSION_11
+    }
+    kotlinOptions {
+        jvmTarget = '11'
+    }
+}
+
+dependencies {
+    implementation project(path: ':shared')
+
+    // pumpx2-android dependencies
+    implementation 'com.github.weliem:blessed-android:2.4.0'
+    implementation 'com.jakewharton.timber:timber:5.0.1'
+    implementation "me.champeau.openbeans:openbeans:1.0.2"
+    implementation "commons-codec:commons-codec:1.18.0"
+    implementation "org.apache.commons:commons-lang3:3.17.0"
+    implementation "com.google.guava:guava:33.3.1-android"
+    implementation 'org.bouncycastle:bcprov-jdk14:1.77'
+
+    // pumpx2
+    if (project.use_local_pumpx2) {
+        implementation files("${project.m2_repository}/com/jwoglom/pumpx2/pumpx2-android/${project.pumpx2_version}/pumpx2-android-${project.pumpx2_version}.aar")
+        implementation files("${project.m2_repository}/com/jwoglom/pumpx2/pumpx2-messages/${project.pumpx2_version}/pumpx2-messages-${project.pumpx2_version}.jar")
+        implementation files("${project.m2_repository}/com/jwoglom/pumpx2/pumpx2-shared/${project.pumpx2_version}/pumpx2-shared-${project.pumpx2_version}.jar")
+    } else {
+        implementation "com.github.jwoglom.pumpX2:pumpx2-android:v${project.pumpx2_version}"
+        implementation "com.github.jwoglom.pumpX2:pumpx2-messages:v${project.pumpx2_version}"
+        implementation "com.github.jwoglom.pumpX2:pumpx2-shared:v${project.pumpx2_version}"
+    }
+
+    // Coroutines
+    implementation "org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3"
+
+    testImplementation 'junit:junit:4.13.2'
+}
