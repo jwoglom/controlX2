@@ -12,6 +12,9 @@ data class XdripTreatmentPayload(
     val createdAt: String,
     val mills: Long,
     val insulin: Double? = null,
+    val duration: Int? = null,
+    val rate: Double? = null,
+    val absolute: Double? = null,
     val notes: String
 ) {
     fun toJsonObject(): JSONObject {
@@ -20,6 +23,9 @@ data class XdripTreatmentPayload(
             put("created_at", createdAt)
             put("mills", mills)
             insulin?.let { put("insulin", it) }
+            duration?.let { put("duration", it) }
+            rate?.let { put("rate", it) }
+            absolute?.let { put("absolute", it) }
             put("notes", notes)
         }
     }
@@ -60,6 +66,22 @@ data class XdripTreatmentPayload(
                 mills = timestamp.toEpochMilli(),
                 insulin = InsulinUnit.from1000To1(requestedVolumeMilli),
                 notes = "ControlX2 bolus status bolusId=$bolusId status=$status"
+            )
+        }
+
+        fun forBasalRate(
+            unitsPerHour: Double,
+            durationMinutes: Int,
+            timestamp: Instant
+        ): XdripTreatmentPayload {
+            return XdripTreatmentPayload(
+                eventType = "Temp Basal",
+                createdAt = timestamp.toString(),
+                mills = timestamp.toEpochMilli(),
+                duration = durationMinutes,
+                rate = unitsPerHour,
+                absolute = unitsPerHour,
+                notes = "ControlX2 basal rate ${unitsPerHour}U/h"
             )
         }
     }

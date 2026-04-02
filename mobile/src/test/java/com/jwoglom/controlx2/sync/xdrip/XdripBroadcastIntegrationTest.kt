@@ -219,6 +219,69 @@ class XdripBroadcastIntegrationTest {
     }
 
     // ---------------------------------------------------------------
+    // 2b. Basal treatment broadcast — xDrip draws basal bar/graph
+    // ---------------------------------------------------------------
+
+    @Test
+    fun fullPipeline_basalTreatmentBroadcast_matchesXdripSchema() {
+        config = config.copy(sendCgmSgv = false, sendPumpDeviceStatus = false, sendStatusLine = false)
+        dispatcher.onReceiveMessage(CurrentBasalStatusResponse(0, 900, 0))
+
+        val treatmentBroadcasts = broadcastsWithAction(XdripBroadcastSender.ACTION_NEW_TREATMENT)
+        assertEquals("one treatment broadcast for basal", 1, treatmentBroadcasts.size)
+
+        val bc = treatmentBroadcasts.single()
+        assertEquals("treatments", bc.extraKey)
+
+        val arr = JSONArray(bc.payload)
+        assertTrue("payload must be non-empty array", arr.length() > 0)
+        val trtMap = jsonToMap(arr.getJSONObject(0).toString())
+
+        // mills must exist and be positive
+        val mills = trtMap["mills"] ?: trtMap["date"]
+        assertNotNull("mills/date required for xDrip treatment timestamp", mills)
+        assertTrue("timestamp > 0", (mills as Number).toLong() > 0)
+
+        // eventType must be "Temp Basal" for xDrip to render basal bars
+        assertNotNull("eventType required", trtMap["eventType"])
+        assertEquals("Temp Basal", trtMap["eventType"].toString())
+
+        // duration must be present and positive for xDrip to draw basal segment
+        assertNotNull("duration required for basal segment rendering", trtMap["duration"])
+        assertTrue("duration > 0", (trtMap["duration"] as Number).toInt() > 0)
+
+        // rate and absolute must be present for xDrip basal rate display
+        assertNotNull("rate required for basal treatment", trtMap["rate"])
+        assertTrue("rate > 0", (trtMap["rate"] as Number).toDouble() > 0)
+        assertNotNull("absolute required for basal treatment", trtMap["absolute"])
+        assertTrue("absolute > 0", (trtMap["absolute"] as Number).toDouble() > 0)
+
+        // created_at should be an ISO string
+        assertNotNull("created_at expected", trtMap["created_at"])
+
+        // Food broadcast should also be sent
+        val foodBroadcasts = broadcastsWithAction(XdripBroadcastSender.ACTION_NEW_FOOD)
+        assertEquals("one food broadcast for basal", 1, foodBroadcasts.size)
+    }
+
+    @Test
+    fun fullPipeline_basalTreatmentBroadcast_alsoTriggersDeviceStatus() {
+        config = config.copy(sendCgmSgv = false, sendStatusLine = false)
+        dispatcher.onReceiveMessage(CurrentBasalStatusResponse(0, 850, 0))
+
+        // Basal should trigger BOTH treatment and device status
+        val treatmentBroadcasts = broadcastsWithAction(XdripBroadcastSender.ACTION_NEW_TREATMENT)
+        val dsBroadcasts = broadcastsWithAction(XdripBroadcastSender.ACTION_NEW_DEVICE_STATUS)
+        assertEquals("one treatment broadcast", 1, treatmentBroadcasts.size)
+        assertEquals("one device status broadcast", 1, dsBroadcasts.size)
+
+        // Verify device status has the basal value
+        val dsObj = JSONObject(dsBroadcasts.single().payload)
+        assertTrue("device status has pump object", dsObj.has("pump"))
+        assertTrue("pump has basal field", dsObj.getJSONObject("pump").has("basal"))
+    }
+
+    // ---------------------------------------------------------------
     // 3. Device status broadcast — xDrip AAPSStatusHandler / NSDeviceStatus
     // ---------------------------------------------------------------
 
