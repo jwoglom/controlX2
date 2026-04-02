@@ -1,0 +1,70 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<issues format="6" by="lint 8.13.2" type="baseline" client="gradle" dependencies="false" name="AGP (8.13.2)" variant="all" version="8.13.2">
+
+    <issue
+        id="MissingPermission"
+        message="Missing permissions required by BluetoothAdapter.getBondedDevices: android.permission.BLUETOOTH_CONNECT"
+        errorLine1="        val bondedDevice = adapter.bondedDevices"
+        errorLine2="                           ~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/com/jwoglom/controlx2/pump/PumpCommHandler.kt"
+            line="171"
+            column="28"/>
+    </issue>
+
+    <issue
+        id="MissingPermission"
+        message="Missing permissions required by BluetoothDevice.getName: android.permission.BLUETOOTH_CONNECT"
+        errorLine1="            Timber.i(&quot;init_pump_comm: requested unbond for ${bondedDevice.name} ($targetMac), result=$didRequestUnbond&quot;)"
+        errorLine2="                                                             ~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/com/jwoglom/controlx2/pump/PumpCommHandler.kt"
+            line="181"
+            column="62"/>
+    </issue>
+
+    <issue
+        id="MissingPermission"
+        message="Missing permissions required by BluetoothAdapter.getBondedDevices: android.permission.BLUETOOTH_CONNECT"
+        errorLine1="        val stillBonded = adapter.bondedDevices"
+        errorLine2="                          ~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/com/jwoglom/controlx2/pump/PumpCommHandler.kt"
+            line="189"
+            column="27"/>
+    </issue>
+
+    <issue
+        id="MissingPermission"
+        message="Missing permissions required by BluetoothDevice.getName: android.permission.BLUETOOTH_CONNECT"
+        errorLine1="        val details = &quot;${bondedDevice.name ?: &quot;Unknown Tandem device&quot;}=$targetMac&quot;"
+        errorLine2="                         ~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/com/jwoglom/controlx2/pump/PumpCommHandler.kt"
+            line="196"
+            column="26"/>
+    </issue>
+
+    <issue
+        id="OldTargetApi"
+        message="Not targeting the latest versions of Android; compatibility modes apply. Consider testing and updating this version. Consult the `android.os.Build.VERSION_CODES` javadoc for details."
+        errorLine1="        targetSdk 35"
+        errorLine2="        ~~~~~~~~~~~~">
+        <location
+            file="build.gradle"
+            line="12"
+            column="9"/>
+    </issue>
+
+    <issue
+        id="GradleDependency"
+        message="A newer version of org.jetbrains.kotlinx:kotlinx-coroutines-android than 1.7.3 is available: 1.10.2"
+        errorLine1="    implementation &quot;org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3&quot;"
+        errorLine2="                   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="build.gradle"
+            line="60"
+            column="20"/>
+    </issue>
+
+</issues>
