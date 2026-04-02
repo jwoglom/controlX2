@@ -642,10 +642,7 @@ private fun rememberBasalData(
     )
 
     val basalQueryStartTime = remember(startTimeSeconds) {
-        LocalDateTime.ofInstant(
-            Instant.ofEpochSecond(startTimeSeconds - BASAL_LOOKBACK_SECONDS),
-            ZoneId.systemDefault()
-        )
+        Instant.ofEpochSecond(startTimeSeconds - BASAL_LOOKBACK_SECONDS)
     }
     val basalHistoryLogs = historyLogViewModel?.itemsForTypesSince(
         basalClasses,
