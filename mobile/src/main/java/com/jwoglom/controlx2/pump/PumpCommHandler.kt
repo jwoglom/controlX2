@@ -299,7 +299,9 @@ class PumpCommHandler(
             events: MutableSet<QualifyingEvent>?
         ) {
             Timber.i("onReceiveQualifyingEvent: $events")
-            callbacks.showToast("Events: $events", Toast.LENGTH_SHORT)
+            if (Prefs(applicationContext).qualifyingEventToastsEnabled()) {
+                callbacks.showToast("Events: $events", Toast.LENGTH_SHORT)
+            }
             if (events != null && QualifyingEvent.PUMP_COMMUNICATIONS_SUSPENDED in events) {
                 Timber.w("onReceiveQualifyingEvent: PUMP_COMMUNICATIONS_SUSPENDED — pausing sends")
                 currentSession?.pauseSends(currentSession?.rateLimitConfig?.commSuspendedPauseMs ?: 5_000)
