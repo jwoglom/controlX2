@@ -30,6 +30,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavHostController
+import com.jwoglom.controlx2.Prefs
 import com.jwoglom.controlx2.presentation.components.HeaderLine
 import com.jwoglom.controlx2.sync.xdrip.XdripBroadcastSender
 import com.jwoglom.controlx2.sync.xdrip.XdripPayloadGroup
@@ -47,7 +48,7 @@ fun XdripSettings(
     sendMessage: (String, ByteArray) -> Unit,
 ) {
     val context = LocalContext.current
-    val prefs = context.getSharedPreferences("controlx2", Context.MODE_PRIVATE)
+    val prefs = Prefs(context).prefs()
     val coroutineScope = rememberCoroutineScope()
 
     var config by remember { mutableStateOf(XdripSyncConfig.load(prefs)) }
