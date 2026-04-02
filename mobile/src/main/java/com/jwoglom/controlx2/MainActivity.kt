@@ -140,6 +140,7 @@ class MainActivity : ComponentActivity() {
     }
 
     private lateinit var messageBus: MessageBus
+    private lateinit var messageListener: MessageListener
     private val sheetLaunchRequestState = mutableStateOf<SheetLaunchRequest?>(null)
     private var btPermissionsRequestInFlight = false
     private var notificationPermissionRequestInFlight = false
@@ -210,11 +211,12 @@ class MainActivity : ComponentActivity() {
 
         // Always initialize MessageBus (factory handles Play Services fallback internally)
         messageBus = MessageBusFactory.createMessageBus(this)
-        messageBus.addMessageListener(object : MessageListener {
+        messageListener = object : MessageListener {
             override fun onMessageReceived(path: String, data: ByteArray, sourceNodeId: String) {
                 handleMessageReceived(path, data, sourceNodeId)
             }
-        })
+        }
+        messageBus.addMessageListener(messageListener)
         // Show warning dialog if Play Services missing (non-blocking)
         checkPlayServicesAndInitialize()
 
@@ -271,8 +273,8 @@ class MainActivity : ComponentActivity() {
     }
 
     override fun onDestroy() {
-        if (::messageBus.isInitialized) {
-            messageBus.close()
+        if (::messageBus.isInitialized && ::messageListener.isInitialized) {
+            messageBus.removeMessageListener(messageListener)
         }
         super.onDestroy()
     }

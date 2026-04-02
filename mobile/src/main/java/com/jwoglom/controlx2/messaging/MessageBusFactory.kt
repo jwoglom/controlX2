@@ -164,6 +164,16 @@ object MessageBusFactory {
     @Volatile
     private var forcedMode: Boolean? = null
 
+    /**
+     * Clear the cached singleton so the next createMessageBus() call creates a fresh instance.
+     * Must be called when the bus is closed to avoid returning a stale, closed bus on activity recreation.
+     */
+    fun clearInstance() {
+        synchronized(this) {
+            messageBusInstance = null
+        }
+    }
+
     @androidx.annotation.VisibleForTesting
     fun setInstanceForTesting(bus: MessageBus?) {
         messageBusInstance = bus
