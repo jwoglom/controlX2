@@ -125,6 +125,7 @@ import com.patrykandpatrick.vico.core.common.component.Component
 import com.patrykandpatrick.vico.core.common.component.TextComponent
 import com.patrykandpatrick.vico.core.common.data.ExtraStore
 import java.time.Instant
+import java.time.LocalDateTime
 import java.time.ZoneId
 import java.util.Locale
 import kotlin.math.max
@@ -640,12 +641,15 @@ private fun rememberBasalData(
         DailyBasalHistoryLog::class.java
     )
 
-    val basalHistoryLogs = historyLogViewModel?.latestItemsForTypes(
+    val basalQueryStartTime = remember(startTimeSeconds) {
+        LocalDateTime.ofInstant(
+            Instant.ofEpochSecond(startTimeSeconds - BASAL_LOOKBACK_SECONDS),
+            ZoneId.systemDefault()
+        )
+    }
+    val basalHistoryLogs = historyLogViewModel?.itemsForTypesSince(
         basalClasses,
-        // Basal delivery can be emitted roughly every 5 minutes. Over-fetch enough rows to
-        // cover the selected range, 30 minutes of lead-in before the left edge, and extra
-        // transition records from other basal-related history-log types.
-        (timeRange.hours * 12) + 36
+        basalQueryStartTime
     )?.observeAsState()
 
     val basalChartData = remember(basalHistoryLogs?.value, timeRange, startTimeSeconds, currentTimeSeconds) {

@@ -155,7 +155,17 @@ class HistoryLogFetcher(
         
         val catchupThreshold = message.lastSequenceNum - InitialHistoryLogCount
         var startId = when {
-            dbLatestId != null && dbLatestId >= catchupThreshold && dbLatestId <= message.lastSequenceNum -> dbLatestId
+            dbLatestId != null && dbLatestId >= catchupThreshold && dbLatestId <= message.lastSequenceNum -> {
+                // Use the catchup threshold if we have far fewer rows than expected,
+                // e.g. when a previous fetch was interrupted mid-way. The DB has the
+                // latest seq but is missing many older entries within the window.
+                val expectedCount = dbLatestId - catchupThreshold
+                if (expectedCount > 0 && dbCount < expectedCount / 2) {
+                    catchupThreshold
+                } else {
+                    dbLatestId
+                }
+            }
             else -> catchupThreshold
         }
 

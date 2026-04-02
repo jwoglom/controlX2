@@ -2,6 +2,7 @@ package com.jwoglom.controlx2.db.historylog
 
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flowOf
+import java.time.LocalDateTime
 
 
 class HistoryLogDummyDao(val data: MutableList<HistoryLogItem>) : HistoryLogDao {
@@ -50,6 +51,11 @@ class HistoryLogDummyDao(val data: MutableList<HistoryLogItem>) : HistoryLogDao 
 
     override fun getRangeForType(pumpSid: Int, typeId: Int, seqIdMin: Long, seqIdMax: Long): Flow<List<HistoryLogItem>> = flowOf(
         data.filter { it.pumpSid == pumpSid && it.typeId == typeId && it.seqId in seqIdMin..seqIdMax }
+            .sortedBy { it.seqId }
+    )
+
+    override fun getItemsForTypesSince(pumpSid: Int, typeIds: List<Int>, startTime: LocalDateTime): Flow<List<HistoryLogItem>> = flowOf(
+        data.filter { it.pumpSid == pumpSid && it.typeId in typeIds && !it.pumpTime.isBefore(startTime) }
             .sortedBy { it.seqId }
     )
 

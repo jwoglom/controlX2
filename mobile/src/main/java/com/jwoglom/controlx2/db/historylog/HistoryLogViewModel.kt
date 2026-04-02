@@ -40,6 +40,11 @@ class HistoryLogViewModel(private val repo: HistoryLogRepo, private val pumpSid:
         return latestItemsForTypes(typeClasses.map { LOG_MESSAGE_CLASS_TO_ID[it]!!}.toTypedArray(), maxItems)
     }
 
+    fun itemsForTypesSince(typeClasses: List<Class<out HistoryLog>>, startTime: java.time.LocalDateTime): LiveData<List<HistoryLogItem>> {
+        val typeIds = typeClasses.map { LOG_MESSAGE_CLASS_TO_ID[it]!! }
+        return repo.getItemsForTypesSince(pumpSid, typeIds, startTime).asLiveData()
+    }
+
     fun insert(historyLogItem: HistoryLogItem) = viewModelScope.launch {
         repo.insert(historyLogItem)
     }

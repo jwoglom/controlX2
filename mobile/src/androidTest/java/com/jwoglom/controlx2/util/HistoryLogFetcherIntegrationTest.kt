@@ -685,4 +685,42 @@ class HistoryLogFetcherIntegrationTest {
             assertFalse("Dropped seqId $id should NOT be in DB", id in allIds)
         }
     }
+
+    @Test
+    fun interruptedFetch_secondConnectionFetchesMissingOlderEntries() = runBlocking {
+        // Simulate a previous fetch that was interrupted: the DB has the latest
+        // entries (e.g. the newest 96 out of 5000) but is missing everything older.
+        // On reconnect the fetcher should detect the sparse DB and fetch the rest.
+        val pumpLastSeq = 10000L
+        val catchupStart = pumpLastSeq - InitialHistoryLogCount  // 5000
+
+        // Insert only the newest 96 entries (as if the first fetch was killed mid-way)
+        insertExistingLogs((pumpLastSeq - 95)..pumpLastSeq)
+
+        val fetcher = createAutoRespondingFetcher()
+        val status = makeStatusResponse(
+            numEntries = pumpLastSeq,
+            firstSeqNum = 1,
+            lastSeqNum = pumpLastSeq
+        )
+
+        val scope = CoroutineScope(Dispatchers.Default + Job())
+        fetcher.onStatusResponse(status, scope)
+        waitForFetchCompletion(scope, timeoutMs = 60_000L)
+
+        val dbCount = repo.getCount(TEST_PUMP_SID).firstOrNull() ?: 0
+        val expectedCount = pumpLastSeq - catchupStart + 1  // 5001
+        assertEquals(
+            "DB should have all entries in the catchup window, not just the 96 from the interrupted fetch",
+            expectedCount,
+            dbCount
+        )
+
+        // Verify the oldest entries in the window were actually fetched
+        val oldestInWindow = catchupStart + 1
+        val allIds = repo.getAllIds(TEST_PUMP_SID, oldestInWindow, oldestInWindow + 10)
+        for (id in oldestInWindow..(oldestInWindow + 10)) {
+            assertTrue("Older seqId $id should have been fetched", id in allIds)
+        }
+    }
 }
