@@ -23,6 +23,7 @@ internal sealed class DispatchEvent {
     data class PumpIob(val units: Double) : DispatchEvent()
     data class PumpReservoir(val units: Int) : DispatchEvent()
     data class PumpBasal(val unitsPerHour: Double) : DispatchEvent()
+    data class BasalTreatment(val unitsPerHour: Double) : DispatchEvent()
     data class CgmSgv(val mgdl: Int, val trendRate: Int) : DispatchEvent()
     data class TreatmentInitiated(val bolusId: Int, val status: String) : DispatchEvent()
     data class TreatmentStatus(val bolusId: Int, val requestedVolumeMilli: Long, val status: String, val timestamp: Instant) : DispatchEvent()
@@ -50,7 +51,7 @@ class XdripMessageDispatcher(
         if (!config.enabled) return
 
         val receivedAt = nowProvider()
-        val category = updateSnapshot(event, receivedAt)
+        val categories = updateSnapshot(event, receivedAt)
 
         if (config.sendCgmSgv && event is DispatchEvent.CgmSgv) {
             val sgvPayload = XdripSgvPayload
@@ -59,14 +60,14 @@ class XdripMessageDispatcher(
             broadcaster.sendSgv(sgvPayload, config.cgmSgvMinimumIntervalSeconds)
         }
 
-        if (config.sendPumpDeviceStatus && category == StatusCategory.PUMP_STATUS) {
+        if (config.sendPumpDeviceStatus && StatusCategory.PUMP_STATUS in categories) {
             val deviceStatusPayload = latestPumpSnapshot
                 .toPayload(createdAt = receivedAt)
                 .toJsonString()
             broadcaster.sendDeviceStatus(deviceStatusPayload, config.pumpDeviceStatusMinimumIntervalSeconds)
         }
 
-        if (config.sendTreatments && category == StatusCategory.TREATMENT) {
+        if (config.sendTreatments && StatusCategory.TREATMENT in categories) {
             val treatmentPayload = when (event) {
                 is DispatchEvent.TreatmentInitiated -> XdripTreatmentPayload(
                     eventType = "Bolus",
@@ -84,6 +85,14 @@ class XdripMessageDispatcher(
                     )
                     .toJsonArrayString()
 
+                is DispatchEvent.BasalTreatment -> XdripTreatmentPayload
+                    .forBasalRate(
+                        unitsPerHour = event.unitsPerHour,
+                        durationMinutes = BASAL_TREATMENT_DURATION_MINUTES,
+                        timestamp = receivedAt
+                    )
+                    .toJsonArrayString()
+
                 else -> null
             }
             if (treatmentPayload != null) {
@@ -95,7 +104,7 @@ class XdripMessageDispatcher(
             }
         }
 
-        if (config.sendStatusLine && category == StatusCategory.PUMP_STATUS) {
+        if (config.sendStatusLine && StatusCategory.PUMP_STATUS in categories) {
             val statusline = buildString {
                 append("Pump")
                 latestPumpSnapshot.sgvMgdl?.value?.let { append(" SGV:$it") }
@@ -108,31 +117,35 @@ class XdripMessageDispatcher(
         }
     }
 
-    private fun updateSnapshot(event: DispatchEvent, receivedAt: Instant): StatusCategory {
+    private fun updateSnapshot(event: DispatchEvent, receivedAt: Instant): Set<StatusCategory> {
         return when (event) {
             is DispatchEvent.PumpBattery -> {
                 latestPumpSnapshot.batteryPercent = XdripTimedValue(event.percent, receivedAt)
-                StatusCategory.PUMP_STATUS
+                setOf(StatusCategory.PUMP_STATUS)
             }
             is DispatchEvent.PumpIob -> {
                 latestPumpSnapshot.iobUnits = XdripTimedValue(event.units, receivedAt)
-                StatusCategory.PUMP_STATUS
+                setOf(StatusCategory.PUMP_STATUS)
             }
             is DispatchEvent.PumpReservoir -> {
                 latestPumpSnapshot.cartridgeUnits = XdripTimedValue(event.units, receivedAt)
-                StatusCategory.PUMP_STATUS
+                setOf(StatusCategory.PUMP_STATUS)
             }
             is DispatchEvent.PumpBasal -> {
                 latestPumpSnapshot.basalUnitsPerHour = XdripTimedValue(event.unitsPerHour, receivedAt)
-                StatusCategory.PUMP_STATUS
+                setOf(StatusCategory.PUMP_STATUS)
+            }
+            is DispatchEvent.BasalTreatment -> {
+                latestPumpSnapshot.basalUnitsPerHour = XdripTimedValue(event.unitsPerHour, receivedAt)
+                setOf(StatusCategory.PUMP_STATUS, StatusCategory.TREATMENT)
             }
             is DispatchEvent.CgmSgv -> {
                 latestPumpSnapshot.applySgvValue(event.mgdl, receivedAt)
-                StatusCategory.PUMP_STATUS
+                setOf(StatusCategory.PUMP_STATUS)
             }
             is DispatchEvent.TreatmentInitiated,
-            is DispatchEvent.TreatmentStatus -> StatusCategory.TREATMENT
-            is DispatchEvent.Other -> StatusCategory.OTHER
+            is DispatchEvent.TreatmentStatus -> setOf(StatusCategory.TREATMENT)
+            is DispatchEvent.Other -> setOf(StatusCategory.OTHER)
         }
     }
 
@@ -141,7 +154,7 @@ class XdripMessageDispatcher(
             is CurrentBatteryAbstractResponse -> DispatchEvent.PumpBattery(batteryPercent)
             is ControlIQIOBResponse -> DispatchEvent.PumpIob(InsulinUnit.from1000To1(pumpDisplayedIOB))
             is InsulinStatusResponse -> DispatchEvent.PumpReservoir(currentInsulinAmount)
-            is CurrentBasalStatusResponse -> DispatchEvent.PumpBasal(InsulinUnit.from1000To1(currentBasalRate))
+            is CurrentBasalStatusResponse -> DispatchEvent.BasalTreatment(InsulinUnit.from1000To1(currentBasalRate))
             is CurrentEGVGuiDataResponse -> DispatchEvent.CgmSgv(cgmReading, trendRate)
             is InitiateBolusResponse -> DispatchEvent.TreatmentInitiated(bolusId, statusType.toString())
             is CurrentBolusStatusResponse -> DispatchEvent.TreatmentStatus(
@@ -158,5 +171,10 @@ class XdripMessageDispatcher(
         PUMP_STATUS,
         TREATMENT,
         OTHER
+    }
+
+    companion object {
+        /** Duration for basal treatment segments, matching the pump status polling interval. */
+        internal const val BASAL_TREATMENT_DURATION_MINUTES = 5
     }
 }

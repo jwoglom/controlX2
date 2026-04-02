@@ -101,4 +101,23 @@ class XdripPayloadModelsTest {
         assertTrue(statusObj.getLong("mills") > 0)
         assertTrue(statusObj.getString("notes").contains("bolusId=77"))
     }
+
+    @Test
+    fun treatmentPayload_forBasalRate_includesBasalFields() {
+        val timestamp = Instant.parse("2026-01-01T00:00:00Z")
+        val payload = XdripTreatmentPayload
+            .forBasalRate(unitsPerHour = 0.85, durationMinutes = 5, timestamp = timestamp)
+            .toJsonArrayString()
+        val obj = JSONArray(payload).getJSONObject(0)
+
+        assertEquals("Temp Basal", obj.getString("eventType"))
+        assertEquals(timestamp.toEpochMilli(), obj.getLong("mills"))
+        assertEquals(timestamp.toString(), obj.getString("created_at"))
+        assertEquals(5, obj.getInt("duration"))
+        assertEquals(0.85, obj.getDouble("rate"), 0.0001)
+        assertEquals(0.85, obj.getDouble("absolute"), 0.0001)
+        assertTrue(obj.getString("notes").contains("0.85U/h"))
+        // Basal treatments should not have insulin field
+        assertTrue(!obj.has("insulin"))
+    }
 }

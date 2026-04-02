@@ -11,6 +11,7 @@ import com.jwoglom.pumpx2.pump.messages.response.currentStatus.InsulinStatusResp
 import org.json.JSONArray
 import org.json.JSONObject
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.time.Instant
@@ -155,6 +156,41 @@ class XdripMessageDispatcherTest {
         assertEquals(InsulinUnit.from1000To1(2300), status.getDouble("insulin"), 0.0001)
         assertTrue(status.getLong("mills") > 0)
         assertTrue(status.getString("notes").contains("status="))
+    }
+
+    @Test
+    fun onReceiveMessage_mapsBasalStatusToTreatmentAndDeviceStatus() {
+        val broadcaster = FakeBroadcaster()
+        val now = Instant.parse("2026-01-01T00:00:00Z")
+        val dispatcher = XdripMessageDispatcher(
+            broadcaster = broadcaster,
+            configProvider = {
+                XdripSyncConfig(
+                    enabled = true,
+                    sendCgmSgv = false,
+                    sendStatusLine = false
+                )
+            },
+            nowProvider = { now }
+        )
+
+        dispatcher.onReceiveMessage(CurrentBasalStatusResponse(0, 900, 0))
+
+        // Should trigger both device status and treatment broadcasts
+        assertEquals(1, broadcaster.deviceStatusPayloads.size)
+        assertEquals(1, broadcaster.treatmentPayloads.size)
+
+        // Verify treatment payload has basal fields
+        val treatment = JSONArray(broadcaster.treatmentPayloads.single().payload).getJSONObject(0)
+        assertEquals("Temp Basal", treatment.getString("eventType"))
+        assertEquals(InsulinUnit.from1000To1(900), treatment.getDouble("rate"), 0.0001)
+        assertEquals(InsulinUnit.from1000To1(900), treatment.getDouble("absolute"), 0.0001)
+        assertEquals(XdripMessageDispatcher.BASAL_TREATMENT_DURATION_MINUTES, treatment.getInt("duration"))
+        assertEquals(now.toEpochMilli(), treatment.getLong("mills"))
+
+        // Verify device status also updated
+        val deviceStatus = JSONObject(broadcaster.deviceStatusPayloads.single().payload)
+        assertEquals(InsulinUnit.from1000To1(900), deviceStatus.getJSONObject("pump").getDouble("basal"), 0.0001)
     }
 
     @Test
