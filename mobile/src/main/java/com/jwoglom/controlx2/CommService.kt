@@ -95,9 +95,9 @@ class CommService : Service(), CommServiceCallbacks {
             if (!serviceStatusAcknowledged) {
                 Timber.i("Periodically sending service status (not yet acknowledged)")
                 if (Prefs(applicationContext).pumpFinderServiceEnabled()) {
-                    sendWearCommMessage(MessagePaths.TO_PHONE_PUMP_FINDER_STARTED, "".toByteArray())
+                    sendWearCommMessage(MessagePaths.TO_SERVER_PUMP_FINDER_STARTED, "".toByteArray())
                 } else {
-                    sendWearCommMessage(MessagePaths.TO_PHONE_COMM_STARTED, "".toByteArray())
+                    sendWearCommMessage(MessagePaths.TO_SERVER_COMM_STARTED, "".toByteArray())
                 }
                 serviceLooper?.let { looper ->
                     Handler(looper).postDelayed(this, 2000)
@@ -242,14 +242,14 @@ class CommService : Service(), CommServiceCallbacks {
         }
         httpDebugApiService?.onMessagingReceived(path, data, sourceNodeId)
         when (path) {
-            MessagePaths.TO_PHONE_FORCE_RELOAD -> {
+            MessagePaths.TO_SERVER_FORCE_RELOAD -> {
                 Timber.i("force-reload")
                 triggerAppReload(applicationContext)
             }
-            MessagePaths.TO_PHONE_SET_PAIRING_CODE -> {
+            MessagePaths.TO_SERVER_SET_PAIRING_CODE -> {
                 Timber.i("set-pairing-code received in service")
             }
-            MessagePaths.TO_PHONE_STOP_PUMP_FINDER -> {
+            MessagePaths.TO_SERVER_STOP_PUMP_FINDER -> {
                 Timber.i("stop-pump-finder")
                 sendStopPumpFinderComm()
                 if (String(data) == "init_comm") {
@@ -268,10 +268,10 @@ class CommService : Service(), CommServiceCallbacks {
                     pumpCommHandler?.postDelayed(periodicUpdateTask, periodicUpdateIntervalMs)
                     pumpCommHandler?.postDelayed(checkForUpdatesTask, checkForUpdatesDelayMs)
                     sendInitPumpComm(pairingCodeTypeEnum, filterToMac)
-                    sendWearCommMessage(MessagePaths.TO_PHONE_COMM_STARTED, "".toByteArray())
+                    sendWearCommMessage(MessagePaths.TO_SERVER_COMM_STARTED, "".toByteArray())
                 }
             }
-            MessagePaths.TO_PHONE_RESTART_PUMP_FINDER -> {
+            MessagePaths.TO_SERVER_RESTART_PUMP_FINDER -> {
                 Timber.i("restart-pump-finder")
                 sendStopPumpFinderComm()
                 pumpCommHandler = PumpCommHandler(serviceLooper!!, this)
@@ -280,49 +280,49 @@ class CommService : Service(), CommServiceCallbacks {
                 triggerAppReload(applicationContext)
                 //sendInitPumpComm()
             }
-            MessagePaths.TO_PHONE_CHECK_PUMP_FINDER_FOUND_PUMPS -> {
+            MessagePaths.TO_SERVER_CHECK_PUMP_FINDER_FOUND_PUMPS -> {
                 Timber.i("check-pump-finder-found-pumps")
                 sendCheckPumpFinderFoundPumps()
             }
-            MessagePaths.TO_PHONE_REQUEST_SERVICE_STATUS -> {
+            MessagePaths.TO_SERVER_REQUEST_SERVICE_STATUS -> {
                 Timber.i("request-service-status received, responding with current status")
                 if (Prefs(applicationContext).pumpFinderServiceEnabled()) {
-                    sendWearCommMessage(MessagePaths.TO_PHONE_PUMP_FINDER_STARTED, "".toByteArray())
+                    sendWearCommMessage(MessagePaths.TO_SERVER_PUMP_FINDER_STARTED, "".toByteArray())
                 } else {
-                    sendWearCommMessage(MessagePaths.TO_PHONE_COMM_STARTED, "".toByteArray())
+                    sendWearCommMessage(MessagePaths.TO_SERVER_COMM_STARTED, "".toByteArray())
                 }
             }
-            MessagePaths.TO_PHONE_REFRESH_HISTORY_LOG_SYNC -> {
+            MessagePaths.TO_SERVER_REFRESH_HISTORY_LOG_SYNC -> {
                 Timber.i("refresh-history-log-sync received")
                 pumpCommHandler?.refreshHistoryLogSyncWorker(triggerImmediateSync = true)
             }
-            MessagePaths.TO_PHONE_SERVICE_STATUS_ACKNOWLEDGED -> {
+            MessagePaths.TO_SERVER_SERVICE_STATUS_ACKNOWLEDGED -> {
                 Timber.i("service-status acknowledged, stopping periodic sender")
                 serviceStatusAcknowledged = true
             }
-            MessagePaths.TO_PHONE_STOP_COMM -> {
+            MessagePaths.TO_SERVER_STOP_COMM -> {
                 Timber.w("stop-comm")
                 sendStopPumpComm()
             }
-            MessagePaths.TO_PHONE_IS_PUMP_CONNECTED -> {
+            MessagePaths.TO_SERVER_IS_PUMP_CONNECTED -> {
                 sendCheckPumpConnected()
             }
             MessagePaths.TO_PUMP_PAIR -> {
                 sendPumpPairingMessage()
             }
-            MessagePaths.TO_PHONE_BOLUS_REQUEST_WEAR -> {
+            MessagePaths.TO_SERVER_BOLUS_REQUEST_WEAR -> {
                 // removed: initialized check
                 confirmBolusRequest(PumpMessageSerializer.fromBytes(data) as InitiateBolusRequest, BolusRequestSource.WEAR)
             }
-            MessagePaths.TO_PHONE_BOLUS_REQUEST_PHONE -> {
+            MessagePaths.TO_SERVER_BOLUS_REQUEST_PHONE -> {
                 // removed: initialized check
                 confirmBolusRequest(PumpMessageSerializer.fromBytes(data) as InitiateBolusRequest, BolusRequestSource.PHONE)
             }
-            MessagePaths.TO_PHONE_BOLUS_CANCEL -> {
+            MessagePaths.TO_SERVER_BOLUS_CANCEL -> {
                 Timber.i("bolus state cancelled")
                 resetBolusPrefs(this)
             }
-            MessagePaths.TO_PHONE_INITIATE_CONFIRMED_BOLUS -> {
+            MessagePaths.TO_SERVER_INITIATE_CONFIRMED_BOLUS -> {
                 // removed: initialized check
                 val secretKey = prefs(this)?.getString("initiateBolusSecret", "") ?: ""
                 val confirmedBolus =
@@ -332,7 +332,7 @@ class CommService : Service(), CommServiceCallbacks {
                 val initiateMessage = confirmedBolus.right
                 if (!messageOk) {
                     Timber.e("invalid message -- blocked signature $messageOk $initiateMessage")
-                    sendWearCommMessage(MessagePaths.TO_WEAR_BLOCKED_BOLUS_SIGNATURE,
+                    sendWearCommMessage(MessagePaths.TO_CLIENT_BLOCKED_BOLUS_SIGNATURE,
                         "CommService".toByteArray()
                     )
                     NotificationCompat.Builder(this)
@@ -345,7 +345,7 @@ class CommService : Service(), CommServiceCallbacks {
                 Timber.i("sending confirmed bolus request: $initiateMessage")
                 sendPumpCommBolusMessage(data)
             }
-            MessagePaths.TO_PHONE_WRITE_CHARACTERISTIC_FAILED_CALLBACK -> {
+            MessagePaths.TO_SERVER_WRITE_CHARACTERISTIC_FAILED_CALLBACK -> {
                 Timber.i("writeCharacteristicFailedCallback from message")
                 handleWriteCharacteristicFailedCallback(String(data))
             }
@@ -692,8 +692,8 @@ class CommService : Service(), CommServiceCallbacks {
         val minNotifyThreshold = Prefs(this).bolusConfirmationInsulinThreshold()
         val autoApproveTimeout = if (source == BolusRequestSource.WEAR)
             Prefs(this).wearBolusAutoApproveTimeoutSeconds() else 0
-        sendWearCommMessage(MessagePaths.TO_WEAR_BOLUS_MIN_NOTIFY_THRESHOLD, "$minNotifyThreshold".toByteArray())
-        sendWearCommMessage(MessagePaths.TO_WEAR_WEAR_AUTO_APPROVE_TIMEOUT, "$autoApproveTimeout".toByteArray())
+        sendWearCommMessage(MessagePaths.TO_CLIENT_BOLUS_MIN_NOTIFY_THRESHOLD, "$minNotifyThreshold".toByteArray())
+        sendWearCommMessage(MessagePaths.TO_CLIENT_WEAR_AUTO_APPROVE_TIMEOUT, "$autoApproveTimeout".toByteArray())
 
         if (InsulinUnit.from1000To1(request.totalVolume) >= minNotifyThreshold || minNotifyThreshold == 0.0) {
             Timber.i("Requesting permission for bolus because $units >= minNotifyThreshold=$minNotifyThreshold")
@@ -716,7 +716,7 @@ class CommService : Service(), CommServiceCallbacks {
             makeNotif(bolusNotificationId, notif)
 
             // Broadcast to phone UI for in-app dialog
-            sendWearCommMessage(MessagePaths.TO_PHONE_BOLUS_CONFIRM_DIALOG,
+            sendWearCommMessage(MessagePaths.TO_SERVER_BOLUS_CONFIRM_DIALOG,
                 "${Hex.encodeHexString(PumpMessageSerializer.toBytes(request))}|${source.id}|$autoApproveTimeout".toByteArray())
 
             // Schedule auto-approve if timeout is set

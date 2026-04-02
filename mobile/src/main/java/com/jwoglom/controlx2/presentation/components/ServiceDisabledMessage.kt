@@ -58,10 +58,10 @@ fun ServiceDisabledMessage(
                     coroutineScope.launch {
                         delay(250)
                         // reload service, if running
-                        sendMessage(MessagePaths.TO_PHONE_FORCE_RELOAD, "".toByteArray())
+                        sendMessage(MessagePaths.TO_SERVER_FORCE_RELOAD, "".toByteArray())
                         delay(250)
                         // reload main activity as fallback
-                        sendMessage(MessagePaths.TO_PHONE_APP_RELOAD, "".toByteArray())
+                        sendMessage(MessagePaths.TO_SERVER_APP_RELOAD, "".toByteArray())
                     }
                 }
             ) {

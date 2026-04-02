@@ -238,7 +238,7 @@ fun Debug(
                             Prefs(context).setServiceEnabled(false)
                             coroutineScope.launch {
                                 delay(250)
-                                sendMessage(MessagePaths.TO_PHONE_FORCE_RELOAD, "".toByteArray())
+                                sendMessage(MessagePaths.TO_SERVER_FORCE_RELOAD, "".toByteArray())
                             }
                         }
                     )
@@ -774,7 +774,7 @@ fun Debug(
                                 Prefs(context).setOnlySnoopBluetoothEnabled(false)
                                 coroutineScope.launch {
                                     delay(250)
-                                    sendMessage(MessagePaths.TO_PHONE_FORCE_RELOAD, "".toByteArray())
+                                    sendMessage(MessagePaths.TO_SERVER_FORCE_RELOAD, "".toByteArray())
                                 }
                             }
                         )
@@ -792,7 +792,7 @@ fun Debug(
                                 Prefs(context).setOnlySnoopBluetoothEnabled(true)
                                 coroutineScope.launch {
                                     delay(250)
-                                    sendMessage(MessagePaths.TO_PHONE_FORCE_RELOAD, "".toByteArray())
+                                    sendMessage(MessagePaths.TO_SERVER_FORCE_RELOAD, "".toByteArray())
                                 }
                             }
                         )

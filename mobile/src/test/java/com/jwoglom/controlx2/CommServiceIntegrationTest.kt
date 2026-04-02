@@ -204,28 +204,28 @@ class CommServiceIntegrationTest {
         // Service should have registered a message listener on the bus
         // and be in normal comm mode. Verify by checking it responds to
         // service status request with comm-started (not pump-finder-started)
-        sendMessage(MessagePaths.TO_PHONE_REQUEST_SERVICE_STATUS)
+        sendMessage(MessagePaths.TO_SERVER_REQUEST_SERVICE_STATUS)
         assertTrue(
-            "Expected /to-phone/comm-started",
-            messageBus.hasMessage(MessagePaths.TO_PHONE_COMM_STARTED)
+            "Expected /to-server/comm-started",
+            messageBus.hasMessage(MessagePaths.TO_SERVER_COMM_STARTED)
         )
         assertFalse(
             "Should NOT send pump-finder-started in normal mode",
-            messageBus.hasMessage(MessagePaths.TO_PHONE_PUMP_FINDER_STARTED)
+            messageBus.hasMessage(MessagePaths.TO_SERVER_PUMP_FINDER_STARTED)
         )
     }
 
     @Test
     fun service_onCreate_pumpFinderMode_createsPumpFinderHandler() {
         startServicePumpFinder()
-        sendMessage(MessagePaths.TO_PHONE_REQUEST_SERVICE_STATUS)
+        sendMessage(MessagePaths.TO_SERVER_REQUEST_SERVICE_STATUS)
         assertTrue(
-            "Expected /to-phone/pump-finder-started",
-            messageBus.hasMessage(MessagePaths.TO_PHONE_PUMP_FINDER_STARTED)
+            "Expected /to-server/pump-finder-started",
+            messageBus.hasMessage(MessagePaths.TO_SERVER_PUMP_FINDER_STARTED)
         )
         assertFalse(
             "Should NOT send comm-started in pump-finder mode",
-            messageBus.hasMessage(MessagePaths.TO_PHONE_COMM_STARTED)
+            messageBus.hasMessage(MessagePaths.TO_SERVER_COMM_STARTED)
         )
     }
 
@@ -238,8 +238,8 @@ class CommServiceIntegrationTest {
         // When TOS is not accepted, service should not set up handlers.
         // Sending a message should not crash (handlers are null).
         // And no status messages should have been sent.
-        val statusMessages = messageBus.messagesForPath(MessagePaths.TO_PHONE_COMM_STARTED) +
-            messageBus.messagesForPath(MessagePaths.TO_PHONE_PUMP_FINDER_STARTED)
+        val statusMessages = messageBus.messagesForPath(MessagePaths.TO_SERVER_COMM_STARTED) +
+            messageBus.messagesForPath(MessagePaths.TO_SERVER_PUMP_FINDER_STARTED)
         assertTrue("No status messages expected when TOS not accepted", statusMessages.isEmpty())
     }
 
@@ -249,8 +249,8 @@ class CommServiceIntegrationTest {
         serviceController.create()
         service = serviceController.get()
         shadowOf(Looper.getMainLooper()).idle()
-        val statusMessages = messageBus.messagesForPath(MessagePaths.TO_PHONE_COMM_STARTED) +
-            messageBus.messagesForPath(MessagePaths.TO_PHONE_PUMP_FINDER_STARTED)
+        val statusMessages = messageBus.messagesForPath(MessagePaths.TO_SERVER_COMM_STARTED) +
+            messageBus.messagesForPath(MessagePaths.TO_SERVER_PUMP_FINDER_STARTED)
         assertTrue("No status messages expected when service disabled", statusMessages.isEmpty())
     }
 
@@ -263,8 +263,8 @@ class CommServiceIntegrationTest {
         serviceController.startCommand(0, 0)
         shadowOf(Looper.getMainLooper()).idle()
         // Service should still function normally
-        sendMessage(MessagePaths.TO_PHONE_REQUEST_SERVICE_STATUS)
-        assertTrue(messageBus.hasMessage(MessagePaths.TO_PHONE_COMM_STARTED))
+        sendMessage(MessagePaths.TO_SERVER_REQUEST_SERVICE_STATUS)
+        assertTrue(messageBus.hasMessage(MessagePaths.TO_SERVER_COMM_STARTED))
     }
 
     // =========================================================================
@@ -276,13 +276,13 @@ class CommServiceIntegrationTest {
         startServiceNormal()
         // After acknowledgment, requesting status should still respond,
         // but the periodic sender should stop (we verify no duplicate sends)
-        sendMessage(MessagePaths.TO_PHONE_SERVICE_STATUS_ACKNOWLEDGED)
+        sendMessage(MessagePaths.TO_SERVER_SERVICE_STATUS_ACKNOWLEDGED)
         messageBus.clear()
         // Now advance time — no periodic status should be sent
         shadowOf(Looper.getMainLooper()).idleFor(java.time.Duration.ofSeconds(5))
         assertFalse(
             "No periodic comm-started after acknowledgment",
-            messageBus.hasMessage(MessagePaths.TO_PHONE_COMM_STARTED)
+            messageBus.hasMessage(MessagePaths.TO_SERVER_COMM_STARTED)
         )
     }
 
@@ -304,7 +304,7 @@ class CommServiceIntegrationTest {
         // We verify it doesn't crash and doesn't send a bolus confirmation
         assertFalse(
             "Bolus should not be confirmed via normal command path",
-            messageBus.hasMessage(MessagePaths.TO_WEAR_BOLUS_BLOCKED_SIGNATURE)
+            messageBus.hasMessage(MessagePaths.TO_CLIENT_BOLUS_BLOCKED_SIGNATURE)
         )
     }
 
@@ -318,7 +318,7 @@ class CommServiceIntegrationTest {
 
         val bolusRequest = InitiateBolusRequest(1000, 1, 0, 0, 0, 0, 0, 0)
         val msgBytes = PumpMessageSerializer.toBytes(bolusRequest)
-        sendMessage(MessagePaths.TO_PHONE_BOLUS_REQUEST_PHONE, msgBytes)
+        sendMessage(MessagePaths.TO_SERVER_BOLUS_REQUEST_PHONE, msgBytes)
         shadowOf(Looper.getMainLooper()).idle()
 
         // Should set up bolus prefs
@@ -341,13 +341,13 @@ class CommServiceIntegrationTest {
 
         val bolusRequest = InitiateBolusRequest(1000, 1, 0, 0, 0, 0, 0, 0)
         val msgBytes = PumpMessageSerializer.toBytes(bolusRequest)
-        sendMessage(MessagePaths.TO_PHONE_BOLUS_REQUEST_WEAR, msgBytes)
+        sendMessage(MessagePaths.TO_SERVER_BOLUS_REQUEST_WEAR, msgBytes)
         shadowOf(Looper.getMainLooper()).idle()
 
         assertEquals("wear", prefs.getString("initiateBolusSource", null))
         // Should also broadcast threshold and auto-approve timeout to wear
-        assertTrue(messageBus.hasMessage(MessagePaths.TO_WEAR_BOLUS_MIN_NOTIFY_THRESHOLD))
-        assertTrue(messageBus.hasMessage(MessagePaths.TO_WEAR_WEAR_AUTO_APPROVE_TIMEOUT))
+        assertTrue(messageBus.hasMessage(MessagePaths.TO_CLIENT_BOLUS_MIN_NOTIFY_THRESHOLD))
+        assertTrue(messageBus.hasMessage(MessagePaths.TO_CLIENT_WEAR_AUTO_APPROVE_TIMEOUT))
     }
 
     @Test
@@ -363,13 +363,13 @@ class CommServiceIntegrationTest {
         val bolusRequest = InitiateBolusRequest(1000, 1, 0, 0, 0, 0, 0, 0)
         val signedBytes = InitiateConfirmedBolusSerializer.toBytes(secret, bolusRequest)
 
-        sendMessage(MessagePaths.TO_PHONE_INITIATE_CONFIRMED_BOLUS, signedBytes)
+        sendMessage(MessagePaths.TO_SERVER_INITIATE_CONFIRMED_BOLUS, signedBytes)
         shadowOf(Looper.getMainLooper()).idle()
 
         // Should NOT send blocked-bolus-signature since signature is valid
         assertFalse(
             "Valid signature should not be blocked",
-            messageBus.hasMessage(MessagePaths.TO_WEAR_BLOCKED_BOLUS_SIGNATURE)
+            messageBus.hasMessage(MessagePaths.TO_CLIENT_BLOCKED_BOLUS_SIGNATURE)
         )
     }
 
@@ -384,13 +384,13 @@ class CommServiceIntegrationTest {
         val bolusRequest = InitiateBolusRequest(1000, 1, 0, 0, 0, 0, 0, 0)
         val signedBytes = InitiateConfirmedBolusSerializer.toBytes("wrong-secret", bolusRequest)
 
-        sendMessage(MessagePaths.TO_PHONE_INITIATE_CONFIRMED_BOLUS, signedBytes)
+        sendMessage(MessagePaths.TO_SERVER_INITIATE_CONFIRMED_BOLUS, signedBytes)
         shadowOf(Looper.getMainLooper()).idle()
 
         // Should send blocked-bolus-signature
         assertTrue(
             "Invalid signature should be blocked",
-            messageBus.hasMessage(MessagePaths.TO_WEAR_BLOCKED_BOLUS_SIGNATURE)
+            messageBus.hasMessage(MessagePaths.TO_CLIENT_BLOCKED_BOLUS_SIGNATURE)
         )
     }
 
@@ -405,7 +405,7 @@ class CommServiceIntegrationTest {
             .putLong("initiateBolusTime", System.currentTimeMillis())
             .commit()
 
-        sendMessage(MessagePaths.TO_PHONE_BOLUS_CANCEL)
+        sendMessage(MessagePaths.TO_SERVER_BOLUS_CANCEL)
 
         // initiateBolusRequest and initiateBolusTime should be cleared
         assertNull(prefs.getString("initiateBolusRequest", null))
@@ -444,7 +444,7 @@ class CommServiceIntegrationTest {
     @Test
     fun lifecycle_isPumpConnected_whenNotConnected_sendsPumpNotConnected() {
         startServiceNormal()
-        sendMessage(MessagePaths.TO_PHONE_IS_PUMP_CONNECTED)
+        sendMessage(MessagePaths.TO_SERVER_IS_PUMP_CONNECTED)
 
         // Need to process the Handler message
         shadowOf(Looper.getMainLooper()).idle()
@@ -488,13 +488,13 @@ class CommServiceIntegrationTest {
         messageBus.clear()
 
         // Transition to normal comm mode
-        sendMessage(MessagePaths.TO_PHONE_STOP_PUMP_FINDER, "init_comm")
+        sendMessage(MessagePaths.TO_SERVER_STOP_PUMP_FINDER, "init_comm")
         shadowOf(Looper.getMainLooper()).idle()
 
         // Should send comm-started
         assertTrue(
             "Expected comm-started after transition",
-            messageBus.hasMessage(MessagePaths.TO_PHONE_COMM_STARTED)
+            messageBus.hasMessage(MessagePaths.TO_SERVER_COMM_STARTED)
         )
 
         // pumpfinder-service-enabled pref should be false now
@@ -509,11 +509,11 @@ class CommServiceIntegrationTest {
         messageBus.clear()
 
         // Stop without transitioning
-        sendMessage(MessagePaths.TO_PHONE_STOP_PUMP_FINDER, "")
+        sendMessage(MessagePaths.TO_SERVER_STOP_PUMP_FINDER, "")
         shadowOf(Looper.getMainLooper()).idle()
 
         // Should NOT send comm-started (just stopped finder)
-        assertFalse(messageBus.hasMessage(MessagePaths.TO_PHONE_COMM_STARTED))
+        assertFalse(messageBus.hasMessage(MessagePaths.TO_SERVER_COMM_STARTED))
     }
 
     @Test
@@ -528,7 +528,7 @@ class CommServiceIntegrationTest {
         // Request a small bolus (0.5u = 500 milliunits) - below 5u threshold
         val bolusRequest = InitiateBolusRequest(500, 1, 0, 0, 0, 0, 0, 0)
         val msgBytes = PumpMessageSerializer.toBytes(bolusRequest)
-        sendMessage(MessagePaths.TO_PHONE_BOLUS_REQUEST_PHONE, msgBytes)
+        sendMessage(MessagePaths.TO_SERVER_BOLUS_REQUEST_PHONE, msgBytes)
         shadowOf(Looper.getMainLooper()).idle()
 
         // Bolus prefs should still be set (for the auto-approve flow)
@@ -560,7 +560,7 @@ class CommServiceIntegrationTest {
     @Test
     fun connectedPump_isPumpConnected_sendsPumpConnected() {
         startServiceAndConnectPump()
-        sendMessage(MessagePaths.TO_PHONE_IS_PUMP_CONNECTED)
+        sendMessage(MessagePaths.TO_SERVER_IS_PUMP_CONNECTED)
         shadowOf(Looper.getMainLooper()).idle()
         Thread.sleep(200)
         shadowOf(Looper.getMainLooper()).idle()
@@ -720,10 +720,10 @@ class CommServiceIntegrationTest {
         capturedPump!!.onReceiveMessage(mockPeripheral, response)
         shadowOf(Looper.getMainLooper()).idle()
 
-        // Battery responses should be forwarded to wear via /to-wear/service-receive-message
+        // Battery responses should be forwarded to wear via /to-client/service-receive-message
         assertTrue(
             "Battery response should be forwarded to wear",
-            messageBus.hasMessage(MessagePaths.TO_WEAR_SERVICE_RECEIVE_MESSAGE)
+            messageBus.hasMessage(MessagePaths.TO_CLIENT_SERVICE_RECEIVE_MESSAGE)
         )
     }
 
@@ -737,7 +737,7 @@ class CommServiceIntegrationTest {
 
         assertTrue(
             "IOB response should be forwarded to wear",
-            messageBus.hasMessage(MessagePaths.TO_WEAR_SERVICE_RECEIVE_MESSAGE)
+            messageBus.hasMessage(MessagePaths.TO_CLIENT_SERVICE_RECEIVE_MESSAGE)
         )
     }
 
@@ -751,7 +751,7 @@ class CommServiceIntegrationTest {
 
         assertTrue(
             "CGM response should be forwarded to wear",
-            messageBus.hasMessage(MessagePaths.TO_WEAR_SERVICE_RECEIVE_MESSAGE)
+            messageBus.hasMessage(MessagePaths.TO_CLIENT_SERVICE_RECEIVE_MESSAGE)
         )
     }
 
@@ -764,14 +764,14 @@ class CommServiceIntegrationTest {
         capturedPump!!.onReceiveMessage(mockPeripheral, response)
         shadowOf(Looper.getMainLooper()).idle()
 
-        // Should be forwarded via /from-pump/receive-message but NOT /to-wear/service-receive-message
+        // Should be forwarded via /from-pump/receive-message but NOT /to-client/service-receive-message
         assertTrue(
             "Response should go to /from-pump/receive-message",
             messageBus.hasMessage(MessagePaths.FROM_PUMP_RECEIVE_MESSAGE)
         )
         assertFalse(
-            "Non-battery/IOB/CGM response should NOT go to /to-wear/service-receive-message",
-            messageBus.hasMessage(MessagePaths.TO_WEAR_SERVICE_RECEIVE_MESSAGE)
+            "Non-battery/IOB/CGM response should NOT go to /to-client/service-receive-message",
+            messageBus.hasMessage(MessagePaths.TO_CLIENT_SERVICE_RECEIVE_MESSAGE)
         )
     }
 
@@ -808,7 +808,7 @@ class CommServiceIntegrationTest {
         val bolusRequest = InitiateBolusRequest(1000, 1, 0, 0, 0, 0, 0, 0)
         val signedBytes = InitiateConfirmedBolusSerializer.toBytes(secret, bolusRequest)
 
-        sendMessage(MessagePaths.TO_PHONE_INITIATE_CONFIRMED_BOLUS, signedBytes)
+        sendMessage(MessagePaths.TO_SERVER_INITIATE_CONFIRMED_BOLUS, signedBytes)
         shadowOf(Looper.getMainLooper()).idle()
         Thread.sleep(200)
         shadowOf(Looper.getMainLooper()).idle()
@@ -816,12 +816,12 @@ class CommServiceIntegrationTest {
         // Valid signature should NOT be blocked
         assertFalse(
             "Valid signature should not be blocked",
-            messageBus.hasMessage(MessagePaths.TO_WEAR_BLOCKED_BOLUS_SIGNATURE)
+            messageBus.hasMessage(MessagePaths.TO_CLIENT_BLOCKED_BOLUS_SIGNATURE)
         )
         // Should NOT send bolus-not-enabled since insulin-delivery-actions is true
         assertFalse(
             "Insulin delivery is enabled, should not send bolus-not-enabled",
-            messageBus.hasMessage(MessagePaths.TO_WEAR_BOLUS_NOT_ENABLED)
+            messageBus.hasMessage(MessagePaths.TO_CLIENT_BOLUS_NOT_ENABLED)
         )
     }
 
@@ -837,7 +837,7 @@ class CommServiceIntegrationTest {
         val bolusRequest = InitiateBolusRequest(1000, 1, 0, 0, 0, 0, 0, 0)
         val signedBytes = InitiateConfirmedBolusSerializer.toBytes(secret, bolusRequest)
 
-        sendMessage(MessagePaths.TO_PHONE_INITIATE_CONFIRMED_BOLUS, signedBytes)
+        sendMessage(MessagePaths.TO_SERVER_INITIATE_CONFIRMED_BOLUS, signedBytes)
         shadowOf(Looper.getMainLooper()).idle()
         Thread.sleep(200)
         shadowOf(Looper.getMainLooper()).idle()
@@ -845,11 +845,11 @@ class CommServiceIntegrationTest {
         // Signature is valid, but insulin delivery is disabled — should be blocked
         assertFalse(
             "Signature is valid, should not block for signature",
-            messageBus.hasMessage(MessagePaths.TO_WEAR_BLOCKED_BOLUS_SIGNATURE)
+            messageBus.hasMessage(MessagePaths.TO_CLIENT_BLOCKED_BOLUS_SIGNATURE)
         )
         assertTrue(
-            "Insulin delivery disabled should send /to-wear/bolus-not-enabled",
-            messageBus.hasMessage(MessagePaths.TO_WEAR_BOLUS_NOT_ENABLED)
+            "Insulin delivery disabled should send /to-client/bolus-not-enabled",
+            messageBus.hasMessage(MessagePaths.TO_CLIENT_BOLUS_NOT_ENABLED)
         )
     }
 

@@ -187,7 +187,7 @@ class MainActivity : ComponentActivity() {
                 },
                 sendServiceBolusCancel = {
                     sendMessage(
-                        MessagePaths.TO_PHONE_BOLUS_CANCEL,
+                        MessagePaths.TO_SERVER_BOLUS_CANCEL,
                         "".toByteArray()
                     )
                 },
@@ -225,7 +225,7 @@ class MainActivity : ComponentActivity() {
     }
 
     private val writeCharacteristicFailedCallback: (String) -> Unit = { uuid ->
-        sendMessage(MessagePaths.TO_PHONE_WRITE_CHARACTERISTIC_FAILED_CALLBACK, uuid.toByteArray())
+        sendMessage(MessagePaths.TO_SERVER_WRITE_CHARACTERISTIC_FAILED_CALLBACK, uuid.toByteArray())
     }
 
     override fun onNewIntent(intent: Intent) {
@@ -263,7 +263,7 @@ class MainActivity : ComponentActivity() {
         if (dataStore.pumpSetupStage.value == PumpSetupStage.WAITING_PUMP_FINDER_INIT &&
             Prefs(applicationContext).serviceEnabled()) {
             Timber.i("onResume: requesting service status (currently in WAITING_PUMP_FINDER_INIT)")
-            sendMessage(MessagePaths.TO_PHONE_REQUEST_SERVICE_STATUS, "".toByteArray())
+            sendMessage(MessagePaths.TO_SERVER_REQUEST_SERVICE_STATUS, "".toByteArray())
         }
 
         super.onResume()
@@ -333,7 +333,7 @@ class MainActivity : ComponentActivity() {
             //from the onBind method to communicate with
             Timber.i("CommService onServiceConnected")
             // Request service status now that we're ready to receive it
-            sendMessage(MessagePaths.TO_PHONE_REQUEST_SERVICE_STATUS, "".toByteArray())
+            sendMessage(MessagePaths.TO_SERVER_REQUEST_SERVICE_STATUS, "".toByteArray())
         }
 
         override fun onServiceDisconnected(name: ComponentName) {
@@ -468,7 +468,7 @@ class MainActivity : ComponentActivity() {
         )
 
         Timber.i("sendServiceBolusRequest: numUnits=$numUnits numCarbs=$numCarbs bgValue=$bgValue foodVolume=$foodVolume corrVolume=$corrVolume iobUnits=$iobUnits: bolusRequest=$bolusRequest preCommands=$preCommands")
-        this.sendMessage(MessagePaths.TO_PHONE_BOLUS_REQUEST_PHONE, PumpMessageSerializer.toBytes(bolusRequest))
+        this.sendMessage(MessagePaths.TO_SERVER_BOLUS_REQUEST_PHONE, PumpMessageSerializer.toBytes(bolusRequest))
     }
 
 
@@ -518,7 +518,7 @@ class MainActivity : ComponentActivity() {
         Timber.i("phone messageReceived: $path: ${String(data)} from $sourceNodeId")
         val inInitialSetupFlow = !Prefs(applicationContext).pumpSetupComplete() || !Prefs(applicationContext).appSetupComplete()
         when (path) {
-            MessagePaths.TO_PHONE_START_COMM -> {
+            MessagePaths.TO_SERVER_START_COMM -> {
                 when (String(data)) {
                     "skip_notif_permission" -> {
                         startBTPermissionsCheck()
@@ -540,17 +540,17 @@ class MainActivity : ComponentActivity() {
                 }
             }
 
-            MessagePaths.TO_PHONE_COMM_STARTED -> {
+            MessagePaths.TO_SERVER_COMM_STARTED -> {
                 if (inInitialSetupFlow) {
                     dataStore.pumpSetupStage.value = dataStore.pumpSetupStage.value?.nextStage(PumpSetupStage.PUMPX2_SEARCHING_FOR_PUMP)
                 } else {
                     Timber.i("comm-started: setup complete, skipping setup-stage transition")
                 }
                 // Acknowledge receipt to stop periodic sender
-                sendMessage(MessagePaths.TO_PHONE_SERVICE_STATUS_ACKNOWLEDGED, "".toByteArray())
+                sendMessage(MessagePaths.TO_SERVER_SERVICE_STATUS_ACKNOWLEDGED, "".toByteArray())
             }
 
-            MessagePaths.TO_PHONE_START_PUMP_FINDER -> {
+            MessagePaths.TO_SERVER_START_PUMP_FINDER -> {
                 when (String(data)) {
                     "skip_notif_permission" -> {
                         startBTPermissionsCheck()
@@ -572,14 +572,14 @@ class MainActivity : ComponentActivity() {
                 }
             }
 
-            MessagePaths.TO_PHONE_PUMP_FINDER_STARTED -> {
+            MessagePaths.TO_SERVER_PUMP_FINDER_STARTED -> {
                 if (inInitialSetupFlow) {
                     dataStore.pumpSetupStage.value = dataStore.pumpSetupStage.value?.nextStage(PumpSetupStage.PUMP_FINDER_SEARCHING_FOR_PUMPS)
                 } else {
                     Timber.i("pump-finder-started: setup complete, skipping setup-stage transition")
                 }
                 // Acknowledge receipt to stop periodic sender
-                sendMessage(MessagePaths.TO_PHONE_SERVICE_STATUS_ACKNOWLEDGED, "".toByteArray())
+                sendMessage(MessagePaths.TO_SERVER_SERVICE_STATUS_ACKNOWLEDGED, "".toByteArray())
             }
 
             MessagePaths.FROM_PUMP_PUMP_FINDER_FOUND_PUMPS -> {
@@ -610,7 +610,7 @@ class MainActivity : ComponentActivity() {
                 }
             }
 
-            MessagePaths.TO_PHONE_SET_PAIRING_CODE -> {
+            MessagePaths.TO_SERVER_SET_PAIRING_CODE -> {
                 val pairingCodeText = String(data)
                 PumpState.setPairingCode(applicationContext, pairingCodeText)
                 Toast.makeText(applicationContext, "Set pairing code: $pairingCodeText", Toast.LENGTH_SHORT).show()
@@ -618,7 +618,7 @@ class MainActivity : ComponentActivity() {
                 if (dataStore.pumpSetupStage.value == PumpSetupStage.WAITING_PUMP_FINDER_CLEANUP)
                 {
                     Prefs(applicationContext).setPumpFinderServiceEnabled(false)
-                    sendMessage(MessagePaths.TO_PHONE_STOP_PUMP_FINDER, "init_comm".toByteArray())
+                    sendMessage(MessagePaths.TO_SERVER_STOP_PUMP_FINDER, "init_comm".toByteArray())
                 } else if (dataStore.pumpSetupStage.value == PumpSetupStage.PUMPX2_WAITING_FOR_PAIRING_CODE) {
                     sendMessage(MessagePaths.TO_PUMP_PAIR, "".toByteArray())
                 } else {
@@ -626,11 +626,11 @@ class MainActivity : ComponentActivity() {
                 }
             }
 
-            MessagePaths.TO_PHONE_APP_RELOAD -> {
+            MessagePaths.TO_SERVER_APP_RELOAD -> {
                 triggerAppReload(applicationContext)
             }
 
-            MessagePaths.TO_PHONE_CONNECTED -> {
+            MessagePaths.TO_SERVER_CONNECTED -> {
                 dataStore.watchConnected.value = true
             }
 
@@ -672,7 +672,7 @@ class MainActivity : ComponentActivity() {
                 Timber.w("invalid-pairing-code with code: ${PumpState.getPairingCode(applicationContext)}")
                 PumpState.setPairingCode(applicationContext, "")
                 dataStore.pumpSetupStage.value = dataStore.pumpSetupStage.value?.nextStage(PumpSetupStage.PUMPX2_INVALID_PAIRING_CODE)
-                sendMessage(MessagePaths.TO_PHONE_STOP_COMM, "invalid_pairing_code".toByteArray())
+                sendMessage(MessagePaths.TO_SERVER_STOP_COMM, "invalid_pairing_code".toByteArray())
             }
 
             MessagePaths.FROM_PUMP_PUMP_CRITICAL_ERROR -> {
@@ -706,7 +706,7 @@ class MainActivity : ComponentActivity() {
                 }
             }
 
-            MessagePaths.TO_PHONE_BOLUS_CONFIRM_DIALOG -> {
+            MessagePaths.TO_SERVER_BOLUS_CONFIRM_DIALOG -> {
                 val parts = String(data).split("|")
                 if (parts.size >= 3) {
                     val requestHex = parts[0]

@@ -103,7 +103,7 @@ fun PumpSetup(
         coroutineScope.launch {
             delay(500)
             sendMessage(
-                MessagePaths.TO_PHONE_APP_RELOAD,
+                MessagePaths.TO_SERVER_APP_RELOAD,
                 "".toByteArray()
             )
             delay(500)
@@ -127,7 +127,7 @@ fun PumpSetup(
                 PumpSetupStage.PERMISSIONS_NOT_GRANTED -> {
                     Button(
                         onClick = {
-                            sendMessage(MessagePaths.TO_PHONE_START_PUMP_FINDER, "skip_notif_permission".toByteArray())
+                            sendMessage(MessagePaths.TO_SERVER_START_PUMP_FINDER, "skip_notif_permission".toByteArray())
                         }
                     ) {
                         Text("Continue Without Permission")
@@ -176,7 +176,7 @@ fun PumpSetup(
                 PumpSetupStage.PERMISSIONS_NOT_GRANTED -> {
                     Button(
                         onClick = {
-                            sendMessage(MessagePaths.TO_PHONE_START_PUMP_FINDER, "".toByteArray())
+                            sendMessage(MessagePaths.TO_SERVER_START_PUMP_FINDER, "".toByteArray())
                         }
                     ) {
                         Text("Retry")
@@ -193,7 +193,7 @@ fun PumpSetup(
                                 if (setupStage.value != PumpSetupStage.PUMPX2_WAITING_FOR_PAIRING_CODE) {
                                     ds.pumpSetupStage.value = setupStage.value!!.nextStage(PumpSetupStage.WAITING_PUMP_FINDER_CLEANUP)
                                 }
-                                sendMessage(MessagePaths.TO_PHONE_SET_PAIRING_CODE, code.toByteArray())
+                                sendMessage(MessagePaths.TO_SERVER_SET_PAIRING_CODE, code.toByteArray())
                             } catch (e: Exception) {
                                 Timber.w("pairingCodeInput: $e")
                                 Toast.makeText(context, e.toString().replaceBefore("$", "").substring(1), Toast.LENGTH_SHORT).show()
@@ -206,7 +206,7 @@ fun PumpSetup(
                 PumpSetupStage.PUMPX2_INVALID_PAIRING_CODE -> {
                     Button(
                         onClick = {
-                            sendMessage(MessagePaths.TO_PHONE_RESTART_PUMP_FINDER, "".toByteArray())
+                            sendMessage(MessagePaths.TO_SERVER_RESTART_PUMP_FINDER, "".toByteArray())
                         }
                     ) {
                         Text("Retry")
