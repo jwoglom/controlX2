@@ -23,7 +23,7 @@ import androidx.compose.ui.unit.dp
 import com.jwoglom.controlx2.presentation.components.HeaderLine
 import com.jwoglom.controlx2.presentation.components.Line
 import com.jwoglom.controlx2.presentation.theme.ControlX2Theme
-import com.jwoglom.controlx2.util.determinePumpModel
+import com.jwoglom.controlx2.shared.util.determinePumpModel
 import com.jwoglom.pumpx2.pump.messages.models.KnownDeviceModel
 
 @Composable

@@ -10,17 +10,11 @@ import android.os.Handler
 import android.os.Looper
 import android.os.Message
 import android.widget.Toast
-import com.jwoglom.controlx2.Prefs
 import com.jwoglom.controlx2.shared.CommServiceCodes
 import com.jwoglom.controlx2.shared.MessagePaths
 import com.jwoglom.controlx2.shared.InitiateConfirmedBolusSerializer
 import com.jwoglom.controlx2.shared.PumpMessageSerializer
-import com.jwoglom.controlx2.sync.nightscout.NightscoutSyncWorker
-import com.jwoglom.controlx2.sync.xdrip.XdripMessageDispatcher
-import com.jwoglom.controlx2.util.DataClientState
-import com.jwoglom.controlx2.util.HistoryLogFetcher
-import com.jwoglom.controlx2.util.HistoryLogSyncWorker
-import com.jwoglom.controlx2.util.extractPumpSid
+import com.jwoglom.controlx2.shared.util.extractPumpSid
 import com.jwoglom.pumpx2.pump.PumpState
 import com.jwoglom.pumpx2.pump.TandemError
 import com.jwoglom.pumpx2.pump.bluetooth.PumpReadyState
@@ -87,8 +81,8 @@ class PumpCommHandler(
     var currentSession: PumpSession? = null
         internal set
 
-    private var historyLogFetcher: HistoryLogFetcher? = null
-    private var historyLogSyncWorker: HistoryLogSyncWorker? = null
+    private var historyLogFetcher: PumpHistoryLogFetcher? = null
+    private var historyLogSyncWorker: PumpHistoryLogSyncWorker? = null
 
     fun getPumpSid(): Int? {
         return if (this::pump.isInitialized) pump.pumpSid else null
@@ -115,7 +109,7 @@ class PumpCommHandler(
             return
         }
 
-        if (!Prefs(callbacks.getApplicationContext()).autoFetchHistoryLogs()) {
+        if (!callbacks.prefAutoFetchHistoryLogs()) {
             Timber.i("refreshHistoryLogSyncWorker stopping worker")
             worker.stop()
             return
@@ -129,7 +123,7 @@ class PumpCommHandler(
     }
 
     private fun requestHistoryLogStatusUpdate() {
-        if (!Prefs(callbacks.getApplicationContext()).autoFetchHistoryLogs()) {
+        if (!callbacks.prefAutoFetchHistoryLogs()) {
             return
         }
         callbacks.sendPumpCommMessages(
@@ -141,11 +135,10 @@ class PumpCommHandler(
 
     private fun ensurePumpUnbondedForFreshInit(filterToBluetoothMac: String?): Boolean {
         val ctx = callbacks.getApplicationContext()
-        val targetMac = (filterToBluetoothMac ?: Prefs(ctx).pumpFinderPumpMac().orEmpty())
+        val targetMac = (filterToBluetoothMac ?: callbacks.prefPumpFinderPumpMac().orEmpty())
             .trim()
             .uppercase()
-        val prefs = Prefs(ctx)
-        val scheduledUnbondMac = prefs.unbondOnNextCommInitMac().orEmpty().trim().uppercase()
+        val scheduledUnbondMac = callbacks.prefUnbondOnNextCommInitMac().orEmpty().trim().uppercase()
 
         if (scheduledUnbondMac.isEmpty()) {
             Timber.i("init_pump_comm: skipping unbond (not scheduled for this init)")
@@ -162,7 +155,7 @@ class PumpCommHandler(
             return true
         }
 
-        prefs.setUnbondOnNextCommInitMac(null)
+        callbacks.prefSetUnbondOnNextCommInitMac(null)
 
         val adapter = BluetoothAdapter.getDefaultAdapter()
         if (adapter == null) {
@@ -212,23 +205,21 @@ class PumpCommHandler(
 
     private inner class Pump(var tandemConfig: TandemConfig) : TandemPump(callbacks.getApplicationContext(), tandemConfig) {
         private val scope = CoroutineScope(SupervisorJob(parent = callbacks.supervisorJob) + Dispatchers.IO)
-        private val xdripMessageDispatcher = XdripMessageDispatcher(callbacks.getApplicationContext())
         var lastPeripheral: BluetoothPeripheral? = null
         var isConnected = false
         var pumpSid: Int? = null
 
         init {
-            val ctx = callbacks.getApplicationContext()
-            if (Prefs(ctx).connectionSharingEnabled()) {
+            if (callbacks.prefConnectionSharingEnabled()) {
                 enableTconnectAppConnectionSharing()
                 enableSendSharedConnectionResponseMessages()
             }
-            if (Prefs(ctx).onlySnoopBluetoothEnabled()) {
+            if (callbacks.prefOnlySnoopBluetoothEnabled()) {
                 Timber.i("ONLY SNOOP BLUETOOTH ENABLED")
                 onlySnoopBluetoothAndBlockAllPumpX2Functionality()
             }
 
-            if (Prefs(ctx).insulinDeliveryActions()) {
+            if (callbacks.prefInsulinDeliveryActions()) {
                 Timber.i("ACTIONS AFFECTING INSULIN DELIVERY ENABLED")
                 enableActionsAffectingInsulinDelivery()
             } else {
@@ -248,7 +239,7 @@ class PumpCommHandler(
                 } else {
                     com.jwoglom.controlx2.shared.util.SendType.STANDARD
                 }
-                callbacks.httpDebugApiService?.onPumpMessageReceived(it, source = source)
+                callbacks.onPumpMessageReceived(it, source = source)
             }
             callbacks.sendWearCommMessage(MessagePaths.FROM_PUMP_RECEIVE_MESSAGE, PumpMessageSerializer.toBytes(message))
 
@@ -268,11 +259,11 @@ class PumpCommHandler(
                 is BolusPermissionResponse -> {
                     PumpStateSupplier.inProgressBolusId = Supplier { message.bolusId }
                 }
-                is CurrentBatteryAbstractResponse -> DataClientState(context).pumpBattery = Pair("${message.batteryPercent}", Instant.now())
-                is ControlIQIOBResponse -> DataClientState(context).pumpIOB = Pair("${InsulinUnit.from1000To1(message.pumpDisplayedIOB)}", Instant.now())
-                is InsulinStatusResponse -> DataClientState(context).pumpCartridgeUnits = Pair("${message.currentInsulinAmount}", Instant.now())
-                is CurrentBasalStatusResponse -> DataClientState(context).pumpCurrentBasal = Pair("${InsulinUnit.from1000To1(message.currentBasalRate)}", Instant.now())
-                is CurrentEGVGuiDataResponse -> DataClientState(context).cgmReading = Pair("${message.cgmReading}", Instant.now())
+                is CurrentBatteryAbstractResponse -> callbacks.updateComplicationData("pumpBattery", "${message.batteryPercent}", Instant.now())
+                is ControlIQIOBResponse -> callbacks.updateComplicationData("pumpIOB", "${InsulinUnit.from1000To1(message.pumpDisplayedIOB)}", Instant.now())
+                is InsulinStatusResponse -> callbacks.updateComplicationData("pumpCartridgeUnits", "${message.currentInsulinAmount}", Instant.now())
+                is CurrentBasalStatusResponse -> callbacks.updateComplicationData("pumpCurrentBasal", "${InsulinUnit.from1000To1(message.currentBasalRate)}", Instant.now())
+                is CurrentEGVGuiDataResponse -> callbacks.updateComplicationData("cgmReading", "${message.cgmReading}", Instant.now())
                 is HistoryLogStatusResponse -> {
                     Timber.i("HistoryLogStatusResponse: $message")
                     scope.launch {
@@ -291,7 +282,7 @@ class PumpCommHandler(
                 }
             }
 
-            message?.let { xdripMessageDispatcher.onReceiveMessage(it) }
+            message?.let { callbacks.dispatchExternalMessage(it) }
             message?.let { callbacks.updateNotificationWithPumpData(it) }
         }
 
@@ -300,7 +291,7 @@ class PumpCommHandler(
             events: MutableSet<QualifyingEvent>?
         ) {
             Timber.i("onReceiveQualifyingEvent: $events")
-            if (Prefs(callbacks.getApplicationContext()).qualifyingEventToastsEnabled()) {
+            if (callbacks.prefQualifyingEventToastsEnabled()) {
                 callbacks.showToast("Events: $events", Toast.LENGTH_SHORT)
             }
             if (events != null && QualifyingEvent.PUMP_COMMUNICATIONS_SUSPENDED in events) {
@@ -403,7 +394,7 @@ class PumpCommHandler(
 
             extractPumpSid(peripheral.name ?: "")?.let {
                 pumpSid = it
-                Prefs(callbacks.getApplicationContext()).setCurrentPumpSid(it)
+                callbacks.prefSetCurrentPumpSid(it)
             }
 
             val session = PumpSession.open(this, peripheral)
@@ -414,7 +405,7 @@ class PumpCommHandler(
             callbacks.sendWearCommMessage(MessagePaths.FROM_PUMP_PUMP_CONNECTED,
                 peripheral.name!!.toByteArray()
             )
-            val glucoseUnit = Prefs(callbacks.getApplicationContext()).glucoseUnit()
+            val glucoseUnit = callbacks.prefGlucoseUnit()
             if (glucoseUnit != null) {
                 callbacks.sendWearCommMessage(MessagePaths.TO_CLIENT_GLUCOSE_UNIT, glucoseUnit.name.toByteArray())
             }
@@ -422,23 +413,16 @@ class PumpCommHandler(
         }
 
         private fun initializeHistoryAndSync() {
-            historyLogFetcher = HistoryLogFetcher(
-                historyLogRepo = callbacks.historyLogRepo,
+            historyLogFetcher = callbacks.createHistoryLogFetcher(
                 pumpSid = pumpSid!!,
                 pumpSession = this@PumpCommHandler.currentSession!!,
-                autoFetchEnabled = { Prefs(callbacks.getApplicationContext()).autoFetchHistoryLogs() },
-                broadcastCallback = { item -> callbacks.broadcastHistoryLogItem(item) }
+                autoFetchEnabled = { callbacks.prefAutoFetchHistoryLogs() },
             )
             Timber.i("HistoryLogFetcher initialized")
 
-            historyLogSyncWorker = HistoryLogSyncWorker(requestSync = { requestHistoryLogStatusUpdate() })
+            historyLogSyncWorker = callbacks.createHistoryLogSyncWorker(requestSync = { requestHistoryLogStatusUpdate() })
             refreshHistoryLogSyncWorker(triggerImmediateSync = true)
-            val ctx = callbacks.getApplicationContext()
-            NightscoutSyncWorker.startIfEnabled(
-                ctx,
-                ctx.getSharedPreferences("controlx2", Context.MODE_PRIVATE),
-                pumpSid!!
-            )
+            callbacks.onPumpConnectedSync(pumpSid!!)
         }
 
         private fun waitForResponseStabilization() {
@@ -485,7 +469,7 @@ class PumpCommHandler(
                 KnownDeviceModel.MOBI -> "Tandem Mobi"
                 else -> "Tandem Pump"
             }
-            Prefs(callbacks.getApplicationContext()).setPumpModelName(modelName)
+            callbacks.prefSetPumpModelName(modelName)
         }
 
         override fun onPumpDisconnected(
@@ -523,7 +507,7 @@ class PumpCommHandler(
                     com.jwoglom.controlx2.shared.util.SendType.STANDARD
                 }
             } ?: com.jwoglom.controlx2.shared.util.SendType.STANDARD
-            reason?.let { callbacks.httpDebugApiService?.onPumpCriticalError(it, source = source) }
+            reason?.let { callbacks.onPumpCriticalError(it, source = source) }
             callbacks.showToast("${reason?.name}: ${reason?.message}", Toast.LENGTH_LONG)
             callbacks.sendWearCommMessage(MessagePaths.FROM_PUMP_PUMP_CRITICAL_ERROR,
                 reason?.message!!.toByteArray()
@@ -766,7 +750,7 @@ class PumpCommHandler(
                     Timber.e("SEND_PUMP_COMMAND_BOLUS not a bolus command: $pumpMsg")
                 } else if (pumpConnectedPrecondition()) {
                     Timber.i("pumpCommHandler send bolus command with valid signature: $pumpMsg")
-                    if (!Prefs(callbacks.getApplicationContext()).insulinDeliveryActions()) {
+                    if (!callbacks.prefInsulinDeliveryActions()) {
                         Timber.e("No insulin delivery messages enabled -- blocking bolus command $pumpMsg")
                         callbacks.sendWearCommMessage(MessagePaths.TO_CLIENT_BOLUS_NOT_ENABLED, "from_self".toByteArray())
                         return
@@ -793,7 +777,7 @@ class PumpCommHandler(
                     }
 
                     if (pumpConnectedPrecondition()) {
-                        if (!Prefs(callbacks.getApplicationContext()).insulinDeliveryActions()) {
+                        if (!callbacks.prefInsulinDeliveryActions()) {
                             return
                         }
                         valuesHex.forEach {

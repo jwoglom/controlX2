@@ -61,7 +61,7 @@ import com.jwoglom.controlx2.shared.util.setupTimber
 import com.jwoglom.controlx2.shared.util.shortTime
 import com.jwoglom.controlx2.shared.util.shortTimeAgo
 import com.jwoglom.controlx2.shared.util.twoDecimalPlaces1000Unit
-import com.jwoglom.controlx2.util.extractPumpSid
+import com.jwoglom.controlx2.shared.util.extractPumpSid
 import com.jwoglom.pumpx2.pump.PumpState
 import com.jwoglom.pumpx2.pump.bluetooth.PumpReadyState
 import com.jwoglom.pumpx2.pump.messages.Message

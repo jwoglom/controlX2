@@ -28,7 +28,17 @@ import com.jwoglom.controlx2.pump.CommServiceCallbacks
 import com.jwoglom.controlx2.pump.PumpCommHandler
 import com.jwoglom.controlx2.pump.PumpCommState
 import com.jwoglom.controlx2.pump.PumpFinderCommHandler
+import com.jwoglom.controlx2.pump.PumpHistoryLogFetcher
+import com.jwoglom.controlx2.pump.PumpHistoryLogSyncWorker
 import com.jwoglom.controlx2.pump.PumpSession
+import com.jwoglom.controlx2.shared.enums.GlucoseUnit
+import com.jwoglom.controlx2.shared.util.SendType
+import com.jwoglom.controlx2.sync.nightscout.NightscoutSyncWorker
+import com.jwoglom.controlx2.sync.xdrip.XdripMessageDispatcher
+import com.jwoglom.controlx2.util.DataClientState
+import com.jwoglom.controlx2.util.HistoryLogFetcher
+import com.jwoglom.controlx2.util.HistoryLogSyncWorker
+import com.jwoglom.pumpx2.pump.TandemError
 import com.jwoglom.controlx2.shared.CommServiceCodes
 import com.jwoglom.controlx2.shared.InitiateConfirmedBolusSerializer
 import com.jwoglom.controlx2.shared.MessagePaths
@@ -71,7 +81,7 @@ class CommService : Service(), CommServiceCallbacks {
     private var pumpFinderCommHandler: PumpFinderCommHandler? = null
 
     private lateinit var messageBus: MessageBus
-    override var httpDebugApiService: HttpDebugApiService? = null
+    var httpDebugApiService: HttpDebugApiService? = null
         private set
 
     @androidx.annotation.VisibleForTesting
@@ -107,7 +117,7 @@ class CommService : Service(), CommServiceCallbacks {
     override val pumpCommState = PumpCommState()
 
     val historyLogDb by lazy { HistoryLogDatabase.getDatabase(this) }
-    override val historyLogRepo by lazy { HistoryLogRepo(historyLogDb.historyLogDao()) }
+    val historyLogRepo by lazy { HistoryLogRepo(historyLogDb.historyLogDao()) }
 
 
     // PumpCommHandler extracted to pump/PumpCommHandler.kt
@@ -373,8 +383,69 @@ class CommService : Service(), CommServiceCallbacks {
         }
     }
 
-    override fun broadcastHistoryLogItem(item: HistoryLogItem) {
-        httpDebugApiService?.onHistoryLogInsertedCallback?.invoke(item)
+    // --- Preference accessors ---
+    override fun prefAutoFetchHistoryLogs() = Prefs(applicationContext).autoFetchHistoryLogs()
+    override fun prefConnectionSharingEnabled() = Prefs(applicationContext).connectionSharingEnabled()
+    override fun prefOnlySnoopBluetoothEnabled() = Prefs(applicationContext).onlySnoopBluetoothEnabled()
+    override fun prefInsulinDeliveryActions() = Prefs(applicationContext).insulinDeliveryActions()
+    override fun prefQualifyingEventToastsEnabled() = Prefs(applicationContext).qualifyingEventToastsEnabled()
+    override fun prefGlucoseUnit(): GlucoseUnit? = Prefs(applicationContext).glucoseUnit()
+    override fun prefSetPumpModelName(name: String) { Prefs(applicationContext).setPumpModelName(name) }
+    override fun prefSetCurrentPumpSid(sid: Int) { Prefs(applicationContext).setCurrentPumpSid(sid) }
+    override fun prefPumpFinderPumpMac(): String? = Prefs(applicationContext).pumpFinderPumpMac()
+    override fun prefUnbondOnNextCommInitMac(): String? = Prefs(applicationContext).unbondOnNextCommInitMac()
+    override fun prefSetUnbondOnNextCommInitMac(mac: String?) { Prefs(applicationContext).setUnbondOnNextCommInitMac(mac) }
+
+    // --- Sync/dispatch callbacks ---
+    override fun onPumpConnectedSync(pumpSid: Int) {
+        val ctx = applicationContext
+        NightscoutSyncWorker.startIfEnabled(ctx, ctx.getSharedPreferences("controlx2", Context.MODE_PRIVATE), pumpSid)
+    }
+
+    private val xdripMessageDispatcher by lazy { XdripMessageDispatcher(applicationContext) }
+
+    override fun dispatchExternalMessage(message: com.jwoglom.pumpx2.pump.messages.Message) {
+        xdripMessageDispatcher.onReceiveMessage(message)
+    }
+
+    override fun updateComplicationData(key: String, value: String, timestamp: Instant) {
+        val state = DataClientState(applicationContext)
+        val pair = Pair(value, timestamp)
+        when (key) {
+            "pumpBattery" -> state.pumpBattery = pair
+            "pumpIOB" -> state.pumpIOB = pair
+            "pumpCartridgeUnits" -> state.pumpCartridgeUnits = pair
+            "pumpCurrentBasal" -> state.pumpCurrentBasal = pair
+            "cgmReading" -> state.cgmReading = pair
+        }
+    }
+
+    // --- Debug API callbacks ---
+    override fun onPumpMessageReceived(message: com.jwoglom.pumpx2.pump.messages.Message, source: SendType) {
+        httpDebugApiService?.onPumpMessageReceived(message, source = source)
+    }
+
+    override fun onPumpCriticalError(error: TandemError, source: SendType) {
+        httpDebugApiService?.onPumpCriticalError(error, source = source)
+    }
+
+    // --- History log factories ---
+    override fun createHistoryLogFetcher(
+        pumpSid: Int,
+        pumpSession: PumpSession,
+        autoFetchEnabled: () -> Boolean,
+    ): PumpHistoryLogFetcher {
+        return HistoryLogFetcher(
+            historyLogRepo = historyLogRepo,
+            pumpSid = pumpSid,
+            pumpSession = pumpSession,
+            autoFetchEnabled = autoFetchEnabled,
+            broadcastCallback = { item -> httpDebugApiService?.onHistoryLogInsertedCallback?.invoke(item) }
+        )
+    }
+
+    override fun createHistoryLogSyncWorker(requestSync: () -> Unit): PumpHistoryLogSyncWorker {
+        return HistoryLogSyncWorker(requestSync = requestSync)
     }
 
     override fun markConnectionTime() {

@@ -28,7 +28,7 @@ import com.jwoglom.controlx2.Prefs
 import com.jwoglom.controlx2.presentation.screens.PumpSetupStage
 import com.jwoglom.controlx2.shared.presentation.intervalOf
 import com.jwoglom.controlx2.shared.util.shortTimeAgo
-import com.jwoglom.controlx2.util.determinePumpModel
+import com.jwoglom.controlx2.shared.util.determinePumpModel
 import com.jwoglom.pumpx2.pump.messages.models.KnownDeviceModel
 import com.jwoglom.pumpx2.pump.messages.models.PairingCodeType
 import timber.log.Timber
