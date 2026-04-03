@@ -4,6 +4,7 @@ import android.content.Context
 import android.content.SharedPreferences
 import com.jwoglom.controlx2.clientcomm.ClientConnectionState
 import com.jwoglom.controlx2.clientcomm.ClientStateStore
+import com.jwoglom.controlx2.shared.enums.DeviceRole
 import com.jwoglom.controlx2.shared.enums.GlucoseUnit
 import timber.log.Timber
 import java.time.Instant
@@ -88,6 +89,23 @@ class StatePrefs(val context: Context) : ClientStateStore {
             val ok = prefs().edit().putString("StatePrefs_${key}", "${pair.first};;${pair.second.toEpochMilli()}").commit()
             Timber.d("StatePrefs reply $key=$pair: $ok")
         }
+    }
+
+    /**
+     * The role of this device: PUMP_HOST (manages BT pump connection) or CLIENT (thin client).
+     * Default: CLIENT for watch (backward compatibility).
+     */
+    fun deviceRole(): DeviceRole {
+        val name = prefs().getString("device-role", null)
+        return try {
+            if (name != null) DeviceRole.valueOf(name) else DeviceRole.CLIENT
+        } catch (_: IllegalArgumentException) {
+            DeviceRole.CLIENT
+        }
+    }
+
+    fun setDeviceRole(role: DeviceRole) {
+        prefs().edit().putString("device-role", role.name).commit()
     }
 
     private fun prefs(): SharedPreferences {

@@ -112,6 +112,7 @@ dependencies {
 
     implementation project(path: ':shared')
     implementation project(path: ':pumpcomm')
+    implementation project(path: ':clientcomm')
 
     // pumpx2-android dependencies
     implementation 'com.github.weliem:blessed-android:2.4.0'

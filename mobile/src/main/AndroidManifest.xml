@@ -75,6 +75,13 @@
             </intent-filter>
         </service>
 
+        <service
+            android:name=".MobileClientService"
+            android:exported="false"
+            android:foregroundServiceType="connectedDevice"
+            android:icon="@drawable/pump">
+        </service>
+
         <receiver
             android:name=".BolusNotificationBroadcastReceiver"
             android:exported="false">

@@ -37,6 +37,7 @@ object MessagePaths {
     const val TO_SERVER_STOP_COMM = "/to-server/stop-comm"
     const val TO_SERVER_STOP_PUMP_FINDER = "/to-server/stop-pump-finder"
     const val TO_SERVER_WRITE_CHARACTERISTIC_FAILED_CALLBACK = "/to-server/write-characteristic-failed-callback"
+    const val TO_SERVER_DEVICE_ROLE_CHANGED = "/to-server/device-role-changed"
 
     // === /to-client/* — data/events sent TO the client device ===
     const val TO_CLIENT_BLOCKED_BOLUS_SIGNATURE = "/to-client/blocked-bolus-signature"
@@ -51,6 +52,7 @@ object MessagePaths {
     const val TO_CLIENT_OPEN_ACTIVITY = "/to-client/open-activity"
     const val TO_CLIENT_SERVICE_RECEIVE_MESSAGE = "/to-client/service-receive-message"
     const val TO_CLIENT_WEAR_AUTO_APPROVE_TIMEOUT = "/to-client/wear-auto-approve-timeout"
+    const val TO_CLIENT_DEVICE_ROLE_CHANGED = "/to-client/device-role-changed"
 
     // === /to-pump/* — commands sent TO the pump ===
     const val TO_PUMP_CACHED_COMMANDS = "/to-pump/cached-commands"

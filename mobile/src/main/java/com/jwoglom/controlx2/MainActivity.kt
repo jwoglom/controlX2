@@ -51,6 +51,7 @@ import com.jwoglom.controlx2.presentation.util.ShouldLogToFile
 import com.jwoglom.controlx2.shared.MessagePaths
 import com.jwoglom.controlx2.shared.PumpMessageSerializer
 import com.jwoglom.pumpx2.shared.Hex
+import com.jwoglom.controlx2.shared.enums.DeviceRole
 import com.jwoglom.controlx2.shared.enums.BasalStatus
 import com.jwoglom.controlx2.shared.enums.CGMSessionState
 import com.jwoglom.controlx2.shared.enums.GlucoseUnit
@@ -315,16 +316,29 @@ class MainActivity : ComponentActivity() {
         }
     }
     private fun startCommService() {
-        Timber.i("starting CommService")
-        // Start CommService
-        val intent = Intent(applicationContext, CommService::class.java)
-
-        if (Build.VERSION.SDK_INT >= 26) {
-            applicationContext.startForegroundService(intent)
-        } else {
-            applicationContext.startService(intent)
+        val role = Prefs(applicationContext).deviceRole()
+        when (role) {
+            DeviceRole.PUMP_HOST -> {
+                Timber.i("starting CommService (pump-host mode)")
+                val intent = Intent(applicationContext, CommService::class.java)
+                if (Build.VERSION.SDK_INT >= 26) {
+                    applicationContext.startForegroundService(intent)
+                } else {
+                    applicationContext.startService(intent)
+                }
+                applicationContext.bindService(intent, commServiceConnection, BIND_AUTO_CREATE)
+            }
+            DeviceRole.CLIENT -> {
+                Timber.i("starting MobileClientService (client mode)")
+                val intent = Intent(applicationContext, MobileClientService::class.java)
+                if (Build.VERSION.SDK_INT >= 26) {
+                    applicationContext.startForegroundService(intent)
+                } else {
+                    applicationContext.startService(intent)
+                }
+                applicationContext.bindService(intent, commServiceConnection, BIND_AUTO_CREATE)
+            }
         }
-        applicationContext.bindService(intent, commServiceConnection, BIND_AUTO_CREATE)
     }
 
     private val commServiceConnection = object : ServiceConnection {
