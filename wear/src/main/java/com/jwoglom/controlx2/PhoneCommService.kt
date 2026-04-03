@@ -12,45 +12,34 @@ import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_CONNECTED_DEVICE
-import android.os.Build
-import android.os.Bundle
-import androidx.core.app.ActivityCompat
 import android.app.Service
+import androidx.core.app.ActivityCompat
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.graphics.drawable.IconCompat
+import com.jwoglom.controlx2.clientcomm.ClientConnectionState
+import com.jwoglom.controlx2.clientcomm.ClientMessageHandler
+import com.jwoglom.controlx2.clientcomm.ClientSideEffects
 import com.jwoglom.controlx2.messaging.WearMessageBus
-import com.jwoglom.controlx2.presentation.navigation.Screen
 import com.jwoglom.controlx2.shared.messaging.MessageBus
 import com.jwoglom.controlx2.shared.messaging.MessageListener
-import com.jwoglom.controlx2.shared.PumpMessageSerializer
-import com.jwoglom.controlx2.shared.MessagePaths
 import com.jwoglom.controlx2.shared.util.setupTimber
-import com.jwoglom.controlx2.util.ConnectedState
 import com.jwoglom.controlx2.util.StatePrefs
 import com.jwoglom.controlx2.util.UpdateComplication
 import com.jwoglom.controlx2.util.WearX2Complication
-import com.jwoglom.pumpx2.pump.messages.Message
-import com.jwoglom.pumpx2.pump.messages.helpers.Dates
-import com.jwoglom.pumpx2.pump.messages.models.InsulinUnit
-import com.jwoglom.pumpx2.pump.messages.response.currentStatus.ControlIQIOBResponse
-import com.jwoglom.pumpx2.pump.messages.response.currentStatus.CurrentBatteryAbstractResponse
-import com.jwoglom.pumpx2.pump.messages.response.currentStatus.CurrentEGVGuiDataResponse
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 import timber.log.Timber
-import java.time.Instant
 
 
 class PhoneCommService : Service() {
-    private var connected: ConnectedState = ConnectedState.UNKNOWN
+    private var connectionState: ClientConnectionState = ClientConnectionState.UNKNOWN
     private var notificationId = 0
 
     private lateinit var messageBus: MessageBus
+    private lateinit var clientMessageHandler: ClientMessageHandler
     private val notificationManagerCompat: NotificationManagerCompat by lazy { NotificationManagerCompat.from(this) }
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
 
@@ -60,9 +49,43 @@ class PhoneCommService : Service() {
         Timber.d("wear service onCreate")
 
         messageBus = WearMessageBus(this)
+
+        clientMessageHandler = ClientMessageHandler(
+            stateStore = StatePrefs(this),
+            sideEffects = object : ClientSideEffects {
+                override fun onConnectionStateChanged(state: ClientConnectionState) {
+                    connectionState = state
+                    updateNotification()
+                }
+                override fun onPumpDataUpdated(key: String) {
+                    when (key) {
+                        "pumpBattery" -> UpdateComplication(this@PhoneCommService, WearX2Complication.PUMP_BATTERY)
+                        "pumpIOB" -> UpdateComplication(this@PhoneCommService, WearX2Complication.PUMP_IOB)
+                        "cgmReading" -> UpdateComplication(this@PhoneCommService, WearX2Complication.CGM_READING)
+                    }
+                }
+                override fun onGlucoseUnitUpdated() {
+                    UpdateComplication(this@PhoneCommService, WearX2Complication.CGM_READING)
+                }
+                override fun onOpenActivityRequested() {
+                    startActivity(
+                        Intent(applicationContext, MainActivity::class.java)
+                            .addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP)
+                    )
+                }
+                override fun onBolusBlockedSignature() {
+                    Timber.w("PhoneCommService: blocked bolus signature")
+                }
+                override fun onBolusNotEnabled() {
+                    Timber.w("PhoneCommService: bolus not enabled")
+                }
+            },
+            scope = serviceScope,
+        )
+
         messageBus.addMessageListener(object : MessageListener {
             override fun onMessageReceived(path: String, data: ByteArray, sourceNodeId: String) {
-                handleMessageReceived(path, data, sourceNodeId)
+                clientMessageHandler.handleMessage(path, data)
             }
         })
 
@@ -108,7 +131,7 @@ class PhoneCommService : Service() {
             notificationChannelId
         )
 
-        val title = "ControlX2 is running: $connected"
+        val title = "ControlX2 is running: $connectionState"
         return builder
             .setContentTitle(title)
             .setContentText("This notification can be hidden: open Settings > Apps > Notifications > All > ControlX2 and turn Endless Service Notifications off")
@@ -120,90 +143,17 @@ class PhoneCommService : Service() {
             .build()
     }
 
-    private fun handleMessageReceived(path: String, data: ByteArray, sourceNodeId: String) {
-        Timber.d("wear service handleMessageReceived $path from $sourceNodeId")
-        when (path) {
-            MessagePaths.TO_CLIENT_OPEN_ACTIVITY -> {
-                startActivity(
-                    Intent(applicationContext, MainActivity::class.java)
-                        .addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP)
-                )
-            }
-            MessagePaths.FROM_PUMP_PUMP_CONNECTED -> {
-                connected = ConnectedState.PHONE_CONNECTED_PUMP_CONNECTED
-                StatePrefs(this).connected = Pair(connected.name, Instant.now())
-                updateNotification()
-            }
-            MessagePaths.FROM_PUMP_PUMP_DISCONNECTED -> {
-                connected = ConnectedState.PHONE_CONNECTED_PUMP_DISCONNECTED
-                StatePrefs(this).connected = Pair(connected.name, Instant.now())
-                updateNotification()
-            }
-            MessagePaths.TO_CLIENT_BLOCKED_BOLUS_SIGNATURE -> {
-                Timber.w("PhoneCommService: blocked bolus signature")
-                Intent(applicationContext, MainActivity::class.java)
-                    .addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP)
-                    .putExtra("route", Screen.BolusBlocked.route)
-            }
-            MessagePaths.TO_CLIENT_BOLUS_NOT_ENABLED -> {
-                Timber.w("PhoneCommService: bolus not enabled")
-                Intent(applicationContext, MainActivity::class.java)
-                    .addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP)
-                    .putExtra("route", Screen.BolusNotEnabled.route)
-            }
-            MessagePaths.TO_CLIENT_SERVICE_RECEIVE_MESSAGE -> {
-                serviceScope.launch {
-                    val pumpMessage = withContext(Dispatchers.Default) {
-                        PumpMessageSerializer.fromBytes(data)
-                    }
-                    onPumpMessageReceived(pumpMessage, false)
-                }
-            }
-            MessagePaths.TO_CLIENT_GLUCOSE_UNIT -> {
-                val unitName = String(data)
-                val unit = com.jwoglom.controlx2.shared.enums.GlucoseUnit.fromName(unitName)
-                if (unit != null) {
-                    StatePrefs(applicationContext).glucoseUnit = unit
-                    UpdateComplication(this, WearX2Complication.CGM_READING)
-                }
-            }
-        }
-    }
-
     override fun onDestroy() {
         serviceScope.cancel()
         super.onDestroy()
     }
 
-    // keep in sync with CommService.PumpCommHandler#onReceiveMessage to ensure messages are sent
-    private fun onPumpMessageReceived(message: Message, cached: Boolean) {
-        Timber.i("phoneComm onPumpMessageReceived($message)")
-        when (message) {
-            is CurrentBatteryAbstractResponse -> {
-                StatePrefs(applicationContext).pumpBattery = Pair("${message.batteryPercent}", Instant.now())
-                UpdateComplication(this, WearX2Complication.PUMP_BATTERY)
-            }
-            is ControlIQIOBResponse -> {
-                StatePrefs(applicationContext).pumpIOB = Pair("${InsulinUnit.from1000To1(message.pumpDisplayedIOB)}", Instant.now())
-                UpdateComplication(this, WearX2Complication.PUMP_IOB)
-            }
-            is CurrentEGVGuiDataResponse -> {
-                StatePrefs(applicationContext).cgmReading = Pair("${message.cgmReading}", Dates.fromJan12008EpochSecondsToDate(message.bgReadingTimestampSeconds))
-                UpdateComplication(this, WearX2Complication.CGM_READING)
-            }
-        }
-    }
-
     override fun onBind(intent: Intent?) = null
-
-    // Note: Connection state changes are now handled via MessageBus.observeConnectionState()
-    // if needed in the future. The peer disconnection logic from WearableListenerService
-    // callbacks has been removed as they are no longer invoked with the Service base class.
 
     private fun disconnectedNotification(reason: String) {
         Thread {
             Thread.sleep(30 * 1000)
-            if (connected == ConnectedState.PHONE_CONNECTED_PUMP_CONNECTED) {
+            if (connectionState == ClientConnectionState.HOST_CONNECTED_PUMP_CONNECTED) {
                 return@Thread
             }
 
