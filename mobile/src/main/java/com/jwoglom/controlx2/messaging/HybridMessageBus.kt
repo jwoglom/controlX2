@@ -1,6 +1,7 @@
 package com.jwoglom.controlx2.messaging
 
 import com.jwoglom.controlx2.shared.MessagePaths
+import com.jwoglom.controlx2.shared.enums.DeviceRole
 import com.jwoglom.controlx2.shared.messaging.ConnectionState
 import com.jwoglom.controlx2.shared.messaging.MessageBus
 import com.jwoglom.controlx2.shared.messaging.MessageBusSender
@@ -26,7 +27,8 @@ import java.util.concurrent.CopyOnWriteArrayList
  */
 class HybridMessageBus(
     private val broadcastBus: MessageBus,
-    private val wearBus: MessageBus
+    private val wearBus: MessageBus,
+    private val deviceRole: DeviceRole = DeviceRole.PUMP_HOST
 ) : MessageBus {
     private val listeners = CopyOnWriteArrayList<MessageListener>()
 
@@ -42,11 +44,22 @@ class HybridMessageBus(
         override fun onMessageReceived(path: String, data: ByteArray, sourceNodeId: String) {
             //Timber.d("HybridMessageBus: Message from Wear transport: $path")
 
-            // Messages from the watch: forward to all listeners.
-            // /to-server/* and /to-pump/* are actionable watch-originated messages.
-            // /from-pump/* arrives via Broadcast transport instead.
-            if (path.startsWith(MessagePaths.PREFIX_TO_SERVER) || path.startsWith(MessagePaths.PREFIX_TO_PUMP)) {
-                notifyListeners(path, data, sourceNodeId)
+            when (deviceRole) {
+                DeviceRole.PUMP_HOST -> {
+                    // Phone is pump-host: accept commands FROM the watch client.
+                    // /to-server/* and /to-pump/* are actionable watch-originated messages.
+                    // /from-pump/* arrives via Broadcast transport instead.
+                    if (path.startsWith(MessagePaths.PREFIX_TO_SERVER) || path.startsWith(MessagePaths.PREFIX_TO_PUMP)) {
+                        notifyListeners(path, data, sourceNodeId)
+                    }
+                }
+                DeviceRole.CLIENT -> {
+                    // Phone is client: accept data FROM the watch pump-host.
+                    // /to-client/* and /from-pump/* are data the watch sends to us.
+                    if (path.startsWith(MessagePaths.PREFIX_TO_CLIENT) || path.startsWith(MessagePaths.PREFIX_FROM_PUMP)) {
+                        notifyListeners(path, data, sourceNodeId)
+                    }
+                }
             }
         }
     }
@@ -68,23 +81,48 @@ class HybridMessageBus(
     override fun sendMessage(path: String, data: ByteArray, sender: MessageBusSender) {
         //Timber.i("HybridMessageBus.sendMessage: $path (sender: $sender)")
 
-        when {
-            // Phone → Watch: Wear transport only
-            path.startsWith(MessagePaths.PREFIX_TO_CLIENT) -> {
-                wearBus.sendMessage(path, data, sender)
+        when (deviceRole) {
+            DeviceRole.PUMP_HOST -> {
+                // Phone is pump-host (default / original behavior)
+                when {
+                    // Phone → Watch: Wear transport only
+                    path.startsWith(MessagePaths.PREFIX_TO_CLIENT) -> {
+                        wearBus.sendMessage(path, data, sender)
+                    }
+                    // Pump responses: broadcast locally + send to watch
+                    path.startsWith(MessagePaths.PREFIX_FROM_PUMP) -> {
+                        broadcastBus.sendMessage(path, data, sender)
+                        wearBus.sendMessage(path, data, sender)
+                    }
+                    // /to-server/*, /to-pump/*, and anything else: broadcast locally only.
+                    else -> {
+                        broadcastBus.sendMessage(path, data, sender)
+                    }
+                }
             }
-
-            // Pump responses: broadcast locally + send to watch
-            path.startsWith(MessagePaths.PREFIX_FROM_PUMP) -> {
-                broadcastBus.sendMessage(path, data, sender)
-                wearBus.sendMessage(path, data, sender)
-            }
-
-            // /to-server/*, /to-pump/*, and anything else: broadcast locally only.
-            // Watch-originated messages arrive via wearProxyListener (inbound),
-            // not via sendMessage (outbound).
-            else -> {
-                broadcastBus.sendMessage(path, data, sender)
+            DeviceRole.CLIENT -> {
+                // Phone is client: watch is pump-host
+                when {
+                    // Commands to pump-host: send via Wear to watch
+                    path.startsWith(MessagePaths.PREFIX_TO_SERVER) -> {
+                        wearBus.sendMessage(path, data, sender)
+                    }
+                    // Pump commands: forward via Wear to watch (which forwards to pump)
+                    path.startsWith(MessagePaths.PREFIX_TO_PUMP) -> {
+                        wearBus.sendMessage(path, data, sender)
+                    }
+                    // Client data and pump responses: deliver locally only
+                    // (received from watch via wearProxyListener)
+                    path.startsWith(MessagePaths.PREFIX_TO_CLIENT) -> {
+                        broadcastBus.sendMessage(path, data, sender)
+                    }
+                    path.startsWith(MessagePaths.PREFIX_FROM_PUMP) -> {
+                        broadcastBus.sendMessage(path, data, sender)
+                    }
+                    else -> {
+                        broadcastBus.sendMessage(path, data, sender)
+                    }
+                }
             }
         }
     }

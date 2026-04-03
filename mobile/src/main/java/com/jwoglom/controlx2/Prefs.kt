@@ -3,6 +3,7 @@ package com.jwoglom.controlx2
 import android.content.Context
 import android.content.SharedPreferences
 import com.google.android.gms.wearable.WearableListenerService
+import com.jwoglom.controlx2.shared.enums.DeviceRole
 import com.jwoglom.controlx2.shared.enums.GlucoseUnit
 import com.jwoglom.pumpx2.pump.messages.models.InsulinUnit
 
@@ -242,6 +243,23 @@ class Prefs(val context: Context) {
 
     fun setPumpModelName(name: String) {
         prefs().edit().putString("pump-model-name", name).commit()
+    }
+
+    /**
+     * The role of this device: PUMP_HOST (manages BT pump connection) or CLIENT (thin client).
+     * Default: PUMP_HOST for phone (backward compatibility).
+     */
+    fun deviceRole(): DeviceRole {
+        val name = prefs().getString("device-role", null)
+        return try {
+            if (name != null) DeviceRole.valueOf(name) else DeviceRole.PUMP_HOST
+        } catch (_: IllegalArgumentException) {
+            DeviceRole.PUMP_HOST
+        }
+    }
+
+    fun setDeviceRole(role: DeviceRole) {
+        prefs().edit().putString("device-role", role.name).commit()
     }
 
     fun prefs(): SharedPreferences {

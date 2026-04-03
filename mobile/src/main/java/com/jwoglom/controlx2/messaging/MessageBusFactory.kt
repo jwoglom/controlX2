@@ -3,6 +3,8 @@ package com.jwoglom.controlx2.messaging
 import android.content.Context
 import com.google.android.gms.common.ConnectionResult
 import com.google.android.gms.common.GoogleApiAvailability
+import com.jwoglom.controlx2.Prefs
+import com.jwoglom.controlx2.shared.enums.DeviceRole
 import com.jwoglom.controlx2.shared.messaging.MessageBus
 import com.jwoglom.controlx2.shared.messaging.StateSyncBus
 import timber.log.Timber
@@ -41,9 +43,10 @@ object MessageBusFactory {
                     // Create both transports
                     val broadcastBus = BroadcastMessageBus(context)
                     val wearBus = WearMessageBus(context)
+                    val deviceRole = Prefs(context).deviceRole()
 
-                    // Wrap them in a hybrid bus
-                    HybridMessageBus(broadcastBus, wearBus)
+                    // Wrap them in a hybrid bus with the device's role
+                    HybridMessageBus(broadcastBus, wearBus, deviceRole)
                 } catch (e: Exception) {
                     Timber.w(e, "Failed to create HybridMessageBus, falling back to BroadcastMessageBus")
                     BroadcastMessageBus(context)

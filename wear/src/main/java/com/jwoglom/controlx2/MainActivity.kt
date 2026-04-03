@@ -32,7 +32,9 @@ import com.jwoglom.controlx2.shared.enums.BasalStatus
 import com.jwoglom.controlx2.shared.enums.UserMode
 import com.jwoglom.controlx2.shared.util.SendType
 import com.jwoglom.controlx2.shared.util.pumpTimeToLocalTz
+import com.jwoglom.controlx2.shared.enums.DeviceRole
 import com.jwoglom.controlx2.shared.util.setupTimber
+import com.jwoglom.controlx2.util.StatePrefs
 import com.jwoglom.controlx2.shared.util.shortTime
 import com.jwoglom.controlx2.shared.util.shortTimeAgo
 import com.jwoglom.controlx2.shared.util.twoDecimalPlaces1000Unit
@@ -229,15 +231,27 @@ class MainActivity : ComponentActivity(), MessageClient.OnMessageReceivedListene
         messageClient = Wearable.getMessageClient(this)
         messageClient.addListener(this)
 
-        startPhoneCommService()
+        when (StatePrefs(this).deviceRole()) {
+            DeviceRole.PUMP_HOST -> startWearPumpCommService()
+            DeviceRole.CLIENT -> startPhoneCommService()
+        }
         onConnected(savedInstanceState)
     }
 
     private fun startPhoneCommService() {
-        Timber.i("starting PhoneCommService")
-        // Start CommService
+        Timber.i("starting PhoneCommService (client mode)")
         val intent = Intent(applicationContext, PhoneCommService::class.java)
+        if (Build.VERSION.SDK_INT >= 26) {
+            applicationContext.startForegroundService(intent)
+        } else {
+            applicationContext.startService(intent)
+        }
+        applicationContext.bindService(intent, commServiceConnection, BIND_AUTO_CREATE)
+    }
 
+    private fun startWearPumpCommService() {
+        Timber.i("starting WearPumpCommService (pump-host mode)")
+        val intent = Intent(applicationContext, WearPumpCommService::class.java)
         if (Build.VERSION.SDK_INT >= 26) {
             applicationContext.startForegroundService(intent)
         } else {
