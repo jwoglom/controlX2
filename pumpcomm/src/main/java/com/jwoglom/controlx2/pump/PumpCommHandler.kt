@@ -1,5 +1,6 @@
 package com.jwoglom.controlx2.pump
 
+import androidx.annotation.VisibleForTesting
 import android.Manifest
 import android.bluetooth.BluetoothAdapter
 import android.bluetooth.le.ScanResult
@@ -92,7 +93,7 @@ class PumpCommHandler(
         return currentSession?.isActive == true
     }
 
-    @androidx.annotation.VisibleForTesting
+    @VisibleForTesting
     fun simulateConnectedPump(peripheral: BluetoothPeripheral) {
         pump.initializeConnection(peripheral)
     }
@@ -388,7 +389,7 @@ class PumpCommHandler(
             super.onInitialPumpConnection(peripheral)
         }
 
-        @androidx.annotation.VisibleForTesting
+        @VisibleForTesting
         fun initializeConnection(peripheral: BluetoothPeripheral) {
             lastPeripheral = peripheral
 

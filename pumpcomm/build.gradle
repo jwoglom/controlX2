@@ -35,6 +35,7 @@ android {
 
 dependencies {
     implementation project(path: ':shared')
+    implementation 'androidx.annotation:annotation:1.7.1'
 
     // pumpx2-android dependencies
     implementation 'com.github.weliem:blessed-android:2.4.0'
