@@ -134,6 +134,7 @@ dependencies {
     }
 
     implementation project(path: ':shared')
+    implementation project(path: ':clientcomm')
 
     // androidx
     implementation 'androidx.constraintlayout:constraintlayout:2.2.1'

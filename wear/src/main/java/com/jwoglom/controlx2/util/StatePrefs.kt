@@ -2,16 +2,30 @@ package com.jwoglom.controlx2.util
 
 import android.content.Context
 import android.content.SharedPreferences
-import com.google.android.gms.wearable.WearableListenerService
+import com.jwoglom.controlx2.clientcomm.ClientConnectionState
+import com.jwoglom.controlx2.clientcomm.ClientStateStore
 import com.jwoglom.controlx2.shared.enums.GlucoseUnit
 import timber.log.Timber
 import java.time.Instant
 
-class StatePrefs(val context: Context) {
+class StatePrefs(val context: Context) : ClientStateStore {
     var connected: Pair<String, Instant>?
         get() = get("connected")
         set(value) {
             set("connected", value)
+        }
+
+    override var connectionState: ClientConnectionState
+        get() {
+            val name = connected?.first
+            return try {
+                if (name != null) ClientConnectionState.valueOf(name) else ClientConnectionState.UNKNOWN
+            } catch (_: IllegalArgumentException) {
+                ClientConnectionState.UNKNOWN
+            }
+        }
+        set(value) {
+            connected = Pair(value.name, Instant.now())
         }
 
     var pumpBattery: Pair<String, Instant>?
@@ -20,17 +34,29 @@ class StatePrefs(val context: Context) {
             set("pumpBattery", value)
         }
 
+    override fun updatePumpBattery(value: String, timestamp: Instant) {
+        pumpBattery = Pair(value, timestamp)
+    }
+
     var pumpIOB: Pair<String, Instant>?
         get() = get("pumpIOB")
         set(value) {
             set("pumpIOB", value)
         }
 
+    override fun updatePumpIOB(value: String, timestamp: Instant) {
+        pumpIOB = Pair(value, timestamp)
+    }
+
     var cgmReading: Pair<String, Instant>?
         get() = get("cgmReading")
         set(value) {
             set("cgmReading", value)
         }
+
+    override fun updateCgmReading(value: String, timestamp: Instant) {
+        cgmReading = Pair(value, timestamp)
+    }
 
     var glucoseUnit: GlucoseUnit
         get() {
@@ -41,6 +67,10 @@ class StatePrefs(val context: Context) {
             Timber.d("StatePrefs set glucoseUnit=$value")
             prefs().edit().putString("StatePrefs_glucoseUnit", value.name).apply()
         }
+
+    override fun updateGlucoseUnit(unit: GlucoseUnit) {
+        glucoseUnit = unit
+    }
 
     private fun get(key: String): Pair<String, Instant>? {
         val s = prefs().getString("StatePrefs_${key}", "")
@@ -61,6 +91,6 @@ class StatePrefs(val context: Context) {
     }
 
     private fun prefs(): SharedPreferences {
-        return context.getSharedPreferences("WearX2", WearableListenerService.MODE_PRIVATE)
+        return context.getSharedPreferences("WearX2", Context.MODE_PRIVATE)
     }
 }
