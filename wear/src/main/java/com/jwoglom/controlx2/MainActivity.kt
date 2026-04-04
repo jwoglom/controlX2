@@ -671,6 +671,29 @@ class MainActivity : ComponentActivity(), MessageClient.OnMessageReceivedListene
                     onPumpMessageReceived(pumpMessage, true)
                 }
             }
+            MessagePaths.TO_SERVER_DEVICE_ROLE_CHANGED -> {
+                val roleName = String(messageEvent.data)
+                Timber.i("Device role changed by remote device: $roleName")
+                try {
+                    val newRole = DeviceRole.valueOf(roleName)
+                    WearPrefs(applicationContext).setDeviceRole(newRole)
+                    // Navigate based on new role
+                    runOnUiThread {
+                        when (newRole) {
+                            DeviceRole.PUMP_HOST -> {
+                                // Watch is now pump-host: start pump setup flow
+                                navController.navigateClearBackStack(Screen.WaitingToFindPump.route)
+                            }
+                            DeviceRole.CLIENT -> {
+                                // Watch is now client: return to waiting for phone
+                                navController.navigateClearBackStack(Screen.WaitingForPhone.route)
+                            }
+                        }
+                    }
+                } catch (e: IllegalArgumentException) {
+                    Timber.w("Unknown device role received: $roleName")
+                }
+            }
             else -> {
                 Timber.w("wear activity unhandled receive: ${messageEvent.path} ${String(messageEvent.data)}")
             }

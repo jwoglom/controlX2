@@ -644,6 +644,18 @@ class MainActivity : ComponentActivity() {
                 triggerAppReload(applicationContext)
             }
 
+            MessagePaths.TO_CLIENT_DEVICE_ROLE_CHANGED -> {
+                val roleName = String(data)
+                Timber.i("Device role changed by remote device: $roleName")
+                try {
+                    val newRole = DeviceRole.valueOf(roleName)
+                    Prefs(applicationContext).setDeviceRole(newRole)
+                    triggerAppReload(applicationContext)
+                } catch (e: IllegalArgumentException) {
+                    Timber.w("Unknown device role received: $roleName")
+                }
+            }
+
             MessagePaths.TO_SERVER_CONNECTED -> {
                 dataStore.watchConnected.value = true
             }

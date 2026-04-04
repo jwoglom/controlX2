@@ -38,6 +38,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.style.TextAlign
@@ -82,8 +83,12 @@ import com.jwoglom.controlx2.presentation.components.TopText
 import com.jwoglom.controlx2.presentation.navigation.DestinationScrollType
 import com.jwoglom.controlx2.presentation.navigation.SCROLL_TYPE_NAV_ARGUMENT
 import com.jwoglom.controlx2.presentation.navigation.Screen
+import com.jwoglom.controlx2.presentation.ui.BlePermissionScreen
 import com.jwoglom.controlx2.presentation.ui.BolusScreen
 import com.jwoglom.controlx2.presentation.ui.FullScreenText
+import com.jwoglom.controlx2.presentation.ui.RoleSelectionScreen
+import com.jwoglom.controlx2.shared.enums.DeviceRole
+import com.jwoglom.controlx2.WearPrefs
 import com.jwoglom.controlx2.presentation.ui.IndeterminateProgressIndicator
 import com.jwoglom.controlx2.presentation.ui.LandingScreen
 import com.jwoglom.controlx2.presentation.ui.ScalingLazyListStateViewModel
@@ -107,6 +112,7 @@ fun WearApp(
     sendPhoneCommand: (String) -> Unit,
     sendPhoneOpenActivity: () -> Unit,
 ) {
+    val context = LocalContext.current
     var themeColors by remember { mutableStateOf(defaultTheme.colors) }
     WearAppTheme(colors = themeColors) {
         // Allows user to disable the text before the time.
@@ -607,6 +613,36 @@ fun WearApp(
                         )
                     }
                     BottomText()
+                }
+                composable(Screen.RoleSelection.route) {
+                    RoleSelectionScreen(
+                        onSelectPumpHost = {
+                            navController.navigate(Screen.BlePermission.route)
+                        },
+                        onSelectClient = {
+                            WearPrefs(context).setDeviceRole(DeviceRole.CLIENT)
+                            navController.navigate(Screen.WaitingForPhone.route) {
+                                launchSingleTop = true
+                                popUpTo(navController.graph.startDestinationId) { inclusive = true }
+                            }
+                        },
+                    )
+                }
+                composable(Screen.BlePermission.route) {
+                    BlePermissionScreen(
+                        onPermissionsGranted = {
+                            WearPrefs(context).setDeviceRole(DeviceRole.PUMP_HOST)
+                            WearPrefs(context).setServiceEnabled(true)
+                            WearPrefs(context).setPumpFinderServiceEnabled(true)
+                            navController.navigate(Screen.WaitingToFindPump.route) {
+                                launchSingleTop = true
+                                popUpTo(navController.graph.startDestinationId) { inclusive = true }
+                            }
+                        },
+                        onBack = {
+                            navController.popBackStack()
+                        },
+                    )
                 }
             }
         }

@@ -45,6 +45,7 @@ import com.jwoglom.controlx2.presentation.components.ServiceDisabledMessage
 import com.jwoglom.controlx2.presentation.navigation.Screen
 import com.jwoglom.controlx2.presentation.theme.ControlX2Theme
 import com.jwoglom.controlx2.shared.MessagePaths
+import com.jwoglom.controlx2.shared.enums.DeviceRole
 import com.jwoglom.controlx2.shared.enums.GlucoseUnit
 import com.jwoglom.controlx2.shared.util.twoDecimalPlaces
 import kotlinx.coroutines.launch
@@ -60,6 +61,7 @@ fun AppSetup(
     val context = LocalContext.current
     val ds = LocalDataStore.current
 
+    var deviceRole by remember { mutableStateOf(Prefs(context).deviceRole()) }
     var connectionSharingEnabled by remember { mutableStateOf(Prefs(context).connectionSharingEnabled()) }
     var insulinDeliveryActions by remember { mutableStateOf(Prefs(context).insulinDeliveryActions()) }
     var bolusConfirmationInsulinThreshold by remember { mutableStateOf(Prefs(context).bolusConfirmationInsulinThreshold()) }
@@ -68,6 +70,8 @@ fun AppSetup(
     var autoFetchHistoryLogs by remember { mutableStateOf(Prefs(context).autoFetchHistoryLogs()) }
     var glucoseUnit by remember { mutableStateOf(Prefs(context).glucoseUnit()) }
 
+    var showDeviceRoleDialog by remember { mutableStateOf(false) }
+    var showDeviceRoleClientWarning by remember { mutableStateOf(false) }
     var showGlucoseUnitDialog by remember { mutableStateOf(false) }
     var showInsulinWarningDialog by remember { mutableStateOf(false) }
     var showBolusThresholdDialog by remember { mutableStateOf(false) }
@@ -142,6 +146,34 @@ fun AppSetup(
 //            )
 //            Divider()
 //        }
+        item {
+            ListItem(
+                headlineContent = {
+                    Text("Device Role")
+                },
+                supportingContent = {
+                    Text(
+                        when (deviceRole) {
+                            DeviceRole.PUMP_HOST -> "Phone connects to pump directly"
+                            DeviceRole.CLIENT -> "Watch connects to pump; phone is a client"
+                        }
+                    )
+                },
+                trailingContent = {
+                    Text(
+                        text = when (deviceRole) {
+                            DeviceRole.PUMP_HOST -> "Phone"
+                            DeviceRole.CLIENT -> "Watch"
+                        },
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                },
+                modifier = Modifier.clickable {
+                    showDeviceRoleDialog = true
+                }
+            )
+            Divider()
+        }
         item {
             ListItem(
                 headlineContent = {
@@ -323,6 +355,107 @@ fun AppSetup(
             )
             Divider()
         }
+    }
+
+    // Device Role Selection Dialog
+    if (showDeviceRoleDialog) {
+        AlertDialog(
+            onDismissRequest = { showDeviceRoleDialog = false },
+            title = { Text("Select Device Role") },
+            text = {
+                Column {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable {
+                                deviceRole = DeviceRole.PUMP_HOST
+                                Prefs(context).setDeviceRole(DeviceRole.PUMP_HOST)
+                                showDeviceRoleDialog = false
+                                coroutineScope.launch {
+                                    sendMessage(MessagePaths.TO_SERVER_DEVICE_ROLE_CHANGED, DeviceRole.PUMP_HOST.name.toByteArray())
+                                    delay(250)
+                                    sendMessage(MessagePaths.TO_SERVER_APP_RELOAD, "".toByteArray())
+                                }
+                            }
+                            .padding(vertical = 12.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        RadioButton(
+                            selected = deviceRole == DeviceRole.PUMP_HOST,
+                            onClick = null
+                        )
+                        Spacer(Modifier.width(8.dp))
+                        Column {
+                            Text("Phone as Pump Host", fontWeight = androidx.compose.ui.text.font.FontWeight.Medium)
+                            Text(
+                                "This phone connects directly to the pump via Bluetooth",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable {
+                                showDeviceRoleDialog = false
+                                showDeviceRoleClientWarning = true
+                            }
+                            .padding(vertical = 12.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        RadioButton(
+                            selected = deviceRole == DeviceRole.CLIENT,
+                            onClick = null
+                        )
+                        Spacer(Modifier.width(8.dp))
+                        Column {
+                            Text("Watch as Pump Host", fontWeight = androidx.compose.ui.text.font.FontWeight.Medium)
+                            Text(
+                                "A paired watch connects to the pump; this phone receives data remotely",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { showDeviceRoleDialog = false }) {
+                    Text("Cancel")
+                }
+            }
+        )
+    }
+
+    // Device Role Client Warning Dialog
+    if (showDeviceRoleClientWarning) {
+        AlertDialog(
+            onDismissRequest = { showDeviceRoleClientWarning = false },
+            title = { Text("Switch to Client Mode?") },
+            text = {
+                Text("This phone will not connect to the pump directly. A paired Wear OS watch must be configured as the pump host. The phone will receive pump data from the watch.")
+            },
+            confirmButton = {
+                Button(onClick = {
+                    deviceRole = DeviceRole.CLIENT
+                    Prefs(context).setDeviceRole(DeviceRole.CLIENT)
+                    showDeviceRoleClientWarning = false
+                    coroutineScope.launch {
+                        sendMessage(MessagePaths.TO_SERVER_DEVICE_ROLE_CHANGED, DeviceRole.CLIENT.name.toByteArray())
+                        delay(250)
+                        sendMessage(MessagePaths.TO_SERVER_APP_RELOAD, "".toByteArray())
+                    }
+                }) {
+                    Text("Switch to Client")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDeviceRoleClientWarning = false }) {
+                    Text("Cancel")
+                }
+            }
+        )
     }
 
     // Glucose Unit Selection Dialog

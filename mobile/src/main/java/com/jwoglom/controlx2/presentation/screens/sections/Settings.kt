@@ -17,9 +17,17 @@ import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Send
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.width
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
 import androidx.compose.material3.Divider
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.Surface
@@ -31,7 +39,9 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
@@ -45,6 +55,7 @@ import androidx.compose.ui.unit.sp
 import androidx.navigation.NavHostController
 import com.jwoglom.controlx2.Prefs
 import com.jwoglom.controlx2.R
+import com.jwoglom.controlx2.shared.enums.DeviceRole
 import com.jwoglom.controlx2.presentation.components.HeaderLine
 import com.jwoglom.controlx2.presentation.navigation.Screen
 import com.jwoglom.controlx2.presentation.screens.sections.components.VersionInfo
@@ -81,6 +92,9 @@ fun Settings(
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
     var showPumpSetupConfirmDialog by remember { mutableStateOf(false) }
+    var deviceRole by remember { mutableStateOf(Prefs(context).deviceRole()) }
+    var showDeviceRoleDialog by remember { mutableStateOf(false) }
+    var showDeviceRoleClientWarning by remember { mutableStateOf(false) }
 
     var showSyncTimeDialog by remember { mutableStateOf(false) }
     var showPlaySoundDialog by remember { mutableStateOf(false) }
@@ -252,6 +266,30 @@ fun Settings(
                 Divider()
             }
             
+            item {
+                ListItem(
+                    headlineContent = { Text("Device role") },
+                    supportingContent = {
+                        Text(
+                            when (deviceRole) {
+                                DeviceRole.PUMP_HOST -> "Phone connects to pump directly"
+                                DeviceRole.CLIENT -> "Watch connects to pump; phone is a client"
+                            }
+                        )
+                    },
+                    leadingContent = {
+                        Icon(
+                            Icons.Filled.Settings,
+                            contentDescription = "Device role icon",
+                        )
+                    },
+                    modifier = Modifier.clickable {
+                        showDeviceRoleDialog = true
+                    }
+                )
+                Divider()
+            }
+
             item {
                 ListItem(
                     headlineContent = { Text("Nightscout") },
@@ -455,6 +493,101 @@ fun Settings(
             },
             dismissButton = {
                 TextButton(onClick = { showPlaySoundDialog = false }) {
+                    Text("Cancel")
+                }
+            }
+        )
+    }
+
+    // Device Role Selection Dialog
+    if (showDeviceRoleDialog) {
+        AlertDialog(
+            onDismissRequest = { showDeviceRoleDialog = false },
+            title = { Text("Select Device Role") },
+            text = {
+                Column {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable {
+                                deviceRole = DeviceRole.PUMP_HOST
+                                Prefs(context).setDeviceRole(DeviceRole.PUMP_HOST)
+                                showDeviceRoleDialog = false
+                                coroutineScope.launch {
+                                    sendMessage(MessagePaths.TO_SERVER_DEVICE_ROLE_CHANGED, DeviceRole.PUMP_HOST.name.toByteArray())
+                                    delay(250)
+                                    sendMessage(MessagePaths.TO_SERVER_APP_RELOAD, "".toByteArray())
+                                }
+                            }
+                            .padding(vertical = 12.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        RadioButton(selected = deviceRole == DeviceRole.PUMP_HOST, onClick = null)
+                        Spacer(Modifier.width(8.dp))
+                        Column {
+                            Text("Phone as Pump Host", fontWeight = FontWeight.Medium)
+                            Text(
+                                "This phone connects directly to the pump via Bluetooth",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable {
+                                showDeviceRoleDialog = false
+                                showDeviceRoleClientWarning = true
+                            }
+                            .padding(vertical = 12.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        RadioButton(selected = deviceRole == DeviceRole.CLIENT, onClick = null)
+                        Spacer(Modifier.width(8.dp))
+                        Column {
+                            Text("Watch as Pump Host", fontWeight = FontWeight.Medium)
+                            Text(
+                                "A paired watch connects to the pump; this phone receives data remotely",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { showDeviceRoleDialog = false }) {
+                    Text("Cancel")
+                }
+            }
+        )
+    }
+
+    // Device Role Client Warning Dialog
+    if (showDeviceRoleClientWarning) {
+        AlertDialog(
+            onDismissRequest = { showDeviceRoleClientWarning = false },
+            title = { Text("Switch to Client Mode?") },
+            text = {
+                Text("This phone will not connect to the pump directly. A paired Wear OS watch must be configured as the pump host.")
+            },
+            confirmButton = {
+                Button(onClick = {
+                    deviceRole = DeviceRole.CLIENT
+                    Prefs(context).setDeviceRole(DeviceRole.CLIENT)
+                    showDeviceRoleClientWarning = false
+                    coroutineScope.launch {
+                        sendMessage(MessagePaths.TO_SERVER_DEVICE_ROLE_CHANGED, DeviceRole.CLIENT.name.toByteArray())
+                        delay(250)
+                        sendMessage(MessagePaths.TO_SERVER_APP_RELOAD, "".toByteArray())
+                    }
+                }) {
+                    Text("Switch to Client")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDeviceRoleClientWarning = false }) {
                     Text("Cancel")
                 }
             }

@@ -13,9 +13,10 @@ import com.google.accompanist.flowlayout.FlowRow
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.OpenInNew
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Settings
 
 @Composable
-fun LandingFooterActions(onForceReload: () -> Unit, onOpenPhone: () -> Unit) {
+fun LandingFooterActions(onForceReload: () -> Unit, onOpenPhone: () -> Unit, onOpenRoleSettings: () -> Unit = {}) {
     FlowRow(modifier = Modifier.padding(top = 25.dp)) {
         Chip(
             onClick = onForceReload,
@@ -25,6 +26,11 @@ fun LandingFooterActions(onForceReload: () -> Unit, onOpenPhone: () -> Unit) {
         Chip(
             onClick = onOpenPhone,
             label = { Icon(imageVector = Icons.Filled.OpenInNew, contentDescription = "Open on phone") },
+        )
+        Spacer(Modifier.width(16.dp))
+        Chip(
+            onClick = onOpenRoleSettings,
+            label = { Icon(imageVector = Icons.Filled.Settings, contentDescription = "Device role settings") },
         )
     }
 }

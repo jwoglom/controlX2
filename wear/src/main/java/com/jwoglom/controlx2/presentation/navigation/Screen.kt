@@ -45,5 +45,7 @@ sealed class Screen(
     object BolusBlocked : Screen("BolusBlocked")
     object BolusNotEnabled : Screen("BolusNotEnabled")
     object BolusRejectedOnPhone : Screen("BolusRejectedOnPhone")
+    object RoleSelection : Screen("RoleSelection")
+    object BlePermission : Screen("BlePermission")
 
 }
