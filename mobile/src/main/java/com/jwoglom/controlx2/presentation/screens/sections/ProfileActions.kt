@@ -139,7 +139,7 @@ fun ProfileActions(
             if (messagesSent.containsAll(nextMessages.map { it.cargo })) {
                 Timber.i("profileActions round${round} loading: remaining ${nextMessages?.size} sent ${messagesSent.size}")
                 if (sinceLastFetchTime >= 2500) {
-                    Timber.i("profileActions round${round} loading re-fetching with bust_cache")
+                    Timber.i("profileActions round${round} loading re-fetching with standard")
                     sendPumpCommands(SendType.STANDARD, nextMessages)
                     sinceLastFetchTime = 0
                     attempts++

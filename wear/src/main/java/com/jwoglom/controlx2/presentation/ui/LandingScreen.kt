@@ -138,11 +138,11 @@ fun LandingScreen(
     LifecycleStateObserver(lifecycleOwner = LocalLifecycleOwner.current, onStop = {
         refreshScope.cancel()
     }) {
-        fetchDataStoreFields(SendType.BUST_CACHE)
+        fetchDataStoreFields(SendType.STANDARD)
     }
 
     LaunchedEffect(intervalOf(60)) {
-        fetchDataStoreFields(SendType.BUST_CACHE)
+        fetchDataStoreFields(SendType.STANDARD)
     }
 
     LaunchedEffect(refreshing) {
