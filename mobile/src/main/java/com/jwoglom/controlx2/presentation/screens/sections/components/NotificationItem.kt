@@ -63,7 +63,7 @@ fun NotificationItem(
             when (notification) {
                 is AlertStatusResponse.AlertResponseType -> {
                     sendPumpCommands(
-                        SendType.BUST_CACHE, listOf(
+                        SendType.STANDARD, listOf(
                             DismissNotificationRequest(
                                 DismissNotificationRequest.NotificationType.ALERT,
                                 notification.bitmask().toLong()
@@ -74,7 +74,7 @@ fun NotificationItem(
 
                 is ReminderStatusResponse.ReminderType -> {
                     sendPumpCommands(
-                        SendType.BUST_CACHE, listOf(
+                        SendType.STANDARD, listOf(
                             DismissNotificationRequest(
                                 DismissNotificationRequest.NotificationType.REMINDER,
                                 notification.id().toLong()
@@ -85,7 +85,7 @@ fun NotificationItem(
 
                 is AlarmStatusResponse.AlarmResponseType -> {
                     sendPumpCommands(
-                        SendType.BUST_CACHE, listOf(
+                        SendType.STANDARD, listOf(
                             DismissNotificationRequest(
                                 DismissNotificationRequest.NotificationType.ALARM,
                                 notification.bitmask().toLong()
@@ -96,7 +96,7 @@ fun NotificationItem(
 
                 is CGMAlertStatusResponse.CGMAlert -> {
                     sendPumpCommands(
-                        SendType.BUST_CACHE, listOf(
+                        SendType.STANDARD, listOf(
                             DismissNotificationRequest(
                                 DismissNotificationRequest.NotificationType.CGM_ALERT,
                                 notification.id().toLong()

@@ -112,7 +112,7 @@ fun CartridgeActions(
         sendPumpCommands(type, cartridgeActionsCommands)
     }
 
-    fun refreshNotifications(type: SendType = SendType.BUST_CACHE) = refreshScope.launch {
+    fun refreshNotifications(type: SendType = SendType.STANDARD) = refreshScope.launch {
         if (!Prefs(context).serviceEnabled()) return@launch
         notificationsRefreshing = true
         sendPumpCommands(type, cartridgeNotificationCommands)
@@ -127,7 +127,7 @@ fun CartridgeActions(
         }
     }
 
-    fun refreshWorkflowState(type: SendType = SendType.BUST_CACHE) {
+    fun refreshWorkflowState(type: SendType = SendType.STANDARD) {
         sendPumpCommands(
             type,
             listOf(
