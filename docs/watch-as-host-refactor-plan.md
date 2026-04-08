@@ -179,7 +179,7 @@ Package paths are preserved end-to-end — call sites in `mobile` and `wear` kee
 **Test layout:**
 
 - Pure-JVM unit tests for moved code live in `db/src/test/` (Nightscout client, URL/timestamp formatter, profile converter, processor type, trend arrow, models, xDrip broadcast/dispatcher/payload, history log item).
-- Instrumentation tests (`NightscoutPipelineIntegrationTest`, `NightscoutSyncCoordinatorTest`, `NightscoutSyncConfigTest`, `NightscoutSyncStateDatabaseTest`) intentionally **stay** in `mobile/src/androidTest/` because the root `build.gradle` disables `connectedAndroidTest` on every non-`mobile` subproject under CI to avoid emulator hangs.
+- Instrumentation tests (`NightscoutPipelineIntegrationTest`, `NightscoutSyncCoordinatorTest`, `NightscoutSyncConfigTest`, `NightscoutSyncStateDatabaseTest`) live in `db/src/androidTest/`. Root `build.gradle` keeps a CI allow-list (`["mobile", "db"]`) for `connectedAndroidTest` so the `:db` Room/Nightscout tests run alongside `:mobile`'s while every other subproject's connected tests stay disabled (to avoid the historical emulator hangs).
 
 **Module layout after this phase:**
 
