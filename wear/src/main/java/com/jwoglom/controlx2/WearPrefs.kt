@@ -2,14 +2,17 @@ package com.jwoglom.controlx2
 
 import android.content.Context
 import android.content.SharedPreferences
-import com.jwoglom.controlx2.shared.enums.DeviceRole
 import com.jwoglom.controlx2.shared.enums.GlucoseUnit
 import com.jwoglom.pumpx2.pump.messages.models.InsulinUnit
 
 /**
- * SharedPreferences wrapper for watch pump-host mode.
- * Mirrors mobile/Prefs.kt with the same preference keys so behavior
- * is consistent regardless of which device is the pump-host.
+ * Mirror of [com.jwoglom.controlx2.Prefs] for the watch's pump-host configuration keys
+ * (`service-enabled`, `pumpfinder-*`, `pump-setup-complete`, `tos-accepted`, etc.).
+ * Used only by [WearPumpCommService] to satisfy the `CommServiceCallbacks` interface.
+ *
+ * For runtime state cache (CGM reading, pump battery, IOB) and the `device-role`
+ * selection, use [com.jwoglom.controlx2.util.StatePrefs] instead. Both classes back
+ * the same `"WearX2"` SharedPreferences file but use disjoint key sets.
  */
 class WearPrefs(val context: Context) {
 
@@ -118,19 +121,6 @@ class WearPrefs(val context: Context) {
 
     fun setPumpModelName(name: String) {
         prefs().edit().putString("pump-model-name", name).commit()
-    }
-
-    fun deviceRole(): DeviceRole {
-        val name = prefs().getString("device-role", null)
-        return try {
-            if (name != null) DeviceRole.valueOf(name) else DeviceRole.CLIENT
-        } catch (_: IllegalArgumentException) {
-            DeviceRole.CLIENT
-        }
-    }
-
-    fun setDeviceRole(role: DeviceRole) {
-        prefs().edit().putString("device-role", role.name).commit()
     }
 
     fun tosAccepted(): Boolean {
