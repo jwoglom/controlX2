@@ -40,6 +40,8 @@ import com.jwoglom.controlx2.shared.messaging.MessageListener
 import com.jwoglom.controlx2.shared.util.SendType
 import com.jwoglom.controlx2.shared.util.setupTimber
 import com.jwoglom.controlx2.shared.util.shortTime
+import com.jwoglom.controlx2.sync.nightscout.NightscoutSyncWorker
+import com.jwoglom.controlx2.sync.xdrip.XdripMessageDispatcher
 import com.jwoglom.controlx2.util.HistoryLogFetcher
 import com.jwoglom.controlx2.util.HistoryLogSyncWorker
 import com.jwoglom.controlx2.util.UpdateComplication
@@ -308,14 +310,27 @@ class WearPumpCommService : Service(), CommServiceCallbacks {
     override fun prefSetUnbondOnNextCommInitMac(mac: String?) { WearPrefs(applicationContext).setUnbondOnNextCommInitMac(mac) }
 
     // --- Sync/dispatch callbacks ---
+    private val xdripMessageDispatcher by lazy { XdripMessageDispatcher(applicationContext) }
+
     override fun onPumpConnectedSync(pumpSid: Int) {
-        // Forward pump connection event to phone client for Nightscout/xDrip+ sync
         Timber.i("WearPumpCommService: pump connected, pumpSid=$pumpSid")
+        // Start Nightscout sync directly on the watch when it is the pump-host.
+        // Nightscout config is read from the same SharedPreferences file
+        // ("controlx2") that the mobile app uses, mirroring CommService.kt.
+        NightscoutSyncWorker.startIfEnabled(
+            applicationContext,
+            applicationContext.getSharedPreferences("controlx2", Context.MODE_PRIVATE),
+            pumpSid
+        )
     }
 
     override fun dispatchExternalMessage(message: com.jwoglom.pumpx2.pump.messages.Message) {
-        // Forward pump messages to phone client for xDrip+ broadcast relay
         Timber.d("WearPumpCommService: dispatchExternalMessage: $message")
+        // xDrip+ runtime caveat: on Wear OS the broadcast Intent dispatched by
+        // XdripBroadcastSender is device-local. Whether xDrip+ exposes a
+        // watch-side receiver is unverified — see Phase 4.5 in
+        // docs/watch-as-host-refactor-plan.md.
+        xdripMessageDispatcher.onReceiveMessage(message)
     }
 
     override fun updateComplicationData(key: String, value: String, timestamp: Instant) {

@@ -5,7 +5,6 @@ import android.content.SharedPreferences
 import android.os.BatteryManager
 import android.os.Handler
 import android.os.Looper
-import com.jwoglom.controlx2.Prefs
 import com.jwoglom.controlx2.db.historylog.HistoryLogDatabase
 import com.jwoglom.controlx2.db.historylog.HistoryLogRepo
 import com.jwoglom.controlx2.db.nightscout.NightscoutSyncStateDatabase
@@ -104,7 +103,7 @@ class NightscoutSyncWorker(
 
                 val nsDb = NightscoutSyncStateDatabase.getDatabase(context)
                 val configWithModel = config.copy(
-                    pumpModelName = Prefs(context).pumpModelName() ?: "Tandem Pump"
+                    pumpModelName = readPumpModelName(context) ?: "Tandem Pump"
                 )
 
                 val coordinator = NightscoutSyncCoordinator(
@@ -192,7 +191,7 @@ class NightscoutSyncWorker(
                 ?.takeIf { it in 0..100 }
 
             val configWithModel = config.copy(
-                pumpModelName = Prefs(context).pumpModelName() ?: "Tandem Pump",
+                pumpModelName = readPumpModelName(context) ?: "Tandem Pump",
                 uploaderBattery = phoneBattery
             )
 
@@ -263,6 +262,19 @@ class NightscoutSyncWorker(
     }
 
     companion object {
+        /**
+         * Pump model name lives in the legacy "WearX2" SharedPreferences file
+         * (see Prefs / WearPrefs in the host apps). Both the mobile and wear
+         * apps write to the same file name and key, so the `:db` module reads
+         * directly from it instead of depending on the host's Prefs class.
+         */
+        private const val WEARX2_PREFS_FILE = "WearX2"
+        private const val PUMP_MODEL_NAME_KEY = "pump-model-name"
+
+        private fun readPumpModelName(context: Context): String? =
+            context.getSharedPreferences(WEARX2_PREFS_FILE, Context.MODE_PRIVATE)
+                .getString(PUMP_MODEL_NAME_KEY, null)
+
         private var instance: NightscoutSyncWorker? = null
 
         /**

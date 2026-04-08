@@ -154,6 +154,63 @@ controlX2/
 
 ---
 
+## Phase 4.5: Extract `:db` Module
+
+**Goal:** Move the history-log Room database, the Nightscout sync state DB, the Nightscout sync engine, and the xDrip+ sync engine into a new `:db` Android library module so both `mobile` and `wear` can drive external uplinks when they are the pump-host. Eliminate the history-log DB duplication that Phase 4 introduced.
+
+**Why this comes between Phase 4 and Phase 5:** Phase 4 made `WearPumpCommService` connect to the pump but left it without any external sync — Nightscout and xDrip+ code still lived only in `mobile`. Phase 4 also intentionally duplicated the history-log Room DB into `wear/.../db/historylog/` as a hack so the watch could persist history rows. This phase fixes both gaps before any new watch UI lands.
+
+**What goes into `:db`:**
+
+- `db/historylog/` — `HistoryLogDatabase`, `HistoryLogDao`, `HistoryLogDummyDao`, `HistoryLogItem`, `HistoryLogRepo`, `HistoryLogViewModel`
+- `db/util/Converters.kt`
+- `db/nightscout/` — `NightscoutSyncStateDatabase`, `NightscoutSyncState`, `NightscoutSyncStateDao`, `NightscoutProcessorState`, `NightscoutProcessorStateDao`
+- `sync/nightscout/**` — worker, coordinator, config, status store, auth, profile converter, URL/timestamp formatters, processor type, trend arrow calculator, `api/`, `models/`, `processors/`
+- `sync/xdrip/**` — `XdripBroadcastSender`, `XdripMessageDispatcher`, `XdripPayloadGroup`, `XdripSyncConfig`, `models/`
+
+Package paths are preserved end-to-end — call sites in `mobile` and `wear` keep their existing `import com.jwoglom.controlx2.db.*` and `import com.jwoglom.controlx2.sync.*` lines.
+
+**Resolving the host-app coupling:** Both `NightscoutSyncWorker` and `XdripMessageDispatcher` previously imported `com.jwoglom.controlx2.Prefs` to look up `pumpModelName` / xDrip config. The `:db` module replaces these with direct `context.getSharedPreferences("WearX2", MODE_PRIVATE)` calls — `"WearX2"` is the legacy file name shared between `mobile/Prefs` and `wear/WearPrefs`, so behavior is preserved without dragging the host's `Prefs` class into the library.
+
+**Wiring on the watch side:** `WearPumpCommService.onPumpConnectedSync()` now calls `NightscoutSyncWorker.startIfEnabled(...)` exactly the way `CommService` does on mobile, and `dispatchExternalMessage()` now constructs an `XdripMessageDispatcher` and forwards every pump message into it.
+
+**xDrip+ on Wear OS — TODO / open question:** `XdripBroadcastSender` calls `Context.sendBroadcast()`, which on Wear OS dispatches device-locally. Whether xDrip+ exposes a watch-side broadcast receiver is unverified — the broadcast may simply have no listener when the watch is the pump-host. The code lives in `:db` regardless so a future watch-side xDrip+ install (or a future Wear Data Layer forward back to the phone) can consume it. Investigate before relying on xDrip+ uplinks in watch-as-host mode.
+
+**Test layout:**
+
+- Pure-JVM unit tests for moved code live in `db/src/test/` (Nightscout client, URL/timestamp formatter, profile converter, processor type, trend arrow, models, xDrip broadcast/dispatcher/payload, history log item).
+- Instrumentation tests (`NightscoutPipelineIntegrationTest`, `NightscoutSyncCoordinatorTest`, `NightscoutSyncConfigTest`, `NightscoutSyncStateDatabaseTest`) intentionally **stay** in `mobile/src/androidTest/` because the root `build.gradle` disables `connectedAndroidTest` on every non-`mobile` subproject under CI to avoid emulator hangs.
+
+**Module layout after this phase:**
+
+```
+controlX2/
+├── db/                # NEW — history log + Nightscout + xDrip
+│   ├── build.gradle
+│   ├── lint-baseline.xml
+│   └── src/main/java/com/jwoglom/controlx2/
+│       ├── db/historylog/
+│       ├── db/nightscout/
+│       ├── db/util/
+│       ├── sync/nightscout/{api,models,processors}/
+│       └── sync/xdrip/models/
+├── pumpcomm/
+├── clientcomm/
+├── mobile/            # Now depends on :db
+├── wear/              # Now depends on :db (and no longer ships its own Room copy)
+└── shared/
+```
+
+**Verification:**
+
+- `./gradlew :db:assembleDebug :mobile:assembleDebug :wear:assembleDebug` succeed.
+- `./gradlew :db:testDebugUnitTest :mobile:testDebugUnitTest` pass.
+- `./gradlew :mobile:connectedDebugAndroidTest` runs the migrated Nightscout instrumentation tests against the new `:db` classes.
+- Manual phone-as-host regression: history log persists, Nightscout uploads still happen, xDrip+ broadcasts still flow.
+- Manual watch-as-host smoke: flip `DeviceRole` to `PUMP_HOST` on the watch (still requires a SharedPreferences edit until DeviceRole settings UI lands), pair pump to watch, set Nightscout URL/secret in the watch's `controlx2` SharedPreferences via `adb shell run-as`, confirm history log rows persist on the watch and `NightscoutSyncWorker` uploads them.
+
+---
+
 ## Phase 5: Watch UI for Core Operations
 
 **Goal:** Add full pump management UI on the watch for when it's the pump-host.
@@ -184,6 +241,8 @@ Phase 3 (extract :clientcomm module)
     ↓
 Phase 4 (role-switching logic)
     ↓
+Phase 4.5 (extract :db module — sync engines + DB)
+    ↓
 Phase 5 (watch pump-host UI)
 ```
 
@@ -194,12 +253,12 @@ Each phase is independently shippable. Phases 0-1 are pure refactors with no beh
 ## Resolved Design Decisions
 
 ### 1. Data sync in watch-as-host mode
-**Decision:** The primary (pump-host) device handles external syncs directly — no forwarding.
+**Decision:** The primary (pump-host) device handles external syncs directly — no forwarding. Sync code lives in a dedicated shared `:db` module (extracted in Phase 4.5).
 
-- **Phone-as-host:** Phone does Room DB + Nightscout HTTP + xDrip+ broadcast, all local
-- **Watch-as-host:** Watch does Room DB + Nightscout HTTP directly on watch. xDrip+ integration (Android broadcast intents) is forwarded to the phone via Wear Data Layer since broadcasts are device-local and can't cross devices.
+- **Phone-as-host:** Phone runs the shared `NightscoutSyncWorker` and `XdripMessageDispatcher` from `:db`, all local.
+- **Watch-as-host:** Watch runs the same `:db` `NightscoutSyncWorker` and `XdripMessageDispatcher` directly on the watch. Nightscout uploads work end-to-end. xDrip+ behavior on Wear OS is an open runtime question — the broadcast Intent dispatched by `XdripBroadcastSender` is device-local, and whether xDrip+ exposes a watch-side receiver is unverified (see Phase 4.5 TODO).
 
-**Implication for architecture:** Sync logic (Room, Nightscout upload) must live in `:shared` or a shared sync module, not phone-only code. Both `mobile` and `wear` apps link against it. xDrip+ broadcast sender is a phone-specific `DataSyncDelegate` implementation.
+**Implication for architecture:** Sync logic (Room DB, Nightscout HTTP, xDrip+ broadcasts) lives in `:db`. Both `mobile` and `wear` apps link against it. No `DataSyncDelegate` indirection — `WearPumpCommService` and `CommService` both call the same `:db` entry points directly.
 
 ### 2. PumpCommService layering
 **Decision:** Two layers within the single `:pumpcomm` module.
