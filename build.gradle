@@ -32,12 +32,14 @@ plugins {
 // Connected Android tests can hang on CI when Gradle attempts to exercise
 // every Android subproject (including dependency helper modules that are not
 // meant to run instrumentation tests in automation). The coverage workflow only
-// needs the mobile app's device tests, so disable the other connected test
-// tasks when we know we're running in CI. This prevents the emulator job from
+// needs the mobile app's device tests plus the :db library's Room/Nightscout
+// integration tests, so disable connected test tasks on every other subproject
+// when we know we're running in CI. This prevents the emulator job from
 // waiting forever for tests that will never finish.
+def ciConnectedTestModules = ["mobile", "db"] as Set
 if (System.getenv("CI") == "true") {
     subprojects { subproject ->
-        if (subproject.name != "mobile") {
+        if (!ciConnectedTestModules.contains(subproject.name)) {
             subproject.afterEvaluate {
                 subproject.tasks.matching { task ->
                     task.name.startsWith("connected") && task.name.endsWith("AndroidTest")
