@@ -55,9 +55,11 @@ dependencies {
     implementation "androidx.lifecycle:lifecycle-livedata-ktx:$lifecycle_version"
     implementation "androidx.lifecycle:lifecycle-viewmodel-ktx:$lifecycle_version"
 
-    // Room
+    // Room — room-runtime is exposed as api because HistoryLogDatabase
+    // (a public type in :db) extends RoomDatabase, so consumers of :db need
+    // the supertype on their compile classpath.
     var room_version = "2.7.0"
-    implementation("androidx.room:room-runtime:$room_version")
+    api("androidx.room:room-runtime:$room_version")
     annotationProcessor("androidx.room:room-compiler:$room_version")
     ksp("androidx.room:room-compiler:$room_version")
     implementation("androidx.room:room-ktx:$room_version")
@@ -74,10 +76,14 @@ dependencies {
     testImplementation 'junit:junit:4.13.2'
     testImplementation 'io.mockk:mockk:1.13.13'
     testImplementation 'org.jetbrains.kotlinx:kotlinx-coroutines-test:1.7.3'
+    // NanoHTTPD: in-process HTTP server used by NightscoutClientIntegrationTest
+    // (unit test) and NightscoutPipelineIntegrationTest (instrumentation test).
+    testImplementation 'org.nanohttpd:nanohttpd:2.3.1'
 
     androidTestImplementation 'androidx.test.ext:junit:1.2.1'
     androidTestImplementation 'androidx.test:core:1.6.1'
     androidTestImplementation 'androidx.test:runner:1.6.2'
     androidTestImplementation 'org.jetbrains.kotlinx:kotlinx-coroutines-test:1.7.3'
     androidTestImplementation("androidx.room:room-testing:$room_version")
+    androidTestImplementation 'org.nanohttpd:nanohttpd:2.3.1'
 }

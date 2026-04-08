@@ -3,7 +3,6 @@ plugins {
     id 'org.jetbrains.kotlin.android'
     id 'org.jetbrains.kotlin.plugin.compose'
     id 'hu.supercluster.paperwork'
-    id 'com.google.devtools.ksp'
     id 'io.github.takahirom.roborazzi'
 }
 
@@ -183,14 +182,9 @@ dependencies {
     debugImplementation "androidx.compose.ui:ui-tooling:$compose_version"
     debugImplementation "androidx.compose.ui:ui-test-manifest:$compose_version"
 
-    // room
-    var room_version = "2.7.0"
-    implementation("androidx.room:room-runtime:$room_version")
-    annotationProcessor("androidx.room:room-compiler:$room_version")
-    ksp("androidx.room:room-compiler:$room_version")
-    implementation("androidx.room:room-ktx:$room_version")
-    implementation("androidx.room:room-guava:$room_version")
-    testImplementation("androidx.room:room-testing:$room_version")
+    // Room comes transitively from :db (which exposes room-runtime as api).
+    // The only direct Room usage in mobile is HistoryLogFetcherIntegrationTest
+    // calling Room.inMemoryDatabaseBuilder, satisfied by that transitive dep.
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3")
 
     // SLF4J (pumpx2 library uses it)

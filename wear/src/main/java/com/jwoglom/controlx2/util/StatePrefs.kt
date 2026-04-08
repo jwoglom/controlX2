@@ -9,6 +9,16 @@ import com.jwoglom.controlx2.shared.enums.GlucoseUnit
 import timber.log.Timber
 import java.time.Instant
 
+/**
+ * Wear-side [ClientStateStore] implementation. Persists pump runtime state
+ * (`pumpBattery`, `pumpIOB`, `cgmReading`, `glucoseUnit`) plus the `device-role`
+ * selection that determines whether the watch runs as PUMP_HOST or CLIENT.
+ *
+ * For pump-host configuration keys mirrored from [com.jwoglom.controlx2.Prefs]
+ * (`service-enabled`, `pumpfinder-*`, `pump-setup-complete`, etc.), use
+ * [com.jwoglom.controlx2.WearPrefs] instead. Both classes back the same `"WearX2"`
+ * SharedPreferences file but use disjoint key sets.
+ */
 class StatePrefs(val context: Context) : ClientStateStore {
     var connected: Pair<String, Instant>?
         get() = get("connected")
