@@ -1,7 +1,6 @@
 package com.jwoglom.controlx2.sync.xdrip
 
 import android.content.Context
-import com.jwoglom.controlx2.Prefs
 import com.jwoglom.controlx2.shared.util.twoDecimalPlaces
 import com.jwoglom.controlx2.sync.xdrip.models.XdripDeviceStatusSnapshot
 import com.jwoglom.controlx2.sync.xdrip.models.XdripSgvPayload
@@ -37,7 +36,13 @@ class XdripMessageDispatcher(
 ) {
     constructor(context: Context) : this(
         broadcaster = XdripBroadcastSender(context),
-        configProvider = { XdripSyncConfig.load(Prefs(context).prefs()) }
+        // The host apps store xDrip config in the legacy "WearX2" SharedPreferences
+        // file (mobile Prefs.prefs() and wear WearPrefs.prefs() both use this file).
+        configProvider = {
+            XdripSyncConfig.load(
+                context.getSharedPreferences("WearX2", Context.MODE_PRIVATE)
+            )
+        }
     )
 
     private val latestPumpSnapshot = XdripDeviceStatusSnapshot()
