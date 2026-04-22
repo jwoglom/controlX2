@@ -16,23 +16,25 @@ This is a bottom-up refactor done gradually across multiple phases. Each phase s
 
 ---
 
-## Phase 0: Decompose CommService Internally
+## Phase 0: Decompose CommService Internally — ✅ Partial
 
 **Goal:** Break CommService.kt into smaller, testable pieces without changing behavior or module structure.
 
-**Steps:**
-1. Extract `PumpCommHandler` (inner class) into its own top-level class in `mobile/src/main/java/com/jwoglom/controlx2/pump/`
-2. Extract `PumpFinderCommHandler` similarly
-3. Extract bolus handling logic (bolus request, confirm, cancel) into a `BolusManager` class
-4. Extract pairing flow (pairing code handling, discovery) into a `PairingManager` class
-5. Extract wear message forwarding logic into a `WearMessageForwarder` or similar
-6. CommService becomes a thin orchestrator that delegates to these components
+**Steps (actual state):**
+1. ✅ Extract `PumpCommHandler` — extracted in commit `b9e96e1`, later relocated to `pumpcomm/src/main/java/com/jwoglom/controlx2/pump/PumpCommHandler.kt` in Phase 2
+2. ✅ Extract `PumpFinderCommHandler` — at `pumpcomm/src/main/java/com/jwoglom/controlx2/pump/PumpFinderCommHandler.kt` (wraps an inner `PumpFinder` class)
+3. ✅ Extract bolus handling into `BolusManager` — commit `9dfc152`, at `mobile/src/main/java/com/jwoglom/controlx2/pump/BolusManager.kt`
+4. ❌ **NOT done** — No `PairingManager` class exists. `sendPumpPairingMessage()`, `sendInitPumpComm()`, and pairing-code handling in `handleMessageReceived()` remain in `CommService.kt`.
+5. ❌ **NOT done** — No `WearMessageForwarder` class exists. Wear forwarding lives as direct `sendWearCommMessage()` calls scattered throughout `CommService.kt`.
+6. ⚠️ **Partial** — `CommService.kt` shrank from ~1825 → ~818 lines and delegates pump/bolus, but still directly owns pairing and wear forwarding, so it's not yet a pure orchestrator.
+
+**Outstanding work (tracked as Phase 5 prerequisites below):** If/when the pairing UI and watch-side pairing flow land in Phase 5, revisit extracting `PairingManager` and `WearMessageForwarder` so the same pairing code can be reused by `WearPumpCommService` without copy-paste.
 
 **Verification:** All existing functionality works identically. Run app on phone + watch, verify pump connection, bolus flow, pairing flow, and watch data updates all work.
 
 ---
 
-## Phase 1: Message Path Naming Cleanup
+## Phase 1: Message Path Naming Cleanup — ✅ Complete (with two documented deviations)
 
 **Goal:** Rename message paths from device-specific to role-based naming. No behavior change.
 
@@ -42,121 +44,140 @@ This is a bottom-up refactor done gradually across multiple phases. Each phase s
 - `/to-phone/*` → `/to-server/*` — commands sent TO the pump-host device (start-comm, bolus-request, is-pump-connected, etc.)
 - `/to-wear/*` → `/to-client/*` — data/events sent TO the client device (service-receive-message, glucose-unit, bolus status, etc.)
 
-**Files to modify:**
-- `mobile/src/main/java/com/jwoglom/controlx2/CommService.kt` (or its decomposed pieces from Phase 0)
-- `mobile/src/main/java/com/jwoglom/controlx2/MainActivity.kt`
-- `mobile/src/main/java/com/jwoglom/controlx2/messaging/HybridMessageBus.kt` (routing logic on prefix)
-- `wear/src/main/java/com/jwoglom/controlx2/PhoneCommService.kt`
-- `wear/src/main/java/com/jwoglom/controlx2/MainActivity.kt`
-- Any other files referencing these string paths
+**Outcome (commits `69acbba` Phase 1A, `c1a18c7` Phase 1B):**
+- ✅ `shared/src/main/java/com/jwoglom/controlx2/shared/MessagePaths.kt` holds all path constants.
+- ✅ Zero remaining `/to-phone/` or `/to-wear/` string literals anywhere in the codebase.
+- ✅ `HybridMessageBus` routes on `MessagePaths.PREFIX_TO_SERVER`, `PREFIX_TO_CLIENT`, `PREFIX_TO_PUMP`, `PREFIX_FROM_PUMP`.
 
-**Approach:** Define path constants in `shared` (e.g., `MessagePaths.kt` object) rather than using string literals everywhere. This makes future renames trivial and prevents typos.
+**Deviations from the original table:**
+- ❌ The bolus path collapse (`bolus-request-wear` + `bolus-request-phone` → `bolus-request`) was **not** performed. Both paths kept the `-wear`/`-phone` suffix and just gained the `/to-server/` prefix: `TO_SERVER_BOLUS_REQUEST_WEAR` = `/to-server/bolus-request-wear`, `TO_SERVER_BOLUS_REQUEST_PHONE` = `/to-server/bolus-request-phone`. The router still distinguishes by path rather than by `MessageBusSender` origin. This can be revisited opportunistically; not a blocker for Phase 5.
+- ❌ `/to-wear/service-receive-message` was renamed to `/to-client/service-receive-message` (not `/to-client/pump-message` as proposed in the table). The semantic rename was skipped to minimize diff churn.
 
-**Verification:** Same as Phase 0 — full functional test of all flows.
+**Files modified:** CommService, MainActivity (mobile + wear), HybridMessageBus, PhoneCommService, and helpers — all now reference `MessagePaths.*` constants instead of raw strings.
+
+**Verification:** Regression-tested; all flows unchanged.
 
 ---
 
-## Phase 2: Extract PumpCommService Library Module
+## Phase 2: Extract :pumpcomm Gradle Module — ✅ Complete (class names differ)
 
 **Goal:** Create a new gradle module (`:pumpcomm`) containing the pump BT communication layer, extracted from the mobile app.
 
-**What goes into `:pumpcomm`:**
-- Pump BT connection management (the decomposed PumpCommHandler from Phase 0)
-- Pump discovery / PumpFinder logic
-- Pairing flow
-- PumpSession (session + rate limiting)
-- Message send/receive to/from pump
-- Dependencies: pumpX2 libraries, blessed-android
+**Outcome (commits `2ef84c3` Phase 2 prep, `a439e21` Phase 2, `01dc31d` lint baseline, `8a6777a` test fix):**
+- ✅ `pumpcomm/` module exists, depends on pumpX2 (android/messages/shared), blessed-android 2.4.0, commons-codec, guava, bouncycastle.
+- ✅ `mobile/build.gradle` declares `implementation project(path: ':pumpcomm')`.
+- ✅ The phone app works identically using the extracted library.
 
-**What stays in mobile:**
-- PhoneCommService (the orchestrator that *uses* PumpCommService)
-- Bolus UI/confirmation logic
-- Nightscout sync, Room DB, xDrip+ integration
-- WearMessageForwarder
+**Actual class layout** (package `com.jwoglom.controlx2.pump`, not `.pumpcomm`):
+```
+pumpcomm/src/main/java/com/jwoglom/controlx2/pump/
+├── PumpCommHandler.kt          # Core BT/message handler (NOT named PumpCommService)
+├── PumpFinderCommHandler.kt    # Wraps inner PumpFinder class for discovery
+├── PumpSession.kt              # Session + rate limiting
+├── PumpCommState.kt            # State tracking
+├── CommandRateLimiter.kt       # Rate limiting
+├── RateLimitConfig.kt          # Rate limit configuration
+├── CommServiceCallbacks.kt     # Callback interface used by the hosting Service
+├── BleChangeReceiver.kt        # BT adapter state receiver
+├── PumpHistoryLogFetcher.kt    # History log paging / fetching
+└── PumpHistoryLogSyncWorker.kt # WorkManager entry point for history log sync
+```
 
-**Module structure:**
+**Deviations from original plan:**
+- The core class is `PumpCommHandler`, not `PumpCommService`. It's a plain class driven by the hosting Android `Service` (`CommService` on mobile, `WearPumpCommService` on wear), not a Service itself.
+- No separate `PumpPairingManager` — pairing is handled inline in `PumpCommHandler` plus the still-inlined pairing logic in `CommService` (see Phase 0 outstanding work).
+- Two-layer (core vs lifecycle) split is not realized as distinct classes. Lifecycle concerns sit behind the `CommServiceCallbacks` interface and the hosting Service; the core/lifecycle separation discussed in "Resolved Design Decision 2" is effectively achieved via the callback seam rather than via two layered classes.
+- Package path kept at `com.jwoglom.controlx2.pump` (not `.pumpcomm`) to avoid churning every import site.
+
+**Module structure now:**
 ```
 controlX2/
-├── pumpcomm/          # NEW - pump BT communication library
-│   ├── build.gradle
-│   └── src/main/java/com/jwoglom/controlx2/pumpcomm/
-│       ├── PumpCommService.kt       # Core pump connection service
-│       ├── PumpFinder.kt            # Pump discovery
-│       ├── PumpPairingManager.kt    # Pairing flow
-│       └── PumpSession.kt           # Session management
-├── mobile/            # Now depends on :pumpcomm
-├── wear/              # No change yet
-└── shared/            # No change
+├── pumpcomm/          # pump BT communication library (package: com.jwoglom.controlx2.pump)
+├── mobile/            # depends on :pumpcomm
+├── wear/              # no change in Phase 2 (added in Phase 4)
+└── shared/            # no change
 ```
 
-**Key interface:** `PumpCommService` exposes a clean API that the phone (or later, watch) can call to: connect, disconnect, send command, receive messages, start discovery, pair.
-
-**Verification:** Phone app works identically using the extracted library. Build both modules, run full flow.
+**Verification:** ✅ Phone app works identically using the extracted library.
 
 ---
 
-## Phase 3: Extract ClientCommService Library Module
+## Phase 3: Extract :clientcomm Gradle Module — ✅ Complete (interface-based design instead of abstract base class)
 
 **Goal:** Create a new gradle module (`:clientcomm`) that generalizes the "I'm a client of the pump-host" pattern.
 
-**What goes into `:clientcomm`:**
-- Abstract client that connects to a pump-host device (currently via Wear Data Layer, but transport-agnostic interface)
-- Message forwarding: client UI → pump-host → pump
-- State sync reception (pump battery, IOB, CGM, etc.)
-- Complication/UI data provider interface
+**Outcome (commit `0013f44`):**
+- ✅ `clientcomm/` module exists with `build.gradle`.
+- ✅ `wear/build.gradle` declares `implementation project(path: ':clientcomm')`.
+- ✅ `mobile/build.gradle` declares `implementation project(path: ':clientcomm')` (prep for Phase 4 phone-as-client mode).
+- ✅ Watch app works identically as a client of the phone.
 
-**What stays in wear:**
-- WearCommService implements ClientCommService with Wear OS Data Layer transport
-- Watch-specific UI, complications
+**Actual class layout** — the extraction uses **interface composition** rather than the planned "abstract ClientCommService base class":
+```
+clientcomm/src/main/java/com/jwoglom/controlx2/clientcomm/
+├── ClientMessageHandler.kt     # Message routing + state update logic
+├── ClientStateStore.kt         # Interface: persistent pump-data store (implemented by host apps)
+├── ClientSideEffects.kt        # Interface: transport + UI callbacks (implemented by host apps)
+└── ClientConnectionState.kt    # Enum for role-aware connection states
+                                #  (HOST_CONNECTED_PUMP_CONNECTED, HOST_CONNECTED_PUMP_DISCONNECTED, etc.)
+```
 
-**Module structure addition:**
+**Deviations from original plan:**
+- No `ClientCommService` abstract class. Instead, host Services (`PhoneCommService` on wear, `MobileClientService` on mobile) instantiate `ClientMessageHandler` and pass in their own implementations of `ClientStateStore` + `ClientSideEffects`. This is more flexible and avoids inheritance-based coupling.
+- `ClientStateManager` → `ClientStateStore` (interface only; implementations live in host apps using their own preferences).
+- `ClientMessageRouter` → `ClientMessageHandler` (handles both routing and state updates in one class).
+
+**Module structure now:**
 ```
 controlX2/
 ├── pumpcomm/          # Pump BT library
-├── clientcomm/        # NEW - pump-host client library
-│   ├── build.gradle
-│   └── src/main/java/com/jwoglom/controlx2/clientcomm/
-│       ├── ClientCommService.kt     # Abstract client interface
-│       ├── ClientStateManager.kt    # State sync
-│       └── ClientMessageRouter.kt   # Message forwarding
-├── mobile/            # Depends on :pumpcomm, :clientcomm (for future use)
-├── wear/              # Depends on :clientcomm
+├── clientcomm/        # Pump-host client library (interface-driven)
+├── mobile/            # Depends on :pumpcomm and :clientcomm
+├── wear/              # Depends on :clientcomm (and later :pumpcomm via Phase 4)
 └── shared/
 ```
 
-**Verification:** Watch app works identically as a client of the phone.
+**Verification:** ✅ Watch app works identically as a client of the phone.
 
 ---
 
-## Phase 4: Role-Switching — Setup-Time Configuration
+## Phase 4: Role-Switching — Setup-Time Configuration — ✅ Complete (UI pending in Phase 5)
 
 **Goal:** Allow either phone or watch to be the pump-host, selected via a preference. Requires re-pairing to switch.
 
-**Steps:**
-1. Add a shared preference / setting: "Primary device" = Phone | Watch
-2. **Phone in pump-host mode (default, current behavior):**
-   - Phone starts PumpCommService (BT to pump)
-   - Watch starts ClientCommService (Wear Data Layer to phone)
-3. **Watch in pump-host mode (new):**
-   - Watch starts PumpCommService (BT to pump)
-   - Phone starts ClientCommService (Wear Data Layer to watch)
-4. Both `mobile` and `wear` gradle modules now depend on both `:pumpcomm` and `:clientcomm`
-5. A startup orchestrator on each device reads the preference and starts the appropriate service
-6. The HybridMessageBus routing needs to be symmetric — currently it assumes phone = server
+**Outcome (commit `20d35d9`):**
+1. ✅ `DeviceRole` enum in `shared/src/main/java/com/jwoglom/controlx2/shared/enums/DeviceRole.kt` with values `PUMP_HOST` and `CLIENT`.
+2. ✅ **Phone-as-host mode (default):**
+   - Phone reads `Prefs(this).deviceRole()` (defaults to `PUMP_HOST`) in `mobile/MainActivity.kt:321` and starts `CommService`.
+   - Watch reads `StatePrefs(this).deviceRole()` (defaults to `CLIENT`) in `wear/MainActivity.kt:234` and starts `PhoneCommService`.
+3. ✅ **Watch-as-host mode (new):**
+   - Watch in `PUMP_HOST` mode starts `WearPumpCommService` (`wear/src/main/java/com/jwoglom/controlx2/WearPumpCommService.kt`) — runs BT to pump directly.
+   - Phone in `CLIENT` mode starts `MobileClientService` (`mobile/src/main/java/com/jwoglom/controlx2/MobileClientService.kt`) — receives pump data from the watch via Wear Data Layer.
+4. ✅ Both modules depend on both `:pumpcomm` and `:clientcomm`:
+   - `mobile/build.gradle` lines 113–114
+   - `wear/build.gradle` lines 137–138
+5. ✅ Startup orchestrator: each MainActivity reads the role and starts the appropriate service.
+6. ✅ `HybridMessageBus` routing is symmetric:
+   - `PUMP_HOST` mode sends `/to-client/*` outbound, receives `/to-server/*` + `/to-pump/*`.
+   - `CLIENT` mode sends `/to-server/*` + `/to-pump/*` outbound, receives `/to-client/*` + `/from-pump/*`.
+   - No more "phone = server" assumptions.
 
-**Key challenges:**
-- Watch has more limited resources (battery, memory) — PumpCommService needs to be efficient
-- Foreground service management differs between phone and Wear OS
-- BT permissions model may differ on Wear OS
-- Data sync: the pump-host device runs Nightscout/Room sync directly. Sync logic must be in shared code. xDrip+ broadcasts (Android-local) forwarded to phone via Wear Data Layer when watch is host.
+**UI status:** ❌ Role selection still requires a SharedPreferences edit (either via `adb shell run-as` or calling `setDeviceRole(role)` from a test/debug path). The user-facing settings UI is part of Phase 5 (section 5a below).
 
-**Verification:** Test both configurations end-to-end: phone-as-host (regression), watch-as-host (new). Verify pump connection, data flow, bolus, pairing in both modes.
+**Key challenges (addressed):**
+- Watch resource constraints — handled: `PumpCommHandler` in `:pumpcomm` is the same efficient code path on both devices.
+- Foreground service management — both `CommService` (mobile) and `WearPumpCommService` (wear) run as foreground services with appropriate Wear OS foreground-service type.
+- Data sync: resolved in Phase 4.5 by extracting `:db` so both devices can run `NightscoutSyncWorker` + `XdripMessageDispatcher` directly.
+
+**Verification:** ✅ Phone-as-host regression passes. Watch-as-host smoke-tested (pair, bolus, data flow) — requires SharedPreferences edit until Phase 5a lands.
 
 ---
 
-## Phase 4.5: Extract `:db` Module
+## Phase 4.5: Extract `:db` Module — ✅ Complete
 
 **Goal:** Move the history-log Room database, the Nightscout sync state DB, the Nightscout sync engine, and the xDrip+ sync engine into a new `:db` Android library module so both `mobile` and `wear` can drive external uplinks when they are the pump-host. Eliminate the history-log DB duplication that Phase 4 introduced.
+
+**Status:** All 11 planned items verified in the codebase. Commits `6b301c5` (main extraction), `871ad27` (CI test config), `d099a92` (KSP cleanup + `WearPrefs.deviceRole()` removal).
 
 **Why this comes between Phase 4 and Phase 5:** Phase 4 made `WearPumpCommService` connect to the pump but left it without any external sync — Nightscout and xDrip+ code still lived only in `mobile`. Phase 4 also intentionally duplicated the history-log Room DB into `wear/.../db/historylog/` as a hack so the watch could persist history rows. This phase fixes both gaps before any new watch UI lands.
 
@@ -211,42 +232,100 @@ controlX2/
 
 ---
 
-## Phase 5: Watch UI for Core Operations
+## Phase 5: Watch UI for Core Operations — ⏳ Next
 
-**Goal:** Add full pump management UI on the watch for when it's the pump-host.
+**Goal:** Add full pump management UI on the watch for when it's the pump-host, starting with the items that unblock a non-adb developer loop.
 
-**Scope (high-level, to be detailed when we get here):**
-- Pump setup / pairing flow on watch
-- Connection status and management
-- Bolus delivery (already partially exists via BolusActivity)
-- Basal rate display
-- CGM display (already partially exists)
-- History / recent events
-- Settings management
+### Inventory of what already exists on the watch
 
-**Note:** Much of the watch UI already exists for the client role. The additions are mainly for pump-host-specific flows (pairing, connection management, error handling).
+- `WearPumpCommService` drives BT + `:db` Nightscout/xDrip when `DeviceRole.PUMP_HOST` is set (Phase 4.5).
+- `wear/MainActivity.kt:234-236` already branches on role and starts the right service.
+- Screens in `wear/.../presentation/navigation/Screen.kt`: `WaitingForPhone`, `WaitingToFindPump`, `ConnectingToPump`, `PairingToPump`, `MissingPairingCode`, `PumpDisconnectedReconnecting`, `Landing`, `SleepModeSet`, `ExerciseModeSet`, `Bolus*` (including units/carbs/BG/blocked/not-enabled/rejected-on-phone).
+- Complications: CGM reading, pump battery, IOB, bolus-button, pump-button.
+- `BolusActivity` + `WearBolusManager` in `wear/pump/` handle watch-side bolus request flow.
+
+### Gaps blocking watch-as-host ship-readiness
+
+1. No UI to pick `DeviceRole` — still requires `adb shell` editing SharedPreferences (called out in Phase 4.5 TODO).
+2. No native pump pairing flow on the watch — `PairingToPump` / `MissingPairingCode` exist as route names for the client-mode reconnect experience, but there's no pump-finder or pairing-code entry screen for pump-host mode.
+3. No Nightscout URL / API-secret entry UI on the watch — still requires `adb shell run-as`.
+4. No basal / history / settings surfaces native to the watch in pump-host mode.
+
+### Phase 5 sub-steps (ordered, each independently shippable)
+
+Each sub-step should ship with a phone-as-host regression pass plus a watch-as-host end-to-end smoke test.
+
+#### 5a. DeviceRole settings UI — **start here** (unblocks the rest)
+
+- Add a `RoleSelectionScreen` in `wear/.../presentation/ui/` that reads/writes `StatePrefs(ctx).deviceRole()`.
+- Add a matching setting on the phone side (`mobile`) so the phone can opt into `CLIENT` mode symmetrically.
+- On role change: stop the current service, restart the other one (same logic as `MainActivity.startWearPumpCommService()` / `startPhoneCommService()`).
+- Show a re-pair warning dialog — the pump only accepts one BT bond, so switching host requires re-pairing.
+- **Removes the `adb`-only dev loop** and makes every subsequent sub-step testable without shell access.
+
+#### 5b. Watch-side pump pairing flow
+
+- Build a `PumpFinderScreen` that drives `PumpFinderCommHandler` via `WearPumpCommService` (same code path `CommService` uses on phone).
+- Build a `PairingCodeEntryScreen` (rotary-input digit entry) that writes to the `/to-server/set-pairing-code` path.
+- Wire `PairingToPump` / `MissingPairingCode` routes to real pump-host UI (currently placeholders for client reconnect).
+- Surface pairing errors (wrong code, timeout) on screen.
+- **Opportunistic:** This is the natural moment to revisit Phase 0's outstanding `PairingManager` extraction — if `CommService` and `WearPumpCommService` would otherwise copy-paste pairing code, extract a shared `PairingManager` into `:pumpcomm` first.
+
+#### 5c. Watch-side connection status + reconnection UX
+
+- Promote `ConnectingToPump` / `PumpDisconnectedReconnecting` from splash placeholders to real status screens with: last-seen time, RSSI (if available), manual reconnect button, disconnect button.
+- Persistent ongoing-notification for the foreground service in pump-host mode (compliant with Wear OS foreground-service rules).
+
+#### 5d. Nightscout / xDrip+ settings UI on watch
+
+- Mini-settings screen to enter Nightscout URL + API secret, writing to the `"WearX2"` SharedPreferences keys that `:db`'s `NightscoutSyncWorker` already reads.
+- Toggle for xDrip+ broadcasts, with a UI note that Wear OS receiver behavior is unverified (see Phase 4.5 TODO).
+- Show sync status (last upload time, error count) — reuse `NightscoutStatusStore` from `:db`.
+
+#### 5e. Pump data surfaces on watch (reuse existing flows)
+
+- Basal rate display screen (data already flows through `ClientStateStore` / watch-side state; add a screen to render it).
+- CGM trend-graph screen (complications already exist; build a full-screen version).
+- History / events screen backed by `HistoryLogRepo` from `:db` (the watch already persists rows as of Phase 4.5).
+
+#### 5f. Settings management parity
+
+- Expose pump settings the phone already offers (profile switching, temp basal, suspend insulin) as watch screens, routed through the existing `/to-pump/*` paths — shared code path, no new backend work.
+
+### Verification pattern per sub-step
+
+- **Phone-as-host regression:** flip role back via 5a UI, confirm nothing broke.
+- **Watch-as-host end-to-end:** pair from watch UI, bolus, confirm Nightscout upload, verify history-log rows persist, swap role back.
+
+### Outstanding Phase 0 extractions to fold in during Phase 5
+
+Phase 5b/5c will likely copy pairing / wear-forwarding code between `CommService` and `WearPumpCommService`. Before that copy-paste compounds, extract:
+- `PairingManager` (Phase 0 step 4) → `:pumpcomm` so both Services can share it.
+- `WearMessageForwarder` (Phase 0 step 5) → `:clientcomm` or a new seam, so `CommService` stops owning wear forwarding directly.
+
+These were deferred in Phase 0 but become concrete blockers once Phase 5b/5c land.
 
 ---
 
 ## Implementation Order & Dependencies
 
 ```
-Phase 0 (decompose CommService)
+Phase 0   (decompose CommService)                    ✅ Partial (PairingManager + WearMessageForwarder deferred into Phase 5)
     ↓
-Phase 1 (rename message paths)
+Phase 1   (rename message paths)                     ✅ Complete (bolus path collapse skipped)
     ↓
-Phase 2 (extract :pumpcomm module)
+Phase 2   (extract :pumpcomm module)                 ✅ Complete (class names differ from plan)
     ↓
-Phase 3 (extract :clientcomm module)
+Phase 3   (extract :clientcomm module)               ✅ Complete (interface-based, not abstract class)
     ↓
-Phase 4 (role-switching logic)
+Phase 4   (role-switching logic)                     ✅ Complete (UI deferred to Phase 5a)
     ↓
-Phase 4.5 (extract :db module — sync engines + DB)
+Phase 4.5 (extract :db module — sync engines + DB)   ✅ Complete
     ↓
-Phase 5 (watch pump-host UI)
+Phase 5   (watch pump-host UI)                       ⏳ Next — starts with 5a (DeviceRole settings UI)
 ```
 
-Each phase is independently shippable. Phases 0-1 are pure refactors with no behavior change. Phase 2-3 are structural extractions. Phase 4 is the first user-visible feature. Phase 5 is the full experience.
+Each phase is independently shippable. Phases 0-1 are pure refactors with no behavior change. Phase 2-3 are structural extractions. Phase 4 is the first user-visible feature (once Phase 5a ships the role toggle UI). Phase 5 is the full experience.
 
 ---
 
@@ -261,32 +340,31 @@ Each phase is independently shippable. Phases 0-1 are pure refactors with no beh
 **Implication for architecture:** Sync logic (Room DB, Nightscout HTTP, xDrip+ broadcasts) lives in `:db`. Both `mobile` and `wear` apps link against it. No `DataSyncDelegate` indirection — `WearPumpCommService` and `CommService` both call the same `:db` entry points directly.
 
 ### 2. PumpCommService layering
-**Decision:** Two layers within the single `:pumpcomm` module.
+**Original decision:** Two distinct classes for core vs lifecycle within `:pumpcomm`.
 
-- **Core layer:** BT connection, message send/receive, session management. Steady-state "pump is connected" operations.
-- **Lifecycle layer:** Discovery, pairing, reconnection, error recovery. Wraps core layer, manages the full connection lifecycle.
+**Actual implementation:** The core/lifecycle split is realized as a **callback seam** rather than two classes. `PumpCommHandler` holds connection state + messaging; lifecycle concerns (service lifecycle, foreground notification, pairing UI callbacks, reconnection decisions) sit behind the `CommServiceCallbacks` interface, which the hosting Service (`CommService` on mobile, `WearPumpCommService` on wear) implements. Different lifecycle strategies on phone vs watch are achieved by each hosting Service implementing `CommServiceCallbacks` differently — not by having two separate library classes.
 
-Both are separate classes in `:pumpcomm`. Callers typically use the lifecycle layer. Separation aids testing and allows different lifecycle strategies (e.g., watch may handle reconnection differently due to Wear OS BT power management).
+This lets `:pumpcomm` stay transport-aware-but-UI-agnostic without forcing two mandatory classes on every call site.
 
 ### 3. Message path naming
-**Decision:** Use `/to-server/` and `/to-client/` scheme. Collapse device-specific bolus paths.
+**Decision:** Use `/to-server/` and `/to-client/` scheme. Path constants in `shared/MessagePaths.kt`.
 
-| Current | New | Notes |
-|---------|-----|-------|
+| Original (pre-Phase 1) | Actual (post-Phase 1) | Notes |
+|------------------------|-----------------------|-------|
 | `/to-phone/start-comm` | `/to-server/start-comm` | |
 | `/to-phone/stop-comm` | `/to-server/stop-comm` | |
 | `/to-phone/comm-started` | `/to-server/comm-started` | |
-| `/to-phone/bolus-request-wear` | `/to-server/bolus-request` | Origin tracked by MessageBusSender |
-| `/to-phone/bolus-request-phone` | `/to-server/bolus-request` | Same path, differentiated by sender |
+| `/to-phone/bolus-request-wear` | `/to-server/bolus-request-wear` | ⚠️ Collapse to `/to-server/bolus-request` was skipped; sender-origin disambiguation still encoded in path |
+| `/to-phone/bolus-request-phone` | `/to-server/bolus-request-phone` | ⚠️ Same — still a separate path from the wear variant |
 | `/to-phone/bolus-cancel` | `/to-server/bolus-cancel` | |
 | `/to-phone/is-pump-connected` | `/to-server/is-pump-connected` | |
 | `/to-phone/set-pairing-code` | `/to-server/set-pairing-code` | |
 | `/to-phone/start-pump-finder` | `/to-server/start-pump-finder` | |
-| `/to-wear/service-receive-message` | `/to-client/pump-message` | Cleaner name |
+| `/to-wear/service-receive-message` | `/to-client/service-receive-message` | ⚠️ Original proposal was `/to-client/pump-message`; kept the literal name to minimize diff |
 | `/to-wear/glucose-unit` | `/to-client/glucose-unit` | |
 | `/to-wear/bolus-not-enabled` | `/to-client/bolus-not-enabled` | |
 | `/to-wear/connected` | `/to-client/connected` | |
 | `/to-pump/*` | `/to-pump/*` | No change |
 | `/from-pump/*` | `/from-pump/*` | No change |
 
-Path constants defined in `shared/MessagePaths.kt`.
+**Deviations** (see Phase 1 section for rationale): the two bolus-request paths kept their `-wear` / `-phone` suffixes, and `service-receive-message` was not renamed to `pump-message`. Both can be cleaned up later without blocking any feature.
