@@ -195,6 +195,7 @@ class WearPumpCommService : Service(), CommServiceCallbacks {
         when (path) {
             MessagePaths.TO_SERVER_FORCE_RELOAD -> {
                 Timber.i("force-reload")
+                triggerAppReload(applicationContext)
             }
             // TO_SERVER_SET_PAIRING_CODE: the watch UI calls PairingCodeEntry.apply()
             // directly and that dispatches TO_SERVER_STOP_PUMP_FINDER("init_comm") if
@@ -634,5 +635,14 @@ class WearPumpCommService : Service(), CommServiceCallbacks {
 
     private fun prefs(context: Context): SharedPreferences? {
         return context.getSharedPreferences("WearX2", MODE_PRIVATE)
+    }
+
+    private fun triggerAppReload(context: Context) {
+        val packageManager = context.packageManager
+        val intent = packageManager.getLaunchIntentForPackage(context.packageName)
+        val componentName = intent!!.component
+        val mainIntent = Intent.makeRestartActivityTask(componentName)
+        context.startActivity(mainIntent)
+        Runtime.getRuntime().exit(0)
     }
 }

@@ -1,6 +1,7 @@
 package com.jwoglom.controlx2
 
 import android.content.ComponentName
+import android.content.Context
 import android.content.Intent
 import android.content.ServiceConnection
 import android.net.Uri
@@ -86,6 +87,7 @@ import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import timber.log.Timber
+import java.time.Instant
 import java.time.temporal.ChronoUnit
 import kotlin.math.roundToInt
 
@@ -633,6 +635,8 @@ class MainActivity : ComponentActivity() {
                     }
                 }
                 dataStore.connectionStatus.value = ""
+                dataStore.pumpConnected.value = true
+                dataStore.pumpLastConnectionTimestamp.value = Instant.now()
             }
             MessagePaths.FROM_PUMP_PUMP_DISCONNECTED -> {
                 if (inWaitingState()) {
@@ -648,6 +652,7 @@ class MainActivity : ComponentActivity() {
                     }
                 }
                 dataStore.connectionStatus.value = "Reconnecting"
+                dataStore.pumpConnected.value = false
             }
             MessagePaths.FROM_PUMP_PUMP_CRITICAL_ERROR -> {
                 dataStore.connectionStatus.value = "Error: ${String(data)}"
@@ -661,6 +666,7 @@ class MainActivity : ComponentActivity() {
                 }
             }
             MessagePaths.FROM_PUMP_RECEIVE_MESSAGE -> {
+                dataStore.pumpLastMessageTimestamp.value = Instant.now()
                 uiScope.launch {
                     if (inWaitingState()) {
                         navController.navigateClearBackStack(initialRoute)
@@ -672,6 +678,7 @@ class MainActivity : ComponentActivity() {
                 }
             }
             MessagePaths.FROM_PUMP_RECEIVE_CACHED_MESSAGE -> {
+                dataStore.pumpLastMessageTimestamp.value = Instant.now()
                 uiScope.launch {
                     if (inWaitingState()) {
                         navController.navigateClearBackStack(initialRoute)
@@ -739,9 +746,54 @@ class MainActivity : ComponentActivity() {
                 }
             }
 
+            MessagePaths.TO_SERVER_APP_RELOAD -> {
+                triggerAppReload(applicationContext)
+            }
+
             else -> {
                 Timber.w("wear activity unhandled receive: ${path} ${String(data)}")
             }
+        }
+    }
+
+    private fun triggerAppReload(context: Context) {
+        val packageManager = context.packageManager
+        val intent = packageManager.getLaunchIntentForPackage(context.packageName)
+        val componentName = intent!!.component
+        val mainIntent = Intent.makeRestartActivityTask(componentName)
+        context.startActivity(mainIntent)
+        Runtime.getRuntime().exit(0)
+    }
+
+    /**
+     * Disables the pump-host background service and triggers a force-reload
+     * so the service stops cleanly. Mirrors the mobile disable path in
+     * `Debug.kt`: set pref false, wait 250 ms, send [MessagePaths.TO_SERVER_FORCE_RELOAD].
+     * No-op unless the watch is in [DeviceRole.PUMP_HOST].
+     */
+    internal fun stopPumpService() {
+        if (StatePrefs(applicationContext).deviceRole() != DeviceRole.PUMP_HOST) return
+        WearPrefs(applicationContext).setServiceEnabled(false)
+        uiScope.launch {
+            kotlinx.coroutines.delay(250)
+            sendMessage(MessagePaths.TO_SERVER_FORCE_RELOAD, "".toByteArray())
+        }
+    }
+
+    /**
+     * Re-enables the pump-host background service using mobile's canonical
+     * three-step sequence from `ServiceDisabledMessage.kt`: set pref true,
+     * 250 ms, [MessagePaths.TO_SERVER_FORCE_RELOAD], 250 ms,
+     * [MessagePaths.TO_SERVER_APP_RELOAD] as a fallback.
+     */
+    internal fun reEnablePumpService() {
+        if (StatePrefs(applicationContext).deviceRole() != DeviceRole.PUMP_HOST) return
+        WearPrefs(applicationContext).setServiceEnabled(true)
+        uiScope.launch {
+            kotlinx.coroutines.delay(250)
+            sendMessage(MessagePaths.TO_SERVER_FORCE_RELOAD, "".toByteArray())
+            kotlinx.coroutines.delay(250)
+            sendMessage(MessagePaths.TO_SERVER_APP_RELOAD, "".toByteArray())
         }
     }
 

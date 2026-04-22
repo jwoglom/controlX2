@@ -83,11 +83,13 @@ import com.jwoglom.controlx2.presentation.navigation.DestinationScrollType
 import com.jwoglom.controlx2.presentation.navigation.SCROLL_TYPE_NAV_ARGUMENT
 import com.jwoglom.controlx2.presentation.navigation.Screen
 import com.jwoglom.controlx2.presentation.ui.BolusScreen
+import com.jwoglom.controlx2.presentation.ui.ConnectingToPumpScreen
 import com.jwoglom.controlx2.presentation.ui.FullScreenText
 import com.jwoglom.controlx2.presentation.ui.IndeterminateProgressIndicator
 import com.jwoglom.controlx2.presentation.ui.LandingScreen
 import com.jwoglom.controlx2.presentation.ui.PairingCodeEntryScreen
 import com.jwoglom.controlx2.presentation.ui.PairingUnsupportedOnWatchScreen
+import com.jwoglom.controlx2.presentation.ui.PumpDisconnectedReconnectingScreen
 import com.jwoglom.controlx2.presentation.ui.PumpFinderSelectScreen
 import com.jwoglom.controlx2.presentation.ui.RoleSelectionScreen
 import com.jwoglom.controlx2.presentation.ui.ScalingLazyListStateViewModel
@@ -273,7 +275,7 @@ fun WearApp(
                 }
 
                 composable(Screen.ConnectingToPump.route) {
-                    IndeterminateProgressIndicator(text = "Connecting to pump")
+                    ConnectingToPumpScreen()
                 }
 
                 composable(Screen.PairingToPump.route) {
@@ -285,7 +287,7 @@ fun WearApp(
                 }
 
                 composable(Screen.PumpDisconnectedReconnecting.route) {
-                    IndeterminateProgressIndicator(text = "Reconnecting")
+                    PumpDisconnectedReconnectingScreen()
                 }
 
                 // --- Watch-as-pump-host pairing flow ---
