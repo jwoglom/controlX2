@@ -39,6 +39,7 @@ import com.jwoglom.controlx2.presentation.ui.components.LandingControlIQRow
 import com.jwoglom.controlx2.presentation.ui.components.LandingFooterActions
 import com.jwoglom.controlx2.presentation.ui.components.LandingModeActionsRow
 import com.jwoglom.controlx2.presentation.ui.components.LandingTopRow
+import com.jwoglom.controlx2.presentation.components.WearServiceDisabledMessage
 import com.jwoglom.controlx2.shared.presentation.LifecycleStateObserver
 import com.jwoglom.controlx2.shared.presentation.intervalOf
 import com.jwoglom.controlx2.shared.util.SendType
@@ -169,6 +170,8 @@ fun LandingScreen(
                 ReportFullyDrawn()
                 LandingTopRow()
             }
+
+            item { WearServiceDisabledMessage() }
 
             item {
                 LandingBolusChip(

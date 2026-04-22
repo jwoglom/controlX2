@@ -22,9 +22,13 @@ import com.jwoglom.pumpx2.pump.messages.response.currentStatus.LastBGResponse
 import com.jwoglom.pumpx2.pump.messages.response.currentStatus.LastBolusStatusAbstractResponse
 import com.jwoglom.pumpx2.pump.messages.response.currentStatus.TimeSinceResetResponse
 import timber.log.Timber
+import java.time.Instant
 
 class DataStore {
     val connectionStatus = MutableLiveData<String>()
+    val pumpConnected = MutableLiveData<Boolean>()
+    val pumpLastConnectionTimestamp = MutableLiveData<Instant>()
+    val pumpLastMessageTimestamp = MutableLiveData<Instant>()
 
     val glucoseUnitPreference = MutableLiveData<GlucoseUnit>()
     val batteryPercent = MutableLiveData<Int>()
@@ -101,6 +105,9 @@ class DataStore {
 
     init {
         connectionStatus.logOnChange("connectionStatus")
+        pumpConnected.logOnChange("pumpConnected")
+        pumpLastConnectionTimestamp.logOnChange("pumpLastConnectionTimestamp")
+        pumpLastMessageTimestamp.logOnChange("pumpLastMessageTimestamp")
 
         batteryPercent.logOnChange("batteryPercent")
         iobUnits.logOnChange("iobUnits")
