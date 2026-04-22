@@ -22,7 +22,7 @@ object MessageBusFactory {
     /**
      * Create a MessageBus instance with automatic implementation detection.
      * @param context Android context
-     * @return MessageBus implementation (HybridMessageBus, BroadcastMessageBus, or LocalMessageBus)
+     * @return MessageBus implementation (HybridMessageBus or BroadcastMessageBus)
      */
     @Volatile
     private var messageBusInstance: MessageBus? = null

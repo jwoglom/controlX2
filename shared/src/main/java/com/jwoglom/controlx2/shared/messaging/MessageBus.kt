@@ -19,8 +19,10 @@ enum class MessageBusSender {
 /**
  * Abstraction for sending and receiving messages between components.
  * Implementations include:
- * - LocalMessageBus: In-process communication for phone-only mode
- * - WearMessageBus: Wear OS Data Layer communication for phone-watch mode
+ * - LocalMessageBus: Process-local in-memory dispatch (with reentrance protection)
+ * - BroadcastMessageBus: Cross-process Android broadcasts (mobile)
+ * - WearMessageBus: Wear OS Data Layer communication (phone ↔ watch)
+ * - HybridMessageBus / WearHybridMessageBus: Compose the above with role-aware routing
  */
 interface MessageBus {
     /**
@@ -35,6 +37,19 @@ interface MessageBus {
      * Add a listener for incoming messages
      */
     fun addMessageListener(listener: MessageListener)
+
+    /**
+     * Register a listener that is tagged with a sender identity. Buses that enforce
+     * reentrance protection (notably [LocalMessageBus]) skip delivery of messages
+     * whose `sender` equals [listenerSender] — so a component can never receive its
+     * own emissions back through this bus.
+     *
+     * Buses that cannot determine the original sender (e.g. [WearMessageBus], which
+     * only knows the remote node ID) fall back to the untagged behavior.
+     */
+    fun addMessageListener(listener: MessageListener, listenerSender: MessageBusSender) {
+        addMessageListener(listener)
+    }
 
     /**
      * Remove a previously added listener

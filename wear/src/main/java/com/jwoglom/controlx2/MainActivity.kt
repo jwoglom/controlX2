@@ -16,13 +16,18 @@ import androidx.navigation.NavController
 import androidx.navigation.NavHostController
 import androidx.wear.compose.navigation.rememberSwipeDismissableNavController
 import androidx.wear.remote.interactions.RemoteActivityHelper
-import com.google.android.gms.wearable.MessageClient
-import com.google.android.gms.wearable.MessageEvent
-import com.google.android.gms.wearable.Node
 import com.google.android.gms.wearable.Wearable
+import com.jwoglom.controlx2.messaging.WearHybridMessageBus
 import com.jwoglom.controlx2.presentation.DataStore
 import com.jwoglom.controlx2.presentation.WearApp
+import com.jwoglom.controlx2.presentation.navigation.PumpSetupStage
 import com.jwoglom.controlx2.presentation.navigation.Screen
+import com.jwoglom.controlx2.pump.pairing.PairingCodeEntry
+import com.jwoglom.controlx2.shared.messaging.MessageBus
+import com.jwoglom.controlx2.shared.messaging.MessageBusSender
+import com.jwoglom.controlx2.shared.messaging.MessageListener
+import com.jwoglom.pumpx2.pump.bluetooth.PumpReadyState
+import com.jwoglom.pumpx2.pump.messages.models.PairingCodeType
 import com.jwoglom.controlx2.presentation.ui.resetBolusDataStoreState
 import com.jwoglom.controlx2.shared.InitiateConfirmedBolusSerializer
 import com.jwoglom.controlx2.shared.MessagePaths
@@ -87,10 +92,11 @@ import kotlin.math.roundToInt
 var dataStore = DataStore()
 val LocalDataStore = compositionLocalOf { dataStore }
 
-class MainActivity : ComponentActivity(), MessageClient.OnMessageReceivedListener {
+class MainActivity : ComponentActivity() {
 
     internal lateinit var navController: NavHostController
-    private lateinit var messageClient: MessageClient
+    private lateinit var messageBus: MessageBus
+    private lateinit var messageListener: MessageListener
 
     private lateinit var initialRoute: String
     private val uiScope = kotlinx.coroutines.CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
@@ -228,8 +234,17 @@ class MainActivity : ComponentActivity(), MessageClient.OnMessageReceivedListene
             )
         }
 
-        messageClient = Wearable.getMessageClient(this)
-        messageClient.addListener(this)
+        messageBus = WearHybridMessageBus(
+            context = this,
+            deviceRole = StatePrefs(this).deviceRole(),
+            identity = MessageBusSender.MOBILE_UI,
+        )
+        messageListener = object : MessageListener {
+            override fun onMessageReceived(path: String, data: ByteArray, sourceNodeId: String) {
+                handleMessage(path, data, sourceNodeId)
+            }
+        }
+        messageBus.addMessageListener(messageListener)
 
         when (StatePrefs(this).deviceRole()) {
             DeviceRole.PUMP_HOST -> startWearPumpCommService()
@@ -274,8 +289,6 @@ class MainActivity : ComponentActivity(), MessageClient.OnMessageReceivedListene
 
     override fun onResume() {
         super.onResume()
-        messageClient.addListener(this)
-
         sendMessage(MessagePaths.TO_SERVER_IS_PUMP_CONNECTED, "onResume".toByteArray())
     }
 
@@ -303,13 +316,10 @@ class MainActivity : ComponentActivity(), MessageClient.OnMessageReceivedListene
         sendMessage(MessagePaths.TO_SERVER_IS_PUMP_CONNECTED, "onConnected".toByteArray())
     }
 
-    override fun onStop() {
-        super.onStop()
-        messageClient.removeListener(this)
-    }
-
     override fun onDestroy() {
-        messageClient.removeListener(this)
+        if (::messageBus.isInitialized && ::messageListener.isInitialized) {
+            messageBus.removeMessageListener(messageListener)
+        }
         uiScope.cancel()
         super.onDestroy()
     }
@@ -324,27 +334,7 @@ class MainActivity : ComponentActivity(), MessageClient.OnMessageReceivedListene
 
     private fun sendMessage(path: String, message: ByteArray) {
         Timber.i("wear sendMessage: $path ${String(message)}")
-        val nodeClient = Wearable.getNodeClient(this)
-
-        fun inner(node: Node) {
-            messageClient.sendMessage(node.id, path, message)
-                .addOnSuccessListener {
-                    Timber.d("Wear message sent: ${path} to ${node.displayName}")
-                }
-                .addOnFailureListener {
-                    Timber.w("wear sendMessage callback: ${it}")
-                }
-        }
-
-        // Send to connected nodes, filtering out the local node to avoid echo
-        nodeClient.localNode.addOnSuccessListener { localNode ->
-            val localNodeId = localNode.id
-            nodeClient.connectedNodes.addOnSuccessListener { nodes ->
-                nodes.filter { it.id != localNodeId }.forEach { node ->
-                    inner(node)
-                }
-            }
-        }
+        messageBus.sendMessage(path, message, MessageBusSender.MOBILE_UI)
     }
 
     private fun inWaitingState(): Boolean {
@@ -354,7 +344,10 @@ class MainActivity : ComponentActivity(), MessageClient.OnMessageReceivedListene
             Screen.ConnectingToPump.route,
             Screen.PairingToPump.route,
             Screen.MissingPairingCode.route,
-            Screen.PumpDisconnectedReconnecting.route -> true
+            Screen.PumpDisconnectedReconnecting.route,
+            Screen.PumpFinderSelect.route,
+            Screen.PairingCodeEntry.route,
+            Screen.PairingUnsupportedOnWatch.route -> true
             else -> false
         }
     }
@@ -511,9 +504,9 @@ class MainActivity : ComponentActivity(), MessageClient.OnMessageReceivedListene
         }
     }
 
-    override fun onMessageReceived(messageEvent: MessageEvent) {
-        Timber.d("wear onMessageReceived: ${messageEvent.path}")
-        when (messageEvent.path) {
+    private fun handleMessage(path: String, data: ByteArray, sourceNodeId: String) {
+        Timber.d("wear handleMessage: $path")
+        when (path) {
             MessagePaths.TO_CLIENT_CONNECTED -> {
                 if (inWaitingState()) {
                     runOnUiThread {
@@ -524,13 +517,13 @@ class MainActivity : ComponentActivity(), MessageClient.OnMessageReceivedListene
                 dataStore.connectionStatus.value = "Waiting to find pump"
             }
             MessagePaths.TO_CLIENT_BOLUS_MIN_NOTIFY_THRESHOLD -> {
-                dataStore.bolusMinNotifyThreshold.value = String(messageEvent.data).toDoubleOrNull()
+                dataStore.bolusMinNotifyThreshold.value = String(data).toDoubleOrNull()
             }
             MessagePaths.TO_CLIENT_WEAR_AUTO_APPROVE_TIMEOUT -> {
-                dataStore.wearAutoApproveTimeout.value = String(messageEvent.data).toIntOrNull() ?: 0
+                dataStore.wearAutoApproveTimeout.value = String(data).toIntOrNull() ?: 0
             }
             MessagePaths.TO_CLIENT_GLUCOSE_UNIT -> {
-                val unitName = String(messageEvent.data)
+                val unitName = String(data)
                 val unit = com.jwoglom.controlx2.shared.enums.GlucoseUnit.fromName(unitName)
                 if (unit != null) {
                     dataStore.glucoseUnitPreference.value = unit
@@ -554,7 +547,7 @@ class MainActivity : ComponentActivity(), MessageClient.OnMessageReceivedListene
 
                     val dataStoreUnits = dataStore.bolusFinalParameters.value?.units
                     val initiateBolusRequest = withContext(Dispatchers.Default) {
-                        val confirmedBolus = InitiateConfirmedBolusSerializer.fromBytes("IGNORED_BY_WEAR", messageEvent.data)
+                        val confirmedBolus = InitiateConfirmedBolusSerializer.fromBytes("IGNORED_BY_WEAR", data)
                         confirmedBolus.right as InitiateBolusRequest
                     }
 
@@ -565,7 +558,7 @@ class MainActivity : ComponentActivity(), MessageClient.OnMessageReceivedListene
                     }
 
                     Timber.i("sending initiate-confirmed-bolus from wearable to phone")
-                    sendMessage(MessagePaths.TO_SERVER_INITIATE_CONFIRMED_BOLUS, messageEvent.data)
+                    sendMessage(MessagePaths.TO_SERVER_INITIATE_CONFIRMED_BOLUS, data)
                 }
             }
             MessagePaths.TO_CLIENT_BLOCKED_BOLUS_SIGNATURE -> {
@@ -606,13 +599,31 @@ class MainActivity : ComponentActivity(), MessageClient.OnMessageReceivedListene
                 dataStore.connectionStatus.value = "Pairing to pump"
             }
             MessagePaths.FROM_PUMP_MISSING_PAIRING_CODE -> {
-                if (inWaitingState()) {
-                    runOnUiThread {
-                        navController.navigateClearBackStack(Screen.MissingPairingCode.route)
+                if (StatePrefs(applicationContext).deviceRole() == DeviceRole.PUMP_HOST) {
+                    val codeType = dataStore.setupPairingCodeType.value ?: PairingCodeType.SHORT_6CHAR
+                    if (codeType == PairingCodeType.LONG_16CHAR) {
+                        dataStore.pumpSetupStage.value = PumpSetupStage.PAIRING_UNSUPPORTED
+                        runOnUiThread {
+                            navController.navigateClearBackStack(Screen.PairingUnsupportedOnWatch.route)
+                        }
+                    } else {
+                        dataStore.pumpSetupStage.value = PumpSetupStage.PUMPX2_WAITING_FOR_PAIRING_CODE
+                        runOnUiThread {
+                            if (navController.currentDestination?.route != Screen.PairingCodeEntry.route) {
+                                navController.navigateClearBackStack(Screen.PairingCodeEntry.route)
+                            }
+                        }
                     }
-                    sendMessage(MessagePaths.TO_SERVER_IS_PUMP_CONNECTED, "on-missing-pairing-code".toByteArray())
+                } else {
+                    // CLIENT role: defer to the phone, show waiting screen.
+                    if (inWaitingState()) {
+                        runOnUiThread {
+                            navController.navigateClearBackStack(Screen.MissingPairingCode.route)
+                        }
+                        sendMessage(MessagePaths.TO_SERVER_IS_PUMP_CONNECTED, "on-missing-pairing-code".toByteArray())
+                    }
+                    dataStore.connectionStatus.value = "Missing pairing code"
                 }
-                dataStore.connectionStatus.value = "Missing pairing code"
             }
             MessagePaths.FROM_PUMP_PUMP_CONNECTED -> {
                 if (inWaitingState()) {
@@ -639,12 +650,12 @@ class MainActivity : ComponentActivity(), MessageClient.OnMessageReceivedListene
                 dataStore.connectionStatus.value = "Reconnecting"
             }
             MessagePaths.FROM_PUMP_PUMP_CRITICAL_ERROR -> {
-                dataStore.connectionStatus.value = "Error: ${String(messageEvent.data)}"
+                dataStore.connectionStatus.value = "Error: ${String(data)}"
             }
             MessagePaths.FROM_PUMP_RECEIVE_QUALIFYING_EVENT -> {
                 uiScope.launch {
                     val pumpEvents = withContext(Dispatchers.Default) {
-                        PumpQualifyingEventsSerializer.fromBytes(messageEvent.data)
+                        PumpQualifyingEventsSerializer.fromBytes(data)
                     }
                     onPumpQualifyingEventReceived(pumpEvents)
                 }
@@ -655,7 +666,7 @@ class MainActivity : ComponentActivity(), MessageClient.OnMessageReceivedListene
                         navController.navigateClearBackStack(initialRoute)
                     }
                     val pumpMessage = withContext(Dispatchers.Default) {
-                        PumpMessageSerializer.fromBytes(messageEvent.data)
+                        PumpMessageSerializer.fromBytes(data)
                     }
                     onPumpMessageReceived(pumpMessage, false)
                 }
@@ -666,15 +677,97 @@ class MainActivity : ComponentActivity(), MessageClient.OnMessageReceivedListene
                         navController.navigateClearBackStack(initialRoute)
                     }
                     val pumpMessage = withContext(Dispatchers.Default) {
-                        PumpMessageSerializer.fromBytes(messageEvent.data)
+                        PumpMessageSerializer.fromBytes(data)
                     }
                     onPumpMessageReceived(pumpMessage, true)
                 }
             }
+
+            // --- Watch-as-pump-host pairing flow (DeviceRole.PUMP_HOST only) ---
+
+            MessagePaths.FROM_PUMP_PUMP_FINDER_FOUND_PUMPS -> {
+                if (StatePrefs(applicationContext).deviceRole() == DeviceRole.PUMP_HOST) {
+                    val pumps = String(data).split(";")
+                        .filter { it.isNotBlank() }
+                        .map { Pair(it.substringBefore("="), it.substringAfter("=")) }
+                    dataStore.pumpFinderPumps.value = pumps
+                    if (dataStore.pumpSetupStage.value != PumpSetupStage.PUMP_FINDER_SELECT_PUMP) {
+                        dataStore.pumpSetupStage.value = PumpSetupStage.PUMP_FINDER_SELECT_PUMP
+                    }
+                    runOnUiThread {
+                        if (navController.currentDestination?.route != Screen.PumpFinderSelect.route) {
+                            navController.navigateClearBackStack(Screen.PumpFinderSelect.route)
+                        }
+                    }
+                }
+            }
+
+            MessagePaths.FROM_PUMP_PUMP_FINDER_PUMP_DISCOVERED -> {
+                if (StatePrefs(applicationContext).deviceRole() == DeviceRole.PUMP_HOST) {
+                    val payload = String(data)
+                    val discoveredKey = payload.substringBefore(";;")
+                    val discoveredName = discoveredKey.substringBefore("=")
+                    val readyStateRaw = payload.substringAfter(";;", "UNKNOWN")
+                    val readyState = try {
+                        PumpReadyState.valueOf(readyStateRaw)
+                    } catch (_: IllegalArgumentException) {
+                        PumpReadyState.UNKNOWN
+                    }
+                    if (dataStore.setupDeviceName.value == null || dataStore.setupDeviceName.value == discoveredName) {
+                        dataStore.setupDeviceName.value = discoveredName
+                        dataStore.pumpReadyState.value = readyState
+                    }
+                }
+            }
+
+            MessagePaths.FROM_PUMP_INVALID_PAIRING_CODE -> {
+                if (StatePrefs(applicationContext).deviceRole() == DeviceRole.PUMP_HOST) {
+                    Timber.w("watch pump-host: invalid pairing code, prompting re-entry")
+                    com.jwoglom.pumpx2.pump.PumpState.setPairingCode(applicationContext, "")
+                    dataStore.pumpPairingError.value = "Invalid code, try again"
+                    dataStore.pumpSetupStage.value = PumpSetupStage.PUMPX2_INVALID_PAIRING_CODE
+                    sendMessage(MessagePaths.TO_SERVER_STOP_COMM, "invalid_pairing_code".toByteArray())
+                    runOnUiThread {
+                        navController.navigateClearBackStack(Screen.PairingCodeEntry.route)
+                    }
+                }
+            }
+
+            MessagePaths.FROM_PUMP_INITIAL_PUMP_CONNECTION -> {
+                if (StatePrefs(applicationContext).deviceRole() == DeviceRole.PUMP_HOST) {
+                    dataStore.setupDeviceName.value = String(data)
+                }
+            }
+
             else -> {
-                Timber.w("wear activity unhandled receive: ${messageEvent.path} ${String(messageEvent.data)}")
+                Timber.w("wear activity unhandled receive: ${path} ${String(data)}")
             }
         }
+    }
+
+    /**
+     * Called from [com.jwoglom.controlx2.presentation.ui.PairingCodeEntryScreen]
+     * after the user enters a 6-digit pairing code via the system input UI.
+     * Routes through [PairingCodeEntry] which persists the code and dispatches
+     * the correct next message based on [dataStore.pumpSetupStage].
+     */
+    internal fun submitPairingCode(code: String) {
+        PairingCodeEntry.apply(
+            context = applicationContext,
+            code = code,
+            currentStageName = dataStore.pumpSetupStage.value?.name,
+            sendMessage = { path, data ->
+                // If we were in WAITING_PUMP_FINDER_CLEANUP, the helper will fire
+                // TO_SERVER_STOP_PUMP_FINDER("init_comm"). Before that message hits
+                // the service, make sure pumpfinder-service-enabled is false so the
+                // restarted service path picks the PumpComm handler branch.
+                if (path == MessagePaths.TO_SERVER_STOP_PUMP_FINDER) {
+                    WearPrefs(applicationContext).setPumpFinderServiceEnabled(false)
+                }
+                sendMessage(path, data)
+            },
+        )
+        dataStore.pumpPairingError.value = null
     }
 }
 
