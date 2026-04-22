@@ -11,11 +11,16 @@ import androidx.wear.compose.material.Chip
 import androidx.wear.compose.material.Icon
 import com.google.accompanist.flowlayout.FlowRow
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Devices
 import androidx.compose.material.icons.filled.OpenInNew
 import androidx.compose.material.icons.filled.Refresh
 
 @Composable
-fun LandingFooterActions(onForceReload: () -> Unit, onOpenPhone: () -> Unit) {
+fun LandingFooterActions(
+    onForceReload: () -> Unit,
+    onOpenPhone: () -> Unit,
+    onRoleSelection: () -> Unit,
+) {
     FlowRow(modifier = Modifier.padding(top = 25.dp)) {
         Chip(
             onClick = onForceReload,
@@ -26,11 +31,16 @@ fun LandingFooterActions(onForceReload: () -> Unit, onOpenPhone: () -> Unit) {
             onClick = onOpenPhone,
             label = { Icon(imageVector = Icons.Filled.OpenInNew, contentDescription = "Open on phone") },
         )
+        Spacer(Modifier.width(16.dp))
+        Chip(
+            onClick = onRoleSelection,
+            label = { Icon(imageVector = Icons.Filled.Devices, contentDescription = "Switch pump-host device") },
+        )
     }
 }
 
 @Preview
 @Composable
 private fun LandingFooterActionsPreview() {
-    LandingFooterActions(onForceReload = {}, onOpenPhone = {})
+    LandingFooterActions(onForceReload = {}, onOpenPhone = {}, onRoleSelection = {})
 }

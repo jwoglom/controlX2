@@ -86,6 +86,7 @@ import com.jwoglom.controlx2.presentation.ui.BolusScreen
 import com.jwoglom.controlx2.presentation.ui.FullScreenText
 import com.jwoglom.controlx2.presentation.ui.IndeterminateProgressIndicator
 import com.jwoglom.controlx2.presentation.ui.LandingScreen
+import com.jwoglom.controlx2.presentation.ui.RoleSelectionScreen
 import com.jwoglom.controlx2.presentation.ui.ScalingLazyListStateViewModel
 import com.jwoglom.controlx2.presentation.ui.ScrollStateViewModel
 import com.jwoglom.controlx2.shared.enums.GlucoseUnit
@@ -310,6 +311,13 @@ fun WearApp(
                     )
 
                     RequestFocusOnResume(focusRequester)
+                    BottomText()
+                }
+
+                composable(Screen.RoleSelection.route) {
+                    RoleSelectionScreen(
+                        onCancel = { navController.popBackStack() },
+                    )
                     BottomText()
                 }
 
