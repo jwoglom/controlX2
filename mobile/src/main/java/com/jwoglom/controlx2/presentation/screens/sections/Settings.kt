@@ -13,6 +13,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Devices
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Send
@@ -34,6 +35,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import android.app.Activity
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
@@ -55,9 +57,11 @@ import com.jwoglom.controlx2.presentation.util.getSupportBundleSummary
 import com.jwoglom.controlx2.presentation.util.sendSupportBundleEmail
 import com.jwoglom.controlx2.presentation.util.shareSupportBundle
 import com.jwoglom.controlx2.shared.MessagePaths
+import com.jwoglom.controlx2.shared.enums.DeviceRole
 import com.jwoglom.controlx2.shared.util.SendType
 import com.jwoglom.controlx2.util.AppVersionCheck
 import com.jwoglom.controlx2.util.AppVersionInfo
+import com.jwoglom.controlx2.util.switchDeviceRole
 import com.jwoglom.pumpx2.pump.PumpState
 import com.jwoglom.pumpx2.pump.messages.Message
 import com.jwoglom.pumpx2.pump.messages.request.control.ChangeTimeDateRequest
@@ -86,6 +90,8 @@ fun Settings(
     var showPlaySoundDialog by remember { mutableStateOf(false) }
     var showSupportBundleDialog by remember { mutableStateOf(false) }
     var supportBundleSummary by remember { mutableStateOf<SupportBundleSummary?>(null) }
+    var showDeviceRoleDialog by remember { mutableStateOf(false) }
+    var currentDeviceRole by remember { mutableStateOf(Prefs(context).deviceRole()) }
 
     LazyColumn(
         contentPadding = innerPadding,
@@ -251,7 +257,28 @@ fun Settings(
                 )
                 Divider()
             }
-            
+
+            item {
+                val roleLabel = when (currentDeviceRole) {
+                    DeviceRole.PUMP_HOST -> "Phone (pump-host)"
+                    DeviceRole.CLIENT -> "Watch (pump-host)"
+                }
+                ListItem(
+                    headlineContent = { Text("Pump-host device") },
+                    supportingContent = { Text("Currently: $roleLabel. Tap to switch which device manages the Bluetooth pump connection.") },
+                    leadingContent = {
+                        Icon(
+                            Icons.Filled.Devices,
+                            contentDescription = "Device role icon",
+                        )
+                    },
+                    modifier = Modifier.clickable {
+                        showDeviceRoleDialog = true
+                    }
+                )
+                Divider()
+            }
+
             item {
                 ListItem(
                     headlineContent = { Text("Nightscout") },
@@ -429,6 +456,50 @@ fun Settings(
             },
             dismissButton = {
                 TextButton(onClick = { showSyncTimeDialog = false }) {
+                    Text("Cancel")
+                }
+            }
+        )
+    }
+
+    if (showDeviceRoleDialog) {
+        val newRole = when (currentDeviceRole) {
+            DeviceRole.PUMP_HOST -> DeviceRole.CLIENT
+            DeviceRole.CLIENT -> DeviceRole.PUMP_HOST
+        }
+        val newRoleLabel = when (newRole) {
+            DeviceRole.PUMP_HOST -> "Phone (pump-host)"
+            DeviceRole.CLIENT -> "Watch (pump-host)"
+        }
+        AlertDialog(
+            onDismissRequest = { showDeviceRoleDialog = false },
+            title = { Text("Switch pump-host to $newRoleLabel?") },
+            text = {
+                Text(
+                    "The Tandem pump can only be paired with one device at a time. " +
+                    "After switching:\n\n" +
+                    "1. Flip the other device to the opposite role in its settings.\n" +
+                    "2. Unpair the pump from the old host (via the pump's Bluetooth settings).\n" +
+                    "3. Re-pair the pump to the new host.\n\n" +
+                    "The app will restart to apply the new role."
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    showDeviceRoleDialog = false
+                    val activity = context as? Activity
+                    if (activity != null) {
+                        switchDeviceRole(activity, newRole)
+                        currentDeviceRole = newRole
+                    } else {
+                        Toast.makeText(context, "Unable to switch role: no activity context", Toast.LENGTH_SHORT).show()
+                    }
+                }) {
+                    Text("Switch")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDeviceRoleDialog = false }) {
                     Text("Cancel")
                 }
             }

@@ -1,0 +1,142 @@
+package com.jwoglom.controlx2.presentation.ui
+
+import android.app.Activity
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Clear
+import androidx.compose.material.icons.filled.Devices
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.wear.compose.material.Button
+import androidx.wear.compose.material.ButtonDefaults
+import androidx.wear.compose.material.Chip
+import androidx.wear.compose.material.ChipDefaults
+import androidx.wear.compose.material.Icon
+import androidx.wear.compose.material.MaterialTheme
+import androidx.wear.compose.material.Text
+import androidx.wear.compose.material.dialog.Alert
+import com.jwoglom.controlx2.shared.enums.DeviceRole
+import com.jwoglom.controlx2.util.StatePrefs
+import com.jwoglom.controlx2.util.switchDeviceRole
+
+@Composable
+fun RoleSelectionScreen(
+    onCancel: () -> Unit,
+) {
+    val context = LocalContext.current
+    val currentRole = remember { StatePrefs(context).deviceRole() }
+    var showConfirmDialog by remember { mutableStateOf(false) }
+
+    val roleLabel = when (currentRole) {
+        DeviceRole.PUMP_HOST -> "Watch (pump-host)"
+        DeviceRole.CLIENT -> "Phone (pump-host)"
+    }
+    val newRole = when (currentRole) {
+        DeviceRole.PUMP_HOST -> DeviceRole.CLIENT
+        DeviceRole.CLIENT -> DeviceRole.PUMP_HOST
+    }
+    val newRoleLabel = when (newRole) {
+        DeviceRole.PUMP_HOST -> "Watch (pump-host)"
+        DeviceRole.CLIENT -> "Phone (pump-host)"
+    }
+
+    if (showConfirmDialog) {
+        Alert(
+            title = {
+                Text(
+                    text = "Switch to $newRoleLabel?",
+                    textAlign = TextAlign.Center,
+                    color = MaterialTheme.colors.onBackground,
+                )
+            },
+            negativeButton = {
+                Button(
+                    onClick = { showConfirmDialog = false },
+                    colors = ButtonDefaults.secondaryButtonColors(),
+                ) {
+                    Icon(imageVector = Icons.Filled.Clear, contentDescription = "Cancel")
+                }
+            },
+            positiveButton = {
+                Button(
+                    onClick = {
+                        showConfirmDialog = false
+                        val activity = context as? Activity
+                        if (activity != null) {
+                            switchDeviceRole(activity, newRole)
+                        }
+                    },
+                    colors = ButtonDefaults.primaryButtonColors(),
+                ) {
+                    Icon(imageVector = Icons.Filled.Check, contentDescription = "Confirm")
+                }
+            },
+            icon = {
+                Image(
+                    Icons.Filled.Devices,
+                    "Device role",
+                    Modifier.size(24.dp),
+                )
+            },
+        ) {
+            Text(
+                text = "The pump pairs with one device at a time. After switching, flip the other device to the opposite role and re-pair the pump.",
+                textAlign = TextAlign.Center,
+                style = MaterialTheme.typography.body2,
+                color = MaterialTheme.colors.onBackground,
+            )
+        }
+    } else {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(horizontal = 16.dp),
+            verticalArrangement = Arrangement.Center,
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            Text(
+                text = "Pump-host device",
+                fontSize = 16.sp,
+                textAlign = TextAlign.Center,
+                color = MaterialTheme.colors.onBackground,
+            )
+            Text(
+                text = "Currently: $roleLabel",
+                fontSize = 12.sp,
+                textAlign = TextAlign.Center,
+                color = MaterialTheme.colors.onBackground,
+                modifier = Modifier.padding(top = 6.dp, bottom = 12.dp),
+            )
+            Chip(
+                onClick = { showConfirmDialog = true },
+                label = { Text("Switch to $newRoleLabel", fontSize = 12.sp) },
+                colors = ChipDefaults.primaryChipColors(),
+                modifier = Modifier.fillMaxWidth(),
+            )
+            Chip(
+                onClick = onCancel,
+                label = { Text("Cancel", fontSize = 12.sp) },
+                colors = ChipDefaults.secondaryChipColors(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 8.dp),
+            )
+        }
+    }
+}
