@@ -86,6 +86,9 @@ import com.jwoglom.controlx2.presentation.ui.BolusScreen
 import com.jwoglom.controlx2.presentation.ui.FullScreenText
 import com.jwoglom.controlx2.presentation.ui.IndeterminateProgressIndicator
 import com.jwoglom.controlx2.presentation.ui.LandingScreen
+import com.jwoglom.controlx2.presentation.ui.PairingCodeEntryScreen
+import com.jwoglom.controlx2.presentation.ui.PairingUnsupportedOnWatchScreen
+import com.jwoglom.controlx2.presentation.ui.PumpFinderSelectScreen
 import com.jwoglom.controlx2.presentation.ui.RoleSelectionScreen
 import com.jwoglom.controlx2.presentation.ui.ScalingLazyListStateViewModel
 import com.jwoglom.controlx2.presentation.ui.ScrollStateViewModel
@@ -283,6 +286,20 @@ fun WearApp(
 
                 composable(Screen.PumpDisconnectedReconnecting.route) {
                     IndeterminateProgressIndicator(text = "Reconnecting")
+                }
+
+                // --- Watch-as-pump-host pairing flow ---
+                composable(Screen.PumpFinderSelect.route) {
+                    PumpFinderSelectScreen(
+                        navController = navController,
+                        sendPhoneCommand = sendPhoneCommand,
+                    )
+                }
+                composable(Screen.PairingCodeEntry.route) {
+                    PairingCodeEntryScreen()
+                }
+                composable(Screen.PairingUnsupportedOnWatch.route) {
+                    PairingUnsupportedOnWatchScreen()
                 }
                 // Main Window
                 composable(

@@ -1,9 +1,12 @@
 package com.jwoglom.controlx2.presentation
 
 import androidx.lifecycle.MutableLiveData
+import com.jwoglom.controlx2.presentation.navigation.PumpSetupStage
 import com.jwoglom.controlx2.shared.enums.BasalStatus
 import com.jwoglom.controlx2.shared.enums.GlucoseUnit
 import com.jwoglom.controlx2.shared.enums.UserMode
+import com.jwoglom.pumpx2.pump.bluetooth.PumpReadyState
+import com.jwoglom.pumpx2.pump.messages.models.PairingCodeType
 import com.jwoglom.pumpx2.pump.messages.builders.IDPManager
 import com.jwoglom.pumpx2.pump.messages.calculator.BolusCalcCondition
 import com.jwoglom.pumpx2.pump.messages.calculator.BolusCalcUnits
@@ -67,6 +70,14 @@ class DataStore {
     val bolusFinalConditions = MutableLiveData<Set<BolusCalcCondition>>()
     val bolusMinNotifyThreshold = MutableLiveData<Double>()
     val wearAutoApproveTimeout = MutableLiveData<Int>()
+
+    // Watch-as-pump-host pairing flow state (populated only when DeviceRole.PUMP_HOST).
+    val pumpSetupStage = MutableLiveData<PumpSetupStage>()
+    val pumpFinderPumps = MutableLiveData<List<Pair<String, String>>>()
+    val setupDeviceName = MutableLiveData<String>()
+    val setupPairingCodeType = MutableLiveData<PairingCodeType>()
+    val pumpReadyState = MutableLiveData<PumpReadyState>()
+    val pumpPairingError = MutableLiveData<String?>()
 
     val timeSinceResetResponse = MutableLiveData<TimeSinceResetResponse>()
     val bolusPermissionResponse = MutableLiveData<BolusPermissionResponse>()
@@ -134,6 +145,13 @@ class DataStore {
         bolusFinalConditions.logOnChange("bolusFinalConditions")
         bolusMinNotifyThreshold.logOnChange("bolusMinNotifyThreshold")
         wearAutoApproveTimeout.logOnChange("wearAutoApproveTimeout")
+
+        pumpSetupStage.logOnChange("pumpSetupStage")
+        pumpFinderPumps.logOnChange("pumpFinderPumps")
+        setupDeviceName.logOnChange("setupDeviceName")
+        setupPairingCodeType.logOnChange("setupPairingCodeType")
+        pumpReadyState.logOnChange("pumpReadyState")
+        pumpPairingError.logOnChange("pumpPairingError")
 
         timeSinceResetResponse.logOnChange("timeSinceResetResponse")
         bolusPermissionResponse.logOnChange("bolusPermissionResponse")

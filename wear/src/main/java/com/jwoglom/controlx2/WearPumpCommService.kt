@@ -19,7 +19,8 @@ import androidx.core.app.NotificationCompat
 import androidx.core.graphics.drawable.IconCompat
 import com.jwoglom.controlx2.db.historylog.HistoryLogDatabase
 import com.jwoglom.controlx2.db.historylog.HistoryLogRepo
-import com.jwoglom.controlx2.messaging.WearMessageBus
+import com.jwoglom.controlx2.messaging.WearHybridMessageBus
+import com.jwoglom.controlx2.util.StatePrefs
 import com.jwoglom.controlx2.pump.BleChangeReceiver
 import com.jwoglom.controlx2.pump.WearBolusManager
 import com.jwoglom.controlx2.pump.CommServiceCallbacks
@@ -160,7 +161,11 @@ class WearPumpCommService : Service(), CommServiceCallbacks {
         handlerThread.start()
         serviceLooper = handlerThread.looper
 
-        messageBus = WearMessageBus(this)
+        messageBus = WearHybridMessageBus(
+            context = this,
+            deviceRole = StatePrefs(this).deviceRole(),
+            identity = MessageBusSender.COMM_SERVICE,
+        )
         messageBus.addMessageListener(object : MessageListener {
             override fun onMessageReceived(path: String, data: ByteArray, sourceNodeId: String) {
                 handleMessageReceived(path, data, sourceNodeId)
@@ -191,9 +196,11 @@ class WearPumpCommService : Service(), CommServiceCallbacks {
             MessagePaths.TO_SERVER_FORCE_RELOAD -> {
                 Timber.i("force-reload")
             }
-            MessagePaths.TO_SERVER_SET_PAIRING_CODE -> {
-                Timber.i("set-pairing-code received in service")
-            }
+            // TO_SERVER_SET_PAIRING_CODE: the watch UI calls PairingCodeEntry.apply()
+            // directly and that dispatches TO_SERVER_STOP_PUMP_FINDER("init_comm") if
+            // the stage was WAITING_PUMP_FINDER_CLEANUP. The service has no work to do
+            // on the SET_PAIRING_CODE path itself; PumpState is read by PumpCommHandler
+            // on init via PumpState.getPairingCode.
             MessagePaths.TO_SERVER_STOP_PUMP_FINDER -> {
                 Timber.i("stop-pump-finder")
                 sendStopPumpFinderComm()

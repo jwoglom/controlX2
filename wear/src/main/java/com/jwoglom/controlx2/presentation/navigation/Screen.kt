@@ -47,4 +47,8 @@ sealed class Screen(
     object BolusNotEnabled : Screen("BolusNotEnabled")
     object BolusRejectedOnPhone : Screen("BolusRejectedOnPhone")
 
+    // Watch-as-pump-host pairing flow (DeviceRole.PUMP_HOST).
+    object PumpFinderSelect : Screen("PumpFinderSelect")
+    object PairingCodeEntry : Screen("PairingCodeEntry")
+    object PairingUnsupportedOnWatch : Screen("PairingUnsupportedOnWatch")
 }
