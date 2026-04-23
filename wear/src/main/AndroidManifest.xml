@@ -17,6 +17,18 @@
 
     <uses-feature android:name="android.hardware.type.watch" />
 
+    <!--
+        Package visibility for targeted broadcasts to xDrip+ (see
+        :db's XdripBroadcastSender). Android 11+ requires the sender
+        to declare a <queries> entry before `intent.package = "..."`
+        will deliver; without this the broadcast is silently dropped.
+        The xDrip+ receiver availability on Wear OS is still unverified,
+        but we shouldn't be the ones blocking it.
+    -->
+    <queries>
+        <package android:name="com.eveningoutpost.dexdrip" />
+    </queries>
+
     <application
         android:allowBackup="true"
         android:icon="@drawable/pump"
