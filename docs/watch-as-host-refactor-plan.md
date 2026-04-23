@@ -338,13 +338,22 @@ Split into three sub-phases ordered by complexity so each is independently shipp
 - No type filter UI — keeping it simple; the CGM-reading filter is the only one that matters in practice.
 - No pagination — 100-row cap is fixed. Fine for a watch; can be revisited if users want deeper history.
 
-##### 5e-2. Basal rate display screen — ⏳ Next
+##### 5e-2. Basal rate display screen — ✅ Complete (commit `6581260`)
 
-- `DataStore.basalRate` and `DataStore.basalStatus` already flow on the watch in both roles; build a dedicated screen rendering current rate + status plus a small recent-changes list.
-- Optional: query recent `BasalRateChangeHistoryLog` / `TempRateActivatedHistoryLog` / `TempRateCompletedHistoryLog` rows from `HistoryLogRepo` to show a mini-timeline alongside.
-- No new dependencies; straight Compose + existing data.
+**Shipped:**
+- New `wear/.../presentation/ui/BasalDetailScreen.kt` — headline render of the live `basalRate` + `BasalStatus` from `LocalDataStore` (same fields `LandingBasalRow` uses) above a 20-row list of recent basal-related history events from `HistoryLogRepo`.
+- Event types queried: `BasalRateChangeHistoryLog`, `TempRateActivatedHistoryLog`, `TempRateCompletedHistoryLog`, `PumpingSuspendedHistoryLog`, `PumpingResumedHistoryLog`. Backed by `HistoryLogViewModel.latestItemsForTypes(typeClasses, 20)`, reusing the class→id resolution path from 5e-1.
+- ViewModel keyed `"basal-history-$pumpSid"` so it's distinct from the 5e-1 `HistoryLogScreen`'s default-keyed ViewModel.
+- Per-row formatting is basal-specific (`"→ 1.250U/hr"` rate-change prefix, "Temp basal start/end", "Pump suspended/resumed"); time formatter duplicated from 5e-1 intentionally, will consolidate if 5e-3 also needs it.
+- `Screen.BasalDetail` route added; wired into `WearApp.kt` next to `HistoryLog`.
+- Role-gated "Basal" chip added to `SettingsHubScreen` above the "Pump history" chip. Same `PUMP_HOST`-only gating as 5e-1.
 
-##### 5e-3. CGM trend-graph screen — ⏳ Remaining
+**Deviations / out-of-scope:**
+- `DataStore.basalRate`/`basalStatus` flow in both roles, so technically the header could render in CLIENT mode. Gated to `PUMP_HOST` anyway for consistency with 5e-1 and because the history list below the header needs local `HistoryLogRepo` rows that only exist on `PUMP_HOST` watches.
+- `pumpSid` captured once via `remember { WearPrefs(context).currentPumpSid() }`; if it flips from `-1` to valid during the screen's visibility, the user must navigate away and back to see history populate — matches the 5e-1 / Nightscout-settings pattern.
+- No per-row detail view (tapping a chip is a no-op). Future iteration.
+
+##### 5e-3. CGM trend-graph screen — ⏳ Next
 
 - Full-screen CGM chart — largest of the three. Mobile's `VicoCgmChart.kt` is 2434 lines; the watch version should aim for a much leaner scope (6–12h window, CGM line only, minimal overlays).
 - Needs `com.patrykandpatrick.vico:vico-compose` + `vico-core` added to `wear/build.gradle` (already on mobile). Alternative worth evaluating before that dep lands: a Canvas-based minimal renderer, which would avoid the APK growth.
@@ -402,8 +411,8 @@ Phase 5   (watch pump-host UI)                       ⏳ In progress:
            + Audit Tiers 1/2/3                       ✅ Complete (commits 15b4686, ff130ac, 5eeafa3)
            5e Pump data surfaces on watch            ⏳ In progress:
              5e-1 Watch-side history/events screen   ✅ Complete (commit 0125d58)
-             5e-2 Basal rate display screen          ⏳ Next
-             5e-3 CGM trend-graph screen             ⏳ Remaining
+             5e-2 Basal rate display screen          ✅ Complete (commit 6581260)
+             5e-3 CGM trend-graph screen             ⏳ Next
            5f Settings management parity             ⏳ Remaining
 ```
 
