@@ -5,10 +5,11 @@ package com.jwoglom.controlx2.presentation.navigation
  * `com.jwoglom.controlx2.presentation.screens.PumpSetupStage` containing only
  * the values the watch UI needs. TODO(phase6): share the enum across platforms.
  *
- * The string names of these values are matched against
- * [com.jwoglom.controlx2.pump.pairing.PairingCodeEntry.WAITING_PUMP_FINDER_CLEANUP]
- * and [com.jwoglom.controlx2.pump.pairing.PairingCodeEntry.PUMPX2_WAITING_FOR_PAIRING_CODE]
- * when dispatching post-set-pairing-code actions. Keep the names aligned.
+ * The two post-set-pairing-code values here are dispatched via
+ * [com.jwoglom.controlx2.pump.pairing.PairingCodeEntry.applyForInitialPumpComm]
+ * (for `WAITING_PUMP_FINDER_CLEANUP`) and
+ * [com.jwoglom.controlx2.pump.pairing.PairingCodeEntry.applyForRePair] (for
+ * `PUMPX2_WAITING_FOR_PAIRING_CODE`). See `MainActivity.submitPairingCode`.
  */
 enum class PumpSetupStage {
     WAITING_PUMP_FINDER_INIT,
