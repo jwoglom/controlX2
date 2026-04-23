@@ -198,9 +198,7 @@ fun LandingScreen(
 
             item {
                 LandingFooterActions(
-                    onForceReload = { sendPhoneCommand("force-reload") },
-                    onOpenPhone = sendPhoneOpenActivity,
-                    onRoleSelection = { navController.navigate(Screen.RoleSelection.route) },
+                    onSettings = { navController.navigate(Screen.SettingsHub.route) },
                 )
             }
 

@@ -1,0 +1,163 @@
+package com.jwoglom.controlx2.presentation.ui
+
+import android.content.Context
+import android.text.InputType
+import android.widget.Toast
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.wear.compose.foundation.lazy.ScalingLazyColumn
+import androidx.wear.compose.foundation.lazy.rememberScalingLazyListState
+import androidx.wear.compose.material.Chip
+import androidx.wear.compose.material.ChipDefaults
+import androidx.wear.compose.material.Text
+import com.jwoglom.controlx2.WearPrefs
+import com.jwoglom.controlx2.presentation.ui.components.rememberRemoteTextInputLauncher
+import com.jwoglom.controlx2.shared.presentation.intervalOf
+import com.jwoglom.controlx2.shared.util.shortTimeAgo
+import com.jwoglom.controlx2.sync.nightscout.NightscoutSyncConfig
+import com.jwoglom.controlx2.sync.nightscout.NightscoutSyncStatusStore
+import com.jwoglom.controlx2.sync.nightscout.NightscoutSyncWorker
+import java.time.Instant
+
+/**
+ * Pump-host watch settings for Nightscout sync. Reads/writes the `"controlx2"`
+ * SharedPreferences file via [NightscoutSyncConfig.load] / [save] — same file
+ * [WearPumpCommService.onPumpConnectedSync] passes to the worker.
+ *
+ * Scope is intentionally the MVP subset of mobile's `NightscoutSettings.kt`:
+ * enable toggle, URL, API secret, and sync status. Processors / sync interval /
+ * lookback hours remain phone-side only.
+ */
+@Composable
+fun NightscoutSettingsScreen() {
+    val context = LocalContext.current
+    val prefs = remember { context.getSharedPreferences("controlx2", Context.MODE_PRIVATE) }
+
+    var config by remember { mutableStateOf(NightscoutSyncConfig.load(prefs)) }
+    var syncStatus by remember { mutableStateOf(NightscoutSyncStatusStore.load(prefs)) }
+
+    fun saveAndReload(newConfig: NightscoutSyncConfig) {
+        config = newConfig
+        NightscoutSyncConfig.save(prefs, newConfig)
+        syncStatus = NightscoutSyncStatusStore.load(prefs)
+    }
+
+    val editUrlLauncher = rememberRemoteTextInputLauncher(
+        label = "Nightscout URL",
+        inputType = InputType.TYPE_TEXT_VARIATION_URI or InputType.TYPE_CLASS_TEXT,
+    ) { result ->
+        if (result != null) saveAndReload(config.copy(nightscoutUrl = result))
+    }
+    val editSecretLauncher = rememberRemoteTextInputLauncher(
+        label = "API secret",
+        inputType = InputType.TYPE_TEXT_VARIATION_PASSWORD or InputType.TYPE_CLASS_TEXT,
+    ) { result ->
+        if (result != null) saveAndReload(config.copy(apiSecret = result))
+    }
+
+    val state = rememberScalingLazyListState()
+
+    ScalingLazyColumn(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(horizontal = 8.dp),
+        state = state,
+    ) {
+        item {
+            Chip(
+                onClick = {
+                    val newConfig = config.copy(enabled = !config.enabled)
+                    saveAndReload(newConfig)
+                    val pumpSid = WearPrefs(context).currentPumpSid()
+                    if (newConfig.enabled) {
+                        NightscoutSyncWorker.startIfEnabled(context, prefs, pumpSid)
+                        Toast.makeText(context, "Nightscout enabled", Toast.LENGTH_SHORT).show()
+                    } else {
+                        NightscoutSyncWorker.stopIfRunning()
+                        Toast.makeText(context, "Nightscout disabled", Toast.LENGTH_SHORT).show()
+                    }
+                },
+                label = { Text(if (config.enabled) "Enabled" else "Disabled", fontSize = 13.sp) },
+                secondaryLabel = { Text("Tap to toggle", fontSize = 10.sp) },
+                colors = if (config.enabled) ChipDefaults.primaryChipColors()
+                    else ChipDefaults.secondaryChipColors(),
+                modifier = Modifier.fillMaxWidth(),
+            )
+        }
+        item {
+            Chip(
+                onClick = { editUrlLauncher() },
+                label = { Text("URL", fontSize = 12.sp) },
+                secondaryLabel = {
+                    Text(
+                        text = config.nightscoutUrl.ifBlank { "Not set" },
+                        fontSize = 10.sp,
+                        maxLines = 1,
+                    )
+                },
+                colors = ChipDefaults.secondaryChipColors(),
+                modifier = Modifier.fillMaxWidth(),
+            )
+        }
+        item {
+            Chip(
+                onClick = { editSecretLauncher() },
+                label = { Text("API secret", fontSize = 12.sp) },
+                secondaryLabel = {
+                    Text(
+                        text = if (config.apiSecret.isBlank()) "Not set" else "••••••",
+                        fontSize = 10.sp,
+                    )
+                },
+                colors = ChipDefaults.secondaryChipColors(),
+                modifier = Modifier.fillMaxWidth(),
+            )
+        }
+        item {
+            LaunchedStatusText(syncStatus)
+        }
+        item {
+            Text(
+                text = "Advanced settings (processors, interval, lookback) are configured on the phone.",
+                fontSize = 10.sp,
+                modifier = Modifier.padding(top = 8.dp, start = 8.dp, end = 8.dp),
+            )
+        }
+    }
+}
+
+@Composable
+private fun LaunchedStatusText(
+    syncStatus: com.jwoglom.controlx2.sync.nightscout.NightscoutSyncStatus,
+) {
+    // Tick every 10s so relative timestamps refresh without re-saving config.
+    val tick = intervalOf(10)
+    val text = remember(syncStatus, tick) {
+        val parts = mutableListOf<String>()
+        syncStatus.lastSuccessfulSyncMillis?.let {
+            parts += "Last sync ${shortTimeAgo(Instant.ofEpochMilli(it))}"
+        }
+        syncStatus.lastError?.let { err ->
+            val when_ = syncStatus.lastErrorMillis?.let { shortTimeAgo(Instant.ofEpochMilli(it)) }
+            parts += if (when_ != null) "Last error $when_: $err" else "Last error: $err"
+        }
+        parts.joinToString("\n")
+    }
+    if (text.isNotBlank()) {
+        Text(
+            text = text,
+            fontSize = 10.sp,
+            modifier = Modifier.padding(top = 8.dp, start = 8.dp, end = 8.dp),
+        )
+    }
+}
