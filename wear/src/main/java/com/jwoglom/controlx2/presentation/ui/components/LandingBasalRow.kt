@@ -17,7 +17,9 @@ data class BasalRowModel(
 
 @OptIn(ExperimentalWearMaterialApi::class)
 @Composable
-fun LandingBasalRow() {
+fun LandingBasalRow(
+    onClick: () -> Unit = {},
+) {
     val ds = LocalDataStore.current
     val model = BasalRowModel(
         basalRate = ds.basalRate.observeAsState().value,
@@ -37,7 +39,7 @@ fun LandingBasalRow() {
         else -> if (model.basalRate == null) model.basalStatus.str else "${model.basalStatus.str} (${model.basalRate})"
     } ?: "?"
 
-    LineInfoChip("Basal", text)
+    LineInfoChip("Basal", text, onClick = onClick)
 }
 
 @Preview

@@ -29,6 +29,11 @@ class DataStore {
     val pumpConnected = MutableLiveData<Boolean>()
     val pumpLastConnectionTimestamp = MutableLiveData<Instant>()
     val pumpLastMessageTimestamp = MutableLiveData<Instant>()
+    // Short pump serial id (last 3 digits of BT device name). Reactive mirror
+    // of `WearPrefs.currentPumpSid()` so Compose screens can recompose when a
+    // pump pairs for the first time without the user navigating away and back.
+    // `-1` means "no pump has ever been bound on this install".
+    val currentPumpSid = MutableLiveData<Int>(-1)
 
     val glucoseUnitPreference = MutableLiveData<GlucoseUnit>()
     val batteryPercent = MutableLiveData<Int>()
@@ -108,6 +113,7 @@ class DataStore {
         pumpConnected.logOnChange("pumpConnected")
         pumpLastConnectionTimestamp.logOnChange("pumpLastConnectionTimestamp")
         pumpLastMessageTimestamp.logOnChange("pumpLastMessageTimestamp")
+        currentPumpSid.logOnChange("currentPumpSid")
 
         batteryPercent.logOnChange("batteryPercent")
         iobUnits.logOnChange("iobUnits")

@@ -327,11 +327,40 @@ fun WearApp(
                 composable(Screen.XdripSettings.route) {
                     XdripSettingsScreen()
                 }
-                composable(Screen.HistoryLog.route) {
-                    HistoryLogScreen()
+                composable(
+                    route = Screen.HistoryLog.route,
+                    arguments = listOf(
+                        navArgument(SCROLL_TYPE_NAV_ARGUMENT) {
+                            type = NavType.EnumType(DestinationScrollType::class.java)
+                            defaultValue = DestinationScrollType.SCALING_LAZY_COLUMN_SCROLLING
+                        }
+                    )
+                ) {
+                    val listState = scalingLazyListState(it)
+                    val focusRequester = remember { FocusRequester() }
+                    HistoryLogScreen(
+                        scalingLazyListState = listState,
+                        focusRequester = focusRequester,
+                    )
+                    RequestFocusOnResume(focusRequester)
                 }
-                composable(Screen.BasalDetail.route) {
-                    BasalDetailScreen()
+                composable(
+                    route = Screen.BasalDetail.route,
+                    arguments = listOf(
+                        navArgument(SCROLL_TYPE_NAV_ARGUMENT) {
+                            type = NavType.EnumType(DestinationScrollType::class.java)
+                            defaultValue = DestinationScrollType.SCALING_LAZY_COLUMN_SCROLLING
+                        }
+                    )
+                ) {
+                    val listState = scalingLazyListState(it)
+                    val focusRequester = remember { FocusRequester() }
+                    BasalDetailScreen(
+                        scalingLazyListState = listState,
+                        focusRequester = focusRequester,
+                        sendPumpCommands = sendPumpCommands,
+                    )
+                    RequestFocusOnResume(focusRequester)
                 }
                 // Main Window
                 composable(
