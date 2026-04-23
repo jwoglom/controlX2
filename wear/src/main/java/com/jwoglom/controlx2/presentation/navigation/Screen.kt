@@ -51,6 +51,7 @@ sealed class Screen(
     object PumpFinderSelect : Screen("PumpFinderSelect")
     object PairingCodeEntry : Screen("PairingCodeEntry")
     object PairingUnsupportedOnWatch : Screen("PairingUnsupportedOnWatch")
+    object PumpBondedNeedsUnbond : Screen("PumpBondedNeedsUnbond")
 
     // Settings hub + sub-screens.
     object SettingsHub : Screen("SettingsHub")

@@ -90,6 +90,7 @@ import com.jwoglom.controlx2.presentation.ui.LandingScreen
 import com.jwoglom.controlx2.presentation.ui.NightscoutSettingsScreen
 import com.jwoglom.controlx2.presentation.ui.PairingCodeEntryScreen
 import com.jwoglom.controlx2.presentation.ui.PairingUnsupportedOnWatchScreen
+import com.jwoglom.controlx2.presentation.ui.PumpBondedNeedsUnbondScreen
 import com.jwoglom.controlx2.presentation.ui.PumpDisconnectedReconnectingScreen
 import com.jwoglom.controlx2.presentation.ui.PumpFinderSelectScreen
 import com.jwoglom.controlx2.presentation.ui.RoleSelectionScreen
@@ -305,6 +306,9 @@ fun WearApp(
                 }
                 composable(Screen.PairingUnsupportedOnWatch.route) {
                     PairingUnsupportedOnWatchScreen()
+                }
+                composable(Screen.PumpBondedNeedsUnbond.route) {
+                    PumpBondedNeedsUnbondScreen()
                 }
 
                 // --- Settings hub + sub-screens ---

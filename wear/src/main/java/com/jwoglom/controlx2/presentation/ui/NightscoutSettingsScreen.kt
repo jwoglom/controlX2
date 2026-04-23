@@ -76,15 +76,30 @@ fun NightscoutSettingsScreen() {
         item {
             Chip(
                 onClick = {
-                    val newConfig = config.copy(enabled = !config.enabled)
-                    saveAndReload(newConfig)
                     val pumpSid = WearPrefs(context).currentPumpSid()
-                    if (newConfig.enabled) {
-                        NightscoutSyncWorker.startIfEnabled(context, prefs, pumpSid)
-                        Toast.makeText(context, "Nightscout enabled", Toast.LENGTH_SHORT).show()
-                    } else {
-                        NightscoutSyncWorker.stopIfRunning()
-                        Toast.makeText(context, "Nightscout disabled", Toast.LENGTH_SHORT).show()
+                    val enabling = !config.enabled
+                    val newConfig = config.copy(enabled = enabling)
+                    saveAndReload(newConfig)
+                    when {
+                        !enabling -> {
+                            NightscoutSyncWorker.stopIfRunning()
+                            Toast.makeText(context, "Nightscout disabled", Toast.LENGTH_SHORT).show()
+                        }
+                        pumpSid < 0 -> {
+                            // No pump has connected yet this run, so we have no
+                            // valid Nightscout device tag. Let `onPumpConnectedSync`
+                            // start the worker once the first real pumpSid arrives
+                            // — the config is already persisted above.
+                            Toast.makeText(
+                                context,
+                                "Enabled — will start after pump connects",
+                                Toast.LENGTH_SHORT,
+                            ).show()
+                        }
+                        else -> {
+                            NightscoutSyncWorker.startIfEnabled(context, prefs, pumpSid)
+                            Toast.makeText(context, "Nightscout enabled", Toast.LENGTH_SHORT).show()
+                        }
                     }
                 },
                 label = { Text(if (config.enabled) "Enabled" else "Disabled", fontSize = 13.sp) },

@@ -9,12 +9,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.livedata.observeAsState
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -26,11 +20,8 @@ import androidx.wear.compose.material.ChipDefaults
 import androidx.wear.compose.material.Icon
 import androidx.wear.compose.material.MaterialTheme
 import androidx.wear.compose.material.Text
-import com.jwoglom.controlx2.LocalDataStore
 import com.jwoglom.controlx2.MainActivity
-import com.jwoglom.controlx2.WearPrefs
 import com.jwoglom.controlx2.presentation.components.LastConnectionText
-import com.jwoglom.controlx2.presentation.components.WearServiceDisabledMessage
 
 /**
  * Shown when the pump-host watch has lost its BT connection and the service is
@@ -40,20 +31,15 @@ import com.jwoglom.controlx2.presentation.components.WearServiceDisabledMessage
  * Layout:
  *  - Warning icon + "Disconnected, reconnecting…" header.
  *  - [LastConnectionText] for "Last seen N ago".
- *  - Stop button (same as [ConnectingToPumpScreen]).
- *  - [WearServiceDisabledMessage] shown instead of the Stop button after the
- *    user taps Stop, matching mobile's re-enable UX.
+ *  - Stop button that disables the service via
+ *    [MainActivity.stopPumpService]. After Stop, `triggerAppReload` restarts
+ *    the app to `LandingScreen`, where
+ *    [com.jwoglom.controlx2.presentation.components.WearServiceDisabledMessage]
+ *    provides the re-enable affordance — no duplicate in-screen banner here.
  */
 @Composable
 fun PumpDisconnectedReconnectingScreen() {
     val context = LocalContext.current
-    val ds = LocalDataStore.current
-    val pumpConnected = ds.pumpConnected.observeAsState()
-
-    var serviceEnabled by remember { mutableStateOf(WearPrefs(context).serviceEnabled()) }
-    LaunchedEffect(pumpConnected.value) {
-        serviceEnabled = WearPrefs(context).serviceEnabled()
-    }
 
     Column(
         modifier = Modifier
@@ -68,7 +54,7 @@ fun PumpDisconnectedReconnectingScreen() {
             modifier = Modifier.size(24.dp),
         )
         Text(
-            text = if (serviceEnabled) "Disconnected, reconnecting…" else "Service disabled",
+            text = "Disconnected, reconnecting…",
             fontSize = 13.sp,
             textAlign = TextAlign.Center,
             color = MaterialTheme.colors.onBackground,
@@ -76,17 +62,11 @@ fun PumpDisconnectedReconnectingScreen() {
         )
         LastConnectionText(modifier = Modifier.padding(top = 4.dp, bottom = 12.dp))
 
-        if (serviceEnabled) {
-            Chip(
-                onClick = {
-                    (context as? MainActivity)?.stopPumpService()
-                },
-                label = { Text("Stop", fontSize = 12.sp) },
-                colors = ChipDefaults.secondaryChipColors(),
-                modifier = Modifier.fillMaxWidth(),
-            )
-        } else {
-            WearServiceDisabledMessage()
-        }
+        Chip(
+            onClick = { (context as? MainActivity)?.stopPumpService() },
+            label = { Text("Stop", fontSize = 12.sp) },
+            colors = ChipDefaults.primaryChipColors(),
+            modifier = Modifier.fillMaxWidth(),
+        )
     }
 }

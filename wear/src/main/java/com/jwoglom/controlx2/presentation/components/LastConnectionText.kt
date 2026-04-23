@@ -1,12 +1,7 @@
 package com.jwoglom.controlx2.presentation.components
 
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.livedata.observeAsState
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.sp
@@ -30,23 +25,22 @@ fun LastConnectionText(
     val pumpLastConnectionTimestamp = ds.pumpLastConnectionTimestamp.observeAsState()
     val pumpLastMessageTimestamp = ds.pumpLastMessageTimestamp.observeAsState()
 
-    var relative: String? by remember { mutableStateOf(null) }
-    fun update() {
-        relative = pumpLastMessageTimestamp.value?.let {
-            shortTimeAgo(it, nowThresholdSeconds = 1)
-        }
-    }
-
-    LaunchedEffect(pumpLastMessageTimestamp.value) { update() }
-    LaunchedEffect(intervalOf(10)) { update() }
+    // intervalOf itself triggers a recomposition every 10s via an internal
+    // mutable state it reads, so the relative timestamp refreshes without any
+    // writes to the observed LiveData fields.
+    @Suppress("UNUSED_VARIABLE")
+    val tick = intervalOf(10)
 
     val line: String? = when {
-        pumpConnected.value == false -> when {
-            relative != null -> "Last seen $relative"
-            pumpLastConnectionTimestamp.value != null -> "Last seen ${pumpLastConnectionTimestamp.value}"
-            else -> null
+        pumpConnected.value == false -> {
+            // When disconnected, prefer the connection timestamp (set on the
+            // last successful connect) over the last-message timestamp since
+            // the latter is typically older and more confusing than useful.
+            val instant = pumpLastConnectionTimestamp.value ?: pumpLastMessageTimestamp.value
+            instant?.let { "Last seen ${shortTimeAgo(it, nowThresholdSeconds = 1)}" }
         }
-        relative != null -> "Last updated $relative"
+        pumpLastMessageTimestamp.value != null ->
+            "Last updated ${shortTimeAgo(pumpLastMessageTimestamp.value!!, nowThresholdSeconds = 1)}"
         else -> null
     }
 

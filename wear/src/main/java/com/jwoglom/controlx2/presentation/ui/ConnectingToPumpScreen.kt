@@ -62,11 +62,9 @@ fun ConnectingToPumpScreen() {
             )
         }
         Chip(
-            onClick = {
-                (context as? MainActivity)?.stopPumpService()
-            },
+            onClick = { (context as? MainActivity)?.stopPumpService() },
             label = { Text("Stop", fontSize = 12.sp) },
-            colors = ChipDefaults.secondaryChipColors(),
+            colors = ChipDefaults.primaryChipColors(),
             modifier = Modifier.fillMaxWidth(),
         )
     }
