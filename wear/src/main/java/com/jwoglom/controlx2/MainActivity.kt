@@ -740,6 +740,22 @@ class MainActivity : ComponentActivity() {
                 }
             }
 
+            MessagePaths.FROM_PUMP_PUMP_BONDED_NEEDS_MANUAL_UNBOND -> {
+                if (StatePrefs(applicationContext).deviceRole() == DeviceRole.PUMP_HOST) {
+                    // Payload is "name=mac". Surface the name so the UI can
+                    // name the pump the user needs to unpair.
+                    val payload = String(data)
+                    val name = payload.substringBefore("=", missingDelimiterValue = "")
+                    if (name.isNotBlank()) {
+                        dataStore.setupDeviceName.value = name
+                    }
+                    Timber.w("watch pump-host: pump still bonded, needs manual unbond: $payload")
+                    runOnUiThread {
+                        navController.navigateClearBackStack(Screen.PumpBondedNeedsUnbond.route)
+                    }
+                }
+            }
+
             MessagePaths.FROM_PUMP_INITIAL_PUMP_CONNECTION -> {
                 if (StatePrefs(applicationContext).deviceRole() == DeviceRole.PUMP_HOST) {
                     dataStore.setupDeviceName.value = String(data)
