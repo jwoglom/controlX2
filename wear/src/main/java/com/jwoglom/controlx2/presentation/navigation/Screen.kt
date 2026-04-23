@@ -62,4 +62,7 @@ sealed class Screen(
     // Pump data surfaces (DeviceRole.PUMP_HOST).
     object HistoryLog : Screen("HistoryLog")
     object BasalDetail : Screen("BasalDetail")
+
+    // Pump-command screens (work in both DeviceRole values).
+    object ProfileSwitch : Screen("ProfileSwitch")
 }

@@ -98,6 +98,7 @@ import com.jwoglom.controlx2.presentation.ui.LandingScreen
 import com.jwoglom.controlx2.presentation.ui.NightscoutSettingsScreen
 import com.jwoglom.controlx2.presentation.ui.PairingCodeEntryScreen
 import com.jwoglom.controlx2.presentation.ui.PairingUnsupportedOnWatchScreen
+import com.jwoglom.controlx2.presentation.ui.ProfileSwitchScreen
 import com.jwoglom.controlx2.presentation.ui.PumpBondedNeedsUnbondScreen
 import com.jwoglom.controlx2.presentation.ui.PumpDisconnectedReconnectingScreen
 import com.jwoglom.controlx2.presentation.ui.PumpFinderSelectScreen
@@ -365,6 +366,24 @@ fun WearApp(
                     val listState = scalingLazyListState(it)
                     val focusRequester = remember { FocusRequester() }
                     BasalDetailScreen(
+                        scalingLazyListState = listState,
+                        focusRequester = focusRequester,
+                        sendPumpCommands = sendPumpCommands,
+                    )
+                    RequestFocusOnResume(focusRequester)
+                }
+                composable(
+                    route = Screen.ProfileSwitch.route,
+                    arguments = listOf(
+                        navArgument(SCROLL_TYPE_NAV_ARGUMENT) {
+                            type = NavType.EnumType(DestinationScrollType::class.java)
+                            defaultValue = DestinationScrollType.SCALING_LAZY_COLUMN_SCROLLING
+                        }
+                    )
+                ) {
+                    val listState = scalingLazyListState(it)
+                    val focusRequester = remember { FocusRequester() }
+                    ProfileSwitchScreen(
                         scalingLazyListState = listState,
                         focusRequester = focusRequester,
                         sendPumpCommands = sendPumpCommands,
