@@ -19,14 +19,14 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
-import androidx.wear.compose.foundation.lazy.AutoCenteringParams
-import androidx.wear.compose.foundation.lazy.ScalingLazyColumn
-import androidx.wear.compose.foundation.lazy.ScalingLazyListState
-import androidx.wear.compose.foundation.lazy.items
+import androidx.wear.compose.material.AutoCenteringParams
 import androidx.wear.compose.material.Chip
 import androidx.wear.compose.material.ChipDefaults
 import androidx.wear.compose.material.MaterialTheme
+import androidx.wear.compose.material.ScalingLazyColumn
+import androidx.wear.compose.material.ScalingLazyListState
 import androidx.wear.compose.material.Text
+import androidx.wear.compose.material.items
 import com.google.android.horologist.compose.navscaffold.scrollableColumn
 import com.jwoglom.controlx2.LocalDataStore
 import com.jwoglom.controlx2.LocalHistoryLogRepo
@@ -135,7 +135,7 @@ fun BasalDetailScreen(
                         modifier = Modifier.padding(top = 8.dp, bottom = 4.dp),
                     )
                 }
-                items(recentItems, key = { it.seqId }) { item ->
+                items(recentItems) { item ->
                     BasalHistoryRow(item)
                 }
             }
