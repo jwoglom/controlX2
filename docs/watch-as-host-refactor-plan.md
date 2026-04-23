@@ -232,85 +232,133 @@ controlX2/
 
 ---
 
-## Phase 5: Watch UI for Core Operations — ⏳ Next
+## Phase 5: Watch UI for Core Operations — ⏳ In progress (5a–5d ✅ done, 5e next, 5f remaining)
 
 **Goal:** Add full pump management UI on the watch for when it's the pump-host, starting with the items that unblock a non-adb developer loop.
 
 ### Inventory of what already exists on the watch
 
 - `WearPumpCommService` drives BT + `:db` Nightscout/xDrip when `DeviceRole.PUMP_HOST` is set (Phase 4.5).
-- `wear/MainActivity.kt:234-236` already branches on role and starts the right service.
-- Screens in `wear/.../presentation/navigation/Screen.kt`: `WaitingForPhone`, `WaitingToFindPump`, `ConnectingToPump`, `PairingToPump`, `MissingPairingCode`, `PumpDisconnectedReconnecting`, `Landing`, `SleepModeSet`, `ExerciseModeSet`, `Bolus*` (including units/carbs/BG/blocked/not-enabled/rejected-on-phone).
+- `wear/MainActivity.kt` already branches on role and starts the right service.
+- Screens in `wear/.../presentation/navigation/Screen.kt`: `WaitingForPhone`, `WaitingToFindPump`, `ConnectingToPump`, `PairingToPump`, `MissingPairingCode`, `PumpDisconnectedReconnecting`, `Landing`, `SleepModeSet`, `ExerciseModeSet`, `Bolus*`, plus the new Phase 5 screens: `RoleSelection`, `PumpFinderSelect`, `PairingCodeEntry`, `PairingUnsupportedOnWatch`, `PumpBondedNeedsUnbond`, `SettingsHub`, `NightscoutSettings`, `XdripSettings`.
 - Complications: CGM reading, pump battery, IOB, bolus-button, pump-button.
 - `BolusActivity` + `WearBolusManager` in `wear/pump/` handle watch-side bolus request flow.
 
-### Gaps blocking watch-as-host ship-readiness
+### Gaps blocking watch-as-host ship-readiness — updated status
 
-1. No UI to pick `DeviceRole` — still requires `adb shell` editing SharedPreferences (called out in Phase 4.5 TODO).
-2. No native pump pairing flow on the watch — `PairingToPump` / `MissingPairingCode` exist as route names for the client-mode reconnect experience, but there's no pump-finder or pairing-code entry screen for pump-host mode.
-3. No Nightscout URL / API-secret entry UI on the watch — still requires `adb shell run-as`.
-4. No basal / history / settings surfaces native to the watch in pump-host mode.
+1. ✅ DeviceRole UI — landed in 5a; the `adb`-only dev loop is gone on both phone and watch.
+2. ✅ Native pump pairing flow on the watch — landed in 5b (finder, pairing-code RemoteInput, `PairingUnsupportedOnWatch` for `LONG_16CHAR`, and `PumpBondedNeedsUnbond` from Audit Tier 1).
+3. ✅ Nightscout URL / API-secret entry UI on the watch — landed in 5d, with an xDrip+ toggle and role-gated `SettingsHub` entry point.
+4. ❌ Basal / history / settings surfaces native to the watch in pump-host mode — still open; covered by 5e/5f below.
 
 ### Phase 5 sub-steps (ordered, each independently shippable)
 
 Each sub-step should ship with a phone-as-host regression pass plus a watch-as-host end-to-end smoke test.
 
-#### 5a. DeviceRole settings UI — **start here** (unblocks the rest)
+#### 5a. DeviceRole settings UI — ✅ Complete (commit `6660f11`)
 
-- Add a `RoleSelectionScreen` in `wear/.../presentation/ui/` that reads/writes `StatePrefs(ctx).deviceRole()`.
-- Add a matching setting on the phone side (`mobile`) so the phone can opt into `CLIENT` mode symmetrically.
-- On role change: stop the current service, restart the other one (same logic as `MainActivity.startWearPumpCommService()` / `startPhoneCommService()`).
-- Show a re-pair warning dialog — the pump only accepts one BT bond, so switching host requires re-pairing.
-- **Removes the `adb`-only dev loop** and makes every subsequent sub-step testable without shell access.
+**Shipped:**
+- `wear/.../presentation/ui/RoleSelectionScreen.kt` reads/writes `StatePrefs(ctx).deviceRole()` with a wear Alert dialog re-pair warning. `Screen.RoleSelection` route wired into `SwipeDismissableNavHost`.
+- Matching mobile entry in `mobile/.../presentation/screens/sections/Settings.kt` ("Pump-host device" ListItem + `AlertDialog` spelling out the three manual re-pair steps).
+- `mobile/util/RoleSwitcher.kt` and `wear/util/RoleSwitcher.kt` stop both services and call `Activity.recreate()` so `MainActivity.onCreate` role-branching is the single source of truth.
 
-#### 5b. Watch-side pump pairing flow
+**Deviations from the plan:**
+- Service swap is done via `Activity.recreate()` (not programmatic in-MainActivity start/stop swap) so each `MainActivity` reads `deviceRole()` once on entry.
+- No cross-device notification: `TO_SERVER_DEVICE_ROLE_CHANGED` / `TO_CLIENT_DEVICE_ROLE_CHANGED` constants (added speculatively in Phase 1) remain **unused** — the re-pair warning is the cross-device contract instead.
+- Wear-side dialog copy was brought to parity with mobile in Audit Tier 2 (explicit "unpair in old host's Bluetooth settings first" step).
 
-- Build a `PumpFinderScreen` that drives `PumpFinderCommHandler` via `WearPumpCommService` (same code path `CommService` uses on phone).
-- Build a `PairingCodeEntryScreen` (rotary-input digit entry) that writes to the `/to-server/set-pairing-code` path.
-- Wire `PairingToPump` / `MissingPairingCode` routes to real pump-host UI (currently placeholders for client reconnect).
-- Surface pairing errors (wrong code, timeout) on screen.
-- **Opportunistic:** This is the natural moment to revisit Phase 0's outstanding `PairingManager` extraction — if `CommService` and `WearPumpCommService` would otherwise copy-paste pairing code, extract a shared `PairingManager` into `:pumpcomm` first.
+#### 5b. Watch-side pump pairing flow — ✅ Complete (commit `6c6d4d6`)
 
-#### 5c. Watch-side connection status + reconnection UX
+**Shipped:**
+- Screens: `PumpFinderSelectScreen` (restart-scan fallback), `PairingCodeEntryScreen` (uses Wear system numeric `RemoteInput` via `RemoteInputIntentHelper`, not a custom rotary keypad), `PairingUnsupportedOnWatchScreen` (graceful `LONG_16CHAR` degradation).
+- Watch-local `PumpSetupStage` enum (9-value subset of mobile's) + new DataStore fields (`pumpSetupStage`, `pumpFinderPumps`, `setupDeviceName`, `setupPairingCodeType`, `pumpReadyState`, `pumpPairingError`).
+- Watch `handleMessage()` gains PUMP_HOST handlers for `FROM_PUMP_PUMP_FINDER_FOUND_PUMPS` / `PUMP_DISCOVERED`, `FROM_PUMP_MISSING_PAIRING_CODE` (splits on `PairingCodeType` to either code-entry or unsupported), `FROM_PUMP_INVALID_PAIRING_CODE` (clears code, shows banner, relaunches entry), `FROM_PUMP_INITIAL_PUMP_CONNECTION`. CLIENT-role behavior on shared paths preserved.
+- Shared helper `pumpcomm/pump/pairing/PairingCodeEntry.kt` dedupes the post-`SET_PAIRING_CODE` dispatch (persists the code via `PumpState.setPairingCode` and sends `TO_SERVER_STOP_PUMP_FINDER` / `TO_PUMP_PAIR` based on stage). Mobile `MainActivity` now delegates to the same helper. Audit Tier 3 later split it into two typed entry points: `applyForInitialPumpComm` / `applyForRePair`, with a loud `Timber.w` else-branch on callers.
 
-- Promote `ConnectingToPump` / `PumpDisconnectedReconnecting` from splash placeholders to real status screens with: last-seen time, RSSI (if available), manual reconnect button, disconnect button.
-- Persistent ongoing-notification for the foreground service in pump-host mode (compliant with Wear OS foreground-service rules).
+**Message-bus plumbing (a structural change not anticipated by the plan):**
+- `LocalMessageBus` moved `:mobile` → `:shared` as a **process-level singleton** so both platforms share the in-process transport.
+- `MessageBus` gained a sender-tagged overload `addMessageListener(listener, listenerSender)`, and `LocalMessageBus.deliver()` skips any listener whose registered sender matches the emission's sender — **reentrance prevention is now enforced by the bus, not by listener-side discipline**.
+- New `wear/.../messaging/WearHybridMessageBus.kt` mirrors mobile's `HybridMessageBus`: wraps the singleton `LocalMessageBus` + a per-instance `WearMessageBus`, takes an `identity: MessageBusSender`, and registers its local proxy tagged with that identity. `WearPumpCommService` uses `COMM_SERVICE`; the watch `MainActivity` uses `MOBILE_UI` and **stops being a `MessageClient.OnMessageReceivedListener`** — all routing goes through the hybrid bus.
+- `shared/src/test` gains a `LocalMessageBusTest` covering sender-tagged filtering (untagged sees all, tagged never sees own, mixed, `removeMessageListener` stops delivery, singleton identity).
 
-#### 5d. Nightscout / xDrip+ settings UI on watch
+**Post-ship audit fix (Audit Tier 1, commit `15b4686`):**
+- `PumpBondedNeedsUnbondScreen` added to handle `FROM_PUMP_PUMP_BONDED_NEEDS_MANUAL_UNBOND` (previously silently dropped on watch); screen opens system Bluetooth settings directly.
 
-- Mini-settings screen to enter Nightscout URL + API secret, writing to the `"WearX2"` SharedPreferences keys that `:db`'s `NightscoutSyncWorker` already reads.
-- Toggle for xDrip+ broadcasts, with a UI note that Wear OS receiver behavior is unverified (see Phase 4.5 TODO).
-- Show sync status (last upload time, error count) — reuse `NightscoutStatusStore` from `:db`.
+#### 5c. Watch-side connection status + reconnection UX — ✅ Complete (commit `ca97612`)
 
-#### 5e. Pump data surfaces on watch (reuse existing flows)
+**Shipped:**
+- Real `ConnectingToPumpScreen` + `PumpDisconnectedReconnectingScreen` replacing the `IndeterminateProgressIndicator` placeholders; both surface a Stop button that triggers mobile's disable-sequence idiom.
+- `LastConnectionText` (wear port of `LastConnectionUpdatedTimestamp`) and `WearServiceDisabledMessage` (wear port of `ServiceDisabledMessage`) mounted on `LandingScreen` and in the disconnected screen.
+- New watch `stopPumpService()` / `reEnablePumpService()` in `MainActivity` mirroring mobile `Debug.kt` and `ServiceDisabledMessage.kt`; watch `TO_SERVER_APP_RELOAD` → `triggerAppReload`.
+- `WearPumpCommService.TO_SERVER_FORCE_RELOAD` now actually cycles the service (was previously a no-op log).
+- DataStore: `pumpConnected`, `pumpLastConnectionTimestamp`, `pumpLastMessageTimestamp` (mobile-identical field names).
+
+**Deviations from the plan:**
+- RSSI is **not** surfaced (plan listed it as optional — not currently plumbed through from `PumpCommHandler`).
+- Manual reconnect + disconnect UX is collapsed into a single Stop button that triggers the mobile-idiomatic disable sequence; the re-enable path is via the `WearServiceDisabledMessage` on Landing, not a separate reconnect button.
+- No new message paths were introduced — reuses `TO_SERVER_FORCE_RELOAD` + `TO_SERVER_APP_RELOAD` end-to-end.
+
+**Post-ship audit fixes (Audit Tier 1, commit `15b4686`):**
+- `LastConnectionText` fallback branches no longer render raw `Instant.toString()` (ISO-8601); both fallbacks now route through `shortTimeAgo` and drive recomposition from `intervalOf`.
+- Dropped a dead `serviceEnabled` branch in `PumpDisconnectedReconnectingScreen` whose `LaunchedEffect` only fired on `pumpConnected` changes.
+- Stop buttons switched to `primaryChipColors` for readable contrast on small watch faces.
+
+#### 5d. Nightscout / xDrip+ settings UI on watch — ✅ Complete (commit `c61435f`)
+
+**Shipped:**
+- `SettingsHubScreen` — single entry point with role-gated entries (Role, Nightscout, xDrip+ shown only in `PUMP_HOST`; Force reload, Open on phone always). Replaces the three-chip Landing footer with a single Settings chip.
+- `NightscoutSettingsScreen` — enable toggle (starts/stops `NightscoutSyncWorker` using mobile's pattern), URL + API secret via `RemoteInput`, sync-status text ticking via `intervalOf`. Reads/writes the `"controlx2"` prefs that mobile and `WearPumpCommService.onPumpConnectedSync` already use.
+- `XdripSettingsScreen` — enable toggle + four payload toggles (CGM, device status, treatments, status line). Reads/writes `"WearX2"` prefs matching `XdripMessageDispatcher`. Dispatches the mobile two-step reload sequence when `requiresReloadComparedTo()` is true.
+- Shared `RemoteTextInput` helper extracted from the `PairingCodeEntryScreen` pattern.
+- `MainActivity.forceReloadService()` mirroring mobile `XdripSettings.kt:62-68`.
+
+**Post-ship audit fixes:**
+- Tier 1: `NightscoutSettings` enable toggle guarded against `WearPrefs.currentPumpSid() == -1` so `startIfEnabled` is never called with an invalid sid.
+- Tier 2: `AutoCenteringParams()` added to all three new `ScalingLazyColumn`s; Settings chip gets a visible "Settings" label; Nightscout URL chip truncates via `compactUrlLabel` with `TextOverflow.Ellipsis`; `StatePrefs.deviceRole()` reads cached via `remember { ... }` in composables.
+
+**Still open:** xDrip+ on Wear OS receiver behavior remains unverified (inherited from Phase 4.5). UI ships the toggle and dispatches `sendBroadcast`, but whether a watch-side xDrip+ receiver exists is still an open runtime question.
+
+#### 5e. Pump data surfaces on watch (reuse existing flows) — ⏳ Next
 
 - Basal rate display screen (data already flows through `ClientStateStore` / watch-side state; add a screen to render it).
 - CGM trend-graph screen (complications already exist; build a full-screen version).
 - History / events screen backed by `HistoryLogRepo` from `:db` (the watch already persists rows as of Phase 4.5).
 
-#### 5f. Settings management parity
+**Recommended order within 5e:** history/events first (reuses `HistoryLogRepo` with no new plumbing), then basal display, then CGM trend-graph (largest UI lift).
+
+#### 5f. Settings management parity — ⏳ Remaining
 
 - Expose pump settings the phone already offers (profile switching, temp basal, suspend insulin) as watch screens, routed through the existing `/to-pump/*` paths — shared code path, no new backend work.
+
+### Audit work completed alongside Phase 5 (commits `15b4686`, `ff130ac`, `5eeafa3`)
+
+Three rounds of self-audit landed on top of 5a–5d:
+
+- **Tier 1 (correctness):** `PumpBondedNeedsUnbondScreen` for 5b; `LastConnectionText` formatting + dead-branch removal + primary-chip contrast for 5c; `currentPumpSid()` guard for 5d Nightscout enable.
+- **Tier 2 (polish):** `AutoCenteringParams()` on Phase-5d lists; Settings chip text label; `compactUrlLabel` truncation; `remember { ... }` caching of `deviceRole()` reads; dead `currentDeviceRole = newRole` removed; re-pair dialog copy parity.
+- **Tier 3 (systemic cleanups):** `triggerAppReload` extracted to new `shared/util/AppReload.kt` — replaces **five near-identical copies** (mobile `CommService`, mobile `MainActivity`, mobile `PumpSetup.kt`, watch `MainActivity`, `WearPumpCommService`). Typed `PairingCodeEntry` dispatch (`applyForInitialPumpComm` / `applyForRePair`) so stringly-typed stage names can't silently mis-match. Pump-finder enable-pref write reordered on watch to shrink the race window before `STOP_PUMP_FINDER` is processed.
 
 ### Verification pattern per sub-step
 
 - **Phone-as-host regression:** flip role back via 5a UI, confirm nothing broke.
 - **Watch-as-host end-to-end:** pair from watch UI, bolus, confirm Nightscout upload, verify history-log rows persist, swap role back.
 
-### Outstanding Phase 0 extractions to fold in during Phase 5
+**Build/verification gaps to close on this branch before merging to `dev`:**
+- The 5b commit message explicitly notes the sandbox had no Android SDK and **ran no gradle tasks**. Subsequent audit + CI commits fixed specific compile issues (`AutoCenteringParams` package, Settings chip icon size, stale KDoc, nested comment + `RemoteInput` API mismatches) but a clean `./gradlew :mobile:assembleDebug :wear:assembleDebug :shared:testDebugUnitTest :db:testDebugUnitTest` pass on this branch is still worth doing before dev merge.
+- xDrip+ Wear OS receiver question (Phase 4.5 open item) remains unverified.
 
-Phase 5b/5c will likely copy pairing / wear-forwarding code between `CommService` and `WearPumpCommService`. Before that copy-paste compounds, extract:
-- `PairingManager` (Phase 0 step 4) → `:pumpcomm` so both Services can share it.
-- `WearMessageForwarder` (Phase 0 step 5) → `:clientcomm` or a new seam, so `CommService` stops owning wear forwarding directly.
+### Outstanding Phase 0 extractions — updated status
 
-These were deferred in Phase 0 but become concrete blockers once Phase 5b/5c land.
+- `PairingManager` (Phase 0 step 4) — **partially addressed.** 5b extracted the small post-`SET_PAIRING_CODE` dispatch into `pumpcomm/pump/pairing/PairingCodeEntry.kt` (later split into typed `applyForInitialPumpComm` / `applyForRePair` in Audit Tier 3). The larger pairing surface — `sendPumpPairingMessage()`, `sendInitPumpComm()`, and pairing-code handling inside `handleMessageReceived()` — still lives inlined in `CommService.kt`, with the watch-side handlers duplicating parts of it in `WearPumpCommService.kt`. Worth revisiting before 5f pushes more into that seam.
+- `WearMessageForwarder` (Phase 0 step 5) — **still not done.** `sendWearCommMessage()` calls remain scattered in `CommService.kt`. Deferrable unless 5e/5f extends that surface.
 
 ---
 
 ## Implementation Order & Dependencies
 
 ```
-Phase 0   (decompose CommService)                    ✅ Partial (PairingManager + WearMessageForwarder deferred into Phase 5)
+Phase 0   (decompose CommService)                    ✅ Partial (PairingManager partially addressed via 5b PairingCodeEntry;
+                                                                 WearMessageForwarder still deferred)
     ↓
 Phase 1   (rename message paths)                     ✅ Complete (bolus path collapse skipped)
     ↓
@@ -318,14 +366,21 @@ Phase 2   (extract :pumpcomm module)                 ✅ Complete (class names d
     ↓
 Phase 3   (extract :clientcomm module)               ✅ Complete (interface-based, not abstract class)
     ↓
-Phase 4   (role-switching logic)                     ✅ Complete (UI deferred to Phase 5a)
+Phase 4   (role-switching logic)                     ✅ Complete (UI shipped in Phase 5a)
     ↓
 Phase 4.5 (extract :db module — sync engines + DB)   ✅ Complete
     ↓
-Phase 5   (watch pump-host UI)                       ⏳ Next — starts with 5a (DeviceRole settings UI)
+Phase 5   (watch pump-host UI)                       ⏳ In progress:
+           5a DeviceRole settings UI                 ✅ Complete (commit 6660f11)
+           5b Watch-side pump pairing flow           ✅ Complete (commit 6c6d4d6)
+           5c Connection status + reconnection UX    ✅ Complete (commit ca97612)
+           5d Nightscout / xDrip+ settings on watch  ✅ Complete (commit c61435f)
+           + Audit Tiers 1/2/3                       ✅ Complete (commits 15b4686, ff130ac, 5eeafa3)
+           5e Pump data surfaces on watch            ⏳ Next
+           5f Settings management parity             ⏳ Remaining
 ```
 
-Each phase is independently shippable. Phases 0-1 are pure refactors with no behavior change. Phase 2-3 are structural extractions. Phase 4 is the first user-visible feature (once Phase 5a ships the role toggle UI). Phase 5 is the full experience.
+Each phase is independently shippable. Phases 0-1 are pure refactors with no behavior change. Phase 2-3 are structural extractions. Phase 4 is the first user-visible feature (role selection shipped in 5a). Phase 5 is the full watch-as-host experience — 5a–5d are landed, 5e–5f remain.
 
 ---
 
