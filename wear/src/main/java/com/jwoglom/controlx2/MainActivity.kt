@@ -11,6 +11,7 @@ import android.os.IBinder
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.compositionLocalOf
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.navigation.NavController
@@ -29,6 +30,8 @@ import com.jwoglom.controlx2.shared.messaging.MessageBusSender
 import com.jwoglom.controlx2.shared.messaging.MessageListener
 import com.jwoglom.pumpx2.pump.bluetooth.PumpReadyState
 import com.jwoglom.pumpx2.pump.messages.models.PairingCodeType
+import com.jwoglom.controlx2.db.historylog.HistoryLogDatabase
+import com.jwoglom.controlx2.db.historylog.HistoryLogRepo
 import com.jwoglom.controlx2.presentation.ui.resetBolusDataStoreState
 import com.jwoglom.controlx2.shared.InitiateConfirmedBolusSerializer
 import com.jwoglom.controlx2.shared.MessagePaths
@@ -95,6 +98,13 @@ import kotlin.math.roundToInt
 var dataStore = DataStore()
 val LocalDataStore = compositionLocalOf { dataStore }
 
+// CompositionLocal for the watch's HistoryLog repo. Provided by `MainActivity`
+// so screens don't each construct their own `HistoryLogRepo(dao)` around the
+// singleton Room database.
+val LocalHistoryLogRepo = compositionLocalOf<com.jwoglom.controlx2.db.historylog.HistoryLogRepo> {
+    error("LocalHistoryLogRepo not provided")
+}
+
 class MainActivity : ComponentActivity() {
 
     internal lateinit var navController: NavHostController
@@ -103,6 +113,9 @@ class MainActivity : ComponentActivity() {
 
     private lateinit var initialRoute: String
     private val uiScope = kotlinx.coroutines.CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
+
+    private val historyLogDb by lazy { HistoryLogDatabase.getDatabase(this) }
+    private val historyLogRepo by lazy { HistoryLogRepo(historyLogDb.historyLogDao()) }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         installSplashScreen()
@@ -115,6 +128,10 @@ class MainActivity : ComponentActivity() {
         }
 
         Timber.i("activity onCreate initialRoute=$initialRoute savedInstanceState=$savedInstanceState")
+
+        // Seed dataStore.currentPumpSid from the persisted pref so screens that
+        // observe it get the right initial value across process restarts.
+        dataStore.currentPumpSid.value = WearPrefs(this).currentPumpSid()
 
         setContent {
             navController = rememberSwipeDismissableNavController()
@@ -226,15 +243,17 @@ class MainActivity : ComponentActivity() {
                 this.sendMessage("${MessagePaths.PREFIX_TO_SERVER}$cmd", "".toByteArray())
             }
 
-            WearApp(
-                navController = navController,
-                sendPumpCommands = sendPumpCommands,
-                sendPhoneConnectionCheck = sendPhoneConnectionCheck,
-                sendPhoneBolusRequest = sendPhoneBolusRequest,
-                sendPhoneBolusCancel = sendPhoneBolusCancel,
-                sendPhoneCommand = sendPhoneCommand,
-                sendPhoneOpenActivity = sendPhoneOpenActivity,
-            )
+            CompositionLocalProvider(LocalHistoryLogRepo provides historyLogRepo) {
+                WearApp(
+                    navController = navController,
+                    sendPumpCommands = sendPumpCommands,
+                    sendPhoneConnectionCheck = sendPhoneConnectionCheck,
+                    sendPhoneBolusRequest = sendPhoneBolusRequest,
+                    sendPhoneBolusCancel = sendPhoneBolusCancel,
+                    sendPhoneCommand = sendPhoneCommand,
+                    sendPhoneOpenActivity = sendPhoneOpenActivity,
+                )
+            }
         }
 
         messageBus = WearHybridMessageBus(

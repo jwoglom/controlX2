@@ -54,14 +54,9 @@ fun SettingsHubScreen(
             )
         }
         if (role == DeviceRole.PUMP_HOST) {
-            item {
-                Chip(
-                    onClick = { navController.navigate(Screen.BasalDetail.route) },
-                    label = { Text("Basal", fontSize = 13.sp) },
-                    colors = ChipDefaults.primaryChipColors(),
-                    modifier = Modifier.fillMaxWidth(),
-                )
-            }
+            // Basal is a pump-data surface, not a setting — reached by tapping
+            // the basal row on Landing. Pump history is more diagnostic, so it
+            // lives here for now.
             item {
                 Chip(
                     onClick = { navController.navigate(Screen.HistoryLog.route) },

@@ -181,7 +181,11 @@ fun LandingScreen(
                 )
             }
 
-            item { LandingBasalRow() }
+            item {
+                LandingBasalRow(
+                    onClick = { navController.navigate(Screen.BasalDetail.route) },
+                )
+            }
 
             item {
                 LandingModeActionsRow(

@@ -31,7 +31,9 @@ class HistoryLogViewModel(private val repo: HistoryLogRepo, private val pumpSid:
     }
 
     fun latestItemsForType(typeClass: Class<out HistoryLog>, maxItems: Int): LiveData<List<HistoryLogItem>> {
-        return latestItemsForType(LOG_MESSAGE_CLASS_TO_ID[typeClass]!!, maxItems)
+        val typeId = LOG_MESSAGE_CLASS_TO_ID[typeClass]
+            ?: return repo.getLatestItemsForTypes(pumpSid, emptyList(), maxItems).asLiveData()
+        return latestItemsForType(typeId, maxItems)
     }
 
     fun latestItemsForTypes(typeIds: Array<Int>, maxItems: Int): LiveData<List<HistoryLogItem>> {
@@ -39,7 +41,10 @@ class HistoryLogViewModel(private val repo: HistoryLogRepo, private val pumpSid:
     }
 
     fun latestItemsForTypes(typeClasses: List<Class<out HistoryLog>>, maxItems: Int): LiveData<List<HistoryLogItem>> {
-        return latestItemsForTypes(typeClasses.map { LOG_MESSAGE_CLASS_TO_ID[it]!!}.toTypedArray(), maxItems)
+        return latestItemsForTypes(
+            typeClasses.mapNotNull { LOG_MESSAGE_CLASS_TO_ID[it] }.toTypedArray(),
+            maxItems,
+        )
     }
 
     /**
@@ -53,7 +58,7 @@ class HistoryLogViewModel(private val repo: HistoryLogRepo, private val pumpSid:
      * No timezone conversion needed — pump seconds compared to pump seconds.
      */
     fun itemsForTypesSince(typeClasses: List<Class<out HistoryLog>>, minPumpTimeSec: Long): LiveData<List<HistoryLogItem>> {
-        val typeIds = typeClasses.map { LOG_MESSAGE_CLASS_TO_ID[it]!! }
+        val typeIds = typeClasses.mapNotNull { LOG_MESSAGE_CLASS_TO_ID[it] }
         return repo.getItemsForTypesSince(pumpSid, typeIds, minPumpTimeSec).asLiveData()
     }
 

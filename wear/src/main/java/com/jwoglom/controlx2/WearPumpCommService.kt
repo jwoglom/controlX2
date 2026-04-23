@@ -313,7 +313,14 @@ class WearPumpCommService : Service(), CommServiceCallbacks {
     override fun prefQualifyingEventToastsEnabled() = WearPrefs(applicationContext).qualifyingEventToastsEnabled()
     override fun prefGlucoseUnit(): GlucoseUnit? = WearPrefs(applicationContext).glucoseUnit()
     override fun prefSetPumpModelName(name: String) { WearPrefs(applicationContext).setPumpModelName(name) }
-    override fun prefSetCurrentPumpSid(sid: Int) { WearPrefs(applicationContext).setCurrentPumpSid(sid) }
+    override fun prefSetCurrentPumpSid(sid: Int) {
+        WearPrefs(applicationContext).setCurrentPumpSid(sid)
+        // Mirror to DataStore so Compose screens observing dataStore.currentPumpSid
+        // recompose on first pump pairing instead of having to cache the pref
+        // snapshot. `postValue` because this callback is invoked off the main
+        // thread by PumpCommHandler.
+        dataStore.currentPumpSid.postValue(sid)
+    }
     override fun prefPumpFinderPumpMac(): String? = WearPrefs(applicationContext).pumpFinderPumpMac()
     override fun prefUnbondOnNextCommInitMac(): String? = WearPrefs(applicationContext).unbondOnNextCommInitMac()
     override fun prefSetUnbondOnNextCommInitMac(mac: String?) { WearPrefs(applicationContext).setUnbondOnNextCommInitMac(mac) }
