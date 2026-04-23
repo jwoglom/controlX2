@@ -32,7 +32,6 @@ import androidx.wear.compose.material.ScalingLazyColumn
 import androidx.wear.compose.material.ScalingLazyListState
 import androidx.wear.compose.material.Text
 import androidx.wear.compose.material.dialog.Alert
-import androidx.wear.compose.material.items
 import com.google.android.horologist.compose.navscaffold.scrollableColumn
 import com.jwoglom.controlx2.LocalDataStore
 import com.jwoglom.controlx2.shared.presentation.intervalOf
@@ -72,7 +71,7 @@ fun ProfileSwitchScreen(
         }
     }
 
-    val pending = pendingConfirm
+    val pending: IDPManager.Profile? = pendingConfirm
     if (pending != null) {
         ProfileSwitchConfirmAlert(
             profile = pending,
@@ -129,16 +128,18 @@ fun ProfileSwitchScreen(
                         modifier = Modifier.padding(top = 8.dp, bottom = 4.dp),
                     )
                 }
-                items(profiles) { profile ->
-                    ProfileChip(
-                        profile = profile,
-                        isActive = profile.idpId == activeProfileId,
-                        onClick = {
-                            if (profile.idpId != activeProfileId) {
-                                pendingConfirm = profile
-                            }
-                        },
-                    )
+                profiles.forEach { profile ->
+                    item {
+                        ProfileChip(
+                            profile = profile,
+                            isActive = profile.idpId == activeProfileId,
+                            onClick = {
+                                if (profile.idpId != activeProfileId) {
+                                    pendingConfirm = profile
+                                }
+                            },
+                        )
+                    }
                 }
             }
         }
