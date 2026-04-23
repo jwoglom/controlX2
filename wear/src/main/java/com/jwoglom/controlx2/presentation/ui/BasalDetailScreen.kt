@@ -26,7 +26,6 @@ import androidx.wear.compose.material.MaterialTheme
 import androidx.wear.compose.material.ScalingLazyColumn
 import androidx.wear.compose.material.ScalingLazyListState
 import androidx.wear.compose.material.Text
-import androidx.wear.compose.material.items
 import com.google.android.horologist.compose.navscaffold.scrollableColumn
 import com.jwoglom.controlx2.LocalDataStore
 import com.jwoglom.controlx2.LocalHistoryLogRepo
@@ -135,8 +134,10 @@ fun BasalDetailScreen(
                         modifier = Modifier.padding(top = 8.dp, bottom = 4.dp),
                     )
                 }
-                items(recentItems) { item ->
-                    BasalHistoryRow(item)
+                recentItems.forEach { row ->
+                    item {
+                        BasalHistoryRow(row)
+                    }
                 }
             }
         }

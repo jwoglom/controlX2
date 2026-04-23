@@ -20,7 +20,6 @@ import androidx.wear.compose.material.ChipDefaults
 import androidx.wear.compose.material.ScalingLazyColumn
 import androidx.wear.compose.material.ScalingLazyListState
 import androidx.wear.compose.material.Text
-import androidx.wear.compose.material.items
 import com.google.android.horologist.compose.navscaffold.scrollableColumn
 import com.jwoglom.controlx2.LocalDataStore
 import com.jwoglom.controlx2.LocalHistoryLogRepo
@@ -109,8 +108,10 @@ fun HistoryLogScreen(
                     modifier = Modifier.padding(16.dp),
                 )
             }
-            else -> items(items) { item ->
-                HistoryLogChip(item)
+            else -> items.forEach { row ->
+                item {
+                    HistoryLogChip(row)
+                }
             }
         }
     }
