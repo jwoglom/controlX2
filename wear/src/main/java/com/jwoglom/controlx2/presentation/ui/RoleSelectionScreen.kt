@@ -96,7 +96,7 @@ fun RoleSelectionScreen(
             },
         ) {
             Text(
-                text = "The pump pairs with one device at a time. After switching, flip the other device to the opposite role and re-pair the pump.",
+                text = "The pump pairs with one device at a time. First unpair the pump from the current host in its Bluetooth settings, then flip the other device to the opposite role and re-pair.",
                 textAlign = TextAlign.Center,
                 style = MaterialTheme.typography.body2,
                 color = MaterialTheme.colors.onBackground,

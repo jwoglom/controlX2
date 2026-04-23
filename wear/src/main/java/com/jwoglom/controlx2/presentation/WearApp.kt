@@ -346,8 +346,6 @@ fun WearApp(
                         focusRequester = focusRequester,
                         navController = navController,
                         sendPumpCommands = sendPumpCommands,
-                        sendPhoneCommand = sendPhoneCommand,
-                        sendPhoneOpenActivity = sendPhoneOpenActivity,
                         resetSavedBolusEnteredState = resetSavedBolusEnteredState,
                     )
 
