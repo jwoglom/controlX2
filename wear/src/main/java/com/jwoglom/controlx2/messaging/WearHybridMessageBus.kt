@@ -27,9 +27,11 @@ import java.util.concurrent.CopyOnWriteArrayList
  * listener-side discipline.
  *
  * Routing (identical semantics to mobile's `HybridMessageBus`):
- * - PUMP_HOST: `/to-client/*` → Wear (phone client); `/from-pump/*` → Local + Wear;
- *   `/to-server/*`, `/to-pump/*` → Local (the service in this process handles them).
- * - CLIENT: `/to-server/*`, `/to-pump/*` → Wear (phone pump-host); everything else → Local.
+ * - PUMP_HOST: `to-client` paths go to Wear (phone client); `from-pump`
+ *   paths go to Local + Wear; `to-server` and `to-pump` paths stay Local
+ *   (the service in this process handles them).
+ * - CLIENT: `to-server` and `to-pump` paths go to Wear (phone pump-host);
+ *   everything else stays Local.
  */
 class WearHybridMessageBus(
     context: Context,

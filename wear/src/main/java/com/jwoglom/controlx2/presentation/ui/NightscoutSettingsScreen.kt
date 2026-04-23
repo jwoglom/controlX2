@@ -1,7 +1,6 @@
 package com.jwoglom.controlx2.presentation.ui
 
 import android.content.Context
-import android.text.InputType
 import android.widget.Toast
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -54,16 +53,10 @@ fun NightscoutSettingsScreen() {
         syncStatus = NightscoutSyncStatusStore.load(prefs)
     }
 
-    val editUrlLauncher = rememberRemoteTextInputLauncher(
-        label = "Nightscout URL",
-        inputType = InputType.TYPE_TEXT_VARIATION_URI or InputType.TYPE_CLASS_TEXT,
-    ) { result ->
+    val editUrlLauncher = rememberRemoteTextInputLauncher(label = "Nightscout URL") { result ->
         if (result != null) saveAndReload(config.copy(nightscoutUrl = result))
     }
-    val editSecretLauncher = rememberRemoteTextInputLauncher(
-        label = "API secret",
-        inputType = InputType.TYPE_TEXT_VARIATION_PASSWORD or InputType.TYPE_CLASS_TEXT,
-    ) { result ->
+    val editSecretLauncher = rememberRemoteTextInputLauncher(label = "API secret") { result ->
         if (result != null) saveAndReload(config.copy(apiSecret = result))
     }
 

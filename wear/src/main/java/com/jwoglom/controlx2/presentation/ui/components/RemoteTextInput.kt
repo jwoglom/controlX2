@@ -1,13 +1,12 @@
 package com.jwoglom.controlx2.presentation.ui.components
 
 import android.app.Activity
-import android.text.InputType
+import android.app.RemoteInput
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.ActivityResultLauncher
 import androidx.activity.result.contract.ActivityResultContracts.StartActivityForResult
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
-import androidx.core.app.RemoteInput
 import androidx.wear.input.RemoteInputIntentHelper
 import timber.log.Timber
 
@@ -20,11 +19,14 @@ import timber.log.Timber
  * [com.jwoglom.controlx2.presentation.ui.PairingCodeEntryScreen] for 6-digit
  * code entry, generalized so Nightscout / xDrip settings can reuse it for
  * URL + API secret entry.
+ *
+ * Note: `androidx.wear:wear-input:1.2.0-alpha02` doesn't expose
+ * `putInputTypeExtra`, so we can't constrain the input to URI/password here.
+ * The caller still gets a free-form text field.
  */
 @Composable
 fun rememberRemoteTextInputLauncher(
     label: String,
-    inputType: Int = InputType.TYPE_CLASS_TEXT,
     onResult: (String?) -> Unit,
 ): () -> Unit {
     val key = remember(label) { "remote_input_${label.hashCode()}" }
@@ -34,7 +36,7 @@ fun rememberRemoteTextInputLauncher(
                 onResult(null)
                 return@rememberLauncherForActivityResult
             }
-            val value = RemoteInput.getResultsFromIntent(result.data)
+            val value = result.data?.let { RemoteInput.getResultsFromIntent(it) }
                 ?.getCharSequence(key)
                 ?.toString()
                 ?.trim()
@@ -45,7 +47,6 @@ fun rememberRemoteTextInputLauncher(
         val remoteInput = RemoteInput.Builder(key).setLabel(label).build()
         val intent = RemoteInputIntentHelper.createActionRemoteInputIntent()
         RemoteInputIntentHelper.putRemoteInputsExtra(intent, listOf(remoteInput))
-        RemoteInputIntentHelper.putInputTypeExtra(intent, inputType)
         try {
             launcher.launch(intent)
         } catch (e: Exception) {

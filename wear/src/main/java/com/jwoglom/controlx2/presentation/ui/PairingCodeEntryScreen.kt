@@ -1,7 +1,7 @@
 package com.jwoglom.controlx2.presentation.ui
 
 import android.app.Activity
-import android.text.InputType
+import android.app.RemoteInput
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts.StartActivityForResult
 import androidx.compose.foundation.layout.Arrangement
@@ -21,7 +21,6 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.core.app.RemoteInput
 import androidx.wear.compose.material.Chip
 import androidx.wear.compose.material.ChipDefaults
 import androidx.wear.compose.material.MaterialTheme
@@ -56,7 +55,7 @@ fun PairingCodeEntryScreen() {
             Timber.i("PairingCodeEntryScreen: user cancelled input")
             return@rememberLauncherForActivityResult
         }
-        val code = RemoteInput.getResultsFromIntent(result.data)
+        val code = result.data?.let { RemoteInput.getResultsFromIntent(it) }
             ?.getCharSequence(REMOTE_INPUT_KEY)
             ?.toString()
             ?.trim()
@@ -85,7 +84,6 @@ fun PairingCodeEntryScreen() {
             .build()
         val intent = RemoteInputIntentHelper.createActionRemoteInputIntent()
         RemoteInputIntentHelper.putRemoteInputsExtra(intent, listOf(remoteInput))
-        RemoteInputIntentHelper.putInputTypeExtra(intent, InputType.TYPE_CLASS_NUMBER)
         try {
             launcher.launch(intent)
         } catch (e: Exception) {
