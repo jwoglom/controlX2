@@ -59,6 +59,7 @@ import com.jwoglom.controlx2.shared.enums.UserMode
 import com.jwoglom.controlx2.shared.util.SendType
 import com.jwoglom.controlx2.shared.util.pumpTimeToLocalTz
 import com.jwoglom.controlx2.shared.util.setupTimber
+import com.jwoglom.controlx2.shared.util.triggerAppReload
 import com.jwoglom.controlx2.shared.util.shortTime
 import com.jwoglom.controlx2.shared.util.shortTimeAgo
 import com.jwoglom.controlx2.shared.util.twoDecimalPlaces1000Unit
@@ -628,15 +629,29 @@ class MainActivity : ComponentActivity() {
             MessagePaths.TO_SERVER_SET_PAIRING_CODE -> {
                 val pairingCodeText = String(data)
                 Toast.makeText(applicationContext, "Set pairing code: $pairingCodeText", Toast.LENGTH_SHORT).show()
-                if (dataStore.pumpSetupStage.value == PumpSetupStage.WAITING_PUMP_FINDER_CLEANUP) {
-                    Prefs(applicationContext).setPumpFinderServiceEnabled(false)
+                when (dataStore.pumpSetupStage.value) {
+                    PumpSetupStage.WAITING_PUMP_FINDER_CLEANUP -> {
+                        Prefs(applicationContext).setPumpFinderServiceEnabled(false)
+                        PairingCodeEntry.applyForInitialPumpComm(
+                            context = applicationContext,
+                            code = pairingCodeText,
+                            sendMessage = ::sendMessage,
+                        )
+                    }
+                    PumpSetupStage.PUMPX2_WAITING_FOR_PAIRING_CODE -> {
+                        PairingCodeEntry.applyForRePair(
+                            context = applicationContext,
+                            code = pairingCodeText,
+                            sendMessage = ::sendMessage,
+                        )
+                    }
+                    else -> {
+                        Timber.w(
+                            "TO_SERVER_SET_PAIRING_CODE: unexpected stage=%s, ignoring",
+                            dataStore.pumpSetupStage.value,
+                        )
+                    }
                 }
-                PairingCodeEntry.apply(
-                    context = applicationContext,
-                    code = pairingCodeText,
-                    currentStageName = dataStore.pumpSetupStage.value?.name,
-                    sendMessage = { path, message -> sendMessage(path, message) },
-                )
             }
 
             MessagePaths.TO_SERVER_APP_RELOAD -> {
@@ -1282,14 +1297,6 @@ class MainActivity : ComponentActivity() {
     }
 
 
-    private fun triggerAppReload(context: Context) {
-        val packageManager = context.packageManager
-        val intent = packageManager.getLaunchIntentForPackage(context.packageName)
-        val componentName = intent!!.component
-        val mainIntent = Intent.makeRestartActivityTask(componentName)
-        context.startActivity(mainIntent)
-        Runtime.getRuntime().exit(0)
-    }
 
     private fun openPlayStore(pkg: String) {
         try {

@@ -40,6 +40,7 @@ import com.jwoglom.controlx2.shared.messaging.MessageBusSender
 import com.jwoglom.controlx2.shared.messaging.MessageListener
 import com.jwoglom.controlx2.shared.util.SendType
 import com.jwoglom.controlx2.shared.util.setupTimber
+import com.jwoglom.controlx2.shared.util.triggerAppReload
 import com.jwoglom.controlx2.shared.util.shortTime
 import com.jwoglom.controlx2.sync.nightscout.NightscoutSyncWorker
 import com.jwoglom.controlx2.sync.xdrip.XdripMessageDispatcher
@@ -197,9 +198,9 @@ class WearPumpCommService : Service(), CommServiceCallbacks {
                 Timber.i("force-reload")
                 triggerAppReload(applicationContext)
             }
-            // TO_SERVER_SET_PAIRING_CODE: the watch UI calls PairingCodeEntry.apply()
-            // directly and that dispatches TO_SERVER_STOP_PUMP_FINDER("init_comm") if
-            // the stage was WAITING_PUMP_FINDER_CLEANUP. The service has no work to do
+            // TO_SERVER_SET_PAIRING_CODE: the watch UI calls PairingCodeEntry
+            // directly and that dispatches TO_SERVER_STOP_PUMP_FINDER("init_comm")
+            // or TO_PUMP_PAIR based on the stage. The service has no work to do
             // on the SET_PAIRING_CODE path itself; PumpState is read by PumpCommHandler
             // on init via PumpState.getPairingCode.
             MessagePaths.TO_SERVER_STOP_PUMP_FINDER -> {
@@ -635,14 +636,5 @@ class WearPumpCommService : Service(), CommServiceCallbacks {
 
     private fun prefs(context: Context): SharedPreferences? {
         return context.getSharedPreferences("WearX2", MODE_PRIVATE)
-    }
-
-    private fun triggerAppReload(context: Context) {
-        val packageManager = context.packageManager
-        val intent = packageManager.getLaunchIntentForPackage(context.packageName)
-        val componentName = intent!!.component
-        val mainIntent = Intent.makeRestartActivityTask(componentName)
-        context.startActivity(mainIntent)
-        Runtime.getRuntime().exit(0)
     }
 }

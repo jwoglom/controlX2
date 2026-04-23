@@ -47,6 +47,7 @@ import com.jwoglom.controlx2.shared.messaging.MessageBus
 import com.jwoglom.controlx2.shared.messaging.MessageBusSender
 import com.jwoglom.controlx2.shared.messaging.MessageListener
 import com.jwoglom.controlx2.shared.util.setupTimber
+import com.jwoglom.controlx2.shared.util.triggerAppReload
 import com.jwoglom.controlx2.shared.util.shortTime
 import com.jwoglom.controlx2.util.AppVersionCheck
 import com.jwoglom.pumpx2.pump.PumpState
@@ -807,12 +808,4 @@ class CommService : Service(), CommServiceCallbacks {
         return context.getSharedPreferences("WearX2", MODE_PRIVATE)
     }
 
-    private fun triggerAppReload(context: Context) {
-        val packageManager = context.packageManager
-        val intent = packageManager.getLaunchIntentForPackage(context.packageName)
-        val componentName = intent!!.component
-        val mainIntent = Intent.makeRestartActivityTask(componentName)
-        context.startActivity(mainIntent)
-        Runtime.getRuntime().exit(0)
-    }
 }
