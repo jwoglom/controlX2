@@ -60,4 +60,5 @@ sealed class Screen(
 
     // Pump data surfaces (DeviceRole.PUMP_HOST).
     object HistoryLog : Screen("HistoryLog")
+    object BasalDetail : Screen("BasalDetail")
 }

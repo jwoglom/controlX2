@@ -84,6 +84,7 @@ import com.jwoglom.controlx2.presentation.navigation.SCROLL_TYPE_NAV_ARGUMENT
 import com.jwoglom.controlx2.presentation.navigation.Screen
 import com.jwoglom.controlx2.presentation.ui.BolusScreen
 import com.jwoglom.controlx2.presentation.ui.ConnectingToPumpScreen
+import com.jwoglom.controlx2.presentation.ui.BasalDetailScreen
 import com.jwoglom.controlx2.presentation.ui.FullScreenText
 import com.jwoglom.controlx2.presentation.ui.HistoryLogScreen
 import com.jwoglom.controlx2.presentation.ui.IndeterminateProgressIndicator
@@ -328,6 +329,9 @@ fun WearApp(
                 }
                 composable(Screen.HistoryLog.route) {
                     HistoryLogScreen()
+                }
+                composable(Screen.BasalDetail.route) {
+                    BasalDetailScreen()
                 }
                 // Main Window
                 composable(
