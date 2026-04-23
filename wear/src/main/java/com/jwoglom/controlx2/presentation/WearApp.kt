@@ -85,6 +85,7 @@ import com.jwoglom.controlx2.presentation.navigation.Screen
 import com.jwoglom.controlx2.presentation.ui.BolusScreen
 import com.jwoglom.controlx2.presentation.ui.ConnectingToPumpScreen
 import com.jwoglom.controlx2.presentation.ui.FullScreenText
+import com.jwoglom.controlx2.presentation.ui.HistoryLogScreen
 import com.jwoglom.controlx2.presentation.ui.IndeterminateProgressIndicator
 import com.jwoglom.controlx2.presentation.ui.LandingScreen
 import com.jwoglom.controlx2.presentation.ui.NightscoutSettingsScreen
@@ -324,6 +325,9 @@ fun WearApp(
                 }
                 composable(Screen.XdripSettings.route) {
                     XdripSettingsScreen()
+                }
+                composable(Screen.HistoryLog.route) {
+                    HistoryLogScreen()
                 }
                 // Main Window
                 composable(

@@ -57,4 +57,7 @@ sealed class Screen(
     object SettingsHub : Screen("SettingsHub")
     object NightscoutSettings : Screen("NightscoutSettings")
     object XdripSettings : Screen("XdripSettings")
+
+    // Pump data surfaces (DeviceRole.PUMP_HOST).
+    object HistoryLog : Screen("HistoryLog")
 }
