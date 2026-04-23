@@ -63,6 +63,7 @@ import com.jwoglom.controlx2.presentation.components.input.ShortPairingCodeInput
 import com.jwoglom.controlx2.presentation.navigation.Screen
 import com.jwoglom.controlx2.presentation.theme.ControlX2Theme
 import com.jwoglom.controlx2.shared.util.determinePumpModel
+import com.jwoglom.controlx2.shared.util.triggerAppReload
 import com.jwoglom.pumpx2.pump.messages.models.KnownDeviceModel
 import com.jwoglom.pumpx2.pump.messages.models.PairingCodeType
 import kotlinx.coroutines.launch
@@ -274,16 +275,6 @@ fun PumpSetup(
                                     modifier = Modifier.fillMaxWidth().height(200.dp).background(Color.White)
                                 )
                             }
-
-                            fun triggerAppReload(context: Context) {
-                                val packageManager = context.packageManager
-                                val intent = packageManager.getLaunchIntentForPackage(context.packageName)
-                                val componentName = intent!!.component
-                                val mainIntent = Intent.makeRestartActivityTask(componentName)
-                                context.startActivity(mainIntent)
-                                Runtime.getRuntime().exit(0)
-                            }
-
 
                             item {
                                 LazyRow {

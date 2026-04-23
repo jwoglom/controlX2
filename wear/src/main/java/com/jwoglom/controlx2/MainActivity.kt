@@ -32,6 +32,7 @@ import com.jwoglom.pumpx2.pump.messages.models.PairingCodeType
 import com.jwoglom.controlx2.presentation.ui.resetBolusDataStoreState
 import com.jwoglom.controlx2.shared.InitiateConfirmedBolusSerializer
 import com.jwoglom.controlx2.shared.MessagePaths
+import com.jwoglom.controlx2.shared.util.triggerAppReload
 import com.jwoglom.controlx2.shared.PumpMessageSerializer
 import com.jwoglom.controlx2.shared.PumpQualifyingEventsSerializer
 import com.jwoglom.controlx2.shared.enums.BasalStatus
@@ -772,15 +773,6 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    private fun triggerAppReload(context: Context) {
-        val packageManager = context.packageManager
-        val intent = packageManager.getLaunchIntentForPackage(context.packageName)
-        val componentName = intent!!.component
-        val mainIntent = Intent.makeRestartActivityTask(componentName)
-        context.startActivity(mainIntent)
-        Runtime.getRuntime().exit(0)
-    }
-
     /**
      * Disables the pump-host background service and triggers a force-reload
      * so the service stops cleanly. Mirrors the mobile disable path in
@@ -831,21 +823,32 @@ class MainActivity : ComponentActivity() {
      * the correct next message based on [dataStore.pumpSetupStage].
      */
     internal fun submitPairingCode(code: String) {
-        PairingCodeEntry.apply(
-            context = applicationContext,
-            code = code,
-            currentStageName = dataStore.pumpSetupStage.value?.name,
-            sendMessage = { path, data ->
-                // If we were in WAITING_PUMP_FINDER_CLEANUP, the helper will fire
-                // TO_SERVER_STOP_PUMP_FINDER("init_comm"). Before that message hits
-                // the service, make sure pumpfinder-service-enabled is false so the
-                // restarted service path picks the PumpComm handler branch.
-                if (path == MessagePaths.TO_SERVER_STOP_PUMP_FINDER) {
-                    WearPrefs(applicationContext).setPumpFinderServiceEnabled(false)
-                }
-                sendMessage(path, data)
-            },
-        )
+        when (dataStore.pumpSetupStage.value) {
+            PumpSetupStage.WAITING_PUMP_FINDER_CLEANUP -> {
+                // Flip pump-finder-enabled false before the TO_SERVER_STOP_PUMP_FINDER
+                // message hits the service, so the restarted service path picks the
+                // PumpComm handler branch.
+                WearPrefs(applicationContext).setPumpFinderServiceEnabled(false)
+                PairingCodeEntry.applyForInitialPumpComm(
+                    context = applicationContext,
+                    code = code,
+                    sendMessage = ::sendMessage,
+                )
+            }
+            PumpSetupStage.PUMPX2_WAITING_FOR_PAIRING_CODE -> {
+                PairingCodeEntry.applyForRePair(
+                    context = applicationContext,
+                    code = code,
+                    sendMessage = ::sendMessage,
+                )
+            }
+            else -> {
+                Timber.w(
+                    "submitPairingCode: unexpected stage=%s, ignoring",
+                    dataStore.pumpSetupStage.value,
+                )
+            }
+        }
         dataStore.pumpPairingError.value = null
     }
 }
