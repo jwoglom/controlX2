@@ -318,13 +318,37 @@ Each sub-step should ship with a phone-as-host regression pass plus a watch-as-h
 
 **Still open:** xDrip+ on Wear OS receiver behavior remains unverified (inherited from Phase 4.5). UI ships the toggle and dispatches `sendBroadcast`, but whether a watch-side xDrip+ receiver exists is still an open runtime question.
 
-#### 5e. Pump data surfaces on watch (reuse existing flows) — ⏳ Next
+#### 5e. Pump data surfaces on watch (reuse existing flows) — ⏳ In progress (5e-1 ✅ done, 5e-2 + 5e-3 remaining)
 
-- Basal rate display screen (data already flows through `ClientStateStore` / watch-side state; add a screen to render it).
-- CGM trend-graph screen (complications already exist; build a full-screen version).
-- History / events screen backed by `HistoryLogRepo` from `:db` (the watch already persists rows as of Phase 4.5).
+Split into three sub-phases ordered by complexity so each is independently shippable.
 
-**Recommended order within 5e:** history/events first (reuses `HistoryLogRepo` with no new plumbing), then basal display, then CGM trend-graph (largest UI lift).
+##### 5e-1. History / events screen — ✅ Complete (commit `0125d58`)
+
+**Shipped:**
+- New `wear/.../presentation/ui/HistoryLogScreen.kt` — `ScalingLazyColumn` rendering up to 100 recent rows from `HistoryLogRepo.getAll(pumpSid)` as formatted one-liners. ViewModel scoped to the `NavBackStackEntry` so it's cleared on navigation-away.
+- `HistoryLogRepo` obtained via `HistoryLogDatabase.getDatabase(context)` — same Room singleton `WearPumpCommService` already uses, so no duplicate DB instance.
+- Per-type formatters: bolus delivery/complete, basal rate change, temp basal start/end, carbs, alarms, alerts, cannula/tubing/cartridge fills, pumping-resumed/suspended, daily-basal summary. Unknown types render as the pumpx2 class name minus the `HistoryLog` suffix.
+- CGM-reading rows (DexcomG6, CgmDataGx/Fsl2/Fsl3) filtered client-side so ~5-minute samples don't drown the event log. Filter set is computed once from `HistoryLogParser.LOG_MESSAGE_CLASS_TO_ID` rather than hardcoded, so it tracks pumpx2 typeId changes without touching the watch.
+- `Screen.HistoryLog` route added; wired into `SwipeDismissableNavHost` in `WearApp.kt`.
+- Role-gated entry in `SettingsHubScreen` ("Pump history" chip, `PUMP_HOST` only — CLIENT-mode watches don't receive raw history cargo).
+- Empty-state for `pumpSid < 0` (first run before any pump connection) reuses 5d's `NightscoutSettings` guard pattern.
+
+**Deviations / out-of-scope:**
+- No per-row detail view (tapping a chip is currently a no-op). Future iteration.
+- No type filter UI — keeping it simple; the CGM-reading filter is the only one that matters in practice.
+- No pagination — 100-row cap is fixed. Fine for a watch; can be revisited if users want deeper history.
+
+##### 5e-2. Basal rate display screen — ⏳ Next
+
+- `DataStore.basalRate` and `DataStore.basalStatus` already flow on the watch in both roles; build a dedicated screen rendering current rate + status plus a small recent-changes list.
+- Optional: query recent `BasalRateChangeHistoryLog` / `TempRateActivatedHistoryLog` / `TempRateCompletedHistoryLog` rows from `HistoryLogRepo` to show a mini-timeline alongside.
+- No new dependencies; straight Compose + existing data.
+
+##### 5e-3. CGM trend-graph screen — ⏳ Remaining
+
+- Full-screen CGM chart — largest of the three. Mobile's `VicoCgmChart.kt` is 2434 lines; the watch version should aim for a much leaner scope (6–12h window, CGM line only, minimal overlays).
+- Needs `com.patrykandpatrick.vico:vico-compose` + `vico-core` added to `wear/build.gradle` (already on mobile). Alternative worth evaluating before that dep lands: a Canvas-based minimal renderer, which would avoid the APK growth.
+- Backed by `HistoryLogViewModel.itemsForTypesSince(...)` filtered to the CGM-reading types (opposite of the 5e-1 filter).
 
 #### 5f. Settings management parity — ⏳ Remaining
 
@@ -376,7 +400,10 @@ Phase 5   (watch pump-host UI)                       ⏳ In progress:
            5c Connection status + reconnection UX    ✅ Complete (commit ca97612)
            5d Nightscout / xDrip+ settings on watch  ✅ Complete (commit c61435f)
            + Audit Tiers 1/2/3                       ✅ Complete (commits 15b4686, ff130ac, 5eeafa3)
-           5e Pump data surfaces on watch            ⏳ Next
+           5e Pump data surfaces on watch            ⏳ In progress:
+             5e-1 Watch-side history/events screen   ✅ Complete (commit 0125d58)
+             5e-2 Basal rate display screen          ⏳ Next
+             5e-3 CGM trend-graph screen             ⏳ Remaining
            5f Settings management parity             ⏳ Remaining
 ```
 
