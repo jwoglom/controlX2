@@ -27,6 +27,8 @@ import androidx.compose.material.icons.automirrored.filled.DirectionsRun
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.KingBed
+import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Stop
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -34,6 +36,7 @@ import androidx.compose.runtime.key
 import androidx.compose.runtime.livedata.observeAsState
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
@@ -69,7 +72,10 @@ import com.google.android.horologist.compose.layout.fadeAwayScalingLazyList
 import com.jwoglom.pumpx2.pump.messages.Message
 import com.jwoglom.pumpx2.pump.messages.calculator.BolusCalcUnits
 import com.jwoglom.pumpx2.pump.messages.calculator.BolusParameters
+import com.jwoglom.pumpx2.pump.messages.request.control.ResumePumpingRequest
+import com.jwoglom.pumpx2.pump.messages.request.control.SuspendPumpingRequest
 import com.jwoglom.pumpx2.pump.messages.request.currentStatus.GlobalMaxBolusSettingsRequest
+import com.jwoglom.pumpx2.pump.messages.request.currentStatus.HomeScreenMirrorRequest
 import com.jwoglom.pumpx2.pump.messages.response.currentStatus.BolusCalcDataSnapshotResponse
 import com.jwoglom.pumpx2.pump.messages.response.currentStatus.TimeSinceResetResponse
 import com.jwoglom.controlx2.LocalDataStore
@@ -100,6 +106,7 @@ import com.jwoglom.controlx2.presentation.ui.SettingsHubScreen
 import com.jwoglom.controlx2.presentation.ui.XdripSettingsScreen
 import com.jwoglom.controlx2.presentation.ui.ScalingLazyListStateViewModel
 import com.jwoglom.controlx2.presentation.ui.ScrollStateViewModel
+import com.jwoglom.controlx2.shared.enums.BasalStatus
 import com.jwoglom.controlx2.shared.enums.GlucoseUnit
 import com.jwoglom.controlx2.shared.enums.UserMode
 import com.jwoglom.controlx2.shared.util.SendType
@@ -107,6 +114,8 @@ import com.jwoglom.pumpx2.pump.messages.request.control.SetModesRequest
 import kotlin.math.abs
 import kotlin.math.pow
 import kotlinx.coroutines.awaitCancellation
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
 @Composable
 fun WearApp(
@@ -517,6 +526,81 @@ fun WearApp(
                                 Icons.AutoMirrored.Filled.DirectionsRun,
                                 "Exercise mode",
                                 Modifier.size(24.dp)
+                            )
+                        },
+                    ) {}
+                    BottomText()
+                }
+
+                composable(Screen.SuspendPumpingSet.route) {
+                    val basalStatus = dataStore.basalStatus.observeAsState()
+                    val pollScope = rememberCoroutineScope()
+                    // Mirror of mobile Actions.kt: 5 x HomeScreenMirrorRequest @ 1s
+                    // after a suspend/resume so `dataStore.basalStatus` refreshes
+                    // before the pump reports the state change asynchronously.
+                    fun pollBasalStatus() {
+                        pollScope.launch {
+                            repeat(5) {
+                                delay(1000)
+                                sendPumpCommands(SendType.BUST_CACHE, listOf(HomeScreenMirrorRequest()))
+                            }
+                        }
+                    }
+                    Alert(
+                        title = {
+                            Text(
+                                text = when (basalStatus.value) {
+                                    BasalStatus.PUMP_SUSPENDED -> "Resume insulin deliveries?"
+                                    BasalStatus.UNKNOWN, null -> "Insulin state unknown, try again in a moment."
+                                    else -> "Suspend all insulin deliveries?"
+                                },
+                                textAlign = TextAlign.Center,
+                                color = MaterialTheme.colors.onBackground,
+                            )
+                        },
+                        negativeButton = {
+                            Button(
+                                onClick = { navController.navigate(Screen.Landing.route) },
+                                colors = ButtonDefaults.secondaryButtonColors(),
+                            ) {
+                                Icon(imageVector = Icons.Filled.Clear, contentDescription = "Cancel")
+                            }
+                        },
+                        positiveButton = {
+                            when (basalStatus.value) {
+                                BasalStatus.PUMP_SUSPENDED ->
+                                    Button(
+                                        onClick = {
+                                            sendPumpCommands(SendType.BUST_CACHE, listOf(ResumePumpingRequest()))
+                                            pollBasalStatus()
+                                            navController.navigate(Screen.Landing.route)
+                                        },
+                                        colors = ButtonDefaults.primaryButtonColors(),
+                                    ) {
+                                        Icon(imageVector = Icons.Filled.PlayArrow, contentDescription = "Resume insulin")
+                                    }
+                                BasalStatus.UNKNOWN, null -> {}
+                                else ->
+                                    Button(
+                                        onClick = {
+                                            sendPumpCommands(SendType.BUST_CACHE, listOf(SuspendPumpingRequest()))
+                                            pollBasalStatus()
+                                            navController.navigate(Screen.Landing.route)
+                                        },
+                                        colors = ButtonDefaults.primaryButtonColors(),
+                                    ) {
+                                        Icon(imageVector = Icons.Filled.Check, contentDescription = "Suspend insulin")
+                                    }
+                            }
+                        },
+                        icon = {
+                            Image(
+                                imageVector = when (basalStatus.value) {
+                                    BasalStatus.PUMP_SUSPENDED -> Icons.Filled.PlayArrow
+                                    else -> Icons.Filled.Stop
+                                },
+                                contentDescription = "Insulin",
+                                modifier = Modifier.size(24.dp),
                             )
                         },
                     ) {}
