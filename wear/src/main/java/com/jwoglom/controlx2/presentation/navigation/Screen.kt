@@ -51,4 +51,9 @@ sealed class Screen(
     object PumpFinderSelect : Screen("PumpFinderSelect")
     object PairingCodeEntry : Screen("PairingCodeEntry")
     object PairingUnsupportedOnWatch : Screen("PairingUnsupportedOnWatch")
+
+    // Settings hub + sub-screens.
+    object SettingsHub : Screen("SettingsHub")
+    object NightscoutSettings : Screen("NightscoutSettings")
+    object XdripSettings : Screen("XdripSettings")
 }

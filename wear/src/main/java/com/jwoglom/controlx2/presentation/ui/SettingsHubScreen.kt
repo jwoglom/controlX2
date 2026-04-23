@@ -1,0 +1,88 @@
+package com.jwoglom.controlx2.presentation.ui
+
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.navigation.NavHostController
+import androidx.wear.compose.foundation.lazy.ScalingLazyColumn
+import androidx.wear.compose.foundation.lazy.rememberScalingLazyListState
+import androidx.wear.compose.material.Chip
+import androidx.wear.compose.material.ChipDefaults
+import androidx.wear.compose.material.Text
+import com.jwoglom.controlx2.presentation.navigation.Screen
+import com.jwoglom.controlx2.shared.enums.DeviceRole
+import com.jwoglom.controlx2.util.StatePrefs
+
+/**
+ * Watch settings hub. Single entry point for all watch-local configuration so
+ * the `LandingScreen` footer can collapse to one chip.
+ *
+ * Entries gated by [DeviceRole] — Nightscout and xDrip settings are pump-host
+ * only; in CLIENT mode the phone owns those and showing them on the watch
+ * would be misleading.
+ */
+@Composable
+fun SettingsHubScreen(
+    navController: NavHostController,
+    sendPhoneCommand: (String) -> Unit,
+    sendPhoneOpenActivity: () -> Unit,
+) {
+    val context = LocalContext.current
+    val role = StatePrefs(context).deviceRole()
+    val state = rememberScalingLazyListState()
+
+    ScalingLazyColumn(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(horizontal = 8.dp),
+        state = state,
+    ) {
+        item {
+            Chip(
+                onClick = { navController.navigate(Screen.RoleSelection.route) },
+                label = { Text("Role", fontSize = 13.sp) },
+                colors = ChipDefaults.primaryChipColors(),
+                modifier = Modifier.fillMaxWidth(),
+            )
+        }
+        if (role == DeviceRole.PUMP_HOST) {
+            item {
+                Chip(
+                    onClick = { navController.navigate(Screen.NightscoutSettings.route) },
+                    label = { Text("Nightscout", fontSize = 13.sp) },
+                    colors = ChipDefaults.primaryChipColors(),
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
+            item {
+                Chip(
+                    onClick = { navController.navigate(Screen.XdripSettings.route) },
+                    label = { Text("xDrip+", fontSize = 13.sp) },
+                    colors = ChipDefaults.primaryChipColors(),
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
+        }
+        item {
+            Chip(
+                onClick = { sendPhoneCommand("force-reload") },
+                label = { Text("Force reload", fontSize = 13.sp) },
+                colors = ChipDefaults.secondaryChipColors(),
+                modifier = Modifier.fillMaxWidth(),
+            )
+        }
+        item {
+            Chip(
+                onClick = sendPhoneOpenActivity,
+                label = { Text("Open on phone", fontSize = 13.sp) },
+                colors = ChipDefaults.secondaryChipColors(),
+                modifier = Modifier.fillMaxWidth(),
+            )
+        }
+    }
+}

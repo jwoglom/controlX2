@@ -87,11 +87,14 @@ import com.jwoglom.controlx2.presentation.ui.ConnectingToPumpScreen
 import com.jwoglom.controlx2.presentation.ui.FullScreenText
 import com.jwoglom.controlx2.presentation.ui.IndeterminateProgressIndicator
 import com.jwoglom.controlx2.presentation.ui.LandingScreen
+import com.jwoglom.controlx2.presentation.ui.NightscoutSettingsScreen
 import com.jwoglom.controlx2.presentation.ui.PairingCodeEntryScreen
 import com.jwoglom.controlx2.presentation.ui.PairingUnsupportedOnWatchScreen
 import com.jwoglom.controlx2.presentation.ui.PumpDisconnectedReconnectingScreen
 import com.jwoglom.controlx2.presentation.ui.PumpFinderSelectScreen
 import com.jwoglom.controlx2.presentation.ui.RoleSelectionScreen
+import com.jwoglom.controlx2.presentation.ui.SettingsHubScreen
+import com.jwoglom.controlx2.presentation.ui.XdripSettingsScreen
 import com.jwoglom.controlx2.presentation.ui.ScalingLazyListStateViewModel
 import com.jwoglom.controlx2.presentation.ui.ScrollStateViewModel
 import com.jwoglom.controlx2.shared.enums.GlucoseUnit
@@ -302,6 +305,21 @@ fun WearApp(
                 }
                 composable(Screen.PairingUnsupportedOnWatch.route) {
                     PairingUnsupportedOnWatchScreen()
+                }
+
+                // --- Settings hub + sub-screens ---
+                composable(Screen.SettingsHub.route) {
+                    SettingsHubScreen(
+                        navController = navController,
+                        sendPhoneCommand = sendPhoneCommand,
+                        sendPhoneOpenActivity = sendPhoneOpenActivity,
+                    )
+                }
+                composable(Screen.NightscoutSettings.route) {
+                    NightscoutSettingsScreen()
+                }
+                composable(Screen.XdripSettings.route) {
+                    XdripSettingsScreen()
                 }
                 // Main Window
                 composable(

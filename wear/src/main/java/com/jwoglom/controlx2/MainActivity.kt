@@ -789,6 +789,17 @@ class MainActivity : ComponentActivity() {
     internal fun reEnablePumpService() {
         if (StatePrefs(applicationContext).deviceRole() != DeviceRole.PUMP_HOST) return
         WearPrefs(applicationContext).setServiceEnabled(true)
+        forceReloadService()
+    }
+
+    /**
+     * Two-message reload sequence used by settings screens when a config
+     * change (e.g. xDrip enable toggle) needs the service to pick up new
+     * values. Matches mobile `XdripSettings.kt:62-68` — dispatches only the
+     * reload messages, does not touch `serviceEnabled`.
+     */
+    internal fun forceReloadService() {
+        if (StatePrefs(applicationContext).deviceRole() != DeviceRole.PUMP_HOST) return
         uiScope.launch {
             kotlinx.coroutines.delay(250)
             sendMessage(MessagePaths.TO_SERVER_FORCE_RELOAD, "".toByteArray())
