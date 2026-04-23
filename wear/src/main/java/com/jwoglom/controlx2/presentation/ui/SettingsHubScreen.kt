@@ -53,6 +53,17 @@ fun SettingsHubScreen(
                 modifier = Modifier.fillMaxWidth(),
             )
         }
+        // Active profile — works in both DeviceRole values. The /to-pump/*
+        // message is routed by HybridMessageBus either to local BT (PUMP_HOST)
+        // or forwarded to the phone (CLIENT), so no role gate.
+        item {
+            Chip(
+                onClick = { navController.navigate(Screen.ProfileSwitch.route) },
+                label = { Text("Active profile", fontSize = 13.sp) },
+                colors = ChipDefaults.primaryChipColors(),
+                modifier = Modifier.fillMaxWidth(),
+            )
+        }
         if (role == DeviceRole.PUMP_HOST) {
             // Basal is a pump-data surface, not a setting — reached by tapping
             // the basal row on Landing. Pump history is more diagnostic, so it
