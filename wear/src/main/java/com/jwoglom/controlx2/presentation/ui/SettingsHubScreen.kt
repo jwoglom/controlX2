@@ -56,6 +56,14 @@ fun SettingsHubScreen(
         if (role == DeviceRole.PUMP_HOST) {
             item {
                 Chip(
+                    onClick = { navController.navigate(Screen.BasalDetail.route) },
+                    label = { Text("Basal", fontSize = 13.sp) },
+                    colors = ChipDefaults.primaryChipColors(),
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
+            item {
+                Chip(
                     onClick = { navController.navigate(Screen.HistoryLog.route) },
                     label = { Text("Pump history", fontSize = 13.sp) },
                     colors = ChipDefaults.primaryChipColors(),
