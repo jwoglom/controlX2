@@ -39,6 +39,7 @@ sealed class Screen(
     object RoleSelection : Screen("RoleSelection")
     object SleepModeSet : Screen("SleepModeSet")
     object ExerciseModeSet : Screen("ExerciseModeSet")
+    object SuspendPumpingSet : Screen("SuspendPumpingSet")
     object Bolus : Screen("Bolus")
     object BolusSelectUnitsScreen : Screen("BolusSelectUnits")
     object BolusSelectCarbsScreen : Screen("BolusSelectCarbs")

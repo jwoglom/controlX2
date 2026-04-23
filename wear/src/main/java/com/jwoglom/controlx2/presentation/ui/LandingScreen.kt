@@ -190,7 +190,8 @@ fun LandingScreen(
             item {
                 LandingModeActionsRow(
                     onExerciseClick = { navController.navigate(Screen.ExerciseModeSet.route) },
-                    onSleepClick = { navController.navigate(Screen.SleepModeSet.route) }
+                    onSleepClick = { navController.navigate(Screen.SleepModeSet.route) },
+                    onSuspendPumpingClick = { navController.navigate(Screen.SuspendPumpingSet.route) },
                 )
             }
 
