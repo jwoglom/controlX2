@@ -68,8 +68,6 @@ fun LandingScreen(
     scalingLazyListState: ScalingLazyListState,
     focusRequester: FocusRequester,
     sendPumpCommands: (SendType, List<Message>) -> Unit,
-    sendPhoneCommand: (String) -> Unit,
-    sendPhoneOpenActivity: () -> Unit,
     resetSavedBolusEnteredState: () -> Unit,
     navController: NavHostController,
     modifier: Modifier = Modifier,
@@ -214,8 +212,6 @@ fun DefaultLandingScreenPreviewFull() {
         scalingLazyListState = ScalingLazyListState(1, 0),
         focusRequester = FocusRequester(),
         sendPumpCommands = { _, _ -> },
-        sendPhoneOpenActivity = {},
-        sendPhoneCommand = {},
         resetSavedBolusEnteredState = {},
         navController = rememberSwipeDismissableNavController()
     )
@@ -228,8 +224,6 @@ fun DefaultLandingScreenPreviewCropped() {
         scalingLazyListState = ScalingLazyListState(1, 0),
         focusRequester = FocusRequester(),
         sendPumpCommands = { _, _ -> },
-        sendPhoneOpenActivity = {},
-        sendPhoneCommand = {},
         resetSavedBolusEnteredState = {},
         navController = rememberSwipeDismissableNavController()
     )

@@ -38,8 +38,9 @@ fun WearServiceDisabledMessage(
 ) {
     val context = LocalContext.current
     val ds = LocalDataStore.current
+    val role = remember { StatePrefs(context).deviceRole() }
 
-    if (StatePrefs(context).deviceRole() != DeviceRole.PUMP_HOST) {
+    if (role != DeviceRole.PUMP_HOST) {
         return
     }
 

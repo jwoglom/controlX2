@@ -489,8 +489,12 @@ fun Settings(
                     showDeviceRoleDialog = false
                     val activity = context as? Activity
                     if (activity != null) {
+                        // `switchDeviceRole` calls `activity.recreate()`; the
+                        // current Composable tree is discarded before any state
+                        // write here would be observable, so we don't touch
+                        // `currentDeviceRole` — the re-created Activity reads
+                        // the fresh pref.
                         switchDeviceRole(activity, newRole)
-                        currentDeviceRole = newRole
                     } else {
                         Toast.makeText(context, "Unable to switch role: no activity context", Toast.LENGTH_SHORT).show()
                     }

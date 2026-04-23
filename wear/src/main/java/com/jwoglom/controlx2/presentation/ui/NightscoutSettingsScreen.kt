@@ -13,10 +13,12 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.wear.compose.foundation.lazy.ScalingLazyColumn
 import androidx.wear.compose.foundation.lazy.rememberScalingLazyListState
+import androidx.wear.compose.material.AutoCenteringParams
 import androidx.wear.compose.material.Chip
 import androidx.wear.compose.material.ChipDefaults
 import androidx.wear.compose.material.Text
@@ -72,6 +74,7 @@ fun NightscoutSettingsScreen() {
             .fillMaxSize()
             .padding(horizontal = 8.dp),
         state = state,
+        autoCentering = AutoCenteringParams(),
     ) {
         item {
             Chip(
@@ -115,9 +118,10 @@ fun NightscoutSettingsScreen() {
                 label = { Text("URL", fontSize = 12.sp) },
                 secondaryLabel = {
                     Text(
-                        text = config.nightscoutUrl.ifBlank { "Not set" },
+                        text = compactUrlLabel(config.nightscoutUrl),
                         fontSize = 10.sp,
                         maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
                     )
                 },
                 colors = ChipDefaults.secondaryChipColors(),
@@ -163,8 +167,8 @@ private fun LaunchedStatusText(
             parts += "Last sync ${shortTimeAgo(Instant.ofEpochMilli(it))}"
         }
         syncStatus.lastError?.let { err ->
-            val when_ = syncStatus.lastErrorMillis?.let { shortTimeAgo(Instant.ofEpochMilli(it)) }
-            parts += if (when_ != null) "Last error $when_: $err" else "Last error: $err"
+            val errTimeAgo = syncStatus.lastErrorMillis?.let { shortTimeAgo(Instant.ofEpochMilli(it)) }
+            parts += if (errTimeAgo != null) "Last error $errTimeAgo: $err" else "Last error: $err"
         }
         parts.joinToString("\n")
     }
@@ -175,4 +179,20 @@ private fun LaunchedStatusText(
             modifier = Modifier.padding(top = 8.dp, start = 8.dp, end = 8.dp),
         )
     }
+}
+
+/**
+ * Renders a Nightscout URL in a form that fits in a Chip secondary label:
+ * - empty → "Not set"
+ * - http(s)://host/path → "host" (or host+short path if short enough)
+ *
+ * Keeps the host visible so the user can confirm which instance is configured
+ * without the raw URL spilling into an unreadable multi-line wrap.
+ */
+private fun compactUrlLabel(url: String): String {
+    if (url.isBlank()) return "Not set"
+    val trimmed = url.trim().trimEnd('/')
+    val afterScheme = trimmed.substringAfter("://", missingDelimiterValue = trimmed)
+    val host = afterScheme.substringBefore('/')
+    return host.ifBlank { trimmed }
 }
