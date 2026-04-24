@@ -43,10 +43,10 @@ import com.jwoglom.pumpx2.pump.messages.builders.IDPManager
  * Watch active-profile picker. Works in both `DeviceRole` values — the
  * `to-pump` command dispatched on confirm routes through the existing
  * `HybridMessageBus` to either the local BT link (PUMP_HOST) or the phone
- * (CLIENT). Written bare (no leading slash, no trailing wildcard) on
- * purpose: KDoc is a block comment and Kotlin 2.2 treats `/*` inside
- * `/** ... */` as a nested comment start, which swallows the rest of the
- * file. Same trap that bit `WearHybridMessageBus.kt` in commit 7db3dc9.
+ * (CLIENT). Path referenced without its leading slash + trailing wildcard
+ * on purpose: Kotlin 2.2 treats a slash-star inside a KDoc block as a
+ * nested comment opener, which swallows the rest of the file. Same trap
+ * that bit WearHybridMessageBus.kt in commit 7db3dc9.
  *
  * On entry, issues `IDPManager.nextMessages()` to fetch profile data (same
  * refresh shape mobile's `ProfileActions` uses); thereafter re-issues
