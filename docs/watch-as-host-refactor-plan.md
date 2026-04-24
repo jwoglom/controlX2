@@ -195,7 +195,7 @@ Package paths are preserved end-to-end — call sites in `mobile` and `wear` kee
 
 **Wiring on the watch side:** `WearPumpCommService.onPumpConnectedSync()` now calls `NightscoutSyncWorker.startIfEnabled(...)` exactly the way `CommService` does on mobile, and `dispatchExternalMessage()` now constructs an `XdripMessageDispatcher` and forwards every pump message into it.
 
-**xDrip+ on Wear OS — TODO / open question:** `XdripBroadcastSender` calls `Context.sendBroadcast()`, which on Wear OS dispatches device-locally. Whether xDrip+ exposes a watch-side broadcast receiver is unverified — the broadcast may simply have no listener when the watch is the pump-host. The code lives in `:db` regardless so a future watch-side xDrip+ install (or a future Wear Data Layer forward back to the phone) can consume it. Investigate before relying on xDrip+ uplinks in watch-as-host mode.
+**xDrip+ on Wear OS — partially resolved (commit `2758ad2`):** `XdripBroadcastSender` calls `Context.sendBroadcast()` with `package = "com.eveningoutpost.dexdrip"` set. On API 30+, a targeted broadcast requires the caller to declare the target package in `<queries>`; neither manifest had one, so the broadcasts were being silently dropped **on our end** before ever reaching xDrip+. Both `mobile/AndroidManifest.xml` and `wear/AndroidManifest.xml` now declare a `<queries>` entry for `com.eveningoutpost.dexdrip`. Whether xDrip+ has a watch-side receiver that consumes the broadcast is still a separate open question (needs an ADB test against a real xDrip+ install), but at least we're no longer the ones blocking it.
 
 **Test layout:**
 
@@ -232,7 +232,7 @@ controlX2/
 
 ---
 
-## Phase 5: Watch UI for Core Operations — ⏳ In progress (5a–5d ✅ done, 5e next, 5f remaining)
+## Phase 5: Watch UI for Core Operations — ⏳ In progress (5a–5d ✅ done; 5e-1/5e-2 + 5f-1/5f-2 ✅ done; 5e-3 + 5f-3 remaining)
 
 **Goal:** Add full pump management UI on the watch for when it's the pump-host, starting with the items that unblock a non-adb developer loop.
 
@@ -249,7 +249,7 @@ controlX2/
 1. ✅ DeviceRole UI — landed in 5a; the `adb`-only dev loop is gone on both phone and watch.
 2. ✅ Native pump pairing flow on the watch — landed in 5b (finder, pairing-code RemoteInput, `PairingUnsupportedOnWatch` for `LONG_16CHAR`, and `PumpBondedNeedsUnbond` from Audit Tier 1).
 3. ✅ Nightscout URL / API-secret entry UI on the watch — landed in 5d, with an xDrip+ toggle and role-gated `SettingsHub` entry point.
-4. ❌ Basal / history / settings surfaces native to the watch in pump-host mode — still open; covered by 5e/5f below.
+4. ⏳ Basal / history / settings surfaces native to the watch in pump-host mode — partially landed: history (5e-1), basal detail (5e-2), suspend/resume (5f-1), profile switch (5f-2). Still open: CGM trend graph (5e-3), temp basal (5f-3).
 
 ### Phase 5 sub-steps (ordered, each independently shippable)
 
@@ -316,9 +316,9 @@ Each sub-step should ship with a phone-as-host regression pass plus a watch-as-h
 - Tier 1: `NightscoutSettings` enable toggle guarded against `WearPrefs.currentPumpSid() == -1` so `startIfEnabled` is never called with an invalid sid.
 - Tier 2: `AutoCenteringParams()` added to all three new `ScalingLazyColumn`s; Settings chip gets a visible "Settings" label; Nightscout URL chip truncates via `compactUrlLabel` with `TextOverflow.Ellipsis`; `StatePrefs.deviceRole()` reads cached via `remember { ... }` in composables.
 
-**Still open:** xDrip+ on Wear OS receiver behavior remains unverified (inherited from Phase 4.5). UI ships the toggle and dispatches `sendBroadcast`, but whether a watch-side xDrip+ receiver exists is still an open runtime question.
+**Still open:** xDrip+ on Wear OS receiver behavior remains unverified. Commit `2758ad2` fixed the sender side (missing `<queries>` entry for `com.eveningoutpost.dexdrip` on both manifests — broadcasts were being dropped pre-delivery on API 30+). Whether xDrip+ itself exposes a watch-side receiver is still an open runtime question needing an ADB test against a real install.
 
-#### 5e. Pump data surfaces on watch (reuse existing flows) — ⏳ In progress (5e-1 ✅ done, 5e-2 + 5e-3 remaining)
+#### 5e. Pump data surfaces on watch (reuse existing flows) — ⏳ In progress (5e-1 + 5e-2 ✅ done and audited, 5e-3 remaining)
 
 Split into three sub-phases ordered by complexity so each is independently shippable.
 
@@ -338,20 +338,45 @@ Split into three sub-phases ordered by complexity so each is independently shipp
 - No type filter UI — keeping it simple; the CGM-reading filter is the only one that matters in practice.
 - No pagination — 100-row cap is fixed. Fine for a watch; can be revisited if users want deeper history.
 
-##### 5e-2. Basal rate display screen — ✅ Complete (commit `6581260`)
+##### 5e-2. Basal rate display screen — ✅ Complete (commit `6581260`, audited in `c9fe04b`)
 
 **Shipped:**
 - New `wear/.../presentation/ui/BasalDetailScreen.kt` — headline render of the live `basalRate` + `BasalStatus` from `LocalDataStore` (same fields `LandingBasalRow` uses) above a 20-row list of recent basal-related history events from `HistoryLogRepo`.
 - Event types queried: `BasalRateChangeHistoryLog`, `TempRateActivatedHistoryLog`, `TempRateCompletedHistoryLog`, `PumpingSuspendedHistoryLog`, `PumpingResumedHistoryLog`. Backed by `HistoryLogViewModel.latestItemsForTypes(typeClasses, 20)`, reusing the class→id resolution path from 5e-1.
-- ViewModel keyed `"basal-history-$pumpSid"` so it's distinct from the 5e-1 `HistoryLogScreen`'s default-keyed ViewModel.
 - Per-row formatting is basal-specific (`"→ 1.250U/hr"` rate-change prefix, "Temp basal start/end", "Pump suspended/resumed"); time formatter duplicated from 5e-1 intentionally, will consolidate if 5e-3 also needs it.
 - `Screen.BasalDetail` route added; wired into `WearApp.kt` next to `HistoryLog`.
-- Role-gated "Basal" chip added to `SettingsHubScreen` above the "Pump history" chip. Same `PUMP_HOST`-only gating as 5e-1.
+- Entry point audited onto `LandingBasalRow` onClick (see audit below) — not a SettingsHub chip.
 
 **Deviations / out-of-scope:**
-- `DataStore.basalRate`/`basalStatus` flow in both roles, so technically the header could render in CLIENT mode. Gated to `PUMP_HOST` anyway for consistency with 5e-1 and because the history list below the header needs local `HistoryLogRepo` rows that only exist on `PUMP_HOST` watches.
-- `pumpSid` captured once via `remember { WearPrefs(context).currentPumpSid() }`; if it flips from `-1` to valid during the screen's visibility, the user must navigate away and back to see history populate — matches the 5e-1 / Nightscout-settings pattern.
+- `DataStore.basalRate`/`basalStatus` flow in both roles, so technically the header renders in either mode; history list below is empty in CLIENT mode because `HistoryLogRepo` rows only exist on `PUMP_HOST` watches.
 - No per-row detail view (tapping a chip is a no-op). Future iteration.
+
+##### Phase 5e audit — ✅ Complete (commit `c9fe04b`)
+
+Consolidated correctness + design review over 5e-1 and 5e-2 before 5e-3 lands.
+
+**Correctness:**
+- `HistoryLogScreen` swapped `viewModel.all` (full-table Flow, thousands of rows re-emitted per insert) for `latestItemsForTypes(NON_CGM_TYPE_IDS, 100)` so Room caps and filters at query time. CGM filter set now includes `DexcomG7CGMHistoryLog` (was missing — G7 users previously saw the 5-minute firehose).
+- `BasalDetailScreen` wraps the `latestItemsForTypes(...)` call in `remember(vm) { ... }` so the observed LiveData has stable identity (was being rebuilt every recomposition).
+- Both screens now key `viewModel(key = "...-pump-$pumpSid")` so VM recreates when the pump first pairs (VMs cache by key, not by factory identity).
+- `BasalDetailScreen` takes `sendPumpCommands` and fires `CurrentBasalStatusRequest` on entry + every 60s via `intervalOf`, matching LandingScreen's refresh story.
+- Both screens take a `FocusRequester` and `Modifier.scrollableColumn(focusRequester, listState)` so the rotary crown/bezel scrolls (was a no-op on the 100-row HistoryLog).
+- `WearApp` registers both routes with `SCROLL_TYPE_NAV_ARGUMENT(SCALING_LAZY_COLUMN_SCROLLING)` so Scaffold PositionIndicator / Vignette / fade-away TopText render correctly.
+- `HistoryLogViewModel` dropped three `!!` bangs that would NPE on any pumpx2 typeId rename; replaced with `mapNotNull` (matches ProcessBasal/ProcessAlarm's defensive pattern).
+- Alarm/alert rows now prefer `alarmResponseType?.name` / `alertResponseType?.name` with numeric-ID fallback. Carb rows use `%.1fg` so the pump's 0.5g fractional carb resolution isn't truncated.
+- CGM type-id resolution uses `requireNotNull` — if pumpx2 renames a CGM class the filter fails loud instead of letting the firehose through.
+
+**Design / architecture:**
+- Reactive `dataStore.currentPumpSid: MutableLiveData<Int>`. `WearPumpCommService.prefSetCurrentPumpSid` mirrors the pref write into DataStore; `MainActivity.onCreate` seeds it from the persisted pref on fresh process launch. Both screens observe via `LocalDataStore.current.currentPumpSid` instead of snapshotting `remember { WearPrefs(...).currentPumpSid() }`. Fixes the "open the screen before the pump pairs, it stays stuck showing no pump" UX hole.
+- New `LocalHistoryLogRepo` CompositionLocal provided from `MainActivity.onCreate` with a lazy service-owned `HistoryLogRepo`. Both screens read from it instead of each constructing their own wrapper around the singleton Room DB.
+- `LandingBasalRow` gains an `onClick` callback; `LandingScreen` wires it to `BasalDetail`. The SettingsHub "Basal" chip is removed — basal is a pump-data surface, not a setting, so it reaches the detail screen via tapping the basal row on Landing. Pump history stays under SettingsHub since it's more diagnostic than day-to-day.
+- The original 5e-2 `basal-history-$pumpSid` VM key was based on a misread of how ViewModel scoping works (VMs are scoped per `NavBackStackEntry`, not per factory). Replaced with `basal-detail-pump-$pumpSid` which actually participates in the reactive-pumpSid work above.
+- Dropped the per-row `remember { formatHistoryLogLabel(item) }` caches — `HistoryLogItem.parse()` is already LRU-cached (500 entries).
+
+**Out of scope / left for a later pass:**
+- Mobile's triple-constructed `HistoryLogRepo` (MainActivity, CommService, HttpDebugApiService) — a pre-existing drift, fix would span the mobile app not just the 5e surfaces.
+- Shared label formatter in `:db` — defer until 5e-3 (CGM chart) lands and we know whether mobile's `VicoCgmChart` wants the same labels.
+- Pre-existing missing `SCROLL_TYPE_NAV_ARGUMENT` on `NightscoutSettings`, `XdripSettings`, `SettingsHub` — pre-5e drift, not addressed to keep the audit commit scoped.
 
 ##### 5e-3. CGM trend-graph screen — ⏳ Next
 
@@ -359,9 +384,38 @@ Split into three sub-phases ordered by complexity so each is independently shipp
 - Needs `com.patrykandpatrick.vico:vico-compose` + `vico-core` added to `wear/build.gradle` (already on mobile). Alternative worth evaluating before that dep lands: a Canvas-based minimal renderer, which would avoid the APK growth.
 - Backed by `HistoryLogViewModel.itemsForTypesSince(...)` filtered to the CGM-reading types (opposite of the 5e-1 filter).
 
-#### 5f. Settings management parity — ⏳ Remaining
+#### 5f. Settings management parity — ⏳ In progress (5f-1 + 5f-2 ✅ done, 5f-3 remaining)
 
-- Expose pump settings the phone already offers (profile switching, temp basal, suspend insulin) as watch screens, routed through the existing `/to-pump/*` paths — shared code path, no new backend work.
+Expose pump settings the phone already offers as watch screens, routed through the existing `/to-pump/*` paths — shared code path, no new backend work. `HybridMessageBus` routes `/to-pump/*` to either the local BT link (`PUMP_HOST`) or forwards to the phone-host (`CLIENT`), so each screen below works in both modes.
+
+##### 5f-1. Suspend / resume insulin — ✅ Complete (commit `1935e0d`)
+
+**Shipped:**
+- State-aware Stop/Start chip on the Landing `LandingModeActionsRow`, replacing the placeholder pump-icon chip that was never wired.
+- Labels/icons: `PUMP_SUSPENDED` → PlayArrow + "STOPPED", `UNKNOWN` → pump-icon + "???", else → Stop + "ON".
+- `Screen.SuspendPumpingSet` route rendered as a wear `Alert` composable (same idiom as `SleepModeSet` / `ExerciseModeSet`): `PUMP_SUSPENDED` → "Resume insulin deliveries?" + PlayArrow; `UNKNOWN` → "Insulin state unknown, try again in a moment." with no positive button; else → "Suspend all insulin deliveries?" + Check.
+- On confirm, fires `SuspendPumpingRequest()` or `ResumePumpingRequest()` via `SendType.BUST_CACHE`, then polls `HomeScreenMirrorRequest` 5x at 1s intervals — direct mirror of mobile `Actions.kt:296-304, 345-353`.
+
+**Out of scope:**
+- "Resume guidance" cartridge-state gate (mobile checks `LoadStatusResponse` before allowing resume). Watch's `UNKNOWN`-state dialog is MVP; cartridge check can land if users report bad resume states.
+
+##### 5f-2. Active profile picker — ✅ Complete (commit `744fa12`)
+
+**Shipped:**
+- New `wear/.../presentation/ui/ProfileSwitchScreen.kt` — `ScalingLazyColumn` of the pump's IDP profiles with the currently-active one highlighted.
+- Tap a non-active profile → in-screen wear `Alert` confirmation → dispatch `profile.setActiveProfileMessage()` with `SendType.BUST_CACHE`, then re-issue `nextMessages()` to refresh the active marker without waiting for the next 60s tick.
+- Data source: `LocalDataStore.current.idpManager` (same `MutableLiveData<IDPManager>` mobile uses). On entry + every 60s, `idpManager.nextMessages()` keeps the IDP cache fresh — mirrors mobile `ProfileActions.kt:118`.
+- Entry in `SettingsHubScreen` (not role-gated — routing covers both modes).
+
+**Design notes:**
+- Active state conveyed by chip color (primary vs secondary) + label ("Active" vs "Tap to activate"). Dropped the conditional-icon approach because `Chip.icon` is `(@Composable BoxScope.() -> Unit)?` and passing `null` through a ternary ran into `@Composable` annotation propagation issues.
+- Scroll type + `FocusRequester` wired through the shared `scalingLazyListState(it)` helper + `RequestFocusOnResume`, matching 5e-1/5e-2.
+
+##### 5f-3. Temp basal — ⏳ Remaining
+
+- Watch equivalent of mobile's `TempRateWindow.kt`: percentage + duration entry, dispatch `SetTempRateRequest`, reflect active temp basal + cancel affordance.
+- Reuses `HybridMessageBus` routing (works in both `PUMP_HOST` and `CLIENT`); state mirrors from `dataStore.basalStatus` + `dataStore.controlIQStatus` already flowing.
+- Input-entry story is the harder part — watch doesn't have mobile's slider/spinner ergonomics. Likely a `RemoteInput` numeric keypad for percentage + a preset duration chip list (30/60/90/120m), mirroring how 5b used `RemoteInput` for pairing codes.
 
 ### Audit work completed alongside Phase 5 (commits `15b4686`, `ff130ac`, `5eeafa3`)
 
@@ -377,8 +431,8 @@ Three rounds of self-audit landed on top of 5a–5d:
 - **Watch-as-host end-to-end:** pair from watch UI, bolus, confirm Nightscout upload, verify history-log rows persist, swap role back.
 
 **Build/verification gaps to close on this branch before merging to `dev`:**
-- The 5b commit message explicitly notes the sandbox had no Android SDK and **ran no gradle tasks**. Subsequent audit + CI commits fixed specific compile issues (`AutoCenteringParams` package, Settings chip icon size, stale KDoc, nested comment + `RemoteInput` API mismatches) but a clean `./gradlew :mobile:assembleDebug :wear:assembleDebug :shared:testDebugUnitTest :db:testDebugUnitTest` pass on this branch is still worth doing before dev merge.
-- xDrip+ Wear OS receiver question (Phase 4.5 open item) remains unverified.
+- CI fix commits landed iteratively for `AutoCenteringParams` package, Settings chip icon size, stale KDoc, nested-comment + `RemoteInput` API mismatches, material.items import, Robolectric jar integrity, and two successive nested-comment regressions in `/to-pump/*` KDoc. A clean `./gradlew :mobile:assembleDebug :wear:assembleDebug :shared:testDebugUnitTest :db:testDebugUnitTest` pass on this branch is still worth confirming before any dev merge.
+- xDrip+ Wear OS receiver question: sender-side manifest `<queries>` now fixed (`2758ad2`); whether an xDrip+ watch-side receiver exists remains unverified and needs an ADB test against a real install.
 
 ### Outstanding Phase 0 extractions — updated status
 
@@ -412,11 +466,16 @@ Phase 5   (watch pump-host UI)                       ⏳ In progress:
            5e Pump data surfaces on watch            ⏳ In progress:
              5e-1 Watch-side history/events screen   ✅ Complete (commit 0125d58)
              5e-2 Basal rate display screen          ✅ Complete (commit 6581260)
-             5e-3 CGM trend-graph screen             ⏳ Next
-           5f Settings management parity             ⏳ Remaining
+             + Phase 5e audit                        ✅ Complete (commit c9fe04b)
+             5e-3 CGM trend-graph screen             ⏳ Remaining
+           5f Settings management parity             ⏳ In progress:
+             5f-1 Suspend / resume insulin           ✅ Complete (commit 1935e0d)
+             5f-2 Active profile picker              ✅ Complete (commit 744fa12)
+             5f-3 Temp basal                         ⏳ Next
+           + xDrip+ Wear manifest <queries>          ✅ Complete (commit 2758ad2)
 ```
 
-Each phase is independently shippable. Phases 0-1 are pure refactors with no behavior change. Phase 2-3 are structural extractions. Phase 4 is the first user-visible feature (role selection shipped in 5a). Phase 5 is the full watch-as-host experience — 5a–5d are landed, 5e–5f remain.
+Each phase is independently shippable. Phases 0-1 are pure refactors with no behavior change. Phase 2-3 are structural extractions. Phase 4 is the first user-visible feature (role selection shipped in 5a). Phase 5 is the full watch-as-host experience — 5a–5d are landed, 5e-1/5e-2 and 5f-1/5f-2 are landed; 5e-3 (CGM chart) and 5f-3 (temp basal) remain.
 
 ---
 
