@@ -36,15 +36,18 @@ import androidx.wear.compose.material.MaterialTheme
 import androidx.wear.compose.material.Text
 import androidx.wear.compose.material.dialog.Alert
 import com.jwoglom.controlx2.LocalDataStore
+import com.jwoglom.controlx2.presentation.components.DecimalNumberPicker
 import com.jwoglom.controlx2.presentation.components.SingleNumberPicker
 import com.jwoglom.controlx2.shared.util.SendType
 import com.jwoglom.pumpx2.pump.messages.Message
 import com.jwoglom.pumpx2.pump.messages.request.control.SetTempRateRequest
 import com.jwoglom.pumpx2.pump.messages.request.control.StopTempRateRequest
+import com.jwoglom.pumpx2.pump.messages.request.currentStatus.CurrentBasalStatusRequest
 import com.jwoglom.pumpx2.pump.messages.request.currentStatus.TempRateRequest
 import com.jwoglom.pumpx2.pump.messages.response.currentStatus.TempRateResponse
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlin.math.roundToInt
 
 /**
  * Watch temp basal set/cancel. Works in both `DeviceRole` values — `to-pump`
@@ -56,18 +59,24 @@ import kotlinx.coroutines.launch
  * in a9df6ac / 61a0262).
  *
  * Flow:
- *  - On entry, fires `TempRateRequest()` with BUST_CACHE so the active/inactive
- *    decision uses fresh state instead of cached values.
+ *  - On entry, fires `TempRateRequest()` + `CurrentBasalStatusRequest()` with
+ *    BUST_CACHE so the active/inactive decision + the U/hr→% derivation use
+ *    fresh state instead of cached values.
  *  - If active, offers a single "Cancel temp basal" confirmation.
- *  - If inactive, runs a two-step picker: percent (0–250, default 100) →
- *    total minutes (15–480, default 30) → final confirm → dispatch
- *    `SetTempRateRequest(totalMinutes, percent)` + 5× 1s poll of
- *    `TempRateRequest()` to catch the post-set state change.
+ *  - If inactive, asks for entry mode first (Percent or U/hr), then runs
+ *    the value picker for that mode, then total minutes, then the final
+ *    confirm dialog. On confirm: dispatch `SetTempRateRequest(minutes,
+ *    derivedPercent)` + 5× 1s poll of `TempRateRequest()` to catch the
+ *    post-set state change.
  *
- * Percent-only entry; no U/hr mode. Mobile's `TempRateWindow.kt` supports
- * both; the U/hr path requires reading the current profile's basal rate to
- * convert, which is extra complexity for the less-common path on a small
- * screen. See docs/watch-as-host-refactor-plan.md 5f-3 for rationale.
+ * U/hr mode mirrors mobile `TempRateWindow.kt:190-265`: reads the current
+ * profile's basal rate out of `dataStore.basalRate` (String like "1.250u",
+ * populated from `CurrentBasalStatusResponse`), converts the entered U/hr
+ * to a percent via `((rawUnits / currentBasalRate) * 100).roundToInt()`,
+ * and validates that the derived percent lands in 0–250%. If the basal
+ * rate isn't known yet (no `CurrentBasalStatusResponse` in DataStore) the
+ * U/hr chip on `PickMode` is disabled with a hint, and the user can still
+ * take the Percent path.
  */
 @Composable
 fun TempBasalScreen(
@@ -77,11 +86,17 @@ fun TempBasalScreen(
     val ds = LocalDataStore.current
     val tempRateActive by ds.tempRateActive.observeAsState()
     val tempRateDetails by ds.tempRateDetails.observeAsState()
+    val basalRateText by ds.basalRate.observeAsState()
+    val currentBasalRate: Double? = parseBasalRateString(basalRateText)
 
-    // Refresh state once on entry so a stale cached response doesn't put us
-    // on the wrong branch (active vs inactive).
+    // Refresh both temp-rate state and the current basal rate on entry so a
+    // stale cache doesn't put us on the wrong branch (active vs inactive)
+    // and so the U/hr→% derivation uses the live profile rate.
     LaunchedEffect(Unit) {
-        sendPumpCommands(SendType.BUST_CACHE, listOf(TempRateRequest()))
+        sendPumpCommands(
+            SendType.BUST_CACHE,
+            listOf(TempRateRequest(), CurrentBasalStatusRequest()),
+        )
     }
 
     val pollScope = rememberCoroutineScope()
@@ -95,23 +110,34 @@ fun TempBasalScreen(
     }
 
     var step by remember { mutableStateOf(TempBasalStep.Loading) }
+    var mode by remember { mutableStateOf(TempBasalMode.PERCENT) }
     var percent by remember { mutableIntStateOf(100) }
+    var enteredUnits by remember { mutableStateOf(0.0) }
     var minutes by remember { mutableIntStateOf(30) }
     var pendingCancel by remember { mutableStateOf(false) }
     var pendingConfirm by remember { mutableStateOf(false) }
+    var pendingError by remember { mutableStateOf<String?>(null) }
 
-    // Transition Loading → CancelActive / PickPercent once tempRateActive is
+    // Transition Loading → CancelActive / PickMode once tempRateActive is
     // known. Done in LaunchedEffect rather than inline so recomposition during
     // picker interaction doesn't bounce the user back through the state.
     LaunchedEffect(tempRateActive) {
         if (step == TempBasalStep.Loading && tempRateActive != null) {
             step = if (tempRateActive == true) TempBasalStep.CancelActive
-                else TempBasalStep.PickPercent
+                else TempBasalStep.PickMode
         }
     }
 
-    // Render confirm Alerts first via early return — same in-place pattern as
-    // ProfileSwitchScreen's ProfileSwitchConfirmAlert.
+    // Early-return alerts — same in-place pattern ProfileSwitchScreen uses for
+    // its confirm. Keep `pendingError` first so an error from the PickUnits
+    // validation wins over an already-open confirm dialog.
+    if (pendingError != null) {
+        ErrorAlert(
+            message = pendingError ?: "",
+            onDismiss = { pendingError = null },
+        )
+        return
+    }
     if (pendingCancel) {
         CancelTempBasalAlert(
             details = tempRateDetails,
@@ -129,6 +155,8 @@ fun TempBasalScreen(
         SetTempBasalConfirmAlert(
             percent = percent,
             minutes = minutes,
+            mode = mode,
+            enteredUnits = enteredUnits,
             onCancel = { pendingConfirm = false },
             onConfirm = {
                 sendPumpCommands(
@@ -149,6 +177,17 @@ fun TempBasalScreen(
             details = tempRateDetails,
             onCancelTapped = { pendingCancel = true },
         )
+        TempBasalStep.PickMode -> PickModePanel(
+            currentBasalRate = currentBasalRate,
+            onPercentTapped = {
+                mode = TempBasalMode.PERCENT
+                step = TempBasalStep.PickPercent
+            },
+            onUnitsTapped = {
+                mode = TempBasalMode.UNITS
+                step = TempBasalStep.PickUnits
+            },
+        )
         TempBasalStep.PickPercent -> SingleNumberPicker(
             modifier = Modifier.fillMaxSize(),
             label = "%",
@@ -158,6 +197,31 @@ fun TempBasalScreen(
             onNumberConfirm = { value ->
                 percent = value
                 step = TempBasalStep.PickMinutes
+            },
+        )
+        TempBasalStep.PickUnits -> DecimalNumberPicker(
+            modifier = Modifier.fillMaxSize(),
+            label = "U/hr",
+            // Cap at 5 U/hr to keep the picker manageable on a watch. The
+            // realistic Tandem basal ceiling is well below that for almost
+            // all users; if someone genuinely needs a higher absolute rate
+            // they can take the Percent path (which maps 1:1 to the pump's
+            // 0-250% range).
+            maxNumber = 5,
+            defaultNumber = currentBasalRate ?: 1.0,
+            onNumberConfirm = { value ->
+                val rate = currentBasalRate
+                val derived = validateUnitsToPercent(value, rate)
+                when (derived) {
+                    is UnitsValidation.Ok -> {
+                        enteredUnits = value
+                        percent = derived.percent
+                        step = TempBasalStep.PickMinutes
+                    }
+                    is UnitsValidation.Error -> {
+                        pendingError = derived.message
+                    }
+                }
             },
         )
         TempBasalStep.PickMinutes -> SingleNumberPicker(
@@ -180,8 +244,52 @@ fun TempBasalScreen(
 private enum class TempBasalStep {
     Loading,
     CancelActive,
+    PickMode,
     PickPercent,
+    PickUnits,
     PickMinutes,
+}
+
+private enum class TempBasalMode {
+    PERCENT,
+    UNITS,
+}
+
+private sealed class UnitsValidation {
+    data class Ok(val percent: Int) : UnitsValidation()
+    data class Error(val message: String) : UnitsValidation()
+}
+
+/**
+ * Mirrors mobile's TempRateWindow.buildTempRateValidationResult for the
+ * UNITS branch: returns the derived percent 0–250 or an Error describing
+ * why the entered U/hr value is unacceptable.
+ */
+private fun validateUnitsToPercent(
+    rawUnits: Double,
+    currentBasalRate: Double?,
+): UnitsValidation {
+    if (currentBasalRate == null || currentBasalRate <= 0.0) {
+        return UnitsValidation.Error("Current basal rate unavailable.")
+    }
+    if (rawUnits < 0.0) {
+        return UnitsValidation.Error("Rate must be 0 or greater.")
+    }
+    if (rawUnits != 0.0 && rawUnits < 0.05) {
+        return UnitsValidation.Error("Rate must be 0 or at least 0.05 U/hr.")
+    }
+    val derived = ((rawUnits / currentBasalRate) * 100.0).roundToInt()
+    if (derived < 0 || derived > 250) {
+        return UnitsValidation.Error("Effective rate ${derived}% exceeds 250% max.")
+    }
+    return UnitsValidation.Ok(derived)
+}
+
+/** Extracts the Double basal rate from the DataStore's String form ("1.250u"). */
+private fun parseBasalRateString(raw: String?): Double? {
+    if (raw == null) return null
+    val numeric = raw.filter { it.isDigit() || it == '.' }
+    return numeric.toDoubleOrNull()
 }
 
 @Composable
@@ -195,6 +303,49 @@ private fun LoadingMessage() {
             text = "Checking temp basal…",
             fontSize = 14.sp,
             textAlign = TextAlign.Center,
+        )
+    }
+}
+
+@Composable
+private fun PickModePanel(
+    currentBasalRate: Double?,
+    onPercentTapped: () -> Unit,
+    onUnitsTapped: () -> Unit,
+) {
+    val unitsAvailable = currentBasalRate != null && currentBasalRate > 0.0
+    Column(
+        modifier = Modifier.fillMaxSize().padding(horizontal = 12.dp),
+        verticalArrangement = Arrangement.Center,
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        Text(
+            text = "Temp basal by…",
+            fontSize = 12.sp,
+            color = MaterialTheme.colors.onSurfaceVariant,
+            textAlign = TextAlign.Center,
+            modifier = Modifier.padding(bottom = 8.dp),
+        )
+        Chip(
+            onClick = onPercentTapped,
+            label = { Text("Percent", fontSize = 13.sp) },
+            colors = ChipDefaults.primaryChipColors(),
+            modifier = Modifier.fillMaxWidth().padding(bottom = 6.dp),
+        )
+        Chip(
+            onClick = { if (unitsAvailable) onUnitsTapped() },
+            enabled = unitsAvailable,
+            label = { Text("U/hr", fontSize = 13.sp) },
+            secondaryLabel = {
+                Text(
+                    text = if (unitsAvailable) "Base ${formatRate(currentBasalRate!!)} U/hr"
+                        else "Basal rate unavailable",
+                    fontSize = 10.sp,
+                )
+            },
+            colors = if (unitsAvailable) ChipDefaults.primaryChipColors()
+                else ChipDefaults.secondaryChipColors(),
+            modifier = Modifier.fillMaxWidth(),
         )
     }
 }
@@ -277,13 +428,19 @@ private fun CancelTempBasalAlert(
 private fun SetTempBasalConfirmAlert(
     percent: Int,
     minutes: Int,
+    mode: TempBasalMode,
+    enteredUnits: Double,
     onCancel: () -> Unit,
     onConfirm: () -> Unit,
 ) {
+    val headline = when (mode) {
+        TempBasalMode.PERCENT -> "Set $percent% for ${formatDurationMinutes(minutes)}?"
+        TempBasalMode.UNITS -> "Set ${formatRate(enteredUnits)} U/hr ($percent%) for ${formatDurationMinutes(minutes)}?"
+    }
     Alert(
         title = {
             Text(
-                text = "Set $percent% for ${formatDurationMinutes(minutes)}?",
+                text = headline,
                 textAlign = TextAlign.Center,
                 color = MaterialTheme.colors.onBackground,
             )
@@ -308,6 +465,35 @@ private fun SetTempBasalConfirmAlert(
     ) {}
 }
 
+@Composable
+private fun ErrorAlert(
+    message: String,
+    onDismiss: () -> Unit,
+) {
+    Alert(
+        title = {
+            Text(
+                text = message,
+                textAlign = TextAlign.Center,
+                color = MaterialTheme.colors.onBackground,
+            )
+        },
+        negativeButton = {},
+        positiveButton = {
+            Button(onClick = onDismiss, colors = ButtonDefaults.primaryButtonColors()) {
+                Icon(Icons.Filled.Check, contentDescription = "OK")
+            }
+        },
+        icon = {
+            Image(
+                imageVector = Icons.Filled.Clear,
+                contentDescription = "Error",
+                modifier = Modifier.size(24.dp),
+            )
+        },
+    ) {}
+}
+
 private fun formatDurationMinutes(totalMinutes: Int): String {
     if (totalMinutes <= 0) return "0 min"
     val h = totalMinutes / 60
@@ -318,3 +504,5 @@ private fun formatDurationMinutes(totalMinutes: Int): String {
         else -> "${h}h ${m}m"
     }
 }
+
+private fun formatRate(rate: Double): String = "%.2f".format(rate)
