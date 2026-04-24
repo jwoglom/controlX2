@@ -36,10 +36,28 @@ jobs:
 
 
       - name: Download Robolectric jars
+        # The unit tests set `robolectric.offline=true` on CI and expect the
+        # framework jar at ~/.robolectric/. If this download is silently
+        # corrupt (e.g. Maven Central serves a 404 HTML page), Robolectric
+        # boots with a broken framework jar, `AndroidVersions.CURRENT` ends
+        # up null, and every Robolectric test blows up with confusing errors
+        # like `NoSuchFieldError: noncompatWidthPixels`. So: `--fail` turns
+        # HTTP errors into curl failures, `--retry` handles transient CDN
+        # blips, and the size assertion catches the rare case where Maven
+        # Central 200's with a tiny error body.
         run: |
           mkdir -p ~/.robolectric
-          curl -L -o ~/.robolectric/android-all-instrumented-15-robolectric-13954326-i7.jar \
+          jar=~/.robolectric/android-all-instrumented-15-robolectric-13954326-i7.jar
+          curl -L --fail --retry 5 --retry-delay 10 --retry-all-errors \
+            -o "$jar" \
             https://repo1.maven.org/maven2/org/robolectric/android-all-instrumented/15-robolectric-13954326-i7/android-all-instrumented-15-robolectric-13954326-i7.jar
+          size=$(stat -c%s "$jar")
+          if [ "$size" -lt 50000000 ]; then
+            echo "Robolectric framework jar too small ($size bytes) — likely a Maven Central error page, not the real jar."
+            head -c 512 "$jar" || true
+            exit 1
+          fi
+          echo "Robolectric framework jar OK: $size bytes"
 
       - name: Assemble Release
         run: |
