@@ -20,6 +20,7 @@ import com.jwoglom.pumpx2.pump.messages.response.currentStatus.BolusCalcDataSnap
 import com.jwoglom.pumpx2.pump.messages.response.currentStatus.CurrentBolusStatusResponse
 import com.jwoglom.pumpx2.pump.messages.response.currentStatus.LastBGResponse
 import com.jwoglom.pumpx2.pump.messages.response.currentStatus.LastBolusStatusAbstractResponse
+import com.jwoglom.pumpx2.pump.messages.response.currentStatus.TempRateResponse
 import com.jwoglom.pumpx2.pump.messages.response.currentStatus.TimeSinceResetResponse
 import timber.log.Timber
 import java.time.Instant
@@ -45,6 +46,13 @@ class DataStore {
     val controlIQMode = MutableLiveData<UserMode>()
     val basalRate = MutableLiveData<String>()
     var basalStatus = MutableLiveData<BasalStatus>()
+    // Temp-rate state, populated from TempRateResponse (refreshed on entry to
+    // the watch TempBasalScreen + every poll after set/cancel). Mirrors mobile
+    // DataStore.tempRateActive / tempRateDetails. `basalStatus` also exposes
+    // TEMP_RATE / ZERO_TEMP_RATE, but tempRateActive gives us the boolean
+    // directly and tempRateDetails carries the percent + duration for display.
+    val tempRateActive = MutableLiveData<Boolean>()
+    val tempRateDetails = MutableLiveData<TempRateResponse>()
     val cgmSessionState = MutableLiveData<String>()
     val cgmSessionExpireRelative = MutableLiveData<String>()
     val cgmSessionExpireExact = MutableLiveData<String>()
@@ -124,6 +132,8 @@ class DataStore {
         controlIQMode.logOnChange("controlIQMode")
         basalRate.logOnChange("basalRate")
         basalStatus.logOnChange("basalStatus")
+        tempRateActive.logOnChange("tempRateActive")
+        tempRateDetails.logOnChange("tempRateDetails")
         cgmSessionState.logOnChange("cgmSessionState")
         cgmSessionExpireExact.logOnChange("cgmSessionExpireExact")
         cgmSessionExpireRelative.logOnChange("cgmSessionExpireRelative")

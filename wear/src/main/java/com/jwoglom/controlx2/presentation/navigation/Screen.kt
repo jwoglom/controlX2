@@ -65,4 +65,5 @@ sealed class Screen(
 
     // Pump-command screens (work in both DeviceRole values).
     object ProfileSwitch : Screen("ProfileSwitch")
+    object TempBasalSet : Screen("TempBasalSet")
 }

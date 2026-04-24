@@ -232,7 +232,7 @@ controlX2/
 
 ---
 
-## Phase 5: Watch UI for Core Operations — ⏳ In progress (5a–5d ✅, 5e-1/5e-2 ✅, 5f-1/5f-2 ✅; 5e-3 deferred, 5f-3+ remaining)
+## Phase 5: Watch UI for Core Operations — ⏳ In progress (5a–5d ✅, 5e-1/5e-2 ✅, 5f-1/5f-2/5f-3 ✅; 5e-3 deferred, 5f-4+ remaining)
 
 **Goal:** Add full pump management UI on the watch for when it's the pump-host, starting with the items that unblock a non-adb developer loop.
 
@@ -249,7 +249,7 @@ controlX2/
 1. ✅ DeviceRole UI — landed in 5a; the `adb`-only dev loop is gone on both phone and watch.
 2. ✅ Native pump pairing flow on the watch — landed in 5b (finder, pairing-code RemoteInput, `PairingUnsupportedOnWatch` for `LONG_16CHAR`, and `PumpBondedNeedsUnbond` from Audit Tier 1).
 3. ✅ Nightscout URL / API-secret entry UI on the watch — landed in 5d, with an xDrip+ toggle and role-gated `SettingsHub` entry point.
-4. ⚠️ Basal / history / settings surfaces native to the watch in pump-host mode — **largely closed**: history (5e-1), basal detail (5e-2), suspend/resume (5f-1), active profile picker (5f-2) all shipped. CGM trend chart (5e-3) deferred; other settings parity items (temp basal, alert dismissal, transmitter ID) tracked as 5f remaining.
+4. ⚠️ Basal / history / settings surfaces native to the watch in pump-host mode — **largely closed**: history (5e-1), basal detail (5e-2), suspend/resume (5f-1), active profile picker (5f-2), temp basal + Sleep/Exercise hub (5f-3) all shipped. CGM trend chart (5e-3) deferred; remaining settings-parity items (alert dismissal, CGM transmitter ID) tracked as 5f-4+.
 
 ### Phase 5 sub-steps (ordered, each independently shippable)
 
@@ -418,16 +418,31 @@ Expose pump settings the phone already offers as watch screens, routed through t
 - Commit `e659bab`: dropped `androidx.wear.compose.material.items` in favor of `list.forEach { row -> item { ... } }` across `HistoryLogScreen`, `BasalDetailScreen`, and `ProfileSwitchScreen`. The 1.4.1 `items` function's signature wasn't lining up with the list-plus-itemContent-only call shape used here; `forEach` on `List` is inline so the outer `ScalingLazyListScope` receiver stays accessible to `item { }`. Works with both `material.*` and `foundation.lazy.*`.
 - Commits `a9df6ac` and `61a0262`: two rounds of the nested-KDoc-comment trap. `ProfileSwitchScreen`'s KDoc contained `` `/to-pump/*` ``, which Kotlin 2.2's block-comment grammar interprets as a nested comment opener. Both rewrites replace the literal slash-star sequence (referenced in prose as `to-pump` instead), mirroring the earlier `7db3dc9` fix in `WearHybridMessageBus.kt`.
 
+##### 5f-3. Watch-side temp basal set/cancel + Sleep/Exercise hub hookup — ✅ Complete
+
+**Shipped:**
+- New `wear/.../presentation/ui/TempBasalScreen.kt` — state-aware screen backed by two new DataStore fields (`tempRateActive: MutableLiveData<Boolean>`, `tempRateDetails: MutableLiveData<TempRateResponse>`) mirroring mobile's DataStore shape. On entry, fires `TempRateRequest()` with `SendType.BUST_CACHE` so the active/inactive branch decision uses fresh pump state.
+- **Active branch:** headline shows `percentage% for Hh Mm` (pulled from `TempRateResponse`) with a single "Cancel temp basal" chip. Tap → wear `Alert` confirm → dispatch `StopTempRateRequest()` with `SendType.BUST_CACHE`, then 5× 1s poll of `TempRateRequest()` (mirror of 5f-1's suspend/resume polling, but polling `TempRateRequest` instead of `HomeScreenMirrorRequest` because that's what mobile's `TempRateWindow.kt:522` / `Actions.kt:610` does).
+- **Inactive branch (two-step picker):** Step 1 = percent picker (range 0–250, default 100), Step 2 = total-minutes picker (range 15–480, default 30). Both reuse `wear/.../presentation/components/SingleNumberPicker.kt` (same component `BolusSelectCarbs` / `BolusSelectBG` use — handles its own rotary focus internally). After Step 2 → wear `Alert` confirm (title: `"Set N% for Hh Mm?"`) → dispatch `SetTempRateRequest(totalMinutes, percent)` with `SendType.BUST_CACHE` + same 5× poll. `SingleNumberPicker` returns 0 when a trailing blank slot is selected — floored to 15 before dispatch so a mis-scroll can't send a pump-rejected duration.
+- `Screen.TempBasalSet` route added; wired into `WearApp.kt` next to `ProfileSwitch` **without** an outer `FocusRequester` / `scalingLazyListState` (matches the `BolusSelectUnits` / `BolusSelectCarbs` pattern — the picker manages focus internally, and calling `RequestFocusOnResume` with a never-attached `FocusRequester` would throw).
+- `MainActivity.onPumpMessageReceived` adds a `TempRateResponse` arm that writes both `dataStore.tempRateActive.value = message.active` and `dataStore.tempRateDetails.value = message`, directly mirroring `mobile/MainActivity.kt:932-935`.
+- **Sleep / Exercise hub entries** (bonus, ~20 lines in `SettingsHubScreen.kt`): new "Sleep mode" and "Exercise mode" chips below "Active profile", navigating to the existing `Screen.SleepModeSet` / `Screen.ExerciseModeSet` Alert routes in `WearApp.kt`. Not role-gated (works in both `PUMP_HOST` and `CLIENT` via the shared `/to-pump/*` routing).
+- **Temp basal chip** added to `SettingsHubScreen` above "Active profile", also not role-gated.
+
+**Deviations from the plan:**
+- **No U/hr entry mode.** Mobile's `TempRateWindow` supports both Percent and U/hr; the U/hr path requires reading the current profile's basal rate to convert (`(rawUnits / currentBasalRate) * 100.0` per `TempRateWindow.kt:206`). Deferred — the percent-only path covers most use cases and keeps the watch screen under 330 lines.
+- **Single total-minutes picker instead of hours + minutes.** Mobile splits into hours (0–72) + minutes (0–59 step 1). Watch uses one picker for total minutes (15–480). Simpler UX on the smaller screen; the 480-minute cap (8h) is below mobile's 72h but covers the realistic day-to-day range.
+- **No "percent" step reuses the mobile preset-like tags** (e.g. "Exercise: 50% for 1h"). Plain entry only.
+- **No cartridge-state gate** — same rationale as 5f-1's resume-gate omission.
+- **Reuses `basalStatus` elsewhere; only `tempRateActive` is consumed here.** The DataStore exposes both `basalStatus` (`TEMP_RATE` / `ZERO_TEMP_RATE` values from `HomeScreenMirrorResponse`) and the new `tempRateActive` Boolean. The screen uses `tempRateActive` directly because it's the same signal mobile uses; the `basalStatus` TEMP_RATE value remains available for other surfaces like `LandingBasalRow`.
+- **Sleep/Exercise hub hookup is NOT strict parity** — mobile doesn't have a "Sleep" / "Exercise" settings entry either; these modes are set from the phone home screen. The hub chips make these already-existing wear screens discoverable from Settings in addition to the Landing modes row.
+
 ##### 5f remaining work — ⏳ Next
 
-Candidate items to fill out "settings management parity" on watch-as-host (mobile equivalents exist; watch code path can route through `/to-pump/*` the same way 5f-1 and 5f-2 do):
+- **CGM transmitter ID / sensor session management** — mobile `CGMActions.kt` (~588 lines). Watch needs G6 transmitter ID entry (6-char text), sensor code (8-digit), and possibly G7 pairing-code UI. Medium-sized (~450 lines on watch). Useful for users who want to pair a new transmitter from the watch side without reaching for the phone.
+- **Pump alert / alarm dismissal UI** — the watch currently doesn't surface a way to silence or acknowledge pump alarms. Mobile does via home-screen actions (`DismissNotificationRequest`). Smaller surface (~150 lines), but UX design requires thought — swipe-to-dismiss is less natural on wear.
 
-- **Temp basal set/cancel** — mobile `TempRateActions.kt`. Watch needs a rate + duration entry affordance (rotary crown is a natural fit).
-- **Sleep / Exercise mode toggles from a single hub** — screens already exist on wear (`SleepModeSet`, `ExerciseModeSet`) but they're only reachable via the Landing modes row; expose under `SettingsHub` too so the parity story with mobile is discoverable.
-- **CGM transmitter ID / sensor session management** — mobile settings flows exist; watch equivalents would benefit users pairing a new transmitter from the watch side.
-- **Pump alert / alarm dismissal UI** — the watch currently doesn't surface a way to silence or acknowledge pump alarms; mobile does via home-screen actions.
-
-Exact sub-phase split and priority TBD — pick based on user demand + implementation complexity, ordered "smallest shippable" first.
+Pick based on user demand + implementation complexity.
 
 ### Audit work completed alongside Phase 5 (commits `15b4686`, `ff130ac`, `5eeafa3`)
 
@@ -483,11 +498,12 @@ Phase 5   (watch pump-host UI)                       ⏳ In progress:
            5f Settings management parity             ⏳ In progress:
              5f-1 Watch-side suspend/resume insulin  ✅ Complete (commit 1935e0d)
              5f-2 Watch-side active profile picker   ✅ Complete (commit 744fa12)
-             5f-3+ Temp basal / alarms / more        ⏳ Next
+             5f-3 Temp basal + Sleep/Exercise hub    ✅ Complete (this branch)
+             5f-4+ CGM transmitter / alarm dismissal ⏳ Next
            + xDrip+ queries fix (enables broadcasts) ✅ Complete (commit 2758ad2, cross-cutting 4.5 + 5)
 ```
 
-Each phase is independently shippable. Phases 0-1 are pure refactors with no behavior change. Phase 2-3 are structural extractions. Phase 4 is the first user-visible feature (role selection shipped in 5a). Phase 5 is the full watch-as-host experience — 5a–5d, 5e-1/5e-2, and 5f-1/5f-2 are landed; 5e-3 (CGM chart) and the rest of 5f remain.
+Each phase is independently shippable. Phases 0-1 are pure refactors with no behavior change. Phase 2-3 are structural extractions. Phase 4 is the first user-visible feature (role selection shipped in 5a). Phase 5 is the full watch-as-host experience — 5a–5d, 5e-1/5e-2, and 5f-1/5f-2/5f-3 are landed; 5e-3 (CGM chart) and the rest of 5f (transmitter / alarms) remain.
 
 ---
 

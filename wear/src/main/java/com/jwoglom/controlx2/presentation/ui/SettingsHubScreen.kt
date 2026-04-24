@@ -53,13 +53,38 @@ fun SettingsHubScreen(
                 modifier = Modifier.fillMaxWidth(),
             )
         }
-        // Active profile — works in both DeviceRole values. The /to-pump/*
-        // message is routed by HybridMessageBus either to local BT (PUMP_HOST)
-        // or forwarded to the phone (CLIENT), so no role gate.
+        // Pump-command entries below work in both DeviceRole values. The
+        // to-pump message is routed by HybridMessageBus either to the local
+        // BT link (PUMP_HOST) or forwarded to the phone (CLIENT), so no role
+        // gate is needed.
+        item {
+            Chip(
+                onClick = { navController.navigate(Screen.TempBasalSet.route) },
+                label = { Text("Temp basal", fontSize = 13.sp) },
+                colors = ChipDefaults.primaryChipColors(),
+                modifier = Modifier.fillMaxWidth(),
+            )
+        }
         item {
             Chip(
                 onClick = { navController.navigate(Screen.ProfileSwitch.route) },
                 label = { Text("Active profile", fontSize = 13.sp) },
+                colors = ChipDefaults.primaryChipColors(),
+                modifier = Modifier.fillMaxWidth(),
+            )
+        }
+        item {
+            Chip(
+                onClick = { navController.navigate(Screen.SleepModeSet.route) },
+                label = { Text("Sleep mode", fontSize = 13.sp) },
+                colors = ChipDefaults.primaryChipColors(),
+                modifier = Modifier.fillMaxWidth(),
+            )
+        }
+        item {
+            Chip(
+                onClick = { navController.navigate(Screen.ExerciseModeSet.route) },
+                label = { Text("Exercise mode", fontSize = 13.sp) },
                 colors = ChipDefaults.primaryChipColors(),
                 modifier = Modifier.fillMaxWidth(),
             )
