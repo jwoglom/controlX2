@@ -104,6 +104,7 @@ import com.jwoglom.controlx2.presentation.ui.PumpDisconnectedReconnectingScreen
 import com.jwoglom.controlx2.presentation.ui.PumpFinderSelectScreen
 import com.jwoglom.controlx2.presentation.ui.RoleSelectionScreen
 import com.jwoglom.controlx2.presentation.ui.SettingsHubScreen
+import com.jwoglom.controlx2.presentation.ui.TempBasalScreen
 import com.jwoglom.controlx2.presentation.ui.XdripSettingsScreen
 import com.jwoglom.controlx2.presentation.ui.ScalingLazyListStateViewModel
 import com.jwoglom.controlx2.presentation.ui.ScrollStateViewModel
@@ -389,6 +390,17 @@ fun WearApp(
                         sendPumpCommands = sendPumpCommands,
                     )
                     RequestFocusOnResume(focusRequester)
+                }
+                composable(Screen.TempBasalSet.route) {
+                    // No outer FocusRequester / scalingLazyListState wiring:
+                    // TempBasalScreen is driven entirely by SingleNumberPicker,
+                    // which manages its own rotary focus internally — same
+                    // pattern as BolusSelectCarbs / BolusSelectBG above.
+                    TempBasalScreen(
+                        sendPumpCommands = sendPumpCommands,
+                        onDone = { navController.popBackStack() },
+                    )
+                    BottomText()
                 }
                 // Main Window
                 composable(

@@ -81,6 +81,7 @@ import com.jwoglom.pumpx2.pump.messages.response.currentStatus.HomeScreenMirrorR
 import com.jwoglom.pumpx2.pump.messages.response.currentStatus.InsulinStatusResponse
 import com.jwoglom.pumpx2.pump.messages.response.currentStatus.LastBGResponse
 import com.jwoglom.pumpx2.pump.messages.response.currentStatus.LastBolusStatusAbstractResponse
+import com.jwoglom.pumpx2.pump.messages.response.currentStatus.TempRateResponse
 import com.jwoglom.pumpx2.pump.messages.response.currentStatus.TimeSinceResetResponse
 import com.jwoglom.pumpx2.pump.messages.response.historyLog.BolusDeliveryHistoryLog
 import com.jwoglom.pumpx2.pump.messages.response.qualifyingEvent.QualifyingEvent
@@ -448,6 +449,10 @@ class MainActivity : ComponentActivity() {
             }
             is CurrentBasalStatusResponse -> {
                 dataStore.basalRate.value = "${twoDecimalPlaces1000Unit(message.currentBasalRate)}u"
+            }
+            is TempRateResponse -> {
+                dataStore.tempRateActive.value = message.active
+                dataStore.tempRateDetails.value = message
             }
             is CGMStatusResponse -> {
                 dataStore.cgmSessionState.value = when (message.sessionState) {
