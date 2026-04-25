@@ -89,6 +89,7 @@ import com.jwoglom.controlx2.presentation.navigation.DestinationScrollType
 import com.jwoglom.controlx2.presentation.navigation.SCROLL_TYPE_NAV_ARGUMENT
 import com.jwoglom.controlx2.presentation.navigation.Screen
 import com.jwoglom.controlx2.presentation.ui.BolusScreen
+import com.jwoglom.controlx2.presentation.ui.CGMTransmitterScreen
 import com.jwoglom.controlx2.presentation.ui.ConnectingToPumpScreen
 import com.jwoglom.controlx2.presentation.ui.BasalDetailScreen
 import com.jwoglom.controlx2.presentation.ui.FullScreenText
@@ -415,6 +416,24 @@ fun WearApp(
                     val listState = scalingLazyListState(it)
                     val focusRequester = remember { FocusRequester() }
                     WatchNotificationsScreen(
+                        scalingLazyListState = listState,
+                        focusRequester = focusRequester,
+                        sendPumpCommands = sendPumpCommands,
+                    )
+                    RequestFocusOnResume(focusRequester)
+                }
+                composable(
+                    route = Screen.CGMTransmitter.route,
+                    arguments = listOf(
+                        navArgument(SCROLL_TYPE_NAV_ARGUMENT) {
+                            type = NavType.EnumType(DestinationScrollType::class.java)
+                            defaultValue = DestinationScrollType.SCALING_LAZY_COLUMN_SCROLLING
+                        }
+                    )
+                ) {
+                    val listState = scalingLazyListState(it)
+                    val focusRequester = remember { FocusRequester() }
+                    CGMTransmitterScreen(
                         scalingLazyListState = listState,
                         focusRequester = focusRequester,
                         sendPumpCommands = sendPumpCommands,
