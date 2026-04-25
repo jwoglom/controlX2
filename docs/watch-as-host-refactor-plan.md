@@ -232,7 +232,7 @@ controlX2/
 
 ---
 
-## Phase 5: Watch UI for Core Operations — ⏳ In progress (5a–5d ✅, 5e-1/5e-2 ✅, 5f ✅ done; 5e-3 still deferred)
+## Phase 5: Watch UI for Core Operations — ✅ Complete (5a–5f all shipped on this branch)
 
 **Goal:** Add full pump management UI on the watch for when it's the pump-host, starting with the items that unblock a non-adb developer loop.
 
@@ -249,7 +249,7 @@ controlX2/
 1. ✅ DeviceRole UI — landed in 5a; the `adb`-only dev loop is gone on both phone and watch.
 2. ✅ Native pump pairing flow on the watch — landed in 5b (finder, pairing-code RemoteInput, `PairingUnsupportedOnWatch` for `LONG_16CHAR`, and `PumpBondedNeedsUnbond` from Audit Tier 1).
 3. ✅ Nightscout URL / API-secret entry UI on the watch — landed in 5d, with an xDrip+ toggle and role-gated `SettingsHub` entry point.
-4. ✅ Basal / history / settings surfaces native to the watch in pump-host mode — **closed**: history (5e-1), basal detail (5e-2), suspend/resume (5f-1), active profile picker (5f-2), temp basal + Sleep/Exercise hub (5f-3), pump-alert dismissal (5f-4), CGM transmitter / sensor session (5f-5) all shipped. CGM trend chart (5e-3) remains deferred on scoping grounds, but is no longer ship-blocking — every other settings-parity surface is in place.
+4. ✅ Basal / history / settings surfaces native to the watch in pump-host mode — **closed**: history (5e-1), basal detail (5e-2), CGM trend chart (5e-3, Canvas-based), suspend/resume (5f-1), active profile picker (5f-2), temp basal + Sleep/Exercise hub (5f-3), pump-alert dismissal (5f-4), CGM transmitter / sensor session (5f-5) all shipped. Every Phase 5 surface is in place.
 
 ### Phase 5 sub-steps (ordered, each independently shippable)
 
@@ -318,7 +318,7 @@ Each sub-step should ship with a phone-as-host regression pass plus a watch-as-h
 
 **Still open:** xDrip+ on Wear OS receiver behavior remains unverified (inherited from Phase 4.5). UI ships the toggle and dispatches `sendBroadcast`, but whether a watch-side xDrip+ receiver exists is still an open runtime question.
 
-#### 5e. Pump data surfaces on watch (reuse existing flows) — ⏳ Partial (5e-1 ✅, 5e-2 ✅, 5e-3 deferred)
+#### 5e. Pump data surfaces on watch (reuse existing flows) — ✅ Complete (5e-1, 5e-2, 5e-3 all shipped)
 
 Split into three sub-phases ordered by complexity so each is independently shippable. Post-ship audit (commit `c9fe04b`) landed after 5e-1 + 5e-2 to address correctness / design drift before the CGM chart work — see the "5e post-ship audit" block below.
 
@@ -353,12 +353,30 @@ Split into three sub-phases ordered by complexity so each is independently shipp
 - `pumpSid` captured once via `remember { WearPrefs(context).currentPumpSid() }`; if it flips from `-1` to valid during the screen's visibility, the user must navigate away and back to see history populate — matches the 5e-1 / Nightscout-settings pattern.
 - No per-row detail view (tapping a chip is a no-op). Future iteration.
 
-##### 5e-3. CGM trend-graph screen — ⏳ Deferred (skipped in favor of 5f)
+##### 5e-3. CGM trend-graph screen — ✅ Complete (Canvas-based, this branch)
 
-- Full-screen CGM chart — largest of the three. Mobile's `VicoCgmChart.kt` is 2434 lines; the watch version should aim for a much leaner scope (6–12h window, CGM line only, minimal overlays).
-- Needs `com.patrykandpatrick.vico:vico-compose` + `vico-core` added to `wear/build.gradle` (already on mobile). Alternative worth evaluating before that dep lands: a Canvas-based minimal renderer, which would avoid the APK growth.
-- Backed by `HistoryLogViewModel.itemsForTypesSince(...)` filtered to the CGM-reading types (opposite of the 5e-1 filter).
-- **Status note:** After 5e-1 and 5e-2 shipped, work jumped directly to 5f because the CGM chart is a larger scoping decision (Vico vs Canvas) and because 5f items unblock day-to-day pump control on watch-as-host. 5e-3 remains the right "finish line" for 5e but is lower priority than 5f subtasks.
+**Shipped:**
+- New `wear/.../presentation/ui/CgmChartScreen.kt` (~210 lines). PUMP_HOST-only since it reads from the watch-local `HistoryLogRepo`.
+- **Renderer:** plain `androidx.compose.foundation.Canvas` — chose Canvas over Vico-compose to avoid pulling `vico-compose` + `vico-core` (~1.2 MB) into the wear APK for what reduces to a single-line chart on a circular watch face. Mobile's `VicoCgmChart.kt` is 2434 lines because it juggles bolus / basal / threshold / CGM layers with rich Vico configuration; this watch port covers just the CGM trace and lands at <215 lines.
+- **Data flow** mirrors mobile `VicoCgmChart.toCgmDataPoint`: query `HistoryLogViewModel.latestItemsForTypes(CGM_TYPE_CLASSES, 200)` (G6, G7, Gx, FSL2, FSL3 — the same list mobile filters on), parse each item, extract glucose via the same subclass dispatch (`currentGlucoseDisplayValue` for G6/G7, `.value` for Gx/FSL), drop zero/negative readings. 200 readings ≈ 16+ hours at the typical 5-minute sample rate — comfortably more than the 6-hour window.
+- **Window anchoring:** the right edge anchors to the most recent reading rather than wall-clock so a watch that's been disconnected for a few hours still shows continuous data instead of an empty chart. Plan-doc deviation: original spec said `itemsForTypesSince(...)` with a wall-clock cutoff; the latest-N + filter approach is simpler and avoids pump-time-vs-real-time conversion in the query.
+- **Render layers** (bottom-up):
+  - Hourly dashed vertical grid lines.
+  - Dashed horizontal threshold lines at low (70 mg/dL or 70/18 mmol/L) and high (180 mg/dL or 180/18 mmol/L). Standard CGM bands; not user-configurable yet.
+  - CGM polyline (`Path` with `Stroke(width = 2.5f)`) using `MaterialTheme.colors.primary`.
+  - Endpoint dot at the most recent reading.
+- **Unit awareness:** observes `dataStore.glucoseUnitPreference`. mg/dL renders raw; mmol/L divides by 18. Threshold lines + Y-axis padding (±10) scale via a `Float.ofUnit(unit)` extension so both units use the same code path.
+- **Footer:** single-line "{value} {unit} · h:mm a" formatted from the most recent reading (LocalDateTime via `pumpTimeLocal()` + `DateTimeFormatter.ofPattern("h:mm a")`).
+- **Empty states:** "No CGM readings in the last 6h." when the windowed series is empty; "CGM history will appear after the first pump connection." when `pumpSid < 0` or `LocalHistoryLogRepo.current` is null. Reuses the same guard pattern 5d Nightscout / 5e-1 / 5e-2 use.
+- `Screen.CgmChart` route added under "Pump data surfaces (DeviceRole.PUMP_HOST)" in `Screen.kt`. Wired in `WearApp.kt` as a plain `composable(Screen.CgmChart.route)` — no `SCROLL_TYPE_NAV_ARGUMENT`, no `scalingLazyListState`, no `RequestFocusOnResume` because the screen is a fixed Canvas with no scroll surface.
+- `SettingsHubScreen.kt` gains a "CGM chart" chip in the `PUMP_HOST` block above "Pump history".
+
+**Deviations from the plan / mobile:**
+- **Canvas instead of Vico.** No new dependencies in `wear/build.gradle`. Plan doc previously called this "the Vico-vs-Canvas decision" — this commit picks Canvas.
+- **No multi-layer overlays.** Mobile's chart shows boluses, basal segments, Control-IQ predictions, and time-in-range bands; watch shows just the CGM line + thresholds. A 192×192 pixel circular watch face can't legibly carry the rest.
+- **No interactivity.** No tap-to-inspect-point, no zoom, no pan. The chart is a static glance surface; if users want detail they have the History Log screen (5e-1) which pulls from the same DB.
+- **No "Vico-style" smoothing.** Linear interpolation between 5-minute samples is fine — the data is already discrete, smoothing would imply false precision.
+- **No live `cgmReading` overlay.** Mobile splices in the live (`dataStore.cgmReading`) value at the right edge; watch shows only what's in the historical DB. Adding the live point is one composable read but defers naturally to a future iteration if users notice the lag.
 
 ##### 5e post-ship audit — ✅ Complete (commit `c9fe04b`)
 
@@ -480,9 +498,9 @@ Expose pump settings the phone already offers as watch screens, routed through t
 - **No "in-progress" gating.** Mobile guards the Start button with `enabled = startG6CgmSessionInProgressTxId == null` to prevent double-clicks. Watch dispatches synchronously inside a `refreshScope.launch { … }` block, so a double-tap on the confirm Alert just sends the same dispatch twice — pump will reject the duplicate. Acceptable on watch where the confirm dialog itself is a stronger gate than mobile's button-disable.
 - **No `GetSavedG7PairingCodeRequest` round-trip to display the existing G7 code.** Mobile fetches it on entry. Watch just shows the session state header. Adding the saved-code display is a one-line addition once `dataStore.savedG7PairingCode` is plumbed; deferred since users typically don't need to read back the code they just entered.
 
-##### 5f complete — what's left under Phase 5
+##### Phase 5 complete
 
-Only **5e-3** (CGM trend chart) remains deferred. It's the largest scoping decision in Phase 5 (Vico-compose dependency vs Canvas-based minimal renderer); revisit when there's a clear use case demanding a full-screen graph on watch. Mobile's `VicoCgmChart.kt` is 2434 lines — the watch port should aim for under 400 with a 6–12h window and no overlays.
+5e-3 also shipped on this branch (Canvas renderer, see the 5e-3 block above). Every Phase 5 surface is now in place: 5a–5d, 5e-1/5e-2/5e-3, and 5f-1 through 5f-5. The only remaining Phase 5 work is build/verification (a clean `./gradlew :wear:assembleDebug :mobile:assembleDebug :shared:testDebugUnitTest :db:testDebugUnitTest` pass on this branch) and the open xDrip+ Wear OS receiver question from Phase 4.5 — both tracked in the "Build/verification gaps" callout below.
 
 ### Audit work completed alongside Phase 5 (commits `15b4686`, `ff130ac`, `5eeafa3`)
 
@@ -530,11 +548,11 @@ Phase 5   (watch pump-host UI)                       ⏳ In progress:
            5c Connection status + reconnection UX    ✅ Complete (commit ca97612)
            5d Nightscout / xDrip+ settings on watch  ✅ Complete (commit c61435f)
            + Audit Tiers 1/2/3                       ✅ Complete (commits 15b4686, ff130ac, 5eeafa3)
-           5e Pump data surfaces on watch            ⏳ Partial (5e-3 deferred):
+           5e Pump data surfaces on watch            ✅ Complete:
              5e-1 Watch-side history/events screen   ✅ Complete (commit 0125d58)
              5e-2 Basal rate display screen          ✅ Complete (commit 6581260)
              + 5e post-ship audit                    ✅ Complete (commit c9fe04b)
-             5e-3 CGM trend-graph screen             ⏳ Deferred (skipped for 5f)
+             5e-3 CGM trend-graph screen             ✅ Complete (this branch, Canvas)
            5f Settings management parity             ✅ Complete:
              5f-1 Watch-side suspend/resume insulin  ✅ Complete (commit 1935e0d)
              5f-2 Watch-side active profile picker   ✅ Complete (commit 744fa12)
@@ -544,7 +562,7 @@ Phase 5   (watch pump-host UI)                       ⏳ In progress:
            + xDrip+ queries fix (enables broadcasts) ✅ Complete (commit 2758ad2, cross-cutting 4.5 + 5)
 ```
 
-Each phase is independently shippable. Phases 0-1 are pure refactors with no behavior change. Phase 2-3 are structural extractions. Phase 4 is the first user-visible feature (role selection shipped in 5a). Phase 5 is the full watch-as-host experience — 5a–5d, 5e-1/5e-2, and all of 5f (5f-1 through 5f-5) are landed. The only Phase 5 item still open is 5e-3 (full-screen CGM trend chart), deferred on scoping grounds (Vico dependency vs Canvas renderer).
+Each phase is independently shippable. Phases 0-1 are pure refactors with no behavior change. Phase 2-3 are structural extractions. Phase 4 is the first user-visible feature (role selection shipped in 5a). Phase 5 is the full watch-as-host experience and is now complete on this branch — 5a–5f all shipped. The only outstanding work is build/verification on the tip of `dev` and the unresolved xDrip+ watch-receiver question from Phase 4.5.
 
 ---
 

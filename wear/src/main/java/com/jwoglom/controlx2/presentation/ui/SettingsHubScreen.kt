@@ -107,8 +107,17 @@ fun SettingsHubScreen(
         }
         if (role == DeviceRole.PUMP_HOST) {
             // Basal is a pump-data surface, not a setting — reached by tapping
-            // the basal row on Landing. Pump history is more diagnostic, so it
-            // lives here for now.
+            // the basal row on Landing. Pump history + CGM chart live here
+            // because they're diagnostic surfaces backed by the watch-local
+            // HistoryLogRepo (PUMP_HOST-only data).
+            item {
+                Chip(
+                    onClick = { navController.navigate(Screen.CgmChart.route) },
+                    label = { Text("CGM chart", fontSize = 13.sp) },
+                    colors = ChipDefaults.primaryChipColors(),
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
             item {
                 Chip(
                     onClick = { navController.navigate(Screen.HistoryLog.route) },
