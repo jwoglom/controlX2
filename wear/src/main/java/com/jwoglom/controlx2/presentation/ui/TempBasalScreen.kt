@@ -356,7 +356,7 @@ private fun CancelActivePanel(
     onCancelTapped: () -> Unit,
 ) {
     val subtitle = details?.let {
-        "${it.percentage}% for ${formatDurationMinutes(it.duration / 60)}"
+        "${it.percentage}% for ${formatDurationMinutes((it.duration / 60).toInt())}"
     } ?: "Active temp basal"
 
     Column(
@@ -394,7 +394,7 @@ private fun CancelTempBasalAlert(
     onConfirm: () -> Unit,
 ) {
     val titleText = details?.let {
-        "Cancel ${it.percentage}% for ${formatDurationMinutes(it.duration / 60)}?"
+        "Cancel ${it.percentage}% for ${formatDurationMinutes((it.duration / 60).toInt())}?"
     } ?: "Cancel this temp basal?"
     Alert(
         title = {
