@@ -232,7 +232,7 @@ controlX2/
 
 ---
 
-## Phase 5: Watch UI for Core Operations — ⏳ In progress (5a–5d ✅, 5e-1/5e-2 ✅, 5f-1/5f-2/5f-3 ✅; 5e-3 deferred, 5f-4+ remaining)
+## Phase 5: Watch UI for Core Operations — ⏳ In progress (5a–5d ✅, 5e-1/5e-2 ✅, 5f-1/5f-2/5f-3/5f-4 ✅; 5e-3 deferred, 5f-5 remaining)
 
 **Goal:** Add full pump management UI on the watch for when it's the pump-host, starting with the items that unblock a non-adb developer loop.
 
@@ -249,7 +249,7 @@ controlX2/
 1. ✅ DeviceRole UI — landed in 5a; the `adb`-only dev loop is gone on both phone and watch.
 2. ✅ Native pump pairing flow on the watch — landed in 5b (finder, pairing-code RemoteInput, `PairingUnsupportedOnWatch` for `LONG_16CHAR`, and `PumpBondedNeedsUnbond` from Audit Tier 1).
 3. ✅ Nightscout URL / API-secret entry UI on the watch — landed in 5d, with an xDrip+ toggle and role-gated `SettingsHub` entry point.
-4. ⚠️ Basal / history / settings surfaces native to the watch in pump-host mode — **largely closed**: history (5e-1), basal detail (5e-2), suspend/resume (5f-1), active profile picker (5f-2), temp basal + Sleep/Exercise hub (5f-3) all shipped. CGM trend chart (5e-3) deferred; remaining settings-parity items (alert dismissal, CGM transmitter ID) tracked as 5f-4+.
+4. ⚠️ Basal / history / settings surfaces native to the watch in pump-host mode — **largely closed**: history (5e-1), basal detail (5e-2), suspend/resume (5f-1), active profile picker (5f-2), temp basal + Sleep/Exercise hub (5f-3), pump-alert dismissal (5f-4) all shipped. CGM trend chart (5e-3) deferred; the only remaining settings-parity item is CGM transmitter / sensor session management (tracked as 5f-5).
 
 ### Phase 5 sub-steps (ordered, each independently shippable)
 
@@ -442,10 +442,29 @@ Expose pump settings the phone already offers as watch screens, routed through t
 - **Reuses `basalStatus` elsewhere; only `tempRateActive` is consumed here.** The DataStore exposes both `basalStatus` (`TEMP_RATE` / `ZERO_TEMP_RATE` values from `HomeScreenMirrorResponse`) and the new `tempRateActive` Boolean. The screen uses `tempRateActive` directly because it's the same signal mobile uses; the `basalStatus` TEMP_RATE value remains available for other surfaces like `LandingBasalRow`.
 - **Sleep/Exercise hub hookup is NOT strict parity** — mobile doesn't have a "Sleep" / "Exercise" settings entry either; these modes are set from the phone home screen. The hub chips make these already-existing wear screens discoverable from Settings in addition to the Landing modes row.
 
+##### 5f-4. Watch-side pump alerts / alarms / reminders / CGM-alerts dismissal — ✅ Complete
+
+**Shipped:**
+- New `wear/.../presentation/ui/WatchNotificationsScreen.kt` — `ScalingLazyColumn` listing every active pump notification (alerts, alarms, reminders, CGM alerts, plus the read-only Tandem-malfunction `HighestAamResponse`) with per-row tap-to-dismiss. Backed by a new `dataStore.notificationBundle: MutableLiveData<NotificationBundle>` that mirrors mobile's shape. On entry, fires every `NotificationBundle.allRequests()` with `SendType.BUST_CACHE` so the list reflects current pump state, not a stale cache.
+- `MainActivity.onPumpMessageReceived` adds a `NotificationBundle.isNotificationResponse(message)` arm next to the existing `IDPManager` arm, populating `dataStore.notificationBundle` via `bundle.add(message)` + re-wrapping in a fresh `NotificationBundle()` to trigger LiveData observers — direct mirror of mobile `MainActivity.kt:820-825`.
+- Per-row dismiss mirrors mobile `NotificationItem.dismissNotification()` exactly: `DismissNotificationRequest(NotificationType, bitmask-or-id)` dispatched via `SendType.STANDARD`, then `delay(500)`, then full `NotificationBundle.allRequests()` refresh. Type/payload mapping:
+  - `AlertStatusResponse.AlertResponseType` → `NotificationType.ALERT, bitmask().toLong()`
+  - `AlarmStatusResponse.AlarmResponseType` → `NotificationType.ALARM, bitmask().toLong()`
+  - `ReminderStatusResponse.ReminderType` → `NotificationType.REMINDER, id().toLong()`
+  - `CGMAlertStatusResponse.CGMAlert` → `NotificationType.CGM_ALERT, id().toLong()`
+- `HighestAamResponse` (pump malfunction, e.g. ERROR-1) renders read-only with secondary label "Cannot be dismissed" and a disabled chip — matches mobile's UX (mobile shows a static informational line for it).
+- Confirm `Alert` per-tap with a `Warning` icon for alarms / `Notifications` icon for everything else; positive button dispatches and closes, negative cancels.
+- `Screen.Notifications` route added with the `SCROLL_TYPE_NAV_ARGUMENT` + `scalingLazyListState` + `RequestFocusOnResume` plumbing (matches `HistoryLog` / `BasalDetail` pattern, since the screen is a scrolling list).
+- `SettingsHubScreen.kt` gains a "Pump alerts" chip below "Exercise mode" (not role-gated — works in both `PUMP_HOST` and `CLIENT` via the shared `/to-pump/*` routing).
+
+**Deviations from mobile:**
+- **No swipe-to-dismiss UI.** Mobile uses `SwipeToDismissBox` (Material3 wrapper) for swipe-to-delete. Wear has its own `SwipeDismissableNavHost` for back-navigation gestures; using a horizontal swipe inside that container is conflict-prone. Tap-to-dismiss with confirm is the safer wear idiom and matches every other 5f screen.
+- **No TSLIM_X2 caveat banner.** Mobile shows "Notifications cannot be dismissed on this device model" for t:slim X2 pumps. The watch dispatches the request anyway — pump silently rejects on TSLIM_X2 — so users on that model will see the alert remain after tapping. Tracked as a known limitation; can add a banner later via `dataStore.deviceName` parsing if it becomes a support burden.
+- **No per-type filter UI.** All four notification types render in one mixed list; users typically have at most one or two active alerts so filtering would add chrome without value.
+
 ##### 5f remaining work — ⏳ Next
 
-- **CGM transmitter ID / sensor session management** — mobile `CGMActions.kt` (~588 lines). Watch needs G6 transmitter ID entry (6-char text), sensor code (8-digit), and possibly G7 pairing-code UI. Medium-sized (~450 lines on watch). Useful for users who want to pair a new transmitter from the watch side without reaching for the phone.
-- **Pump alert / alarm dismissal UI** — the watch currently doesn't surface a way to silence or acknowledge pump alarms. Mobile does via home-screen actions (`DismissNotificationRequest`). Smaller surface (~150 lines), but UX design requires thought — swipe-to-dismiss is less natural on wear.
+- **CGM transmitter ID / sensor session management** — mobile `CGMActions.kt` (~588 lines). Watch needs G6 transmitter ID entry (6-char text), sensor code (8-digit), and possibly G7 pairing-code UI. Medium-sized (~280 lines on watch using the existing `RemoteTextInput` helper for text entry). Useful for users who want to pair a new transmitter from the watch side without reaching for the phone.
 
 Pick based on user demand + implementation complexity.
 
@@ -504,11 +523,12 @@ Phase 5   (watch pump-host UI)                       ⏳ In progress:
              5f-1 Watch-side suspend/resume insulin  ✅ Complete (commit 1935e0d)
              5f-2 Watch-side active profile picker   ✅ Complete (commit 744fa12)
              5f-3 Temp basal + Sleep/Exercise hub    ✅ Complete (this branch)
-             5f-4+ CGM transmitter / alarm dismissal ⏳ Next
+             5f-4 Pump alert / alarm dismissal       ✅ Complete (this branch)
+             5f-5 CGM transmitter / sensor session   ⏳ Next
            + xDrip+ queries fix (enables broadcasts) ✅ Complete (commit 2758ad2, cross-cutting 4.5 + 5)
 ```
 
-Each phase is independently shippable. Phases 0-1 are pure refactors with no behavior change. Phase 2-3 are structural extractions. Phase 4 is the first user-visible feature (role selection shipped in 5a). Phase 5 is the full watch-as-host experience — 5a–5d, 5e-1/5e-2, and 5f-1/5f-2/5f-3 are landed; 5e-3 (CGM chart) and the rest of 5f (transmitter / alarms) remain.
+Each phase is independently shippable. Phases 0-1 are pure refactors with no behavior change. Phase 2-3 are structural extractions. Phase 4 is the first user-visible feature (role selection shipped in 5a). Phase 5 is the full watch-as-host experience — 5a–5d, 5e-1/5e-2, and 5f-1 through 5f-4 are landed; 5e-3 (CGM chart) and 5f-5 (CGM transmitter / sensor session) remain.
 
 ---
 
