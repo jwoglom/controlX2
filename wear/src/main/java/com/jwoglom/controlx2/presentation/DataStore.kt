@@ -10,6 +10,7 @@ import com.jwoglom.pumpx2.pump.messages.models.PairingCodeType
 import com.jwoglom.pumpx2.pump.messages.builders.IDPManager
 import com.jwoglom.pumpx2.pump.messages.calculator.BolusCalcCondition
 import com.jwoglom.pumpx2.pump.messages.calculator.BolusCalcUnits
+import com.jwoglom.pumpx2.pump.messages.models.NotificationBundle
 import com.jwoglom.pumpx2.pump.messages.calculator.BolusCalculatorBuilder
 import com.jwoglom.pumpx2.pump.messages.calculator.BolusParameters
 import com.jwoglom.pumpx2.pump.messages.response.control.BolusPermissionResponse
@@ -67,6 +68,9 @@ class DataStore {
     val maxBolusAmount = MutableLiveData<Double>()
     val maxCarbAmount = MutableLiveData<Int>()
     val idpManager = MutableLiveData<IDPManager>(IDPManager())
+    // Active alerts / alarms / reminders / CGM alerts. Aggregated from
+    // pumpx2 NotificationBundle.add(message), same shape mobile uses.
+    val notificationBundle = MutableLiveData<NotificationBundle>(NotificationBundle())
 
     val landingBasalDisplayedText = MutableLiveData<String>()
     val landingControlIQDisplayedText = MutableLiveData<String>()
@@ -148,6 +152,7 @@ class DataStore {
         maxBolusAmount.logOnChange("maxBolusAmount")
         maxCarbAmount.logOnChange("maxCarbAmount")
         idpManager.logOnChange("idpManager")
+        notificationBundle.logOnChange("notificationBundle")
 
         landingBasalDisplayedText.logOnChange("landingBasalDisplayedText")
         landingControlIQDisplayedText.logOnChange("landingControlIQDisplayedText")

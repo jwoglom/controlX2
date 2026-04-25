@@ -55,6 +55,7 @@ import com.jwoglom.pumpx2.pump.messages.builders.IDPManager
 import com.jwoglom.pumpx2.pump.messages.calculator.BolusCalcUnits
 import com.jwoglom.pumpx2.pump.messages.calculator.BolusParameters
 import com.jwoglom.pumpx2.pump.messages.models.InsulinUnit
+import com.jwoglom.pumpx2.pump.messages.models.NotificationBundle
 import com.jwoglom.pumpx2.pump.messages.request.control.InitiateBolusRequest
 import com.jwoglom.pumpx2.pump.messages.request.control.RemoteBgEntryRequest
 import com.jwoglom.pumpx2.pump.messages.request.control.RemoteCarbEntryRequest
@@ -385,6 +386,13 @@ class MainActivity : ComponentActivity() {
                 if (isComplete != dataStore.idpManager.value?.isComplete) {
                     dataStore.idpManager.value = IDPManager(dataStore.idpManager.value)
                 }
+            }
+        }
+        if (NotificationBundle.isNotificationResponse(message)) {
+            synchronized(dataStore.notificationBundle) {
+                val updated = (dataStore.notificationBundle.value ?: NotificationBundle()).add(message)
+                // Re-create the bundle to trigger LiveData state-change observers; mirrors mobile MainActivity.kt:820-825.
+                dataStore.notificationBundle.value = NotificationBundle(updated)
             }
         }
         when (message) {

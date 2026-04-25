@@ -105,6 +105,7 @@ import com.jwoglom.controlx2.presentation.ui.PumpFinderSelectScreen
 import com.jwoglom.controlx2.presentation.ui.RoleSelectionScreen
 import com.jwoglom.controlx2.presentation.ui.SettingsHubScreen
 import com.jwoglom.controlx2.presentation.ui.TempBasalScreen
+import com.jwoglom.controlx2.presentation.ui.WatchNotificationsScreen
 import com.jwoglom.controlx2.presentation.ui.XdripSettingsScreen
 import com.jwoglom.controlx2.presentation.ui.ScalingLazyListStateViewModel
 import com.jwoglom.controlx2.presentation.ui.ScrollStateViewModel
@@ -401,6 +402,24 @@ fun WearApp(
                         onDone = { navController.popBackStack() },
                     )
                     BottomText()
+                }
+                composable(
+                    route = Screen.Notifications.route,
+                    arguments = listOf(
+                        navArgument(SCROLL_TYPE_NAV_ARGUMENT) {
+                            type = NavType.EnumType(DestinationScrollType::class.java)
+                            defaultValue = DestinationScrollType.SCALING_LAZY_COLUMN_SCROLLING
+                        }
+                    )
+                ) {
+                    val listState = scalingLazyListState(it)
+                    val focusRequester = remember { FocusRequester() }
+                    WatchNotificationsScreen(
+                        scalingLazyListState = listState,
+                        focusRequester = focusRequester,
+                        sendPumpCommands = sendPumpCommands,
+                    )
+                    RequestFocusOnResume(focusRequester)
                 }
                 // Main Window
                 composable(
