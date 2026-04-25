@@ -107,11 +107,15 @@ XML
 fi
 
 # ── Create local.properties ──
-cat > "$REPO_ROOT/local.properties" << EOF
+LOCAL_PROPS_EXPECTED="sdk.dir=$SDK_ROOT
+use_local_pumpx2=false"
+if [[ ! -f "$REPO_ROOT/local.properties" ]] || [[ "$(cat "$REPO_ROOT/local.properties")" != "$LOCAL_PROPS_EXPECTED" ]]; then
+  cat > "$REPO_ROOT/local.properties" << EOF
 sdk.dir=$SDK_ROOT
 use_local_pumpx2=false
 EOF
-echo "local.properties written"
+  echo "local.properties written"
+fi
 
 # ── Download Robolectric offline JARs ──
 # Robolectric downloads instrumented Android JARs at test time.
@@ -152,12 +156,18 @@ write_env_var() {
   local target="$1"
   local key="$2"
   local value="$3"
+  local expected="export $key=$value"
   [[ -z "$target" ]] && return 0
-  # Remove any prior export of this key, then append the fresh one.
+  # Skip if the file already has the exact line we'd write.
+  if [[ -f "$target" ]] && grep -Fxq "$expected" "$target"; then
+    return 0
+  fi
+  # Drop any stale export of this key, then append the fresh one.
   if [[ -f "$target" ]]; then
     sed -i "\|^export $key=|d" "$target" 2>/dev/null || true
   fi
-  echo "export $key=$value" >> "$target"
+  echo "$expected" >> "$target"
+  echo "wrote $key=$value to $target"
 }
 
 for target in "${CLAUDE_ENV_FILE:-}" "$HOME/.bashrc"; do
@@ -184,8 +194,20 @@ for var in ANDROID_HOME ANDROID_SDK_ROOT; do
   fi
 done
 
-echo "Checking gradle dependencies..."
-(cd "$REPO_ROOT" && ./gradlew dependencies --quiet)
+# ── Warm Gradle dependency cache ──
+# Slow (multiple minutes), so gate on a sentinel that records the SDK + script
+# version we cached against. Bump CACHE_VERSION when you change SDK components
+# or anything else that should invalidate the cached resolution.
+CACHE_VERSION="1"
+DEPS_SENTINEL="$SDK_ROOT/.gradle-deps-warmed"
+DEPS_TOKEN="$CACHE_VERSION:$SDK_ROOT"
+if [[ ! -f "$DEPS_SENTINEL" ]] || [[ "$(cat "$DEPS_SENTINEL")" != "$DEPS_TOKEN" ]]; then
+  echo "Warming gradle dependencies..."
+  (cd "$REPO_ROOT" && ./gradlew dependencies --quiet)
+  echo "$DEPS_TOKEN" > "$DEPS_SENTINEL"
+else
+  echo "Gradle dependencies already warmed (skipping)"
+fi
 
 echo "Setup complete!"
 echo "  SDK: $SDK_ROOT"
