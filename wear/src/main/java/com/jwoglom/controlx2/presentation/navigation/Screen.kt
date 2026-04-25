@@ -67,4 +67,5 @@ sealed class Screen(
     object ProfileSwitch : Screen("ProfileSwitch")
     object TempBasalSet : Screen("TempBasalSet")
     object Notifications : Screen("Notifications")
+    object CGMTransmitter : Screen("CGMTransmitter")
 }

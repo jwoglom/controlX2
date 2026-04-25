@@ -97,6 +97,14 @@ fun SettingsHubScreen(
                 modifier = Modifier.fillMaxWidth(),
             )
         }
+        item {
+            Chip(
+                onClick = { navController.navigate(Screen.CGMTransmitter.route) },
+                label = { Text("CGM sensor", fontSize = 13.sp) },
+                colors = ChipDefaults.primaryChipColors(),
+                modifier = Modifier.fillMaxWidth(),
+            )
+        }
         if (role == DeviceRole.PUMP_HOST) {
             // Basal is a pump-data surface, not a setting — reached by tapping
             // the basal row on Landing. Pump history is more diagnostic, so it

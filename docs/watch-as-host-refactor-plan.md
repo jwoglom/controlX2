@@ -232,7 +232,7 @@ controlX2/
 
 ---
 
-## Phase 5: Watch UI for Core Operations — ⏳ In progress (5a–5d ✅, 5e-1/5e-2 ✅, 5f-1/5f-2/5f-3/5f-4 ✅; 5e-3 deferred, 5f-5 remaining)
+## Phase 5: Watch UI for Core Operations — ⏳ In progress (5a–5d ✅, 5e-1/5e-2 ✅, 5f ✅ done; 5e-3 still deferred)
 
 **Goal:** Add full pump management UI on the watch for when it's the pump-host, starting with the items that unblock a non-adb developer loop.
 
@@ -249,7 +249,7 @@ controlX2/
 1. ✅ DeviceRole UI — landed in 5a; the `adb`-only dev loop is gone on both phone and watch.
 2. ✅ Native pump pairing flow on the watch — landed in 5b (finder, pairing-code RemoteInput, `PairingUnsupportedOnWatch` for `LONG_16CHAR`, and `PumpBondedNeedsUnbond` from Audit Tier 1).
 3. ✅ Nightscout URL / API-secret entry UI on the watch — landed in 5d, with an xDrip+ toggle and role-gated `SettingsHub` entry point.
-4. ⚠️ Basal / history / settings surfaces native to the watch in pump-host mode — **largely closed**: history (5e-1), basal detail (5e-2), suspend/resume (5f-1), active profile picker (5f-2), temp basal + Sleep/Exercise hub (5f-3), pump-alert dismissal (5f-4) all shipped. CGM trend chart (5e-3) deferred; the only remaining settings-parity item is CGM transmitter / sensor session management (tracked as 5f-5).
+4. ✅ Basal / history / settings surfaces native to the watch in pump-host mode — **closed**: history (5e-1), basal detail (5e-2), suspend/resume (5f-1), active profile picker (5f-2), temp basal + Sleep/Exercise hub (5f-3), pump-alert dismissal (5f-4), CGM transmitter / sensor session (5f-5) all shipped. CGM trend chart (5e-3) remains deferred on scoping grounds, but is no longer ship-blocking — every other settings-parity surface is in place.
 
 ### Phase 5 sub-steps (ordered, each independently shippable)
 
@@ -462,11 +462,27 @@ Expose pump settings the phone already offers as watch screens, routed through t
 - **No TSLIM_X2 caveat banner.** Mobile shows "Notifications cannot be dismissed on this device model" for t:slim X2 pumps. The watch dispatches the request anyway — pump silently rejects on TSLIM_X2 — so users on that model will see the alert remain after tapping. Tracked as a known limitation; can add a banner later via `dataStore.deviceName` parsing if it becomes a support burden.
 - **No per-type filter UI.** All four notification types render in one mixed list; users typically have at most one or two active alerts so filtering would add chrome without value.
 
-##### 5f remaining work — ⏳ Next
+##### 5f-5. Watch-side CGM transmitter / sensor session management — ✅ Complete
 
-- **CGM transmitter ID / sensor session management** — mobile `CGMActions.kt` (~588 lines). Watch needs G6 transmitter ID entry (6-char text), sensor code (8-digit), and possibly G7 pairing-code UI. Medium-sized (~280 lines on watch using the existing `RemoteTextInput` helper for text entry). Useful for users who want to pair a new transmitter from the watch side without reaching for the phone.
+**Shipped:**
+- New `wear/.../presentation/ui/CGMTransmitterScreen.kt` — `ScalingLazyColumn` with three primary action chips plus a status header showing the current `cgmSessionState` (Active / Stopped / Starting / etc.) and `cgmTransmitterStatus` (OK / Expired / OOR / Error). On entry, fires `CGMStatusRequest()` with `SendType.BUST_CACHE` to refresh state.
+- **Start G6 sensor session** chip → chained `rememberRemoteTextInputLauncher` calls: G6 transmitter ID (6 chars, validated for length, uppercased) → G6 sensor code (digits, parsed via `toIntOrNull`, `0000` accepted to attach to an in-progress sensor) → in-place wear `Alert` confirmation (shows both the entered tx ID and the sensor code). On confirm, dispatches `SetG6TransmitterIdRequest(txId)` via BUST_CACHE, sleeps 750 ms (mirrors mobile `CGMActions.kt:300-318`'s 3×250 ms wait so the pump applies the tx ID before the start command), dispatches `StartDexcomG6SensorSessionRequest(sensorCode)`, then `CGMStatusRequest()` to refresh.
+- **Pair G7 sensor** chip → single `rememberRemoteTextInputLauncher` for the 8-digit pairing code → confirm `Alert` → `SetDexcomG7PairingCodeRequest(code)` + `CGMStatusRequest` refresh. G7 pairs atomically; no separate "start sensor" step.
+- **Stop sensor session** chip → confirm `Alert` → `StopDexcomCGMSensorSessionRequest()` + `CGMStatusRequest` refresh.
+- Validation errors (non-numeric code, wrong-length tx ID) surface via a generic `InfoAlert` and return the user to the chip menu — same `pendingError` early-return pattern 5f-3 (temp basal U/hr) introduced.
+- The two G6 launchers are defined in dependency order inside the composable: `g6SensorCodeLauncher` first, then `g6TxIdLauncher` whose `onResult` chains into it on success. Each `rememberRemoteTextInputLauncher` returns a stable `() -> Unit`, so the chain is just a direct call from one callback to the next — no intermediate state machine needed.
+- `Screen.CGMTransmitter` route added with the `SCROLL_TYPE_NAV_ARGUMENT` + `scalingLazyListState` + `RequestFocusOnResume` plumbing (matches `HistoryLog` / `BasalDetail` / `Notifications` pattern).
+- `SettingsHubScreen.kt` gains a "CGM sensor" chip below "Pump alerts" (not role-gated — works in both `PUMP_HOST` and `CLIENT` via the shared `/to-pump/*` routing).
 
-Pick based on user demand + implementation complexity.
+**Deviations from mobile:**
+- **Validation is intentionally minimal.** Mobile uses `OutlinedTextField` with format constraints (regex / hex digits) plus separate `DexcomG6TransmitterCode` / `DexcomG6SensorCode` composables. Watch checks length on the tx ID (must be exactly 6 chars) and `toIntOrNull` on the codes; everything stricter is enforced by the pump itself, which surfaces rejections via the existing `cgmSessionState` state flow on the next `CGMStatusRequest`. Less defensive but adequate — the pump is the authoritative validator.
+- **No two-field text input on a single screen.** Mobile shows tx ID + sensor code together in one `AlertDialog` with two `OutlinedTextField`s. Watch breaks them into two separate `RemoteTextInput` system dialogs because that's the only multi-line entry primitive available on Wear OS at this `wear-input` version.
+- **No "in-progress" gating.** Mobile guards the Start button with `enabled = startG6CgmSessionInProgressTxId == null` to prevent double-clicks. Watch dispatches synchronously inside a `refreshScope.launch { … }` block, so a double-tap on the confirm Alert just sends the same dispatch twice — pump will reject the duplicate. Acceptable on watch where the confirm dialog itself is a stronger gate than mobile's button-disable.
+- **No `GetSavedG7PairingCodeRequest` round-trip to display the existing G7 code.** Mobile fetches it on entry. Watch just shows the session state header. Adding the saved-code display is a one-line addition once `dataStore.savedG7PairingCode` is plumbed; deferred since users typically don't need to read back the code they just entered.
+
+##### 5f complete — what's left under Phase 5
+
+Only **5e-3** (CGM trend chart) remains deferred. It's the largest scoping decision in Phase 5 (Vico-compose dependency vs Canvas-based minimal renderer); revisit when there's a clear use case demanding a full-screen graph on watch. Mobile's `VicoCgmChart.kt` is 2434 lines — the watch port should aim for under 400 with a 6–12h window and no overlays.
 
 ### Audit work completed alongside Phase 5 (commits `15b4686`, `ff130ac`, `5eeafa3`)
 
@@ -519,16 +535,16 @@ Phase 5   (watch pump-host UI)                       ⏳ In progress:
              5e-2 Basal rate display screen          ✅ Complete (commit 6581260)
              + 5e post-ship audit                    ✅ Complete (commit c9fe04b)
              5e-3 CGM trend-graph screen             ⏳ Deferred (skipped for 5f)
-           5f Settings management parity             ⏳ In progress:
+           5f Settings management parity             ✅ Complete:
              5f-1 Watch-side suspend/resume insulin  ✅ Complete (commit 1935e0d)
              5f-2 Watch-side active profile picker   ✅ Complete (commit 744fa12)
              5f-3 Temp basal + Sleep/Exercise hub    ✅ Complete (this branch)
              5f-4 Pump alert / alarm dismissal       ✅ Complete (this branch)
-             5f-5 CGM transmitter / sensor session   ⏳ Next
+             5f-5 CGM transmitter / sensor session   ✅ Complete (this branch)
            + xDrip+ queries fix (enables broadcasts) ✅ Complete (commit 2758ad2, cross-cutting 4.5 + 5)
 ```
 
-Each phase is independently shippable. Phases 0-1 are pure refactors with no behavior change. Phase 2-3 are structural extractions. Phase 4 is the first user-visible feature (role selection shipped in 5a). Phase 5 is the full watch-as-host experience — 5a–5d, 5e-1/5e-2, and 5f-1 through 5f-4 are landed; 5e-3 (CGM chart) and 5f-5 (CGM transmitter / sensor session) remain.
+Each phase is independently shippable. Phases 0-1 are pure refactors with no behavior change. Phase 2-3 are structural extractions. Phase 4 is the first user-visible feature (role selection shipped in 5a). Phase 5 is the full watch-as-host experience — 5a–5d, 5e-1/5e-2, and all of 5f (5f-1 through 5f-5) are landed. The only Phase 5 item still open is 5e-3 (full-screen CGM trend chart), deferred on scoping grounds (Vico dependency vs Canvas renderer).
 
 ---
 
