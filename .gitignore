@@ -28,3 +28,10 @@ buildSrc/.kotlin
 buildSrc/build
 .android-sdk/
 .gradle-home/
+
+# Roborazzi generated reports/diffs (baselines under src/test/snapshots stay tracked)
+**/src/test/snapshots/**/*.compare.png
+**/src/test/snapshots/**/*.actual.png
+**/src/test/snapshots/**/*.expected.png
+**/src/test/snapshots/**/*.diff.png
+**/src/test/snapshots/**/reports/

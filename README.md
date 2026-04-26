@@ -128,3 +128,24 @@ or edit your `local.properties` file for it to be reflected in Android Studio.
 If the PumpX2 libraries are rebuilt, either bump the version number in both PumpX2 and ControlX2's gradle
 configurations or run `./gradlew build --refresh-dependencies` in ControlX2. Otherwise, if the version
 number was not bumped, rebuilding ControlX2 may still use a cached version of the old code from that version.
+
+## Roborazzi snapshot baselines
+
+Snapshot tests for both modules use Roborazzi and write golden images to stable, versioned paths:
+
+* `mobile/src/test/snapshots/roborazzi/ComposePreviewSnapshotTests/*.png`
+* `wear/src/test/snapshots/roborazzi/ComposePreviewSnapshotTests/*.png`
+
+Record snapshots with:
+
+```bash
+./gradlew :mobile:recordRoborazziDebug :wear:recordRoborazziDebug
+```
+
+When UI changes are intentional, update baselines in the same PR:
+
+1. Re-run the record tasks.
+2. Review changed snapshot PNG files.
+3. Commit updated baselines together with the UI/code changes.
+
+Roborazzi diff/actual report artifacts should remain untracked; `.gitignore` is configured for that.

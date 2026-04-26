@@ -53,14 +53,21 @@ android {
             includeAndroidResources = true
             returnDefaultValues = true
             all {
+                def isRoborazziTask = project.gradle.startParameter.taskNames.any { it.toLowerCase().contains('roborazzi') }
                 jvmArgs '-noverify'
                 maxHeapSize = '4g'
                 systemProperty 'robolectric.pixelCopyRenderMode', 'hardware'
-                // Snapshot tests require Java 21 + Roborazzi tasks; exclude from normal testDebugUnitTest
-                if (!project.gradle.startParameter.taskNames.any { it.contains('Roborazzi') }) {
+                // Snapshot tests are only run for Roborazzi tasks.
+                if (!isRoborazziTask) {
                     exclude '**/snapshots/**'
                     // Wear has no non-snapshot tests; prevent Gradle 9.x from failing on empty test suite
                     failOnNoDiscoveredTests.set(false)
+                } else {
+                    include '**/snapshots/**'
+                }
+                if (System.getenv('CI') == 'true') {
+                    systemProperty 'robolectric.offline', 'true'
+                    systemProperty 'robolectric.dependency.dir', "${System.getProperty('user.home')}/.robolectric"
                 }
             }
         }
