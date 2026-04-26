@@ -528,38 +528,30 @@ Three rounds of self-audit landed on top of 5a–5d:
 
 ---
 
-## Phase 6: Service-Internals Cleanup — ⏳ Not started
+## Phase 6: Service-Internals Cleanup — ⏳ In progress (6a ✅)
 
 **Goal:** Address the two Phase 0 extractions deferred at the end of Phase 5, now that the Phase 5 surface is stable. Reduce duplication between `CommService.kt` and `WearPumpCommService.kt` and improve long-term maintainability. No behavior change.
 
-**Pre-condition:** Phase 5 branch merged to `dev`.
+### 6a. PairingManager extraction — ✅ Complete (this branch)
 
-### 6a. PairingManager extraction
+`sendInitPumpComm()` and `sendPumpPairingMessage()` were nearly bit-for-bit identical in `CommService.kt` and `WearPumpCommService.kt`. Both services also duplicated the `pumpFinderPairingCodeType()` enum-resolution pattern in their `TO_SERVER_STOP_PUMP_FINDER` handler and at service-start.
 
-`sendInitPumpComm()` and `sendPumpPairingMessage()` are nearly bit-for-bit identical in `CommService.kt:610–634` and `WearPumpCommService.kt:499–523`. Both services also duplicate the `pumpFinderPairingCodeType()` pref-lookup block in their `TO_SERVER_SET_PAIRING_CODE` handler and at service-start.
+**Shipped:**
 
-**Proposed change:**
+- New `pumpcomm/src/main/java/com/jwoglom/controlx2/pump/PairingManager.kt`:
+  - `sendInitPumpComm(pairingCodeType, filterToBluetoothMac)` and `sendPumpPairingMessage()` lifted from the two services. Constructor takes a `() -> PumpCommHandler?` provider so reassignments of the services' `pumpCommHandler` field (e.g. in `TO_SERVER_RESTART_PUMP_FINDER`) are visible without re-injecting.
+  - `companion object { fun resolveCodeType(label: String?): PairingCodeType }` — collapses the two services' `if (label.isNotEmpty()) PairingCodeType.fromLabel(label) else SHORT_6CHAR` branches into one place.
+- `CommService.kt` (mobile): adds `private val pairingManager = PairingManager { pumpCommHandler }`, deletes the two private methods, replaces the four inline call sites and two enum-resolution blocks with delegation to `pairingManager` / `PairingManager.resolveCodeType`. Drops the now-unused `PairingCodeType` import.
+- `WearPumpCommService.kt` (wear): symmetrical changes.
 
-1. Create `pumpcomm/src/main/java/com/jwoglom/controlx2/pump/PairingManager.kt`:
-   ```kotlin
-   class PairingManager(private val pumpCommHandler: PumpCommHandler?) {
-       fun sendInitPumpComm(pairingCodeType: PairingCodeType, filterToBluetoothMac: String) { ... }
-       fun sendPumpPairingMessage() { ... }
-   }
-   ```
-   Bodies lifted verbatim from either service (they are identical).
+**Deviation from the original Phase 6 plan:** The plan also proposed adding `prefPumpFinderPairingCodeType()` to `CommServiceCallbacks`. On closer inspection the duplication was in the *enum resolution*, not in the pref read — the services correctly use their own `Prefs` / `WearPrefs` classes, and routing those reads through the callback interface would have added indirection without removing duplication. The `companion object resolveCodeType(...)` helper handles the actual duplication. `CommServiceCallbacks` is unchanged.
 
-2. Add `fun prefPumpFinderPairingCodeType(): String?` to `CommServiceCallbacks` (mirrors the existing `pref*` methods). Both services implement it via their local `Prefs` / `WearPrefs` — same `"WearX2"` SharedPrefs key, so no behavior change.
+**Net diff:** +41 lines (the new `PairingManager.kt`), -68 lines across the two services. ~30 LOC reduction overall, zero behavior change.
 
-3. In both services: replace the two private methods with `PairingManager(pumpCommHandler)` delegation; replace the inline pref-lookup blocks in the `TO_SERVER_SET_PAIRING_CODE` handler and at service-start with the new accessor. The `PairingCodeEntry` helper from Phase 5b (`pumpcomm/pump/pairing/PairingCodeEntry.kt`) is not affected — it operates at the message-content level; `PairingManager` operates at the handler-dispatch level.
-
-**Files changed:**
-- NEW `pumpcomm/src/main/java/com/jwoglom/controlx2/pump/PairingManager.kt`
-- `pumpcomm/src/main/java/com/jwoglom/controlx2/pump/CommServiceCallbacks.kt` — add `prefPumpFinderPairingCodeType()`
-- `mobile/src/main/java/com/jwoglom/controlx2/CommService.kt` — remove two methods, add pref accessor impl, delegate to `PairingManager`
-- `wear/src/main/java/com/jwoglom/controlx2/WearPumpCommService.kt` — same
-
-**Verification:** Pair pump from phone (phone-as-host) and from watch (watch-as-host); both pairing flows complete successfully. `./gradlew :mobile:assembleDebug :wear:assembleDebug` passes.
+**Verification:**
+- ✅ `./gradlew :pumpcomm:assembleDebug :mobile:assembleDebug :wear:assembleDebug` passes.
+- ✅ `./gradlew :shared:testDebugUnitTest :db:testDebugUnitTest :mobile:testDebugUnitTest` passes.
+- ⏳ Manual phone-as-host pairing regression + watch-as-host pairing smoke test still pending on real devices.
 
 ### 6b. WearMessageForwarder — decided: do not extract
 
@@ -612,14 +604,14 @@ Phase 5   (watch pump-host UI)                       ✅ Complete:
              5f-5 CGM transmitter / sensor session   ✅ Complete (this branch)
            + xDrip+ queries fix (enables broadcasts) ✅ Complete (commit 2758ad2, cross-cutting 4.5 + 5)
     ↓
-Phase 6   (service-internals cleanup)                ⏳ Not started:
-           6a PairingManager extraction              ⏳ Not started
+Phase 6   (service-internals cleanup)                ⏳ In progress:
+           6a PairingManager extraction              ✅ Complete (this branch)
            6b WearMessageForwarder                   ✅ Decided: do not extract
            6c Deferred Phase 1 cleanups              ✅ Decided: selective (bolus collapse deferred;
                                                                            service-receive-message skip)
 ```
 
-Each phase is independently shippable. Phases 0-1 are pure refactors with no behavior change. Phase 2-3 are structural extractions. Phase 4 is the first user-visible feature (role selection shipped in 5a). Phase 5 is the full watch-as-host experience, complete on this branch — 5a–5f all shipped and the closeout Gradle suite passed on April 25, 2026. Phase 6 is a post-merge hardening pass covering the two Phase 0 extractions that were deferred; the only outstanding code change is 6a (PairingManager). The only remaining release-readiness item before relying on watch-as-host in production is the unresolved xDrip+ watch-receiver runtime question from Phase 4.5 (requires real-watch validation).
+Each phase is independently shippable. Phases 0-1 are pure refactors with no behavior change. Phase 2-3 are structural extractions. Phase 4 is the first user-visible feature (role selection shipped in 5a). Phase 5 is the full watch-as-host experience, complete on this branch — 5a–5f all shipped and the closeout Gradle suite passed on April 25, 2026. Phase 6's service-internals cleanup is now complete on this branch: 6a (PairingManager) shipped, while 6b (WearMessageForwarder) and 6c (Phase 1 deferred cleanups) were decided not to be extracted. The only remaining release-readiness item before relying on watch-as-host in production is the unresolved xDrip+ watch-receiver runtime question from Phase 4.5 (requires real-watch validation).
 
 ---
 

@@ -24,6 +24,7 @@ import com.jwoglom.controlx2.util.StatePrefs
 import com.jwoglom.controlx2.pump.BleChangeReceiver
 import com.jwoglom.controlx2.pump.WearBolusManager
 import com.jwoglom.controlx2.pump.CommServiceCallbacks
+import com.jwoglom.controlx2.pump.PairingManager
 import com.jwoglom.controlx2.pump.PumpCommHandler
 import com.jwoglom.controlx2.pump.PumpCommState
 import com.jwoglom.controlx2.pump.PumpFinderCommHandler
@@ -54,7 +55,6 @@ import com.jwoglom.pumpx2.pump.messages.builders.CurrentBatteryRequestBuilder
 import com.jwoglom.pumpx2.pump.messages.models.ApiVersion
 import com.jwoglom.pumpx2.pump.messages.models.InsulinUnit
 import com.jwoglom.pumpx2.pump.messages.models.KnownApiVersion
-import com.jwoglom.pumpx2.pump.messages.models.PairingCodeType
 import com.jwoglom.pumpx2.pump.messages.request.control.InitiateBolusRequest
 import com.jwoglom.pumpx2.pump.messages.request.currentStatus.ControlIQIOBRequest
 import com.jwoglom.pumpx2.pump.messages.request.currentStatus.HistoryLogStatusRequest
@@ -86,6 +86,7 @@ class WearPumpCommService : Service(), CommServiceCallbacks {
 
     private lateinit var messageBus: MessageBus
     private lateinit var bolusManager: WearBolusManager
+    private val pairingManager = PairingManager { pumpCommHandler }
 
     override val pumpCommState = PumpCommState()
 
@@ -210,15 +211,12 @@ class WearPumpCommService : Service(), CommServiceCallbacks {
                     pumpFinderCommHandler = null
                     pumpCommHandler = PumpCommHandler(serviceLooper!!, this)
                     val filterToMac = WearPrefs(applicationContext).pumpFinderPumpMac().orEmpty()
-                    val pairingCodeType = WearPrefs(applicationContext).pumpFinderPairingCodeType().orEmpty()
-                    val pairingCodeTypeEnum = if (pairingCodeType.isNotEmpty())
-                        PairingCodeType.fromLabel(pairingCodeType)
-                    else
-                        PairingCodeType.SHORT_6CHAR
+                    val pairingCodeLabel = WearPrefs(applicationContext).pumpFinderPairingCodeType().orEmpty()
+                    val pairingCodeTypeEnum = PairingManager.resolveCodeType(pairingCodeLabel)
                     WearPrefs(applicationContext).setPumpFinderServiceEnabled(false)
                     WearPrefs(applicationContext).setUnbondOnNextCommInitMac(filterToMac)
                     pumpCommHandler?.postDelayed(periodicUpdateTask, periodicUpdateIntervalMs)
-                    sendInitPumpComm(pairingCodeTypeEnum, filterToMac)
+                    pairingManager.sendInitPumpComm(pairingCodeTypeEnum, filterToMac)
                     sendWearCommMessage(MessagePaths.TO_SERVER_COMM_STARTED, "".toByteArray())
                 }
             }
@@ -251,7 +249,7 @@ class WearPumpCommService : Service(), CommServiceCallbacks {
                 sendCheckPumpConnected()
             }
             MessagePaths.TO_PUMP_PAIR -> {
-                sendPumpPairingMessage()
+                pairingManager.sendPumpPairingMessage()
             }
             MessagePaths.TO_SERVER_BOLUS_REQUEST_WEAR -> {
                 bolusManager.confirmBolusRequest(PumpMessageSerializer.fromBytes(data) as InitiateBolusRequest, WearBolusManager.BolusRequestSource.WEAR)
@@ -496,28 +494,9 @@ class WearPumpCommService : Service(), CommServiceCallbacks {
         }
     }
 
-    private fun sendInitPumpComm(pairingCodeType: PairingCodeType, filterToBluetoothMac: String) {
-        pumpCommHandler?.obtainMessage()?.also { msg ->
-            msg.what = CommServiceCodes.INIT_PUMP_COMM.ordinal
-            msg.obj = if (filterToBluetoothMac.isNotEmpty()) {
-                "${pairingCodeType.label} $filterToBluetoothMac"
-            } else {
-                pairingCodeType.label
-            }
-            pumpCommHandler?.sendMessage(msg)
-        }
-    }
-
     private fun sendCheckPumpConnected() {
         pumpCommHandler?.obtainMessage()?.also { msg ->
             msg.what = CommServiceCodes.CHECK_PUMP_CONNECTED.ordinal
-            pumpCommHandler?.sendMessage(msg)
-        }
-    }
-
-    private fun sendPumpPairingMessage() {
-        pumpCommHandler?.obtainMessage()?.also { msg ->
-            msg.what = CommServiceCodes.SEND_PUMP_PAIRING_MESSAGE.ordinal
             pumpCommHandler?.sendMessage(msg)
         }
     }
@@ -617,14 +596,11 @@ class WearPumpCommService : Service(), CommServiceCallbacks {
             Timber.i("Starting WearPumpCommService in PumpFinder mode")
             sendInitPumpFinderComm()
         } else {
-            val pairingCodeType = WearPrefs(applicationContext).pumpFinderPairingCodeType().orEmpty()
-            val pairingCodeTypeEnum = if (pairingCodeType.isNotEmpty())
-                PairingCodeType.fromLabel(pairingCodeType)
-            else
-                PairingCodeType.SHORT_6CHAR
+            val pairingCodeLabel = WearPrefs(applicationContext).pumpFinderPairingCodeType().orEmpty()
+            val pairingCodeTypeEnum = PairingManager.resolveCodeType(pairingCodeLabel)
             val filterToMac = WearPrefs(applicationContext).pumpFinderPumpMac().orEmpty()
-            Timber.i("Starting WearPumpCommService: filterToMac=$filterToMac pairingCodeType=$pairingCodeType")
-            sendInitPumpComm(pairingCodeTypeEnum, filterToMac)
+            Timber.i("Starting WearPumpCommService: filterToMac=$filterToMac pairingCodeType=$pairingCodeLabel")
+            pairingManager.sendInitPumpComm(pairingCodeTypeEnum, filterToMac)
         }
 
         return START_STICKY
