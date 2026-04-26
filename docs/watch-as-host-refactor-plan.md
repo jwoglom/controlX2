@@ -528,6 +528,55 @@ Three rounds of self-audit landed on top of 5a–5d:
 
 ---
 
+## Phase 6: Service-Internals Cleanup — ⏳ Not started
+
+**Goal:** Address the two Phase 0 extractions deferred at the end of Phase 5, now that the Phase 5 surface is stable. Reduce duplication between `CommService.kt` and `WearPumpCommService.kt` and improve long-term maintainability. No behavior change.
+
+**Pre-condition:** Phase 5 branch merged to `dev`.
+
+### 6a. PairingManager extraction
+
+`sendInitPumpComm()` and `sendPumpPairingMessage()` are nearly bit-for-bit identical in `CommService.kt:610–634` and `WearPumpCommService.kt:499–523`. Both services also duplicate the `pumpFinderPairingCodeType()` pref-lookup block in their `TO_SERVER_SET_PAIRING_CODE` handler and at service-start.
+
+**Proposed change:**
+
+1. Create `pumpcomm/src/main/java/com/jwoglom/controlx2/pump/PairingManager.kt`:
+   ```kotlin
+   class PairingManager(private val pumpCommHandler: PumpCommHandler?) {
+       fun sendInitPumpComm(pairingCodeType: PairingCodeType, filterToBluetoothMac: String) { ... }
+       fun sendPumpPairingMessage() { ... }
+   }
+   ```
+   Bodies lifted verbatim from either service (they are identical).
+
+2. Add `fun prefPumpFinderPairingCodeType(): String?` to `CommServiceCallbacks` (mirrors the existing `pref*` methods). Both services implement it via their local `Prefs` / `WearPrefs` — same `"WearX2"` SharedPrefs key, so no behavior change.
+
+3. In both services: replace the two private methods with `PairingManager(pumpCommHandler)` delegation; replace the inline pref-lookup blocks in the `TO_SERVER_SET_PAIRING_CODE` handler and at service-start with the new accessor. The `PairingCodeEntry` helper from Phase 5b (`pumpcomm/pump/pairing/PairingCodeEntry.kt`) is not affected — it operates at the message-content level; `PairingManager` operates at the handler-dispatch level.
+
+**Files changed:**
+- NEW `pumpcomm/src/main/java/com/jwoglom/controlx2/pump/PairingManager.kt`
+- `pumpcomm/src/main/java/com/jwoglom/controlx2/pump/CommServiceCallbacks.kt` — add `prefPumpFinderPairingCodeType()`
+- `mobile/src/main/java/com/jwoglom/controlx2/CommService.kt` — remove two methods, add pref accessor impl, delegate to `PairingManager`
+- `wear/src/main/java/com/jwoglom/controlx2/WearPumpCommService.kt` — same
+
+**Verification:** Pair pump from phone (phone-as-host) and from watch (watch-as-host); both pairing flows complete successfully. `./gradlew :mobile:assembleDebug :wear:assembleDebug` passes.
+
+### 6b. WearMessageForwarder — decided: do not extract
+
+`sendWearCommMessage()` is already abstracted behind `CommServiceCallbacks`, so transport-level duplication is resolved. The call sites in `CommService.kt` (9 calls) and `WearPumpCommService.kt` are each semantically distinct routing decisions, not copy-pasted from each other — each service forwards a different set of messages to its own client. A `WearMessageForwarder` wrapper would add a layer of indirection without removing any duplication.
+
+**Decision:** Do not extract. Keep `sendWearCommMessage()` call sites inline in each service. Re-evaluate only if a third hosting-service type is added (e.g. a standalone tablet app) that would need to share the same forwarding logic.
+
+### 6c. Deferred Phase 1 cleanups — decided: selective
+
+Two Phase 1 deviations remain unaddressed:
+
+- **Bolus path collapse** — `TO_SERVER_BOLUS_REQUEST_WEAR` + `TO_SERVER_BOLUS_REQUEST_PHONE` → a single `TO_SERVER_BOLUS_REQUEST`, distinguishing origin by `MessageBusSender` instead of path suffix. This would simplify the router and `BolusManager` but requires touching every bolus send-site on phone and watch. **Decision:** pursue only if `BolusManager` is refactored for another reason (e.g. unifying mobile `BolusManager` and watch `WearBolusManager`); do not pursue as a standalone change.
+
+- **service-receive-message rename** — `/to-client/service-receive-message` → `/to-client/pump-message`. Pure find-replace across all call sites. **Decision:** skip; the current name is accurate and the rename would not improve clarity enough to justify the diff churn.
+
+---
+
 ## Implementation Order & Dependencies
 
 ```
@@ -562,9 +611,15 @@ Phase 5   (watch pump-host UI)                       ✅ Complete:
              5f-4 Pump alert / alarm dismissal       ✅ Complete (this branch)
              5f-5 CGM transmitter / sensor session   ✅ Complete (this branch)
            + xDrip+ queries fix (enables broadcasts) ✅ Complete (commit 2758ad2, cross-cutting 4.5 + 5)
+    ↓
+Phase 6   (service-internals cleanup)                ⏳ Not started:
+           6a PairingManager extraction              ⏳ Not started
+           6b WearMessageForwarder                   ✅ Decided: do not extract
+           6c Deferred Phase 1 cleanups              ✅ Decided: selective (bolus collapse deferred;
+                                                                           service-receive-message skip)
 ```
 
-Each phase is independently shippable. Phases 0-1 are pure refactors with no behavior change. Phase 2-3 are structural extractions. Phase 4 is the first user-visible feature (role selection shipped in 5a). Phase 5 is the full watch-as-host experience and is complete on this branch — 5a–5f all shipped and the closeout Gradle suite passed on April 25, 2026. The only remaining release-readiness item is the unresolved xDrip+ watch-receiver runtime question from Phase 4.5 (requires real-watch validation).
+Each phase is independently shippable. Phases 0-1 are pure refactors with no behavior change. Phase 2-3 are structural extractions. Phase 4 is the first user-visible feature (role selection shipped in 5a). Phase 5 is the full watch-as-host experience, complete on this branch — 5a–5f all shipped and the closeout Gradle suite passed on April 25, 2026. Phase 6 is a post-merge hardening pass covering the two Phase 0 extractions that were deferred; the only outstanding code change is 6a (PairingManager). The only remaining release-readiness item before relying on watch-as-host in production is the unresolved xDrip+ watch-receiver runtime question from Phase 4.5 (requires real-watch validation).
 
 ---
 
