@@ -7,6 +7,24 @@ CMDLINE_VERSION="11076708"
 CMDLINE_ZIP_URL="https://dl.google.com/android/repository/commandlinetools-linux-${CMDLINE_VERSION}_latest.zip"
 CMDLINE_DIR="$SDK_ROOT/cmdline-tools/latest"
 SDKMANAGER="$CMDLINE_DIR/bin/sdkmanager"
+ROBOLECTRIC_DIR="${ROBOLECTRIC_DIR:-$HOME/.robolectric}"
+
+download_with_retry() {
+  local url="$1"
+  local dest="$2"
+  if command -v curl >/dev/null 2>&1; then
+    curl -fsSL "$url" -o "$dest" && return 0
+  elif command -v wget >/dev/null 2>&1; then
+    wget -q "$url" -O "$dest" && return 0
+  fi
+  echo "Download failed for $url; retrying in 5s..." >&2
+  sleep 5
+  if command -v curl >/dev/null 2>&1; then
+    curl -fsSL "$url" -o "$dest"
+  else
+    wget -q "$url" -O "$dest"
+  fi
+}
 
 mkdir -p "$SDK_ROOT"
 
@@ -54,5 +72,21 @@ echo "Installing required Android SDK packages"
   "platforms;android-35" \
   "platforms;android-36" \
   "build-tools;35.0.0"
+
+echo "Installing Robolectric offline artifacts into $ROBOLECTRIC_DIR"
+mkdir -p "$ROBOLECTRIC_DIR"
+ROBOLECTRIC_REPO="https://repo1.maven.org/maven2/org/robolectric/android-all-instrumented"
+for sdk_ver in \
+  "14-robolectric-10818077-i7" \
+  "15-robolectric-13954326-i7"; do
+  for ext in jar pom; do
+    artifact="android-all-instrumented-${sdk_ver}.${ext}"
+    if [[ ! -f "$ROBOLECTRIC_DIR/$artifact" ]]; then
+      download_with_retry \
+        "$ROBOLECTRIC_REPO/$sdk_ver/$artifact" \
+        "$ROBOLECTRIC_DIR/$artifact"
+    fi
+  done
+done
 
 echo "Setup complete."

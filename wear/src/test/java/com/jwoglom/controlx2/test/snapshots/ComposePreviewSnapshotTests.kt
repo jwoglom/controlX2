@@ -1,13 +1,14 @@
 package com.jwoglom.controlx2.test.snapshots
 
 import com.github.takahirom.roborazzi.captureRoboImage
+import com.jwoglom.controlx2.test.TestActivity
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
-import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onRoot
 import java.io.File
 
@@ -17,7 +18,7 @@ import java.io.File
 class ComposePreviewSnapshotTests {
 
     @get:Rule
-    val composeTestRule = createComposeRule()
+    val composeTestRule = createAndroidComposeRule<TestActivity>()
 
     // Landing screens
     @Test fun snapshot_DefaultLandingScreenPreviewFull() = snapshot { com.jwoglom.controlx2.presentation.ui.DefaultLandingScreenPreviewFull() }

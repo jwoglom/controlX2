@@ -69,6 +69,12 @@ android {
                     systemProperty 'robolectric.offline', 'true'
                     systemProperty 'robolectric.dependency.dir', "${System.getProperty('user.home')}/.robolectric"
                 }
+                // Exclude bcprov-jdk14 from unit test classpath to avoid
+                // BouncyCastle JAR signer conflict with Robolectric's
+                // android-all framework JAR (which bundles its own BC).
+                // bcprov-jdk18on is added as testImplementation to provide
+                // BouncyCastle classes without the JAR signer conflict.
+                classpath = classpath.filter { !it.name.startsWith('bcprov-jdk14') }
             }
         }
     }
@@ -119,6 +125,7 @@ dependencies {
     // https://issuetracker.google.com/issues/227767363
     debugImplementation "androidx.customview:customview:1.2.0-alpha02"
     debugImplementation "androidx.customview:customview-poolingcontainer:1.0.0"
+    debugImplementation "androidx.compose.ui:ui-test-manifest:$compose_version"
 
     // pumpx2-android dependencies
     implementation 'com.github.weliem:blessed-android:2.4.0'
@@ -174,5 +181,6 @@ dependencies {
     testImplementation 'io.github.takahirom.roborazzi:roborazzi-compose-preview-scanner-support:1.58.0'
     testImplementation 'io.github.sergio-sastre.ComposablePreviewScanner:android:0.8.1'
     testImplementation 'org.robolectric:robolectric:4.16.1'
+    testImplementation 'org.bouncycastle:bcprov-jdk18on:1.77'
 
 }
