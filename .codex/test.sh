@@ -12,6 +12,7 @@ fi
 
 export ANDROID_SDK_ROOT="$SDK_ROOT"
 export ANDROID_HOME="$SDK_ROOT"
+export CI=true
 export PATH="$CMDLINE_DIR/bin:$SDK_ROOT/platform-tools:$PATH"
 export GRADLE_USER_HOME="${GRADLE_USER_HOME:-$REPO_ROOT/.gradle-home}"
 

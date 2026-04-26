@@ -131,12 +131,24 @@ if [[ ! -f ~/.robolectric/android-all-instrumented-14-robolectric-10818077-i7.ja
     "$ROBOLECTRIC_REPO/14-robolectric-10818077-i7/android-all-instrumented-14-robolectric-10818077-i7.jar" \
     ~/.robolectric/android-all-instrumented-14-robolectric-10818077-i7.jar
 fi
+if [[ ! -f ~/.robolectric/android-all-instrumented-14-robolectric-10818077-i7.pom ]]; then
+  echo "Downloading Robolectric SDK 14 (Android 34) pom..."
+  download_with_retry \
+    "$ROBOLECTRIC_REPO/14-robolectric-10818077-i7/android-all-instrumented-14-robolectric-10818077-i7.pom" \
+    ~/.robolectric/android-all-instrumented-14-robolectric-10818077-i7.pom
+fi
 
 if [[ ! -f ~/.robolectric/android-all-instrumented-15-robolectric-13954326-i7.jar ]]; then
   echo "Downloading Robolectric SDK 15 (Android 35) jar..."
   download_with_retry \
     "$ROBOLECTRIC_REPO/15-robolectric-13954326-i7/android-all-instrumented-15-robolectric-13954326-i7.jar" \
     ~/.robolectric/android-all-instrumented-15-robolectric-13954326-i7.jar
+fi
+if [[ ! -f ~/.robolectric/android-all-instrumented-15-robolectric-13954326-i7.pom ]]; then
+  echo "Downloading Robolectric SDK 15 (Android 35) pom..."
+  download_with_retry \
+    "$ROBOLECTRIC_REPO/15-robolectric-13954326-i7/android-all-instrumented-15-robolectric-13954326-i7.pom" \
+    ~/.robolectric/android-all-instrumented-15-robolectric-13954326-i7.pom
 fi
 
 # ── Export session-wide environment variables ──
