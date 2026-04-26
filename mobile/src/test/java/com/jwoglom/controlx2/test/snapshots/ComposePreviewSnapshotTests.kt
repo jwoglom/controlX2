@@ -9,6 +9,7 @@ import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onRoot
+import java.io.File
 
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
@@ -104,6 +105,9 @@ class ComposePreviewSnapshotTests {
 
     private fun snapshot(content: @androidx.compose.runtime.Composable () -> Unit) {
         composeTestRule.setContent { content() }
-        composeTestRule.onRoot().captureRoboImage()
+        val methodName = Throwable().stackTrace.first { it.methodName.startsWith("snapshot_") }.methodName
+        val outputPath = "src/test/snapshots/roborazzi/ComposePreviewSnapshotTests/$methodName.png"
+        File(outputPath).parentFile?.mkdirs()
+        composeTestRule.onRoot().captureRoboImage(filePath = outputPath)
     }
 }
