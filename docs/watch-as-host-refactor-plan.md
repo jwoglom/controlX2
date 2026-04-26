@@ -515,14 +515,16 @@ Three rounds of self-audit landed on top of 5a–5d:
 - **Phone-as-host regression:** flip role back via 5a UI, confirm nothing broke.
 - **Watch-as-host end-to-end:** pair from watch UI, bolus, confirm Nightscout upload, verify history-log rows persist, swap role back.
 
-**Build/verification gaps to close on this branch before merging to `dev`:**
-- The 5b commit message explicitly noted the sandbox had no Android SDK and **ran no gradle tasks**. Subsequent audit + CI commits fixed specific compile issues across 5b–5f (`AutoCenteringParams` package, Settings chip icon size, stale KDoc, nested comment + `RemoteInput` API mismatches, `material` vs `foundation.lazy` `ScalingLazyColumn` import unification, two rounds of the nested-KDoc-`/*` trap in `ProfileSwitchScreen`, and a Robolectric jar-download hardening in CI). A clean `./gradlew :mobile:assembleDebug :wear:assembleDebug :shared:testDebugUnitTest :db:testDebugUnitTest` pass on the tip of `dev` is still worth doing before cutting a release.
-- xDrip+ **sender-side** plumbing resolved (commit `2758ad2` added the `<queries>` block on both mobile and wear). The **receiver-side** question — whether xDrip+ exposes a watch-side broadcast receiver — still needs an ADB smoke test against a real watch install before relying on xDrip+ uplinks in watch-as-host mode.
+**Build/verification status before merging to `dev`:**
+- ✅ **Closed (April 25, 2026):** ran `./gradlew :mobile:assembleDebug :wear:assembleDebug :shared:testDebugUnitTest :db:testDebugUnitTest --console=plain` in this environment. Build + unit-test closeout suite passed end-to-end.
+- ⚠️ **Still open:** xDrip+ **receiver-side** behavior on Wear OS. Sender-side plumbing is resolved (commit `2758ad2` added the `<queries>` block on both mobile and wear), but there was no connected watch available in this environment (`adb devices -l` returned no devices), so the on-device ADB smoke test against a real watch xDrip+ install is still required before relying on xDrip+ uplinks in watch-as-host mode.
 
 ### Outstanding Phase 0 extractions — updated status
 
 - `PairingManager` (Phase 0 step 4) — **partially addressed.** 5b extracted the small post-`SET_PAIRING_CODE` dispatch into `pumpcomm/pump/pairing/PairingCodeEntry.kt` (later split into typed `applyForInitialPumpComm` / `applyForRePair` in Audit Tier 3). The larger pairing surface — `sendPumpPairingMessage()`, `sendInitPumpComm()`, and pairing-code handling inside `handleMessageReceived()` — still lives inlined in `CommService.kt`, with the watch-side handlers duplicating parts of it in `WearPumpCommService.kt`. Worth revisiting before 5f pushes more into that seam.
 - `WearMessageForwarder` (Phase 0 step 5) — **still not done.** `sendWearCommMessage()` calls remain scattered in `CommService.kt`. Deferrable unless 5e/5f extends that surface.
+
+**Decision (April 25, 2026):** Defer both extractions to a post-merge hardening pass ("Phase 6: service-internals cleanup"). They are maintainability improvements, not blockers for watch-as-host feature completeness, and deferring avoids late risk to a now-stable 5a–5f surface.
 
 ---
 
@@ -542,7 +544,7 @@ Phase 4   (role-switching logic)                     ✅ Complete (UI shipped in
     ↓
 Phase 4.5 (extract :db module — sync engines + DB)   ✅ Complete
     ↓
-Phase 5   (watch pump-host UI)                       ⏳ In progress:
+Phase 5   (watch pump-host UI)                       ✅ Complete:
            5a DeviceRole settings UI                 ✅ Complete (commit 6660f11)
            5b Watch-side pump pairing flow           ✅ Complete (commit 6c6d4d6)
            5c Connection status + reconnection UX    ✅ Complete (commit ca97612)
@@ -562,7 +564,7 @@ Phase 5   (watch pump-host UI)                       ⏳ In progress:
            + xDrip+ queries fix (enables broadcasts) ✅ Complete (commit 2758ad2, cross-cutting 4.5 + 5)
 ```
 
-Each phase is independently shippable. Phases 0-1 are pure refactors with no behavior change. Phase 2-3 are structural extractions. Phase 4 is the first user-visible feature (role selection shipped in 5a). Phase 5 is the full watch-as-host experience and is now complete on this branch — 5a–5f all shipped. The only outstanding work is build/verification on the tip of `dev` and the unresolved xDrip+ watch-receiver question from Phase 4.5.
+Each phase is independently shippable. Phases 0-1 are pure refactors with no behavior change. Phase 2-3 are structural extractions. Phase 4 is the first user-visible feature (role selection shipped in 5a). Phase 5 is the full watch-as-host experience and is complete on this branch — 5a–5f all shipped and the closeout Gradle suite passed on April 25, 2026. The only remaining release-readiness item is the unresolved xDrip+ watch-receiver runtime question from Phase 4.5 (requires real-watch validation).
 
 ---
 
