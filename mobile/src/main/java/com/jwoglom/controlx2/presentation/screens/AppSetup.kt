@@ -94,7 +94,9 @@ fun AppSetup(
                     // Do not restart the app at the end of setup; restarting here can race pump
                     // bootstrap and leave CommService in a null-peripheral startup loop.
                     sendMessage(MessagePaths.TO_SERVER_REQUEST_SERVICE_STATUS, "".toByteArray())
-                    navController?.navigate(Screen.Landing.route)
+                    navController?.navigate(Screen.Landing.route) {
+                        popUpTo(0) { inclusive = true }
+                    }
                 }
             ) {
                 Text("Continue")

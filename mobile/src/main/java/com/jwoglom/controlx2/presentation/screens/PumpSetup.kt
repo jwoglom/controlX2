@@ -137,6 +137,9 @@ fun PumpSetup(
                 else -> {
                     val resettableStages = setOf(
                         PumpSetupStage.PUMP_FINDER_SEARCHING_FOR_PUMPS,
+                        PumpSetupStage.PUMP_FINDER_MOBI_PICK_UP_AND_TAP,
+                        PumpSetupStage.PUMP_FINDER_MOBI_PLACE_ON_CHARGING_PAD,
+                        PumpSetupStage.PUMP_FINDER_MOBI_ENTER_PAIRING_CODE,
                         PumpSetupStage.WAITING_PUMPX2_INIT,
                         PumpSetupStage.PUMPX2_SEARCHING_FOR_PUMP,
                         PumpSetupStage.PUMPX2_PUMP_DISCOVERED,
