@@ -1,15 +1,16 @@
 package com.jwoglom.controlx2.test.snapshots
 
 import com.github.takahirom.roborazzi.captureRoboImage
-import com.jwoglom.controlx2.test.TestActivity
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
-import androidx.compose.ui.test.junit4.createAndroidComposeRule
+import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onRoot
+import androidx.compose.ui.platform.LocalInspectionMode
+import androidx.compose.runtime.CompositionLocalProvider
 import java.io.File
 
 @RunWith(RobolectricTestRunner::class)
@@ -18,7 +19,7 @@ import java.io.File
 class ComposePreviewSnapshotTests {
 
     @get:Rule
-    val composeTestRule = createAndroidComposeRule<TestActivity>()
+    val composeTestRule = createComposeRule()
 
     // Landing screens
     @Test fun snapshot_DefaultLandingScreenPreviewFull() = snapshot { com.jwoglom.controlx2.presentation.ui.DefaultLandingScreenPreviewFull() }
@@ -33,7 +34,11 @@ class ComposePreviewSnapshotTests {
     @Test fun snapshot_PreviewTopText() = snapshot { com.jwoglom.controlx2.presentation.components.PreviewTopText() }
 
     private fun snapshot(content: @androidx.compose.runtime.Composable () -> Unit) {
-        composeTestRule.setContent { content() }
+        composeTestRule.setContent {
+            CompositionLocalProvider(LocalInspectionMode provides true) {
+                content()
+            }
+        }
         val methodName = Throwable().stackTrace.first { it.methodName.startsWith("snapshot_") }.methodName
         val outputPath = "src/test/snapshots/roborazzi/ComposePreviewSnapshotTests/$methodName.png"
         File(outputPath).parentFile?.mkdirs()

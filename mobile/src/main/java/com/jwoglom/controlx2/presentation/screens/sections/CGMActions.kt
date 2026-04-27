@@ -110,7 +110,10 @@ fun CGMActions(
     }
 
     fun waitForLoaded() = refreshScope.launch {
-        if (!Prefs(context).serviceEnabled()) return@launch
+        if (!Prefs(context).serviceEnabled()) {
+            refreshing = false
+            return@launch
+        }
         var sinceLastFetchTime = 0
         while (true) {
             val nullFields = cgmActionsFields.filter { field -> field.value == null }.toSet()
@@ -133,7 +136,10 @@ fun CGMActions(
     }
 
     fun refresh() = refreshScope.launch {
-        if (!Prefs(context).serviceEnabled()) return@launch
+        if (!Prefs(context).serviceEnabled()) {
+            refreshing = false
+            return@launch
+        }
         Timber.i("reloading CGMActions with force")
         refreshing = true
 
