@@ -51,6 +51,9 @@ import com.jwoglom.controlx2.util.UpdateComplication
 import com.jwoglom.controlx2.util.WearX2Complication
 import com.jwoglom.pumpx2.pump.PumpState
 import com.jwoglom.pumpx2.pump.TandemError
+import androidx.annotation.VisibleForTesting
+import com.jwoglom.pumpx2.pump.bluetooth.TandemPump
+import com.welie.blessed.BluetoothPeripheral
 import com.jwoglom.pumpx2.pump.messages.builders.CurrentBatteryRequestBuilder
 import com.jwoglom.pumpx2.pump.messages.models.ApiVersion
 import com.jwoglom.pumpx2.pump.messages.models.InsulinUnit
@@ -77,6 +80,17 @@ import java.time.Instant
  * (PumpCommHandler, PumpFinderCommHandler, BolusManager) via CommServiceCallbacks.
  */
 class WearPumpCommService : Service(), CommServiceCallbacks {
+
+    companion object {
+        /**
+         * Set before calling Robolectric.buildService(...).create() in tests to bypass
+         * WearHybridMessageBus construction (which requires a real Wear Data Layer).
+         */
+        @VisibleForTesting
+        @Volatile
+        internal var messageBusOverrideForTesting: MessageBus? = null
+    }
+
     override val supervisorJob = SupervisorJob()
     private val scope = CoroutineScope(supervisorJob + Dispatchers.Main.immediate)
 
@@ -163,7 +177,7 @@ class WearPumpCommService : Service(), CommServiceCallbacks {
         handlerThread.start()
         serviceLooper = handlerThread.looper
 
-        messageBus = WearHybridMessageBus(
+        messageBus = messageBusOverrideForTesting ?: WearHybridMessageBus(
             context = this,
             deviceRole = StatePrefs(this).deviceRole(),
             identity = MessageBusSender.COMM_SERVICE,
@@ -190,7 +204,13 @@ class WearPumpCommService : Service(), CommServiceCallbacks {
 
     override fun onBind(intent: Intent?) = null
 
-    private fun handleMessageReceived(path: String, data: ByteArray, sourceNodeId: String) {
+    @VisibleForTesting
+    internal fun simulateConnectedPump(peripheral: BluetoothPeripheral) {
+        pumpCommHandler!!.simulateConnectedPump(peripheral)
+    }
+
+    @VisibleForTesting
+    internal fun handleMessageReceived(path: String, data: ByteArray, sourceNodeId: String) {
         if (!path.startsWith(MessagePaths.PREFIX_FROM_PUMP)) {
             Timber.d("WearPumpCommService messageReceived: $path ${String(data)} from $sourceNodeId")
         }
