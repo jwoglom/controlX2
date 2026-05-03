@@ -10,6 +10,7 @@ import android.content.Intent
 import android.content.IntentFilter
 import android.content.SharedPreferences
 import android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_CONNECTED_DEVICE
+import android.os.Build
 import android.os.Handler
 import android.os.HandlerThread
 import android.os.Looper
@@ -517,7 +518,11 @@ class CommService : Service(), CommServiceCallbacks {
 
     private fun startForegroundWrapped(id: Int, notification: Notification): Boolean {
         return try {
-            startForeground(id, notification, FOREGROUND_SERVICE_TYPE_CONNECTED_DEVICE)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                startForeground(id, notification, FOREGROUND_SERVICE_TYPE_CONNECTED_DEVICE)
+            } else {
+                startForeground(id, notification)
+            }
             true
         } catch (e: SecurityException) {
             Timber.e(e, "Unable to start foreground service: missing connectedDevice permissions")

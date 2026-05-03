@@ -12,6 +12,12 @@ object BluetoothPermissions {
                 Manifest.permission.ACCESS_COARSE_LOCATION,
             )
         } else {
-            arrayOf(Manifest.permission.ACCESS_COARSE_LOCATION)
+            // Pre-S: BLUETOOTH_SCAN doesn't exist; BLE scan requires fine
+            // location at runtime (coarse alone fails on API <= 30 with
+            // SecurityException from BluetoothLeScanner.startScan).
+            arrayOf(
+                Manifest.permission.ACCESS_FINE_LOCATION,
+                Manifest.permission.ACCESS_COARSE_LOCATION,
+            )
         }
 }

@@ -4,6 +4,7 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
+import android.os.Build
 import com.jwoglom.controlx2.shared.messaging.ConnectionState
 import com.jwoglom.controlx2.shared.messaging.MessageBus
 import com.jwoglom.controlx2.shared.messaging.MessageBusSender
@@ -59,7 +60,12 @@ class BroadcastMessageBus(private val context: Context) : MessageBus {
         // Register receiver for messages from other processes
         val filter = IntentFilter(ACTION_MESSAGE)
         try {
-            context.applicationContext.registerReceiver(receiver, filter, Context.RECEIVER_EXPORTED)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                context.applicationContext.registerReceiver(receiver, filter, Context.RECEIVER_EXPORTED)
+            } else {
+                @Suppress("UnspecifiedRegisterReceiverFlag")
+                context.applicationContext.registerReceiver(receiver, filter)
+            }
             Timber.v("BroadcastMessageBus receiver registered")
         } catch (e: Exception) {
             Timber.e(e, "Failed to register BroadcastMessageBus receiver")

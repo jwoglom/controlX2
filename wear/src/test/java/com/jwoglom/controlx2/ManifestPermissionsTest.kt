@@ -11,14 +11,12 @@ import org.junit.runner.RunWith
 import org.robolectric.annotation.Config
 
 /**
- * Locks in the manifest <uses-permission> set declared by the wear app at
- * each supported SDK level. Robolectric runs each test method once per SDK
- * configured below, and the framework parser itself honors
- * android:minSdkVersion / android:maxSdkVersion on each <uses-permission>.
- *
- * If a permission is added, removed, or its SDK gating changes — including
- * via library manifest merging — this test fails and the golden below must
- * be updated deliberately.
+ * Locks in the merged-manifest <uses-permission> set declared by the wear
+ * app at every supported SDK level. Robolectric runs each test method once
+ * per SDK configured below, and the framework parser honors
+ * android:maxSdkVersion on each <uses-permission> (also auto-strips perms
+ * the platform considers obsolete at the target SDK, e.g. BLUETOOTH and
+ * BLUETOOTH_ADMIN past API 30).
  */
 @RunWith(AndroidJUnit4::class)
 @Config(sdk = [30, 31, 32, 33, 34, 35, 36])
@@ -32,11 +30,10 @@ class ManifestPermissionsTest {
         )
         val actual = info.requestedPermissions?.toSet().orEmpty()
         val sdk = Build.VERSION.SDK_INT
-        assertEquals(
-            "manifest requestedPermissions for sdk=$sdk",
-            EXPECTED.getValue(sdk),
-            actual,
-        )
+        val expected = GOLDEN.firstOrNull { it.deviceSdk == sdk }?.expected
+            ?: error("No GOLDEN entry for deviceSdk=$sdk. " +
+                    "Add a Case to ManifestPermissionsTest.GOLDEN.")
+        assertEquals("manifest requestedPermissions for sdk=$sdk", expected, actual)
     }
 
     companion object {
@@ -44,25 +41,34 @@ class ManifestPermissionsTest {
             "android.permission.POST_NOTIFICATIONS",
             "android.permission.WAKE_LOCK",
             "android.permission.FOREGROUND_SERVICE",
+            "android.permission.FOREGROUND_SERVICE_CONNECTED_DEVICE",
             "com.google.android.c2dm.permission.RECEIVE",
-            "android.permission.BLUETOOTH",
-            "android.permission.BLUETOOTH_ADMIN",
             "android.permission.BLUETOOTH_SCAN",
             "android.permission.BLUETOOTH_CONNECT",
             "android.permission.ACCESS_COARSE_LOCATION",
+            // Merged in by libraries at every SDK
+            "android.permission.BLUETOOTH_ADVERTISE", // blessed-android
+            "android.permission.ACCESS_FINE_LOCATION", // blessed-android (no SDK cap)
+            "com.google.android.wearable.permission.BIND_WATCH_FACE_CONTROL", // wear watchface
+            "com.jwoglom.controlx2.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION", // androidx.core
         )
 
-        // Gated by android:minSdkVersion="34" in the manifest.
-        private const val FSCD = "android.permission.FOREGROUND_SERVICE_CONNECTED_DEVICE"
+        // Auto-stripped by the platform past API 30.
+        private val LEGACY_ONLY = setOf(
+            "android.permission.BLUETOOTH",
+            "android.permission.BLUETOOTH_ADMIN",
+        )
 
-        private val EXPECTED: Map<Int, Set<String>> = mapOf(
-            30 to ALWAYS,
-            31 to ALWAYS,
-            32 to ALWAYS,
-            33 to ALWAYS,
-            34 to ALWAYS + FSCD,
-            35 to ALWAYS + FSCD,
-            36 to ALWAYS + FSCD,
+        private data class Case(val deviceSdk: Int, val expected: Set<String>)
+
+        private val GOLDEN: List<Case> = listOf(
+            Case(deviceSdk = 30, expected = ALWAYS + LEGACY_ONLY),
+            Case(deviceSdk = 31, expected = ALWAYS),
+            Case(deviceSdk = 32, expected = ALWAYS),
+            Case(deviceSdk = 33, expected = ALWAYS),
+            Case(deviceSdk = 34, expected = ALWAYS),
+            Case(deviceSdk = 35, expected = ALWAYS),
+            Case(deviceSdk = 36, expected = ALWAYS),
         )
     }
 }
