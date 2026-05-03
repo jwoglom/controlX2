@@ -1155,20 +1155,8 @@ class MainActivity : ComponentActivity() {
         return missingPermissions.toTypedArray()
     }
 
-    private fun getRequiredPermissions(): Array<String> {
-        val targetSdkVersion = applicationInfo.targetSdkVersion
-        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && targetSdkVersion >= Build.VERSION_CODES.S) {
-            // Android 12+ (API 31+) - Need Bluetooth AND Location permissions
-            arrayOf(
-                Manifest.permission.BLUETOOTH_SCAN,
-                Manifest.permission.BLUETOOTH_CONNECT,
-                Manifest.permission.ACCESS_COARSE_LOCATION
-            )
-        } else {
-            // Android 11 (API 30) - minSdk is 30, so this handles the edge case
-            arrayOf(Manifest.permission.ACCESS_COARSE_LOCATION)
-        }
-    }
+    private fun getRequiredPermissions(): Array<String> =
+        BluetoothPermissions.required(Build.VERSION.SDK_INT, applicationInfo.targetSdkVersion)
 
     private fun permissionsGranted() {
         // Check if Location services are on because they are required to make scanning work for SDK < 31
