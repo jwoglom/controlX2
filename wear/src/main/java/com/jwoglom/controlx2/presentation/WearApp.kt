@@ -108,6 +108,7 @@ import com.jwoglom.controlx2.presentation.ui.RoleSelectionScreen
 import com.jwoglom.controlx2.presentation.ui.SettingsHubScreen
 import com.jwoglom.controlx2.presentation.ui.TempBasalScreen
 import com.jwoglom.controlx2.presentation.ui.WatchNotificationsScreen
+import com.jwoglom.controlx2.presentation.ui.FeatureFlagsScreen
 import com.jwoglom.controlx2.presentation.ui.XdripSettingsScreen
 import com.jwoglom.controlx2.presentation.ui.ScalingLazyListStateViewModel
 import com.jwoglom.controlx2.presentation.ui.ScrollStateViewModel
@@ -340,6 +341,9 @@ fun WearApp(
                 }
                 composable(Screen.XdripSettings.route) {
                     XdripSettingsScreen()
+                }
+                composable(Screen.FeatureFlags.route) {
+                    FeatureFlagsScreen()
                 }
                 composable(
                     route = Screen.HistoryLog.route,

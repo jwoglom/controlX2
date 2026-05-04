@@ -58,6 +58,7 @@ sealed class Screen(
     object SettingsHub : Screen("SettingsHub")
     object NightscoutSettings : Screen("NightscoutSettings")
     object XdripSettings : Screen("XdripSettings")
+    object FeatureFlags : Screen("FeatureFlags")
 
     // Pump data surfaces (DeviceRole.PUMP_HOST).
     object HistoryLog : Screen("HistoryLog")

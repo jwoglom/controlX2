@@ -78,6 +78,7 @@ import com.jwoglom.controlx2.presentation.screens.sections.BolusWindow
 import com.jwoglom.controlx2.presentation.screens.sections.CGMActions
 import com.jwoglom.controlx2.presentation.screens.sections.CartridgeActions
 import com.jwoglom.controlx2.presentation.screens.sections.ControlIQSettingsActions
+import com.jwoglom.controlx2.presentation.screens.sections.FeatureFlags
 import com.jwoglom.controlx2.presentation.screens.sections.Dashboard
 import com.jwoglom.controlx2.presentation.screens.sections.Debug
 import com.jwoglom.controlx2.presentation.screens.sections.Notifications
@@ -438,6 +439,18 @@ fun Landing(
                                 sendMessage = sendMessage,
                                 sendPumpCommands = sendPumpCommands,
                                 historyLogViewModel = historyLogViewModel,
+                                navigateToFeatureFlags = {
+                                    selectedItem = LandingSection.FEATURE_FLAGS
+                                },
+                            )
+                        }
+                        LandingSection.FEATURE_FLAGS -> {
+                            FeatureFlags(
+                                innerPadding = innerPadding,
+                                navController = navController,
+                                navigateBack = {
+                                    selectedItem = LandingSection.DEBUG
+                                },
                             )
                         }
                         LandingSection.SETTINGS -> {
@@ -574,6 +587,7 @@ enum class LandingSection(val label: String, val icon: ImageVector, val showInNa
     DEBUG("Settings", Icons.Filled.Settings, false),
     NIGHTSCOUT_SETTINGS("Settings", Icons.Filled.Settings, false),
     XDRIP_SETTINGS("Settings", Icons.Filled.Settings, false),
+    FEATURE_FLAGS("Settings", Icons.Filled.Settings, false),
     ;
 }
 

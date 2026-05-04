@@ -159,5 +159,13 @@ fun SettingsHubScreen(
                 modifier = Modifier.fillMaxWidth(),
             )
         }
+        item {
+            Chip(
+                onClick = { navController.navigate(Screen.FeatureFlags.route) },
+                label = { Text("Feature flags", fontSize = 13.sp) },
+                colors = ChipDefaults.secondaryChipColors(),
+                modifier = Modifier.fillMaxWidth(),
+            )
+        }
     }
 }

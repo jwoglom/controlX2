@@ -36,6 +36,7 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.Button
@@ -158,6 +159,7 @@ fun Debug(
     sendMessage: (String, ByteArray) -> Unit,
     sendPumpCommands: (SendType, List<Message>) -> Unit,
     historyLogViewModel: HistoryLogViewModel? = null,
+    navigateToFeatureFlags: () -> Unit = {},
 ) {
     val coroutineScope = rememberCoroutineScope()
     val clipboardManager: ClipboardManager = LocalClipboardManager.current
@@ -1018,6 +1020,20 @@ fun Debug(
                         }
                     )
                 }
+            }
+
+            item {
+                ListItem(
+                    headlineContent = { Text("Feature Flags") },
+                    supportingContent = { Text("Toggle experimental features.") },
+                    leadingContent = {
+                        Icon(
+                            Icons.Filled.Settings,
+                            contentDescription = null,
+                        )
+                    },
+                    modifier = Modifier.clickable { navigateToFeatureFlags() },
+                )
             }
         }
     )
