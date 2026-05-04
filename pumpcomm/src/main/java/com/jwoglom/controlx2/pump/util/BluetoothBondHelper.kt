@@ -1,6 +1,7 @@
 package com.jwoglom.controlx2.pump.util
 
 import android.Manifest
+import android.annotation.SuppressLint
 import android.bluetooth.BluetoothAdapter
 import android.content.Context
 import android.content.pm.PackageManager
@@ -16,6 +17,7 @@ import timber.log.Timber
  * already absent, or the unbond request was acknowledged and the OS dropped it
  * within the wait window).
  */
+@SuppressLint("MissingPermission") // BLUETOOTH_CONNECT is checked at runtime below for API 31+.
 fun removeBondCompat(ctx: Context, targetMac: String): Boolean {
     if (targetMac.isBlank()) return true
 
