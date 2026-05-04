@@ -5,6 +5,7 @@ import android.Manifest
 import android.bluetooth.BluetoothAdapter
 import android.bluetooth.le.ScanResult
 import android.content.Context
+import java.util.concurrent.CountDownLatch
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Handler
@@ -91,6 +92,45 @@ class PumpCommHandler(
 
     fun isPumpReadyForHistoryFetch(): Boolean {
         return currentSession?.isActive == true
+    }
+
+    /**
+     * Tear down any live BLE pump connection, blocking up to [timeoutMs] for
+     * the GATT-level disconnect callback to fire.
+     *
+     * Used by the graceful path in [com.jwoglom.controlx2.shared.util.AppReload]
+     * so that callers which kill the process (toggling the device role,
+     * Nightscout config, etc.) don't leave the pump in a stale "peer vanished"
+     * state — the next reconnect would otherwise renegotiate to a high-latency
+     * link and silently drop the JPAKE3 message, manifesting as a spurious
+     * "pairing code was invalid" error after the very next pair.
+     *
+     * Returns `true` if a disconnect callback fired in time, `false` if there
+     * was nothing to disconnect or the timeout elapsed first.
+     */
+    fun shutdownAndAwaitDisconnect(timeoutMs: Long): Boolean {
+        if (!this::pump.isInitialized) return false
+        val peripheral = pump.lastPeripheral ?: return false
+        Timber.i("PumpCommHandler.shutdownAndAwaitDisconnect: cancelling ${peripheral.name}")
+        val latch = CountDownLatch(1)
+        pump.shutdownLatch = latch
+        try {
+            peripheral.cancelConnection()
+        } catch (t: Throwable) {
+            Timber.w(t, "shutdownAndAwaitDisconnect: cancelConnection threw")
+            pump.shutdownLatch = null
+            return false
+        }
+        return try {
+            val ok = latch.await(timeoutMs, java.util.concurrent.TimeUnit.MILLISECONDS)
+            if (!ok) Timber.w("shutdownAndAwaitDisconnect: timed out after ${timeoutMs}ms")
+            ok
+        } catch (e: InterruptedException) {
+            Thread.currentThread().interrupt()
+            false
+        } finally {
+            pump.shutdownLatch = null
+        }
     }
 
     @VisibleForTesting
@@ -209,6 +249,10 @@ class PumpCommHandler(
         var lastPeripheral: BluetoothPeripheral? = null
         var isConnected = false
         var pumpSid: Int? = null
+        // Set by [shutdownAndAwaitDisconnect] so that the next disconnect
+        // callback can wake the waiter on the calling thread (typically the
+        // main thread during triggerAppReload's shutdown hook).
+        @Volatile var shutdownLatch: CountDownLatch? = null
 
         init {
             if (callbacks.prefConnectionSharingEnabled()) {
@@ -495,6 +539,7 @@ class PumpCommHandler(
             callbacks.markConnectionTime()
             callbacks.updateNotification("Disconnected from pump")
             callbacks.showToast("Pump disconnected: $status", Toast.LENGTH_SHORT)
+            shutdownLatch?.countDown()
             return super.onPumpDisconnected(peripheral, status)
         }
 

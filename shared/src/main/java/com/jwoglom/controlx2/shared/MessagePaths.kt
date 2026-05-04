@@ -16,6 +16,7 @@ object MessagePaths {
 
     // === /to-server/* — commands sent TO the pump-host device ===
     const val TO_SERVER_APP_RELOAD = "/to-server/app-reload"
+    const val TO_SERVER_APPLY_RUNTIME_PREFS = "/to-server/apply-runtime-prefs"
     const val TO_SERVER_BOLUS_CANCEL = "/to-server/bolus-cancel"
     const val TO_SERVER_BOLUS_CONFIRM_DIALOG = "/to-server/bolus-confirm-dialog"
     const val TO_SERVER_BOLUS_REQUEST_PHONE = "/to-server/bolus-request-phone"
@@ -37,7 +38,17 @@ object MessagePaths {
     const val TO_SERVER_STOP_COMM = "/to-server/stop-comm"
     const val TO_SERVER_STOP_PUMP_FINDER = "/to-server/stop-pump-finder"
     const val TO_SERVER_WRITE_CHARACTERISTIC_FAILED_CALLBACK = "/to-server/write-characteristic-failed-callback"
-    const val TO_SERVER_DEVICE_ROLE_CHANGED = "/to-server/device-role-changed"
+    // Switch-host wizard: messages directed AT the current pump-host.
+    // Mid-flip the pump-host identity changes; senders pick prefix based on
+    // recipient's role at send time.
+    const val TO_SERVER_WIZARD_START = "/to-server/wizard-start"
+    const val TO_SERVER_WIZARD_ACK = "/to-server/wizard-ack"
+    const val TO_SERVER_WIZARD_BOND_CLEARED = "/to-server/wizard-bond-cleared"
+    const val TO_SERVER_WIZARD_ROLE_FLIPPED = "/to-server/wizard-role-flipped"
+    const val TO_SERVER_WIZARD_PUMP_FOUND = "/to-server/wizard-pump-found"
+    const val TO_SERVER_WIZARD_PAIRED = "/to-server/wizard-paired"
+    const val TO_SERVER_WIZARD_CANCEL = "/to-server/wizard-cancel"
+    const val TO_SERVER_WIZARD_PEER_RESCUED = "/to-server/wizard-peer-rescued"
 
     // === /to-client/* — data/events sent TO the client device ===
     const val TO_CLIENT_BLOCKED_BOLUS_SIGNATURE = "/to-client/blocked-bolus-signature"
@@ -52,7 +63,15 @@ object MessagePaths {
     const val TO_CLIENT_OPEN_ACTIVITY = "/to-client/open-activity"
     const val TO_CLIENT_SERVICE_RECEIVE_MESSAGE = "/to-client/service-receive-message"
     const val TO_CLIENT_WEAR_AUTO_APPROVE_TIMEOUT = "/to-client/wear-auto-approve-timeout"
-    const val TO_CLIENT_DEVICE_ROLE_CHANGED = "/to-client/device-role-changed"
+    // Switch-host wizard: messages directed AT the non-pump-host.
+    const val TO_CLIENT_WIZARD_START = "/to-client/wizard-start"
+    const val TO_CLIENT_WIZARD_ACK = "/to-client/wizard-ack"
+    const val TO_CLIENT_WIZARD_BOND_CLEARED = "/to-client/wizard-bond-cleared"
+    const val TO_CLIENT_WIZARD_ROLE_FLIPPED = "/to-client/wizard-role-flipped"
+    const val TO_CLIENT_WIZARD_PUMP_FOUND = "/to-client/wizard-pump-found"
+    const val TO_CLIENT_WIZARD_PAIRED = "/to-client/wizard-paired"
+    const val TO_CLIENT_WIZARD_CANCEL = "/to-client/wizard-cancel"
+    const val TO_CLIENT_WIZARD_PEER_RESCUED = "/to-client/wizard-peer-rescued"
 
     // === /to-pump/* — commands sent TO the pump ===
     const val TO_PUMP_CACHED_COMMANDS = "/to-pump/cached-commands"

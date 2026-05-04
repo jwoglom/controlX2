@@ -343,11 +343,10 @@ fun AppSetup(
                                     Prefs(context).setGlucoseUnit(unit)
                                     ds.glucoseUnitPreference.value = unit
                                     showGlucoseUnitDialog = false
-                                    // Sync glucose unit to wear app and trigger reload
+                                    // Glucose unit is read live by the running pump
+                                    // session; only sync to wear, no reload needed.
                                     coroutineScope.launch {
                                         sendMessage(MessagePaths.TO_CLIENT_GLUCOSE_UNIT, unit.name.toByteArray())
-                                        delay(250)
-                                        sendMessage(MessagePaths.TO_SERVER_APP_RELOAD, "".toByteArray())
                                     }
                                 }
                                 .padding(vertical = 12.dp),
@@ -384,9 +383,12 @@ fun AppSetup(
                     insulinDeliveryActions = true
                     Prefs(context).setInsulinDeliveryActions(true)
                     showInsulinWarningDialog = false
+                    // Soft-apply: flip the pumpx2 static on the running pump
+                    // session instead of restarting the process. This avoids
+                    // killing the BLE link mid-handshake right after pairing.
                     coroutineScope.launch {
                         delay(250)
-                        sendMessage(MessagePaths.TO_SERVER_APP_RELOAD, "".toByteArray())
+                        sendMessage(MessagePaths.TO_SERVER_APPLY_RUNTIME_PREFS, "".toByteArray())
                     }
                 }) {
                     Text("Enable")

@@ -20,6 +20,7 @@ import androidx.core.app.NotificationCompat
 import androidx.core.graphics.drawable.IconCompat
 import com.jwoglom.controlx2.db.historylog.HistoryLogDatabase
 import com.jwoglom.controlx2.db.historylog.HistoryLogItem
+import com.jwoglom.controlx2.shared.enums.DeviceRole
 import com.jwoglom.controlx2.db.historylog.HistoryLogRepo
 import com.jwoglom.controlx2.messaging.MessageBusFactory
 import com.jwoglom.controlx2.presentation.util.ShouldLogToFile
@@ -47,9 +48,11 @@ import com.jwoglom.controlx2.shared.PumpMessageSerializer
 import com.jwoglom.controlx2.shared.messaging.MessageBus
 import com.jwoglom.controlx2.shared.messaging.MessageBusSender
 import com.jwoglom.controlx2.shared.messaging.MessageListener
+import com.jwoglom.controlx2.shared.util.registerAppReloadShutdownHook
 import com.jwoglom.controlx2.shared.util.setupTimber
 import com.jwoglom.controlx2.shared.util.triggerAppReload
 import com.jwoglom.controlx2.shared.util.shortTime
+import com.jwoglom.controlx2.shared.util.unregisterAppReloadShutdownHook
 import com.jwoglom.controlx2.util.AppVersionCheck
 import com.jwoglom.pumpx2.pump.PumpState
 import com.jwoglom.pumpx2.pump.messages.bluetooth.Characteristic
@@ -97,6 +100,19 @@ class CommService : Service(), CommServiceCallbacks {
     }
 
     private lateinit var bolusManager: BolusManager
+
+    // Hook used by triggerAppReload to give pumpx2 a chance to drop the GATT
+    // link cleanly before Runtime.exit(0). Held as a field so we can
+    // unregister in onDestroy and avoid duplicate registrations on
+    // service-restart cycles.
+    private val appReloadShutdownHook: (Long) -> Unit = { timeoutMs ->
+        try {
+            val ok = pumpCommHandler?.shutdownAndAwaitDisconnect(timeoutMs) ?: false
+            Timber.i("appReloadShutdownHook: graceful BLE shutdown ok=$ok timeoutMs=$timeoutMs")
+        } catch (t: Throwable) {
+            Timber.w(t, "appReloadShutdownHook: graceful BLE shutdown threw")
+        }
+    }
 
     private var serviceStatusAcknowledged = false
     private val serviceStatusTask = object : Runnable {
@@ -183,6 +199,19 @@ class CommService : Service(), CommServiceCallbacks {
             writeCharacteristicFailedCallback = handleWriteCharacteristicFailedCallback)
         Timber.i("service onCreate")
 
+        registerAppReloadShutdownHook(appReloadShutdownHook)
+
+        // The Wear data layer auto-starts CommService whenever a /to-phone or
+        // /from-pump message arrives (see AndroidManifest intent-filter). When
+        // the phone is in CLIENT mode the watch is the pump-host and CommService
+        // must NOT scan/bond — otherwise the OS pairing popup keeps appearing
+        // and the pump's bond stays on the phone, blocking watch-side pairing.
+        if (Prefs(applicationContext).deviceRole() != DeviceRole.PUMP_HOST) {
+            Timber.w("commService is short-circuiting because deviceRole is CLIENT")
+            stopSelf()
+            return
+        }
+
         // Listen to BLE state changes
         val intentFilter = IntentFilter()
         intentFilter.addAction("android.bluetooth.adapter.action.STATE_CHANGED")
@@ -257,6 +286,12 @@ class CommService : Service(), CommServiceCallbacks {
                 Timber.i("force-reload")
                 triggerAppReload(applicationContext)
             }
+            MessagePaths.TO_SERVER_WIZARD_PEER_RESCUED -> {
+                Timber.i("peer-rescued: peer is taking pump-host, flipping to CLIENT")
+                com.jwoglom.controlx2.util.applyPeerRescueFromService(
+                    applicationContext, becomeClient = true,
+                )
+            }
             MessagePaths.TO_SERVER_SET_PAIRING_CODE -> {
                 Timber.i("set-pairing-code received in service")
             }
@@ -306,6 +341,34 @@ class CommService : Service(), CommServiceCallbacks {
             MessagePaths.TO_SERVER_REFRESH_HISTORY_LOG_SYNC -> {
                 Timber.i("refresh-history-log-sync received")
                 pumpCommHandler?.refreshHistoryLogSyncWorker(triggerImmediateSync = true)
+            }
+            MessagePaths.TO_SERVER_APPLY_RUNTIME_PREFS -> {
+                // Soft-apply preference changes to the live pump session so the
+                // caller does not have to trigger a process-killing app reload
+                // (which leaves the BLE link in a "peer vanished" state and
+                // breaks the next CONFIRM-mode JPAKE handshake — see post-pair
+                // pairing-failure repro). pumpx2 only exposes one-way enables
+                // for these statics, so we can move off→on at runtime; off is
+                // still left to the legacy reload path.
+                val prefs = Prefs(applicationContext)
+                if (prefs.insulinDeliveryActions() && !PumpState.actionsAffectingInsulinDeliveryEnabled()) {
+                    Timber.i("apply-runtime-prefs: enabling actionsAffectingInsulinDelivery")
+                    PumpState.enableActionsAffectingInsulinDelivery()
+                }
+                if (prefs.connectionSharingEnabled()) {
+                    if (!PumpState.tconnectAppConnectionSharing) {
+                        Timber.i("apply-runtime-prefs: enabling tconnectAppConnectionSharing")
+                        PumpState.tconnectAppConnectionSharing = true
+                    }
+                    if (!PumpState.sendSharedConnectionResponseMessages) {
+                        Timber.i("apply-runtime-prefs: enabling sendSharedConnectionResponseMessages")
+                        PumpState.sendSharedConnectionResponseMessages = true
+                    }
+                }
+                if (prefs.onlySnoopBluetoothEnabled() && !PumpState.onlySnoopBluetooth) {
+                    Timber.i("apply-runtime-prefs: enabling onlySnoopBluetooth")
+                    PumpState.onlySnoopBluetooth = true
+                }
             }
             MessagePaths.TO_SERVER_SERVICE_STATUS_ACKNOWLEDGED -> {
                 Timber.i("service-status acknowledged, stopping periodic sender")
@@ -739,6 +802,7 @@ class CommService : Service(), CommServiceCallbacks {
 
     override fun onDestroy() {
         super.onDestroy()
+        unregisterAppReloadShutdownHook(appReloadShutdownHook)
         pumpCommHandler?.stopHistoryLogSyncWorker()
         scope.cancel()
         messageBus.close()
