@@ -23,6 +23,7 @@ import com.jwoglom.controlx2.clientcomm.ClientSideEffects
 import com.jwoglom.controlx2.messaging.WearMessageBus
 import com.jwoglom.controlx2.shared.messaging.MessageBus
 import com.jwoglom.controlx2.shared.messaging.MessageListener
+import com.jwoglom.controlx2.shared.enums.DeviceRole
 import com.jwoglom.controlx2.shared.util.setupTimber
 import com.jwoglom.controlx2.util.StatePrefs
 import com.jwoglom.controlx2.util.UpdateComplication
@@ -47,6 +48,16 @@ class PhoneCommService : Service() {
         super.onCreate()
         setupTimber("WPC", context = this)
         Timber.d("wear service onCreate")
+
+        // Wear data layer auto-starts this service via the manifest intent-filter
+        // whenever a /to-wear message arrives. When the watch is PUMP_HOST, this
+        // CLIENT-mode service has no business running and would conflict with
+        // WearPumpCommService.
+        if (StatePrefs(applicationContext).deviceRole() != DeviceRole.CLIENT) {
+            Timber.w("PhoneCommService short-circuiting because deviceRole is PUMP_HOST")
+            stopSelf()
+            return
+        }
 
         messageBus = WearMessageBus(this)
 
@@ -85,6 +96,13 @@ class PhoneCommService : Service() {
 
         messageBus.addMessageListener(object : MessageListener {
             override fun onMessageReceived(path: String, data: ByteArray, sourceNodeId: String) {
+                if (path == com.jwoglom.controlx2.shared.MessagePaths.TO_CLIENT_WIZARD_PEER_RESCUED) {
+                    Timber.i("PhoneCommService: peer-rescued received while CLIENT — clearing stale state")
+                    com.jwoglom.controlx2.util.applyPeerRescueFromService(
+                        applicationContext, becomeClient = false,
+                    )
+                    return
+                }
                 clientMessageHandler.handleMessage(path, data)
             }
         })

@@ -33,6 +33,7 @@ import androidx.wear.compose.material.Text
 import androidx.wear.compose.material.dialog.Alert
 import com.jwoglom.controlx2.shared.enums.DeviceRole
 import com.jwoglom.controlx2.util.StatePrefs
+import com.jwoglom.controlx2.util.rescueResetThisDevice
 import com.jwoglom.controlx2.util.switchDeviceRole
 
 @Composable
@@ -42,6 +43,7 @@ fun RoleSelectionScreen(
     val context = LocalContext.current
     val currentRole = remember { StatePrefs(context).deviceRole() }
     var showConfirmDialog by remember { mutableStateOf(false) }
+    var showRescueDialog by remember { mutableStateOf(false) }
 
     val roleLabel = when (currentRole) {
         DeviceRole.PUMP_HOST -> "Watch (pump-host)"
@@ -56,7 +58,72 @@ fun RoleSelectionScreen(
         DeviceRole.CLIENT -> "Phone (pump-host)"
     }
 
-    if (showConfirmDialog) {
+    // Direction-specific walkthrough. The Tandem Mobi pump bonds with one
+    // device at a time and has no on-pump "unpair" UI — to release the bond
+    // you forget the pump on the current host, then place the pump on the
+    // charging pad to put it back in pairing mode.
+    val walkthrough = when (newRole) {
+        DeviceRole.PUMP_HOST -> // CLIENT -> PUMP_HOST: watch taking over host
+            "Hand pump-host to this watch:\n\n" +
+            "1. On the phone (current host), open Settings and tap Forget pump, then switch the phone to client.\n" +
+            "2. Confirm here. The watch restarts and starts scanning.\n" +
+            "3. Place the Mobi on the charging pad to re-enter pairing.\n" +
+            "4. Pick the pump on the watch and enter its pairing code."
+        DeviceRole.CLIENT -> // PUMP_HOST -> CLIENT: watch giving up host
+            "Hand pump-host to the phone:\n\n" +
+            "1. Confirm here. The watch restarts in client mode (its pump bond is no longer used).\n" +
+            "2. On the phone, open Settings → Pump-host device and switch to phone.\n" +
+            "3. Place the Mobi on the charging pad to re-enter pairing.\n" +
+            "4. Pick the pump on the phone and enter its pairing code."
+    }
+
+    if (showRescueDialog) {
+        Alert(
+            title = {
+                Text(
+                    text = "Reset & start over?",
+                    textAlign = TextAlign.Center,
+                    color = MaterialTheme.colors.onBackground,
+                )
+            },
+            negativeButton = {
+                Button(
+                    onClick = { showRescueDialog = false },
+                    colors = ButtonDefaults.secondaryButtonColors(),
+                ) {
+                    Icon(imageVector = Icons.Filled.Clear, contentDescription = "Cancel")
+                }
+            },
+            positiveButton = {
+                Button(
+                    onClick = {
+                        showRescueDialog = false
+                        val activity = context as? Activity
+                        if (activity != null) {
+                            rescueResetThisDevice(activity)
+                        }
+                    },
+                    colors = ButtonDefaults.primaryButtonColors(),
+                ) {
+                    Icon(imageVector = Icons.Filled.Check, contentDescription = "Confirm")
+                }
+            },
+            icon = {
+                Image(
+                    Icons.Filled.Devices,
+                    "Reset",
+                    Modifier.size(24.dp),
+                )
+            },
+        ) {
+            Text(
+                text = "Forgets the pump on this watch, makes the watch the pump-host, and tells the phone to flip itself to client. Place the Mobi on the charging pad.",
+                textAlign = TextAlign.Start,
+                style = MaterialTheme.typography.body2,
+                color = MaterialTheme.colors.onBackground,
+            )
+        }
+    } else if (showConfirmDialog) {
         Alert(
             title = {
                 Text(
@@ -96,8 +163,8 @@ fun RoleSelectionScreen(
             },
         ) {
             Text(
-                text = "The pump pairs with one device at a time. First unpair the pump from the current host in its Bluetooth settings, then flip the other device to the opposite role and re-pair.",
-                textAlign = TextAlign.Center,
+                text = walkthrough,
+                textAlign = TextAlign.Start,
                 style = MaterialTheme.typography.body2,
                 color = MaterialTheme.colors.onBackground,
             )
@@ -128,6 +195,14 @@ fun RoleSelectionScreen(
                 label = { Text("Switch to $newRoleLabel", fontSize = 12.sp) },
                 colors = ChipDefaults.primaryChipColors(),
                 modifier = Modifier.fillMaxWidth(),
+            )
+            Chip(
+                onClick = { showRescueDialog = true },
+                label = { Text("Reset & start over", fontSize = 12.sp) },
+                colors = ChipDefaults.secondaryChipColors(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 8.dp),
             )
             Chip(
                 onClick = onCancel,

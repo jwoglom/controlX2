@@ -62,6 +62,7 @@ import com.jwoglom.controlx2.shared.enums.DeviceRole
 import com.jwoglom.controlx2.shared.util.SendType
 import com.jwoglom.controlx2.util.AppVersionCheck
 import com.jwoglom.controlx2.util.AppVersionInfo
+import com.jwoglom.controlx2.util.rescueResetThisDevice
 import com.jwoglom.controlx2.util.switchDeviceRole
 import com.jwoglom.pumpx2.pump.PumpState
 import com.jwoglom.pumpx2.pump.messages.Message
@@ -92,6 +93,7 @@ fun Settings(
     var showSupportBundleDialog by remember { mutableStateOf(false) }
     var supportBundleSummary by remember { mutableStateOf<SupportBundleSummary?>(null) }
     var showDeviceRoleDialog by remember { mutableStateOf(false) }
+    var showRescueDialog by remember { mutableStateOf(false) }
     var currentDeviceRole by remember { mutableStateOf(Prefs(context).deviceRole()) }
 
     LazyColumn(
@@ -283,6 +285,20 @@ fun Settings(
                         }
                     )
                     Divider()
+                    ListItem(
+                        headlineContent = { Text("Reset & start over on this device") },
+                        supportingContent = { Text("Forgets the pump on this device, makes the phone the pump-host, and tells the watch to flip itself to client. Use this if you're stuck on a pairing popup or 'Scanning for pumps…' loop.") },
+                        leadingContent = {
+                            Icon(
+                                Icons.Filled.Devices,
+                                contentDescription = "Reset icon",
+                            )
+                        },
+                        modifier = Modifier.clickable {
+                            showRescueDialog = true
+                        }
+                    )
+                    Divider()
                 }
             }
 
@@ -376,9 +392,12 @@ fun Settings(
     if (showPumpSetupConfirmDialog) {
         AlertDialog(
             onDismissRequest = { showPumpSetupConfirmDialog = false },
-            title = { Text("Disconnect from pump?") },
+            title = { Text("Forget pump?") },
             text = {
-                Text("This will disconnect from the current pump and clear saved pairing details. You will need the charging pad available to pair again.")
+                Text(
+                    "This clears the saved bond on this phone. Re-pairing requires placing the Mobi on the charging pad to put it back in pairing mode.\n\n" +
+                    "Note: the Mobi has no on-pump 'unpair' UI — forgetting here is how the bond is released."
+                )
             },
             confirmButton = {
                 TextButton(
@@ -478,19 +497,31 @@ fun Settings(
             DeviceRole.PUMP_HOST -> "Phone (pump-host)"
             DeviceRole.CLIENT -> "Watch (pump-host)"
         }
+        // Direction-specific walkthrough. The Tandem Mobi pump bonds with one
+        // device only and has no on-pump "unpair" UI — releasing a bond means
+        // forgetting the pump on the host, then putting the pump back in
+        // pairing mode by placing it on the charging pad.
+        val walkthrough = when (newRole) {
+            DeviceRole.CLIENT -> // PUMP_HOST -> CLIENT: phone giving up host
+                "The Tandem pump bonds with one device at a time.\n\n" +
+                "Steps to hand off pump-host to the watch:\n\n" +
+                "1. On this phone, tap 'Forget pump' below 'Pump-host device' to clear the existing bond.\n" +
+                "2. Confirm this dialog. The phone will restart in client mode.\n" +
+                "3. On the watch, open Settings → Pump-host device and switch it to 'Watch (pump-host)'.\n" +
+                "4. Place your Mobi on the charging pad to put it back in pairing mode.\n" +
+                "5. The watch will scan, find the pump, and prompt for the pairing code shown on the pump."
+            DeviceRole.PUMP_HOST -> // CLIENT -> PUMP_HOST: phone taking over host
+                "The Tandem pump bonds with one device at a time.\n\n" +
+                "Steps to take pump-host onto this phone:\n\n" +
+                "1. On the watch (current pump-host), open Settings → Pump-host device and switch the watch to client mode. (The watch has no separate 'forget pump' — switching its role releases the bond.)\n" +
+                "2. Confirm this dialog. The phone will restart in pump-host mode and start scanning.\n" +
+                "3. Place your Mobi on the charging pad to put it back in pairing mode.\n" +
+                "4. When the phone shows the pump, tap it and enter the pairing code shown on the pump."
+        }
         AlertDialog(
             onDismissRequest = { showDeviceRoleDialog = false },
             title = { Text("Switch pump-host to $newRoleLabel?") },
-            text = {
-                Text(
-                    "The Tandem pump can only be paired with one device at a time. " +
-                    "After switching:\n\n" +
-                    "1. Flip the other device to the opposite role in its settings.\n" +
-                    "2. Unpair the pump from the old host (via the pump's Bluetooth settings).\n" +
-                    "3. Re-pair the pump to the new host.\n\n" +
-                    "The app will restart to apply the new role."
-                )
-            },
+            text = { Text(walkthrough) },
             confirmButton = {
                 TextButton(onClick = {
                     showDeviceRoleDialog = false
@@ -511,6 +542,40 @@ fun Settings(
             },
             dismissButton = {
                 TextButton(onClick = { showDeviceRoleDialog = false }) {
+                    Text("Cancel")
+                }
+            }
+        )
+    }
+
+    if (showRescueDialog) {
+        AlertDialog(
+            onDismissRequest = { showRescueDialog = false },
+            title = { Text("Reset & start over?") },
+            text = {
+                Text(
+                    "This will:\n" +
+                    "1. Forget the pump bond on this phone.\n" +
+                    "2. Set this phone as the pump-host.\n" +
+                    "3. Tell the watch (if reachable) to flip itself to client.\n\n" +
+                    "Place the Mobi on the charging pad to put it back in pairing mode. The phone will scan and prompt for the pairing code."
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    showRescueDialog = false
+                    val activity = context as? Activity
+                    if (activity != null) {
+                        rescueResetThisDevice(activity)
+                    } else {
+                        Toast.makeText(context, "Unable to rescue: no activity context", Toast.LENGTH_SHORT).show()
+                    }
+                }) {
+                    Text("Reset")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showRescueDialog = false }) {
                     Text("Cancel")
                 }
             }

@@ -1453,10 +1453,16 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun determineStartDestination(): String {
+        val prefs = Prefs(applicationContext)
         return when {
-            !Prefs(applicationContext).tosAccepted() -> Screen.FirstLaunch.route
-            !Prefs(applicationContext).pumpSetupComplete() -> Screen.PumpSetup.route
-            !Prefs(applicationContext).appSetupComplete() -> Screen.AppSetup.route
+            !prefs.tosAccepted() -> Screen.FirstLaunch.route
+            // In CLIENT mode the watch handles pump pairing — the phone has no
+            // pump-finder service running, so PumpSetup would wait forever.
+            prefs.deviceRole() == DeviceRole.CLIENT ->
+                if (!prefs.appSetupComplete()) Screen.AppSetup.route
+                else Screen.Landing.route
+            !prefs.pumpSetupComplete() -> Screen.PumpSetup.route
+            !prefs.appSetupComplete() -> Screen.AppSetup.route
             else -> Screen.Landing.route
         }
     }

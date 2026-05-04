@@ -41,6 +41,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.style.TextAlign
@@ -112,6 +113,9 @@ import com.jwoglom.controlx2.presentation.ui.FeatureFlagsScreen
 import com.jwoglom.controlx2.presentation.ui.XdripSettingsScreen
 import com.jwoglom.controlx2.presentation.ui.ScalingLazyListStateViewModel
 import com.jwoglom.controlx2.presentation.ui.ScrollStateViewModel
+import com.jwoglom.controlx2.shared.enums.DeviceRole
+import com.jwoglom.controlx2.util.StatePrefs
+import com.jwoglom.controlx2.WearPrefs
 import com.jwoglom.controlx2.shared.enums.BasalStatus
 import com.jwoglom.controlx2.shared.enums.GlucoseUnit
 import com.jwoglom.controlx2.shared.enums.UserMode
@@ -185,8 +189,19 @@ fun WearApp(
             bolusBgMgdlUserInput = null
         }
 
+        val initialContext = LocalContext.current
+        val initialRoute = remember {
+            if (StatePrefs(initialContext).deviceRole() == DeviceRole.PUMP_HOST &&
+                !WearPrefs(initialContext).pumpSetupComplete()
+            ) {
+                Screen.PumpFinderSelect.route
+            } else {
+                Screen.WaitingForPhone.route
+            }
+        }
+
         LaunchedEffect (Unit) {
-            navController.navigate(Screen.WaitingForPhone.route)
+            navController.navigate(initialRoute)
         }
 
         val lifecycleOwner = LocalLifecycleOwner.current
@@ -282,7 +297,7 @@ fun WearApp(
              */
             SwipeDismissableNavHost(
                 navController = navController,
-                startDestination = Screen.WaitingForPhone.route,
+                startDestination = initialRoute,
                 modifier = Modifier.background(MaterialTheme.colors.background)
             ) {
 

@@ -34,6 +34,7 @@ import com.jwoglom.controlx2.shared.CommServiceCodes
 import com.jwoglom.controlx2.shared.InitiateConfirmedBolusSerializer
 import com.jwoglom.controlx2.shared.MessagePaths
 import com.jwoglom.controlx2.shared.PumpMessageSerializer
+import com.jwoglom.controlx2.shared.enums.DeviceRole
 import com.jwoglom.controlx2.shared.enums.GlucoseUnit
 import com.jwoglom.controlx2.shared.messaging.MessageBus
 import com.jwoglom.controlx2.shared.messaging.MessageBusSender
@@ -145,6 +146,12 @@ class WearPumpCommService : Service(), CommServiceCallbacks {
         setupTimber("WPC", context = this)
         Timber.i("WearPumpCommService onCreate")
 
+        if (StatePrefs(applicationContext).deviceRole() != DeviceRole.PUMP_HOST) {
+            Timber.w("WearPumpCommService short-circuiting because deviceRole is CLIENT")
+            stopSelf()
+            return
+        }
+
         val intentFilter = IntentFilter()
         intentFilter.addAction("android.bluetooth.adapter.action.STATE_CHANGED")
         intentFilter.addAction("android.bluetooth.device.action.BOND_STATE_CHANGED")
@@ -197,6 +204,12 @@ class WearPumpCommService : Service(), CommServiceCallbacks {
             MessagePaths.TO_SERVER_FORCE_RELOAD -> {
                 Timber.i("force-reload")
                 triggerAppReload(applicationContext)
+            }
+            MessagePaths.TO_SERVER_WIZARD_PEER_RESCUED -> {
+                Timber.i("peer-rescued: peer is taking pump-host, flipping to CLIENT")
+                com.jwoglom.controlx2.util.applyPeerRescueFromService(
+                    applicationContext, becomeClient = true,
+                )
             }
             // TO_SERVER_SET_PAIRING_CODE: the watch UI calls PairingCodeEntry
             // directly and that dispatches TO_SERVER_STOP_PUMP_FINDER("init_comm")
