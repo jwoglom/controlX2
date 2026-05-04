@@ -36,6 +36,13 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import android.app.Activity
+import androidx.compose.material.icons.filled.CloudSync
+import androidx.compose.material.icons.filled.DataThresholding
+import androidx.compose.material.icons.filled.DeveloperMode
+import androidx.compose.material.icons.filled.Help
+import androidx.compose.material.icons.filled.NotificationsActive
+import androidx.compose.material.icons.filled.Sync
+import androidx.compose.material.icons.filled.Timer
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
@@ -115,11 +122,11 @@ fun Settings(
 
             item {
                 ListItem(
-                    headlineContent = { Text("Send PumpX2 Support Bundle") },
+                    headlineContent = { Text("Send Support Bundle") },
                     supportingContent = { Text("Generates a zip file with ControlX2 debug logs.") },
                     leadingContent = {
                         Icon(
-                            Icons.Filled.Send,
+                            Icons.Filled.Help,
                             contentDescription = null,
                         )
                     },
@@ -273,7 +280,7 @@ fun Settings(
                     }
                     ListItem(
                         headlineContent = { Text("Pump-host device") },
-                        supportingContent = { Text("Currently: $roleLabel. Tap to switch which device manages the Bluetooth pump connection.") },
+                        supportingContent = { Text("Currently: $roleLabel.") },
                         leadingContent = {
                             Icon(
                                 Icons.Filled.Devices,
@@ -287,7 +294,7 @@ fun Settings(
                     Divider()
                     ListItem(
                         headlineContent = { Text("Reset & start over on this device") },
-                        supportingContent = { Text("Forgets the pump on this device, makes the phone the pump-host, and tells the watch to flip itself to client. Use this if you're stuck on a pairing popup or 'Scanning for pumps…' loop.") },
+                        supportingContent = { Text("Use if you're stuck. Forces this phone to be pump-host and clears the pump bond.") },
                         leadingContent = {
                             Icon(
                                 Icons.Filled.Devices,
@@ -308,7 +315,7 @@ fun Settings(
                     supportingContent = { Text("Configure Nightscout sync to upload pump data.") },
                     leadingContent = {
                         Icon(
-                            Icons.Filled.Refresh,
+                            Icons.Filled.CloudSync,
                             contentDescription = "Nightscout icon",
                         )
                     },
@@ -325,7 +332,7 @@ fun Settings(
                     supportingContent = { Text("Configure xDrip broadcasts for pump and CGM data.") },
                     leadingContent = {
                         Icon(
-                            Icons.Filled.Refresh,
+                            Icons.Filled.Sync,
                             contentDescription = "xDrip icon",
                         )
                     },
@@ -342,7 +349,7 @@ fun Settings(
                     supportingContent = { Text("Set the pump's clock to the current phone time.") },
                     leadingContent = {
                         Icon(
-                            Icons.Filled.Refresh,
+                            Icons.Filled.Timer,
                             contentDescription = "Sync time icon",
                         )
                     },
@@ -359,7 +366,7 @@ fun Settings(
                     supportingContent = { Text("Play a sound on the pump to help locate it.") },
                     leadingContent = {
                         Icon(
-                            Icons.Filled.Notifications,
+                            Icons.Filled.NotificationsActive,
                             contentDescription = "Play sound icon",
                         )
                     },
@@ -376,7 +383,7 @@ fun Settings(
                     supportingContent = { Text("Perform debug options.") },
                     leadingContent = {
                         Icon(
-                            Icons.Filled.Settings,
+                            Icons.Filled.DeveloperMode,
                             contentDescription = "Settings icon",
                         )
                     },
@@ -394,10 +401,7 @@ fun Settings(
             onDismissRequest = { showPumpSetupConfirmDialog = false },
             title = { Text("Forget pump?") },
             text = {
-                Text(
-                    "This clears the saved bond on this phone. Re-pairing requires placing the Mobi on the charging pad to put it back in pairing mode.\n\n" +
-                    "Note: the Mobi has no on-pump 'unpair' UI — forgetting here is how the bond is released."
-                )
+                Text("Clears the pump bond on this phone. Place the Mobi on the charging pad to re-pair.")
             },
             confirmButton = {
                 TextButton(
@@ -497,26 +501,11 @@ fun Settings(
             DeviceRole.PUMP_HOST -> "Phone (pump-host)"
             DeviceRole.CLIENT -> "Watch (pump-host)"
         }
-        // Direction-specific walkthrough. The Tandem Mobi pump bonds with one
-        // device only and has no on-pump "unpair" UI — releasing a bond means
-        // forgetting the pump on the host, then putting the pump back in
-        // pairing mode by placing it on the charging pad.
         val walkthrough = when (newRole) {
-            DeviceRole.CLIENT -> // PUMP_HOST -> CLIENT: phone giving up host
-                "The Tandem pump bonds with one device at a time.\n\n" +
-                "Steps to hand off pump-host to the watch:\n\n" +
-                "1. On this phone, tap 'Forget pump' below 'Pump-host device' to clear the existing bond.\n" +
-                "2. Confirm this dialog. The phone will restart in client mode.\n" +
-                "3. On the watch, open Settings → Pump-host device and switch it to 'Watch (pump-host)'.\n" +
-                "4. Place your Mobi on the charging pad to put it back in pairing mode.\n" +
-                "5. The watch will scan, find the pump, and prompt for the pairing code shown on the pump."
-            DeviceRole.PUMP_HOST -> // CLIENT -> PUMP_HOST: phone taking over host
-                "The Tandem pump bonds with one device at a time.\n\n" +
-                "Steps to take pump-host onto this phone:\n\n" +
-                "1. On the watch (current pump-host), open Settings → Pump-host device and switch the watch to client mode. (The watch has no separate 'forget pump' — switching its role releases the bond.)\n" +
-                "2. Confirm this dialog. The phone will restart in pump-host mode and start scanning.\n" +
-                "3. Place your Mobi on the charging pad to put it back in pairing mode.\n" +
-                "4. When the phone shows the pump, tap it and enter the pairing code shown on the pump."
+            DeviceRole.CLIENT ->
+                "The phone restarts as client and the watch takes over as pump-host. Place the Mobi on the charging pad to re-pair."
+            DeviceRole.PUMP_HOST ->
+                "The phone restarts as pump-host and the watch flips to client. Place the Mobi on the charging pad to re-pair."
         }
         AlertDialog(
             onDismissRequest = { showDeviceRoleDialog = false },
@@ -553,13 +542,7 @@ fun Settings(
             onDismissRequest = { showRescueDialog = false },
             title = { Text("Reset & start over?") },
             text = {
-                Text(
-                    "This will:\n" +
-                    "1. Forget the pump bond on this phone.\n" +
-                    "2. Set this phone as the pump-host.\n" +
-                    "3. Tell the watch (if reachable) to flip itself to client.\n\n" +
-                    "Place the Mobi on the charging pad to put it back in pairing mode. The phone will scan and prompt for the pairing code."
-                )
+                Text("Forces this phone to pump-host, clears the pump bond, and asks the watch to flip to client. Place the Mobi on the charging pad to re-pair.")
             },
             confirmButton = {
                 TextButton(onClick = {

@@ -101,10 +101,17 @@ class MobileClientService : Service() {
         messageBus.addMessageListener(object : MessageListener {
             override fun onMessageReceived(path: String, data: ByteArray, sourceNodeId: String) {
                 if (path == com.jwoglom.controlx2.shared.MessagePaths.TO_CLIENT_WIZARD_PEER_RESCUED) {
-                    Timber.i("MobileClientService: peer-rescued received while CLIENT — clearing stale state")
-                    com.jwoglom.controlx2.util.applyPeerRescueFromService(
-                        applicationContext, becomeClient = false,
-                    )
+                    if (!com.jwoglom.controlx2.shared.FeatureFlag.enabled(
+                            applicationContext,
+                            com.jwoglom.controlx2.shared.FeatureFlag.BTHostSwitch,
+                        )) {
+                        Timber.w("MobileClientService: peer-rescued ignored (BTHostSwitch off)")
+                    } else {
+                        Timber.i("MobileClientService: peer-rescued received while CLIENT — clearing stale state")
+                        com.jwoglom.controlx2.util.applyPeerRescueFromService(
+                            applicationContext, becomeClient = false,
+                        )
+                    }
                     return
                 }
                 clientMessageHandler.handleMessage(path, data)

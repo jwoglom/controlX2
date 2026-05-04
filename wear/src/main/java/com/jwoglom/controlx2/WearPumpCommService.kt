@@ -206,10 +206,17 @@ class WearPumpCommService : Service(), CommServiceCallbacks {
                 triggerAppReload(applicationContext)
             }
             MessagePaths.TO_SERVER_WIZARD_PEER_RESCUED -> {
-                Timber.i("peer-rescued: peer is taking pump-host, flipping to CLIENT")
-                com.jwoglom.controlx2.util.applyPeerRescueFromService(
-                    applicationContext, becomeClient = true,
-                )
+                if (!com.jwoglom.controlx2.shared.FeatureFlag.enabled(
+                        applicationContext,
+                        com.jwoglom.controlx2.shared.FeatureFlag.BTHostSwitch,
+                    )) {
+                    Timber.w("peer-rescued ignored: BTHostSwitch feature flag disabled")
+                } else {
+                    Timber.i("peer-rescued: peer is taking pump-host, flipping to CLIENT")
+                    com.jwoglom.controlx2.util.applyPeerRescueFromService(
+                        applicationContext, becomeClient = true,
+                    )
+                }
             }
             // TO_SERVER_SET_PAIRING_CODE: the watch UI calls PairingCodeEntry
             // directly and that dispatches TO_SERVER_STOP_PUMP_FINDER("init_comm")

@@ -31,6 +31,8 @@ import androidx.wear.compose.material.Icon
 import androidx.wear.compose.material.MaterialTheme
 import androidx.wear.compose.material.Text
 import androidx.wear.compose.material.dialog.Alert
+import androidx.compose.runtime.LaunchedEffect
+import com.jwoglom.controlx2.shared.FeatureFlag
 import com.jwoglom.controlx2.shared.enums.DeviceRole
 import com.jwoglom.controlx2.util.StatePrefs
 import com.jwoglom.controlx2.util.rescueResetThisDevice
@@ -41,6 +43,14 @@ fun RoleSelectionScreen(
     onCancel: () -> Unit,
 ) {
     val context = LocalContext.current
+    val ffEnabled = remember { FeatureFlag.enabled(context, FeatureFlag.BTHostSwitch) }
+    if (!ffEnabled) {
+        // Defense in depth: the SettingsHub chip that navigates here is itself
+        // gated, so this branch is only hit if the route is reached some other
+        // way (e.g. saved nav state after the flag was toggled off).
+        LaunchedEffect(Unit) { onCancel() }
+        return
+    }
     val currentRole = remember { StatePrefs(context).deviceRole() }
     var showConfirmDialog by remember { mutableStateOf(false) }
     var showRescueDialog by remember { mutableStateOf(false) }
@@ -58,23 +68,11 @@ fun RoleSelectionScreen(
         DeviceRole.CLIENT -> "Phone (pump-host)"
     }
 
-    // Direction-specific walkthrough. The Tandem Mobi pump bonds with one
-    // device at a time and has no on-pump "unpair" UI — to release the bond
-    // you forget the pump on the current host, then place the pump on the
-    // charging pad to put it back in pairing mode.
     val walkthrough = when (newRole) {
-        DeviceRole.PUMP_HOST -> // CLIENT -> PUMP_HOST: watch taking over host
-            "Hand pump-host to this watch:\n\n" +
-            "1. On the phone (current host), open Settings and tap Forget pump, then switch the phone to client.\n" +
-            "2. Confirm here. The watch restarts and starts scanning.\n" +
-            "3. Place the Mobi on the charging pad to re-enter pairing.\n" +
-            "4. Pick the pump on the watch and enter its pairing code."
-        DeviceRole.CLIENT -> // PUMP_HOST -> CLIENT: watch giving up host
-            "Hand pump-host to the phone:\n\n" +
-            "1. Confirm here. The watch restarts in client mode (its pump bond is no longer used).\n" +
-            "2. On the phone, open Settings → Pump-host device and switch to phone.\n" +
-            "3. Place the Mobi on the charging pad to re-enter pairing.\n" +
-            "4. Pick the pump on the phone and enter its pairing code."
+        DeviceRole.PUMP_HOST ->
+            "The watch restarts as pump-host and the phone flips to client. Place the Mobi on the charging pad to re-pair."
+        DeviceRole.CLIENT ->
+            "The watch restarts as client and the phone takes over as pump-host. Place the Mobi on the charging pad to re-pair."
     }
 
     if (showRescueDialog) {
@@ -117,7 +115,7 @@ fun RoleSelectionScreen(
             },
         ) {
             Text(
-                text = "Forgets the pump on this watch, makes the watch the pump-host, and tells the phone to flip itself to client. Place the Mobi on the charging pad.",
+                text = "Forces this watch to pump-host and asks the phone to flip to client. Place the Mobi on the charging pad to re-pair.",
                 textAlign = TextAlign.Start,
                 style = MaterialTheme.typography.body2,
                 color = MaterialTheme.colors.onBackground,

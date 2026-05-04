@@ -287,10 +287,17 @@ class CommService : Service(), CommServiceCallbacks {
                 triggerAppReload(applicationContext)
             }
             MessagePaths.TO_SERVER_WIZARD_PEER_RESCUED -> {
-                Timber.i("peer-rescued: peer is taking pump-host, flipping to CLIENT")
-                com.jwoglom.controlx2.util.applyPeerRescueFromService(
-                    applicationContext, becomeClient = true,
-                )
+                if (!com.jwoglom.controlx2.shared.FeatureFlag.enabled(
+                        applicationContext,
+                        com.jwoglom.controlx2.shared.FeatureFlag.BTHostSwitch,
+                    )) {
+                    Timber.w("peer-rescued ignored: BTHostSwitch feature flag disabled")
+                } else {
+                    Timber.i("peer-rescued: peer is taking pump-host, flipping to CLIENT")
+                    com.jwoglom.controlx2.util.applyPeerRescueFromService(
+                        applicationContext, becomeClient = true,
+                    )
+                }
             }
             MessagePaths.TO_SERVER_SET_PAIRING_CODE -> {
                 Timber.i("set-pairing-code received in service")
