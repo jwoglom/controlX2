@@ -16,11 +16,20 @@ import androidx.compose.foundation.layout.wrapContentSize
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.ExperimentalMaterialApi
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.DirectionsRun
+import androidx.compose.material.icons.automirrored.filled.VolumeUp
+import androidx.compose.material.icons.filled.Bedtime
+import androidx.compose.material.icons.filled.Cancel
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Create
+import androidx.compose.material.icons.filled.DevicesOther
+import androidx.compose.material.icons.filled.DirectionsRun
+import androidx.compose.material.icons.filled.EditNote
+import androidx.compose.material.icons.filled.HealthAndSafety
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.VolumeUp
 import androidx.compose.material.pullrefresh.PullRefreshIndicator
 import androidx.compose.material.pullrefresh.pullRefresh
 import androidx.compose.material.pullrefresh.rememberPullRefreshState
@@ -386,7 +395,7 @@ fun Actions(
                             )},
                             leadingContent = {
                                 Icon(
-                                    Icons.Filled.Person,
+                                    Icons.AutoMirrored.Filled.DirectionsRun,
                                     contentDescription = null,
                                 )
                             },
@@ -468,7 +477,7 @@ fun Actions(
                             )},
                             leadingContent = {
                                 Icon(
-                                    Icons.Filled.Person,
+                                    Icons.Filled.Bedtime,
                                     contentDescription = null,
                                 )
                             },
@@ -560,8 +569,8 @@ fun Actions(
                             leadingContent = {
                                 Icon(
                                     when (tempRateActive.value) {
-                                        true -> Icons.Filled.Close
-                                        else -> Icons.Filled.Settings
+                                        true -> Icons.Filled.Cancel
+                                        else -> Icons.Filled.EditNote
                                     },
                                     contentDescription = null,
                                 )
@@ -661,7 +670,7 @@ fun Actions(
                             supportingContent = {
                             },
                             leadingContent = {
-                                Icon(Icons.Filled.Settings, contentDescription = null)
+                                Icon(Icons.Filled.DevicesOther, contentDescription = null)
                             },
                             modifier = Modifier.clickable {
                                 navigateToSection(LandingSection.CGM_ACTIONS)
@@ -705,7 +714,7 @@ fun Actions(
                             supportingContent = {
                             },
                             leadingContent = {
-                                Icon(Icons.Filled.Settings, contentDescription = null)
+                                Icon(Icons.AutoMirrored.Filled.VolumeUp, contentDescription = null)
                             },
                             modifier = Modifier.clickable {
                                 navigateToSection(LandingSection.SOUND_SETTINGS_ACTIONS)
@@ -749,7 +758,7 @@ fun Actions(
                             supportingContent = {
                             },
                             leadingContent = {
-                                Icon(Icons.Filled.Settings, contentDescription = null)
+                                Icon(Icons.Filled.HealthAndSafety, contentDescription = null)
                             },
                             modifier = Modifier.clickable {
                                 navigateToSection(LandingSection.SAFETY_LIMITS_ACTIONS)
