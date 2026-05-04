@@ -24,7 +24,15 @@ jobs:
         with:
           distribution: temurin
           java-version: '21'
-          cache: gradle
+
+      # Centralized Gradle caching: ~/.gradle/caches, ~/.gradle/wrapper,
+      # and the local build cache. Read-only on PRs to avoid unrelated PRs
+      # poisoning the main-branch cache; writes happen on push events.
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          cache-read-only: ${{ github.event_name == 'pull_request' }}
+          validate-wrappers: true
 
       - name: Set up Android SDK
         uses: android-actions/setup-android@v3

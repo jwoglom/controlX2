@@ -14,13 +14,23 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - name: set up JDK 21
-        uses: actions/setup-java@v3
+        uses: actions/setup-java@v4
         with:
           java-version: '21'
           distribution: 'temurin'
-          cache: gradle
+
+      # Single source of truth for Gradle caching: caches ~/.gradle/caches,
+      # ~/.gradle/wrapper, and the local build cache, keyed on
+      # build.gradle/settings.gradle/gradle-wrapper.properties etc. Replaces
+      # the ad-hoc `cache: gradle` from setup-java and the per-step
+      # burrunan/gradle-cache-action that we used to run the unit tests.
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          cache-read-only: ${{ github.event_name == 'pull_request' }}
+          validate-wrappers: true
 
       - name: Grant execute permission for gradlew
         run: chmod +x gradlew
@@ -34,6 +44,15 @@ jobs:
         run: |
           echo $ENCODED_STRING | base64 -di > release.keystore
 
+      # Cache the Robolectric framework jars across runs. Key includes the
+      # workflow file hash so a change to the version list invalidates it.
+      - name: Cache Robolectric jars
+        uses: actions/cache@v4
+        with:
+          path: ~/.robolectric
+          key: robolectric-jars-${{ runner.os }}-${{ hashFiles('.github/workflows/android.yml') }}
+          restore-keys: |
+            robolectric-jars-${{ runner.os }}-
 
       - name: Download Robolectric jars
         # The unit tests set `robolectric.offline=true` on CI and expect the
@@ -69,6 +88,10 @@ jobs:
           for entry in "${versions[@]}"; do
             v="${entry#*:}-i7"
             jar=~/.robolectric/android-all-instrumented-$v.jar
+            if [ -f "$jar" ] && [ "$(stat -c%s "$jar")" -ge 50000000 ]; then
+              echo "Cached: $v ($(stat -c%s "$jar") bytes)"
+              continue
+            fi
             echo "Downloading $v"
             curl -L --fail --retry 5 --retry-delay 10 --retry-all-errors \
               -o "$jar" \
@@ -104,11 +127,8 @@ jobs:
           path: wear/build/outputs/apk/release/wear-release.apk
           if-no-files-found: warn
 
-      - uses: burrunan/gradle-cache-action@v1
-        name: Unit Test
-        with:
-          job-id: android
-          arguments: testDebugUnitTest
+      - name: Unit Test
+        run: ./gradlew testDebugUnitTest
 
       - name: Android Test Report
         uses: asadmansr/android-test-report-action@v1.2.0
@@ -118,56 +138,19 @@ jobs:
         run: find .
         if: ${{ always() }} 
 
-      - name: Validate Gradle wrapper (attempt 1)
-        id: validate_gradle_wrapper
-        continue-on-error: true
-        uses: gradle/actions/wrapper-validation@v5
-
-      - name: Validate Gradle wrapper (retry)
-        id: validate_gradle_wrapper_retry
-        if: ${{ steps.validate_gradle_wrapper.outcome == 'failure' }}
-        continue-on-error: true
-        uses: gradle/actions/wrapper-validation@v5
-
-      - name: Warn if Gradle wrapper validation failed twice
-        if: ${{ steps.validate_gradle_wrapper.outcome == 'failure' && steps.validate_gradle_wrapper_retry.outcome == 'failure' }}
-        run: |
-          echo "::warning::Gradle wrapper validation failed twice (likely network reachability to Gradle checksum services)."
-
       - name: version
-        run: echo "::set-output name=version::$(grep 'controlx2_version =' build.gradle | cut -f2 -d= | tr -d '"' | tr -d '[:space:]')"
         id: version
+        run: |
+          v=$(grep 'controlx2_version =' build.gradle | cut -f2 -d= | tr -d '"' | tr -d '[:space:]')
+          echo "version=$v" >> "$GITHUB_OUTPUT"
 
       - name: release
-        uses: actions/create-release@v1
-        id: create_release
+        uses: softprops/action-gh-release@v2
         if: startsWith(github.event.ref, 'refs/tags/v')
         with:
-          draft: false
           prerelease: true
-          release_name: ${{ steps.version.outputs.version }}
-          tag_name: ${{ github.ref }}
-        env:
-          GITHUB_TOKEN: ${{ github.token }}
-
-      - name: Upload mobile asset
-        uses: actions/upload-release-asset@v1
-        if: startsWith(github.event.ref, 'refs/tags/v')
-        env:
-          GITHUB_TOKEN: ${{ github.token }}
-        with:
-          upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: ./mobile/build/outputs/apk/release/mobile-release.apk
-          asset_name: mobile-release.apk
-          asset_content_type: application/vnd.android.package-archive
-
-      - name: Upload wear asset
-        uses: actions/upload-release-asset@v1
-        if: startsWith(github.event.ref, 'refs/tags/v')
-        env:
-          GITHUB_TOKEN: ${{ github.token }}
-        with:
-          upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: ./wear/build/outputs/apk/release/wear-release.apk
-          asset_name: wear-release.apk
-          asset_content_type: application/vnd.android.package-archive
+          name: ${{ steps.version.outputs.version }}
+          tag_name: ${{ github.ref_name }}
+          files: |
+            mobile/build/outputs/apk/release/mobile-release.apk
+            wear/build/outputs/apk/release/wear-release.apk
