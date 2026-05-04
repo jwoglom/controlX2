@@ -56,6 +56,7 @@ import com.jwoglom.controlx2.presentation.util.formatLogLineCount
 import com.jwoglom.controlx2.presentation.util.getSupportBundleSummary
 import com.jwoglom.controlx2.presentation.util.sendSupportBundleEmail
 import com.jwoglom.controlx2.presentation.util.shareSupportBundle
+import com.jwoglom.controlx2.shared.FeatureFlag
 import com.jwoglom.controlx2.shared.MessagePaths
 import com.jwoglom.controlx2.shared.enums.DeviceRole
 import com.jwoglom.controlx2.shared.util.SendType
@@ -259,24 +260,30 @@ fun Settings(
             }
 
             item {
-                val roleLabel = when (currentDeviceRole) {
-                    DeviceRole.PUMP_HOST -> "Phone (pump-host)"
-                    DeviceRole.CLIENT -> "Watch (pump-host)"
-                }
-                ListItem(
-                    headlineContent = { Text("Pump-host device") },
-                    supportingContent = { Text("Currently: $roleLabel. Tap to switch which device manages the Bluetooth pump connection.") },
-                    leadingContent = {
-                        Icon(
-                            Icons.Filled.Devices,
-                            contentDescription = "Device role icon",
-                        )
-                    },
-                    modifier = Modifier.clickable {
-                        showDeviceRoleDialog = true
+                var ffEnabled by remember { mutableStateOf(FeatureFlag.enabled(context,
+                    FeatureFlag.BTHostSwitch
+                ))}
+
+                if (ffEnabled) {
+                    val roleLabel = when (currentDeviceRole) {
+                        DeviceRole.PUMP_HOST -> "Phone (pump-host)"
+                        DeviceRole.CLIENT -> "Watch (pump-host)"
                     }
-                )
-                Divider()
+                    ListItem(
+                        headlineContent = { Text("Pump-host device") },
+                        supportingContent = { Text("Currently: $roleLabel. Tap to switch which device manages the Bluetooth pump connection.") },
+                        leadingContent = {
+                            Icon(
+                                Icons.Filled.Devices,
+                                contentDescription = "Device role icon",
+                            )
+                        },
+                        modifier = Modifier.clickable {
+                            showDeviceRoleDialog = true
+                        }
+                    )
+                    Divider()
+                }
             }
 
             item {
