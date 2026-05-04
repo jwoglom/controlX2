@@ -15,10 +15,10 @@ jobs:
 
     steps:
       - uses: actions/checkout@v3
-      - name: set up JDK 17
+      - name: set up JDK 21
         uses: actions/setup-java@v3
         with:
-          java-version: '17'
+          java-version: '21'
           distribution: 'temurin'
           cache: gradle
 
@@ -37,7 +37,7 @@ jobs:
 
       - name: Download Robolectric jars
         # The unit tests set `robolectric.offline=true` on CI and expect the
-        # framework jar at ~/.robolectric/. If this download is silently
+        # framework jars at ~/.robolectric/. If a download is silently
         # corrupt (e.g. Maven Central serves a 404 HTML page), Robolectric
         # boots with a broken framework jar, `AndroidVersions.CURRENT` ends
         # up null, and every Robolectric test blows up with confusing errors
@@ -45,19 +45,42 @@ jobs:
         # HTTP errors into curl failures, `--retry` handles transient CDN
         # blips, and the size assertion catches the rare case where Maven
         # Central 200's with a tiny error body.
+        #
+        # Each version pair is "<androidVersion>-robolectric-<frameworkSdkBuildVersion>"
+        # for one supported API level, taken from Robolectric 4.16.1's
+        # AndroidSdk.kt. The set must cover every API level any test pins
+        # via @Config(sdk = [...]).
         run: |
           mkdir -p ~/.robolectric
-          jar=~/.robolectric/android-all-instrumented-15-robolectric-13954326-i7.jar
-          curl -L --fail --retry 5 --retry-delay 10 --retry-all-errors \
-            -o "$jar" \
-            https://repo1.maven.org/maven2/org/robolectric/android-all-instrumented/15-robolectric-13954326-i7/android-all-instrumented-15-robolectric-13954326-i7.jar
-          size=$(stat -c%s "$jar")
-          if [ "$size" -lt 50000000 ]; then
-            echo "Robolectric framework jar too small ($size bytes) — likely a Maven Central error page, not the real jar."
-            head -c 512 "$jar" || true
-            exit 1
-          fi
-          echo "Robolectric framework jar OK: $size bytes"
+          # apiLevel:versionString — keep in sync with @Config(sdk=[...]) in mobile/src/test.
+          versions=(
+            "26:8.0.0_r4-robolectric-r1"
+            "27:8.1.0-robolectric-4611349"
+            "28:9-robolectric-4913185-2"
+            "29:10-robolectric-5803371"
+            "30:11-robolectric-6757853"
+            "31:12-robolectric-7732740"
+            "32:12.1-robolectric-8229987"
+            "33:13-robolectric-9030017"
+            "34:14-robolectric-10818077"
+            "35:15-robolectric-13954326"
+            "36:16-robolectric-13921718"
+          )
+          for entry in "${versions[@]}"; do
+            v="${entry#*:}-i7"
+            jar=~/.robolectric/android-all-instrumented-$v.jar
+            echo "Downloading $v"
+            curl -L --fail --retry 5 --retry-delay 10 --retry-all-errors \
+              -o "$jar" \
+              "https://repo1.maven.org/maven2/org/robolectric/android-all-instrumented/$v/android-all-instrumented-$v.jar"
+            size=$(stat -c%s "$jar")
+            if [ "$size" -lt 50000000 ]; then
+              echo "Robolectric framework jar too small ($size bytes) — likely a Maven Central error page, not the real jar."
+              head -c 512 "$jar" || true
+              exit 1
+            fi
+            echo "  OK: $size bytes"
+          done
 
       - name: Assemble Release
         run: |
