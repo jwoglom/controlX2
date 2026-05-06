@@ -87,10 +87,22 @@ android {
 // Roborazzi preview tests are defined manually in
 // src/test/java/.../snapshots/ComposePreviewSnapshotTests.kt
 
+// Resolve build_time + build_version once at configuration time, keyed on the
+// HEAD commit. `providers.exec` is the config-cache-safe API; the previous
+// `paperwork.buildTime()` (wall-clock) and `gitInfo()` (direct shell-out) both
+// invalidated the kotlin-compile cache on every CI run and blocked
+// org.gradle.configuration-cache.
+def commitSha = providers.exec {
+    commandLine 'git', 'rev-parse', '--short', 'HEAD'
+}.standardOutput.asText.map { it.trim() }.getOrElse("unknown")
+def commitTime = providers.exec {
+    commandLine 'git', 'log', '-1', '--format=%cI'
+}.standardOutput.asText.map { it.trim() }.getOrElse("unknown")
+
 paperwork {
     set = [
-        build_time: buildTime("yyyy-MM-dd HH:mm:ss", "UTC"),
-        build_version: gitInfo()
+        build_time: commitTime,
+        build_version: commitSha
     ]
 }
 

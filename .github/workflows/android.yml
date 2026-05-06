@@ -8,6 +8,13 @@ on:
   pull_request:
     branches: [ "main", "dev" ]
 
+# Tag-builds always run to completion (releases). Branch builds and PR builds
+# cancel in-flight runs on the same ref so superseded runs don't race the
+# Gradle remote cache and waste runner minutes.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ !startsWith(github.ref, 'refs/tags/') }}
+
 jobs:
   build:
 
@@ -105,9 +112,16 @@ jobs:
             echo "  OK: $size bytes"
           done
 
-      - name: Assemble Release
+      - name: Assemble Release & Test
+        # Single Gradle invocation:
+        #  - assembles only what's uploaded (mobile + wear release APKs)
+        #  - runs debug unit tests in the same daemon (so the kotlin compile
+        #    output is reused across assemble + test).
+        # Drops the prior `gradle build assembleRelease` which also ran
+        # assembleDebug, testReleaseUnitTest, lintAnalyzeDebug, and
+        # lintVitalAnalyzeRelease — none of which the workflow ships.
         run: |
-          ./gradlew build assembleRelease \
+          ./gradlew :mobile:assembleRelease :wear:assembleRelease testDebugUnitTest \
             -DRELEASE_STORE_FILE=../release.keystore \
             -DRELEASE_STORE_PASSWORD='${{ secrets.RELEASE_STORE_PASSWORD }}' \
             -DRELEASE_KEY_ALIAS='${{ secrets.RELEASE_KEY_ALIAS }}' \
@@ -126,9 +140,6 @@ jobs:
           name: wear-release.apk
           path: wear/build/outputs/apk/release/wear-release.apk
           if-no-files-found: warn
-
-      - name: Unit Test
-        run: ./gradlew testDebugUnitTest
 
       - name: Android Test Report
         uses: asadmansr/android-test-report-action@v1.2.0
