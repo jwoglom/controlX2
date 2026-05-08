@@ -1,12 +1,29 @@
 @file:OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3Api::class)
 package com.jwoglom.controlx2.presentation.components
 
+import android.content.ActivityNotFoundException
+import android.content.ClipData
+import android.content.ClipboardManager
+import android.content.Context
+import android.content.Intent
+import android.net.Uri
+import android.provider.Settings
+import android.widget.Toast
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.Divider
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -16,6 +33,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.SpanStyle
@@ -26,9 +44,14 @@ import androidx.compose.ui.unit.dp
 import com.jwoglom.controlx2.LocalDataStore
 import com.jwoglom.controlx2.Prefs
 import com.jwoglom.controlx2.presentation.screens.PumpSetupStage
+import com.jwoglom.controlx2.pump.ErrorAction
+import com.jwoglom.controlx2.pump.ErrorPresentation
+import com.jwoglom.controlx2.pump.Severity
+import com.jwoglom.controlx2.shared.MessagePaths
 import com.jwoglom.controlx2.shared.presentation.intervalOf
 import com.jwoglom.controlx2.shared.util.shortTimeAgo
 import com.jwoglom.controlx2.shared.util.determinePumpModel
+import com.jwoglom.pumpx2.pump.PumpState
 import com.jwoglom.pumpx2.pump.messages.models.KnownDeviceModel
 import com.jwoglom.pumpx2.pump.messages.models.PairingCodeType
 import timber.log.Timber
@@ -39,6 +62,7 @@ const val TroubleshootingStepsThresholdSeconds = 15
 fun PumpSetupStageDescription(
     initialSetup: Boolean = false,
     pairingCodeStage: @Composable () -> Unit = {},
+    sendMessage: ((String, ByteArray) -> Unit)? = null,
 ) {
     val context = LocalContext.current
     val ds = LocalDataStore.current
@@ -309,7 +333,18 @@ fun PumpSetupStageDescription(
     }
 
     if (setupStage.value != PumpSetupStage.PUMPX2_PUMP_CONNECTED) {
-        if (pumpConnectionWaitingSeconds > TroubleshootingStepsThresholdSeconds) {
+        val errorState = pumpCriticalError.value
+        // Decide visibility per tier. TRANSIENT errors stay hidden until threshold + time gate.
+        val shouldShowError = errorState != null && when (errorState.presentation.severity) {
+            Severity.TRANSIENT -> errorState.occurrences >= errorState.presentation.occurrenceThreshold &&
+                java.time.Duration.between(errorState.firstSeenAt, java.time.Instant.now()).toMillis() >= errorState.presentation.timeThresholdMs
+            Severity.ACTIONABLE, Severity.FATAL -> errorState.occurrences >= errorState.presentation.occurrenceThreshold
+        }
+
+        if (pumpConnectionWaitingSeconds > TroubleshootingStepsThresholdSeconds &&
+            // Suppress the generic troubleshooting list when we already have a tiered card up
+            // for an ACTIONABLE/FATAL error — it has its own targeted remediation.
+            !(shouldShowError && errorState!!.presentation.severity != Severity.TRANSIENT)) {
             Spacer(Modifier.height(16.dp))
             Line("Troubleshooting Steps:", bold = true)
             when (setupStage.value) {
@@ -328,13 +363,202 @@ fun PumpSetupStageDescription(
                 }
             }
         }
-        if (pumpCriticalError.value != null) {
+        if (shouldShowError) {
+            // shouldShowError implies errorState != null (see definition above).
             Spacer(Modifier.height(16.dp))
-            Line("Connection Error${pumpCriticalError.value?.second?.let { " ${shortTimeAgo(it)}" }}:", bold = true)
-            Line("${pumpCriticalError.value?.first}")
+            TieredCriticalErrorCard(
+                state = errorState!!,
+                pumpModel = setupDeviceName.value?.let { determinePumpModel(it) },
+                sendMessage = sendMessage,
+            )
         }
         Spacer(Modifier.height(16.dp))
         Divider()
         Spacer(Modifier.height(16.dp))
+    }
+}
+
+private fun colorForSeverity(severity: Severity): Pair<Color, Color> = when (severity) {
+    // (background, text) — chosen to be readable against both light and dark themes.
+    Severity.TRANSIENT -> Color(0xFFEEEEEE) to Color(0xFF424242)
+    Severity.ACTIONABLE -> Color(0xFFFFF3CD) to Color(0xFF8B6E0F)
+    Severity.FATAL -> Color(0xFFFFEBEE) to Color(0xFFB71C1C)
+}
+
+@Composable
+private fun TieredCriticalErrorCard(
+    state: com.jwoglom.controlx2.presentation.PumpCriticalErrorState,
+    pumpModel: KnownDeviceModel?,
+    sendMessage: ((String, ByteArray) -> Unit)?,
+) {
+    val context = LocalContext.current
+    val (bg, fg) = colorForSeverity(state.presentation.severity)
+    var detailsExpanded by remember { mutableStateOf(false) }
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(8.dp))
+            .background(bg)
+            .padding(12.dp),
+        verticalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
+        val timeAgo = state.lastSeenAt.let { " ${shortTimeAgo(it)}" }
+        Text(
+            text = state.presentation.headline + timeAgo,
+            color = fg,
+            fontWeight = FontWeight.Bold,
+            style = MaterialTheme.typography.bodyLarge,
+        )
+        // Body, with per-model branching for PAIRING_CANNOT_BEGIN — Mobi and t:slim X2
+        // have different physical pairing flows.
+        if (state.presentation.name == "PAIRING_CANNOT_BEGIN") {
+            Text(text = state.presentation.body, color = fg)
+            Spacer(Modifier.height(4.dp))
+            when (pumpModel) {
+                KnownDeviceModel.MOBI -> {
+                    Text("• Place the Mobi on the wireless charging pad.", color = fg)
+                    Text("• Make sure it is turned on and charging.", color = fg)
+                    Text("• Pick it up, wait a moment, then double-tap the T button when prompted.", color = fg)
+                }
+                else -> {
+                    // Default to t:slim X2 instructions when model is unknown.
+                    Text("1. On your pump, open Options → Device Settings → Bluetooth Settings.", color = fg)
+                    Text("2. Tap 'Pair Device' and confirm OK to display a pairing code.", color = fg)
+                    Text("3. Then tap Retry below.", color = fg)
+                }
+            }
+        } else {
+            Text(text = state.presentation.body, color = fg)
+        }
+
+        if (state.occurrences > 1) {
+            Text(
+                text = "Occurrences: ${state.occurrences}",
+                color = fg,
+                style = MaterialTheme.typography.bodySmall,
+            )
+        }
+
+        if (state.presentation.actions.isNotEmpty()) {
+            Spacer(Modifier.height(4.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                state.presentation.actions.forEach { action ->
+                    TextButton(onClick = { runErrorAction(context, action, state, sendMessage) }) {
+                        Text(actionLabel(action))
+                    }
+                }
+            }
+        }
+
+        // FATAL tier: show "Show details" disclosure with raw fields for diagnostics/bug reports.
+        if (state.presentation.severity == Severity.FATAL) {
+            TextButton(onClick = { detailsExpanded = !detailsExpanded }) {
+                Text(if (detailsExpanded) "Hide details" else "Show details")
+            }
+            if (detailsExpanded) {
+                Text("name: ${state.presentation.name}", color = fg, style = MaterialTheme.typography.bodySmall)
+                if (state.presentation.rawMessage.isNotBlank())
+                    Text("message: ${state.presentation.rawMessage}", color = fg, style = MaterialTheme.typography.bodySmall)
+                if (state.presentation.extra.isNotBlank())
+                    Text("extra: ${state.presentation.extra}", color = fg, style = MaterialTheme.typography.bodySmall)
+                state.presentation.errorCodeId?.let {
+                    Text("errorCodeId: $it", color = fg, style = MaterialTheme.typography.bodySmall)
+                }
+                state.presentation.requestCodeId?.let {
+                    Text("requestCodeId: $it", color = fg, style = MaterialTheme.typography.bodySmall)
+                }
+                state.presentation.initiatingMessageClass?.let {
+                    Text("initiatingMessage: $it", color = fg, style = MaterialTheme.typography.bodySmall)
+                }
+            }
+        }
+    }
+}
+
+private fun actionLabel(action: ErrorAction): String = when (action) {
+    is ErrorAction.Retry -> "Retry"
+    is ErrorAction.RepairPump -> "Re-pair pump"
+    is ErrorAction.OpenBluetoothSettings -> "Open Bluetooth settings"
+    is ErrorAction.OpenTconnectAppInfo -> "Open Tandem app info"
+    is ErrorAction.EnableConnectionSharing -> "Enable connection sharing"
+    is ErrorAction.CopyDiagnostics -> "Copy diagnostics"
+}
+
+private fun runErrorAction(
+    context: Context,
+    action: ErrorAction,
+    state: com.jwoglom.controlx2.presentation.PumpCriticalErrorState,
+    sendMessage: ((String, ByteArray) -> Unit)?,
+) {
+    when (action) {
+        is ErrorAction.Retry -> {
+            // Triggers CommService to drop and reconnect the pump session.
+            sendMessage?.invoke(MessagePaths.TO_SERVER_FORCE_RELOAD, "".toByteArray())
+                ?: Toast.makeText(context, "Retry unavailable here", Toast.LENGTH_SHORT).show()
+        }
+        is ErrorAction.RepairPump -> {
+            // Mirror the "Reconfigure pump" flow from Settings.kt:408-416.
+            try {
+                Prefs(context).setPumpSetupComplete(false)
+                Prefs(context).setPumpFinderPumpMac("")
+                Prefs(context).setPumpFinderPairingCodeType("")
+                Prefs(context).setPumpFinderServiceEnabled(true)
+                Prefs(context).setCurrentPumpSid(-1)
+                PumpState.resetState(context)
+                sendMessage?.invoke(MessagePaths.TO_SERVER_APP_RELOAD, "".toByteArray())
+                Toast.makeText(context, "Resetting pump pairing…", Toast.LENGTH_SHORT).show()
+            } catch (e: Exception) {
+                Timber.e(e, "Re-pair action failed")
+            }
+        }
+        is ErrorAction.OpenBluetoothSettings -> {
+            try {
+                context.startActivity(
+                    Intent(Settings.ACTION_BLUETOOTH_SETTINGS)
+                        .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                )
+            } catch (e: ActivityNotFoundException) {
+                Toast.makeText(context, "Bluetooth settings unavailable", Toast.LENGTH_SHORT).show()
+            }
+        }
+        is ErrorAction.OpenTconnectAppInfo -> {
+            try {
+                context.startActivity(
+                    Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS)
+                        .setData(Uri.parse("package:com.tandemdiabetes.tconnect"))
+                        .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                )
+            } catch (e: ActivityNotFoundException) {
+                Toast.makeText(context, "Tandem app not installed", Toast.LENGTH_SHORT).show()
+            }
+        }
+        is ErrorAction.EnableConnectionSharing -> {
+            // The pref toggles the pumpx2 sharing mode; CommService reads it on next connect.
+            try {
+                Prefs(context).setConnectionSharingEnabled(true)
+                Toast.makeText(context, "Connection sharing enabled. Reconnecting…", Toast.LENGTH_SHORT).show()
+                sendMessage?.invoke(MessagePaths.TO_SERVER_FORCE_RELOAD, "".toByteArray())
+            } catch (e: Exception) {
+                Timber.e(e, "Failed to enable connection sharing")
+            }
+        }
+        is ErrorAction.CopyDiagnostics -> {
+            val text = buildString {
+                appendLine("name: ${state.presentation.name}")
+                appendLine("severity: ${state.presentation.severity}")
+                appendLine("rawMessage: ${state.presentation.rawMessage}")
+                if (state.presentation.extra.isNotBlank()) appendLine("extra: ${state.presentation.extra}")
+                state.presentation.errorCodeId?.let { appendLine("errorCodeId: $it") }
+                state.presentation.requestCodeId?.let { appendLine("requestCodeId: $it") }
+                state.presentation.initiatingMessageClass?.let { appendLine("initiatingMessage: $it") }
+                appendLine("occurrences: ${state.occurrences}")
+                appendLine("firstSeenAt: ${state.firstSeenAt}")
+                appendLine("lastSeenAt: ${state.lastSeenAt}")
+            }
+            val cm = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+            cm.setPrimaryClip(ClipData.newPlainText("ControlX2 diagnostics", text))
+            Toast.makeText(context, "Diagnostics copied", Toast.LENGTH_SHORT).show()
+        }
     }
 }

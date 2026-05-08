@@ -554,10 +554,15 @@ class PumpCommHandler(
                 }
             } ?: com.jwoglom.controlx2.shared.util.SendType.STANDARD
             reason?.let { callbacks.onPumpCriticalError(it, source = source) }
-            callbacks.showToast("${reason?.name}: ${reason?.message}", Toast.LENGTH_LONG)
-            callbacks.sendWearCommMessage(MessagePaths.FROM_PUMP_PUMP_CRITICAL_ERROR,
-                reason?.message!!.toByteArray()
-            )
+            // No toast: pump-critical-errors are surfaced inline by the setup screen, classified
+            // into TRANSIENT/ACTIONABLE/FATAL tiers — see PumpCriticalErrorClassifier.
+            reason?.let { err ->
+                val presentation = PumpCriticalErrorClassifier.classify(err)
+                callbacks.sendWearCommMessage(
+                    MessagePaths.FROM_PUMP_PUMP_CRITICAL_ERROR,
+                    presentation.toJson().toByteArray()
+                )
+            }
         }
 
         @Synchronized

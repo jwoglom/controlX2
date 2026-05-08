@@ -704,8 +704,38 @@ class MainActivity : ComponentActivity() {
             }
 
             MessagePaths.FROM_PUMP_PUMP_CRITICAL_ERROR -> {
-                Timber.w("pump-critical-error: ${String(data)}")
-                dataStore.pumpCriticalError.value = Pair(String(data), Instant.now())
+                val payload = String(data)
+                Timber.w("pump-critical-error: $payload")
+                try {
+                    val presentation = com.jwoglom.controlx2.pump.ErrorPresentation.fromJson(payload)
+                    val now = Instant.now()
+                    val prev = dataStore.pumpCriticalError.value
+                    val coalesced = if (prev != null && prev.presentation.name == presentation.name) {
+                        // Dedupe per (name, retryAttempt) for PAIRING_PROMPT_NOT_ACCEPTED_YET so
+                        // pumpx2's per-tick retry storm doesn't inflate the counter.
+                        if (presentation.name == "PAIRING_PROMPT_NOT_ACCEPTED_YET" &&
+                            prev.presentation.extra == presentation.extra) {
+                            prev.copy(lastSeenAt = now)
+                        } else {
+                            prev.copy(
+                                presentation = presentation, // refresh body in case extras changed
+                                lastSeenAt = now,
+                                occurrences = prev.occurrences + 1,
+                            )
+                        }
+                    } else {
+                        com.jwoglom.controlx2.presentation.PumpCriticalErrorState(
+                            presentation = presentation,
+                            firstSeenAt = now,
+                            lastSeenAt = now,
+                            occurrences = 1,
+                            errorStage = dataStore.pumpSetupStage.value,
+                        )
+                    }
+                    dataStore.pumpCriticalError.value = coalesced
+                } catch (e: Exception) {
+                    Timber.e(e, "Failed to parse pump-critical-error payload: $payload")
+                }
             }
 
             MessagePaths.FROM_PUMP_PUMP_CONNECTED -> {
@@ -716,6 +746,8 @@ class MainActivity : ComponentActivity() {
                 }
                 dataStore.pumpConnected.value = true
                 dataStore.pumpLastConnectionTimestamp.value = Instant.now()
+                // Auto-clear any stale critical-error banner once we're successfully connected.
+                dataStore.pumpCriticalError.value = null
             }
 
             // on explicit disconnection

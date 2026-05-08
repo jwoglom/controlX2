@@ -93,6 +93,8 @@ object MessagePaths {
     const val FROM_PUMP_MISSING_PAIRING_CODE = "/from-pump/missing-pairing-code"
     const val FROM_PUMP_PUMP_BONDED_NEEDS_MANUAL_UNBOND = "/from-pump/pump-bonded-needs-manual-unbond"
     const val FROM_PUMP_PUMP_CONNECTED = "/from-pump/pump-connected"
+    // Payload: JSON-encoded ErrorPresentation (pumpcomm/PumpCriticalErrorClassifier.kt) —
+    // includes severity, name, headline, body, rawMessage, extra, actions, thresholds.
     const val FROM_PUMP_PUMP_CRITICAL_ERROR = "/from-pump/pump-critical-error"
     const val FROM_PUMP_PUMP_DISCONNECTED = "/from-pump/pump-disconnected"
     const val FROM_PUMP_PUMP_DISCOVERED = "/from-pump/pump-discovered"

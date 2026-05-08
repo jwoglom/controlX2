@@ -337,6 +337,7 @@ fun PumpSetup(
             val setupPairingCodeType = ds.setupPairingCodeType.observeAsState()
             PumpSetupStageDescription(
                 initialSetup = true,
+                sendMessage = sendMessage,
                 pairingCodeStage = {
                     if (setupStage.value == PumpSetupStage.PUMPX2_INVALID_PAIRING_CODE) {
                         LaunchedEffect(Unit) {

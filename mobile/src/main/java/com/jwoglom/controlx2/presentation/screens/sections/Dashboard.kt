@@ -180,7 +180,7 @@ fun Dashboard(
 
                     ServiceDisabledMessage(sendMessage = sendMessage)
                     PumpSetupStageProgress(initialSetup = false)
-                    PumpSetupStageDescription(initialSetup = false)
+                    PumpSetupStageDescription(initialSetup = false, sendMessage = sendMessage)
 
                     LaunchedEffect(pumpLastConnectionTimestamp.value) {
                         Timber.d("pumpLastConnectionTimestamp effect: ${pumpLastConnectionTimestamp.value}")

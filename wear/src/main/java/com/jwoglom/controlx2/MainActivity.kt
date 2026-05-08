@@ -688,7 +688,14 @@ class MainActivity : ComponentActivity() {
                 dataStore.pumpConnected.value = false
             }
             MessagePaths.FROM_PUMP_PUMP_CRITICAL_ERROR -> {
-                dataStore.connectionStatus.value = "Error: ${String(data)}"
+                // Payload is a JSON-encoded ErrorPresentation — show only the headline on watch.
+                val payload = String(data)
+                val text = try {
+                    com.jwoglom.controlx2.pump.ErrorPresentation.fromJson(payload).headline
+                } catch (e: Exception) {
+                    payload
+                }
+                dataStore.connectionStatus.value = "Error: $text"
             }
             MessagePaths.FROM_PUMP_RECEIVE_QUALIFYING_EVENT -> {
                 uiScope.launch {

@@ -21,6 +21,7 @@ import com.jwoglom.pumpx2.pump.messages.response.currentStatus.LoadStatusRespons
 import com.jwoglom.pumpx2.pump.messages.response.currentStatus.TimeSinceResetResponse
 import com.jwoglom.pumpx2.pump.messages.response.historyLog.HistoryLog
 import com.jwoglom.controlx2.presentation.screens.PumpSetupStage
+import com.jwoglom.controlx2.pump.ErrorPresentation
 import com.jwoglom.controlx2.shared.enums.BasalStatus
 import com.jwoglom.controlx2.shared.enums.CGMSessionState
 import com.jwoglom.controlx2.shared.enums.GlucoseUnit
@@ -56,7 +57,7 @@ class DataStore {
     val setupPairingCodeType = MutableLiveData<PairingCodeType>()
     val pumpSid = MutableLiveData<Int>()
     val setupDeviceModel = MutableLiveData<String>()
-    val pumpCriticalError = MutableLiveData<Pair<String, Instant>>()
+    val pumpCriticalError = MutableLiveData<PumpCriticalErrorState?>()
 
     val notificationBundle = MutableLiveData<NotificationBundle>(NotificationBundle())
     val batteryPercent = MutableLiveData<Int>()
@@ -263,3 +264,16 @@ class DataStore {
 
 
 }
+
+/**
+ * Coalesced pump-critical-error state held by [DataStore.pumpCriticalError].
+ * Same `presentation.name` arriving repeatedly bumps `occurrences`/`lastSeenAt`
+ * rather than replacing — see MainActivity's FROM_PUMP_PUMP_CRITICAL_ERROR handler.
+ */
+data class PumpCriticalErrorState(
+    val presentation: ErrorPresentation,
+    val firstSeenAt: Instant,
+    val lastSeenAt: Instant,
+    val occurrences: Int,
+    val errorStage: PumpSetupStage?,
+)
