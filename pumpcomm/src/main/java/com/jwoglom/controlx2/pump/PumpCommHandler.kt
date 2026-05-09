@@ -13,6 +13,7 @@ import android.os.Looper
 import android.os.Message
 import android.widget.Toast
 import com.jwoglom.controlx2.shared.CommServiceCodes
+import com.jwoglom.controlx2.shared.FeatureFlags
 import com.jwoglom.controlx2.shared.MessagePaths
 import com.jwoglom.controlx2.shared.InitiateConfirmedBolusSerializer
 import com.jwoglom.controlx2.shared.PumpMessageSerializer
@@ -255,7 +256,7 @@ class PumpCommHandler(
         @Volatile var shutdownLatch: CountDownLatch? = null
 
         init {
-            if (callbacks.prefConnectionSharingEnabled()) {
+            if (FeatureFlags.ConnectionSharing && callbacks.prefConnectionSharingEnabled()) {
                 enableTconnectAppConnectionSharing()
                 enableSendSharedConnectionResponseMessages()
             }

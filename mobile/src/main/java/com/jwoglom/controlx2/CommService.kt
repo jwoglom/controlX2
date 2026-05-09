@@ -42,6 +42,7 @@ import com.jwoglom.controlx2.util.HistoryLogFetcher
 import com.jwoglom.controlx2.util.HistoryLogSyncWorker
 import com.jwoglom.pumpx2.pump.TandemError
 import com.jwoglom.controlx2.shared.CommServiceCodes
+import com.jwoglom.controlx2.shared.FeatureFlags
 import com.jwoglom.controlx2.shared.InitiateConfirmedBolusSerializer
 import com.jwoglom.controlx2.shared.MessagePaths
 import com.jwoglom.controlx2.shared.PumpMessageSerializer
@@ -362,7 +363,7 @@ class CommService : Service(), CommServiceCallbacks {
                     Timber.i("apply-runtime-prefs: enabling actionsAffectingInsulinDelivery")
                     PumpState.enableActionsAffectingInsulinDelivery()
                 }
-                if (prefs.connectionSharingEnabled()) {
+                if (FeatureFlags.ConnectionSharing && prefs.connectionSharingEnabled()) {
                     if (!PumpState.tconnectAppConnectionSharing) {
                         Timber.i("apply-runtime-prefs: enabling tconnectAppConnectionSharing")
                         PumpState.tconnectAppConnectionSharing = true

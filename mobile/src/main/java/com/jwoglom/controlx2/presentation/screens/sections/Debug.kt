@@ -131,6 +131,7 @@ import com.jwoglom.controlx2.db.historylog.HistoryLogViewModel
 import com.jwoglom.controlx2.presentation.components.HeaderLine
 import com.jwoglom.controlx2.presentation.components.HistoryLogSyncProgressBar
 import com.jwoglom.controlx2.presentation.theme.ControlX2Theme
+import com.jwoglom.controlx2.shared.FeatureFlags
 import com.jwoglom.controlx2.shared.MessagePaths
 import com.jwoglom.controlx2.shared.enums.GlucoseUnit
 import com.jwoglom.controlx2.shared.util.SendType
@@ -756,7 +757,7 @@ fun Debug(
                 }
             }
 
-            if (Prefs(context).connectionSharingEnabled()) {
+            if (FeatureFlags.ConnectionSharing && Prefs(context).connectionSharingEnabled()) {
                 item {
                     Divider()
                 }
