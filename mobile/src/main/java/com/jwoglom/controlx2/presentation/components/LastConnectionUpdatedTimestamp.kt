@@ -38,7 +38,10 @@ fun LastConnectionUpdatedTimestamp() {
     when {
         pumpConnected.value == false -> when {
             pumpLastMessageTimestampRelative != null -> Line("Last connected: $pumpLastMessageTimestampRelative", bold = true)
-            pumpLastConnectionTimestamp.value != null -> Line("Device last seen: ${pumpLastConnectionTimestamp.value}", bold = true)
+            pumpLastConnectionTimestamp.value != null -> Line(
+                "Device last seen: ${shortTimeAgo(pumpLastConnectionTimestamp.value!!, nowThresholdSeconds = 1)}",
+                bold = true,
+            )
             else -> {}
         }
         pumpLastMessageTimestamp.value == null -> {}

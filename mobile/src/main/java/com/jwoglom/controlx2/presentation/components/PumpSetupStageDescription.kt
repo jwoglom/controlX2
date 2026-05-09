@@ -12,7 +12,8 @@ import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -385,6 +386,7 @@ private fun colorForSeverity(severity: Severity): Pair<Color, Color> = when (sev
     Severity.FATAL -> Color(0xFFFFEBEE) to Color(0xFFB71C1C)
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun TieredCriticalErrorCard(
     state: com.jwoglom.controlx2.presentation.PumpCriticalErrorState,
@@ -403,9 +405,8 @@ private fun TieredCriticalErrorCard(
             .padding(12.dp),
         verticalArrangement = Arrangement.spacedBy(4.dp),
     ) {
-        val timeAgo = state.lastSeenAt.let { " ${shortTimeAgo(it)}" }
         Text(
-            text = state.presentation.headline + timeAgo,
+            text = state.presentation.headline,
             color = fg,
             fontWeight = FontWeight.Bold,
             style = MaterialTheme.typography.bodyLarge,
@@ -432,6 +433,17 @@ private fun TieredCriticalErrorCard(
             Text(text = state.presentation.body, color = fg)
         }
 
+        // Only render an elapsed-time line when the last sighting is meaningfully old.
+        // Anything fresher than ~60s reads as noise next to a live error card.
+        val elapsedMs = java.time.Duration.between(state.lastSeenAt, java.time.Instant.now()).toMillis()
+        if (elapsedMs >= 60_000) {
+            Text(
+                text = "Last seen ${shortTimeAgo(state.lastSeenAt)}",
+                color = fg,
+                style = MaterialTheme.typography.bodySmall,
+            )
+        }
+
         if (state.occurrences > 1) {
             Text(
                 text = "Occurrences: ${state.occurrences}",
@@ -442,19 +454,37 @@ private fun TieredCriticalErrorCard(
 
         if (state.presentation.actions.isNotEmpty()) {
             Spacer(Modifier.height(4.dp))
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                state.presentation.actions.forEach { action ->
-                    TextButton(onClick = { runErrorAction(context, action, state, sendMessage) }) {
-                        Text(actionLabel(action))
+            // Primary = first action (filled Button). Rest are TextButtons.
+            // FlowRow lets buttons wrap onto a new row whole rather than splitting a single
+            // label like "Enable connecti / on / sharing".
+            FlowRow(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalArrangement = Arrangement.spacedBy(4.dp),
+            ) {
+                state.presentation.actions.forEachIndexed { index, action ->
+                    if (index == 0) {
+                        Button(onClick = { runErrorAction(context, action, state, sendMessage) }) {
+                            Text(actionLabel(action))
+                        }
+                    } else {
+                        TextButton(onClick = { runErrorAction(context, action, state, sendMessage) }) {
+                            Text(actionLabel(action))
+                        }
                     }
                 }
             }
         }
 
-        // FATAL tier: show "Show details" disclosure with raw fields for diagnostics/bug reports.
+        // FATAL tier: "Show details" is a small affordance, not an action-row competitor.
+        // Sits below a thin divider so the primary action row is always visible first.
         if (state.presentation.severity == Severity.FATAL) {
+            Spacer(Modifier.height(4.dp))
+            Divider(color = fg.copy(alpha = 0.2f))
             TextButton(onClick = { detailsExpanded = !detailsExpanded }) {
-                Text(if (detailsExpanded) "Hide details" else "Show details")
+                Text(
+                    text = if (detailsExpanded) "Hide details" else "Show details",
+                    style = MaterialTheme.typography.bodySmall,
+                )
             }
             if (detailsExpanded) {
                 Text("name: ${state.presentation.name}", color = fg, style = MaterialTheme.typography.bodySmall)
