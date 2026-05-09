@@ -490,7 +490,18 @@ internal fun ControlIQSettingsActionsPreview() {
             modifier = Modifier.fillMaxSize(),
             color = Color.White,
         ) {
-            setUpPreviewState(LocalDataStore.current)
+            val ds = LocalDataStore.current
+            setUpPreviewState(ds)
+            ds.controlIQEnabled.value = true
+            ds.controlIQWeight.value = 165
+            ds.controlIQWeightUnit.value = "lbs"
+            ds.controlIQTotalDailyInsulin.value = 45
+            ds.controlIQSleepScheduleResponse.value = ControlIQSleepScheduleResponse(
+                ControlIQSleepScheduleResponse.SleepSchedule(1, 127, 22 * 60, 6 * 60),
+                ControlIQSleepScheduleResponse.SleepSchedule(0, 0, 0, 0),
+                ControlIQSleepScheduleResponse.SleepSchedule(0, 0, 0, 0),
+                ControlIQSleepScheduleResponse.SleepSchedule(0, 0, 0, 0),
+            )
             ControlIQSettingsActions(
                 sendMessage = { _, _ -> },
                 sendPumpCommands = { _, _ -> },

@@ -265,7 +265,6 @@ fun Landing(
                         contentPadding = PaddingValues(all = 16.dp),
                         verticalArrangement = Arrangement.spacedBy(16.dp),
                         modifier = Modifier
-                            .padding(horizontal = 16.dp)
                             .fillMaxWidth()
                             .fillMaxHeight(0.7F),
                         content = {
@@ -609,6 +608,10 @@ fun setUpPreviewState(ds: DataStore) {
     ds.cartridgeRemainingUnits.value = 100
     ds.basalStatus.value = BasalStatus.ON
     ds.controlIQMode.value = UserMode.EXERCISE
+    // Clear any leftover error state from an earlier preview in the same JVM run.
+    // The DataStore is a module-level singleton; without this reset, an error-state
+    // preview can leak its tiered card into subsequent happy-path previews.
+    ds.pumpCriticalError.value = null
 }
 
 @Preview(showBackground = true)

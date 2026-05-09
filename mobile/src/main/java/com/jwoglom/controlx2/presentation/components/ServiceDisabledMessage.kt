@@ -21,6 +21,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalInspectionMode
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
@@ -37,6 +38,7 @@ import org.apache.commons.lang3.text.FormattableUtils.append
 fun ServiceDisabledMessage(
     sendMessage: (String, ByteArray) -> Unit
 ) {
+    if (LocalInspectionMode.current) return
     val coroutineScope = rememberCoroutineScope()
     val context = LocalContext.current
     val ds = LocalDataStore.current
