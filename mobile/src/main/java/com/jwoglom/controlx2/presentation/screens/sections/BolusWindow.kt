@@ -571,6 +571,9 @@ fun resetBolusDataStoreState(dataStore: DataStore) {
     dataStore.bolusUnitsRawValue.value = null
     dataStore.bolusCarbsRawValue.value = null
     dataStore.bolusGlucoseRawValue.value = null
+    dataStore.bolusExtendedEnabled.value = null
+    dataStore.bolusExtendedNowPercent.value = null
+    dataStore.bolusExtendedDurationMinutes.value = null
 }
 
 @Preview

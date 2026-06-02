@@ -13,6 +13,7 @@ import com.jwoglom.controlx2.shared.messaging.MessageBusSender
 import com.jwoglom.controlx2.testutil.RecordingMessageBus
 import com.jwoglom.pumpx2.pump.messages.models.InsulinUnit
 import com.jwoglom.pumpx2.pump.messages.request.control.InitiateBolusRequest
+import com.jwoglom.pumpx2.pump.messages.response.historyLog.BolusDeliveryHistoryLog
 import com.jwoglom.pumpx2.pump.messages.request.currentStatus.ApiVersionRequest
 import com.jwoglom.pumpx2.pump.messages.request.currentStatus.ControlIQIOBRequest
 import com.jwoglom.pumpx2.shared.Hex
@@ -533,6 +534,46 @@ class CommServiceIntegrationTest {
 
         // Bolus prefs should still be set (for the auto-approve flow)
         assertNotNull(prefs.getString("initiateBolusSecret", null))
+    }
+
+    @Test
+    fun bolus_extendedBolus_confirmationThresholdUsesGrandTotal() {
+        startServiceNormal()
+        prefs.edit().putBoolean("insulin-delivery-actions", true).commit()
+        // Threshold = 4u. The extended bolus below has only a 2u immediate portion
+        // (below threshold) but a 6u grand total (above threshold), so it must still
+        // require confirmation. Guards against the immediate portion bypassing confirmation.
+        prefs.edit().putLong(
+            "bolus-confirmation-insulin-threshold",
+            InsulinUnit.from1To1000(4.0).toLong()
+        ).commit()
+
+        // Extended bolus: 2u now + 4u over 120 min (6u grand total).
+        val bolusRequest = InitiateBolusRequest(
+            /* totalVolume (now)  */ 2000,
+            /* bolusID            */ 1,
+            /* bolusTypeBitmask   */ BolusDeliveryHistoryLog.BolusType.toBitmask(
+                BolusDeliveryHistoryLog.BolusType.FOOD2,
+                BolusDeliveryHistoryLog.BolusType.EXTENDED
+            ),
+            /* foodVolume         */ 0,
+            /* correctionVolume   */ 0,
+            /* bolusCarbs         */ 0,
+            /* bolusBG            */ 0,
+            /* bolusIOB           */ 0,
+            /* extendedVolume     */ 4000,
+            /* extendedSeconds    */ 120L * 60,
+            /* extended3          */ 0
+        )
+        val msgBytes = PumpMessageSerializer.toBytes(bolusRequest)
+        sendMessage(MessagePaths.TO_SERVER_BOLUS_REQUEST_PHONE, msgBytes)
+        shadowOf(Looper.getMainLooper()).idle()
+
+        // Confirmation must be requested (in-app confirm dialog broadcast), not auto-sent.
+        assertTrue(
+            "Extended bolus with a 6u grand total must require confirmation despite a 2u immediate portion",
+            messageBus.hasMessage(MessagePaths.TO_SERVER_BOLUS_CONFIRM_DIALOG)
+        )
     }
 
     // =========================================================================

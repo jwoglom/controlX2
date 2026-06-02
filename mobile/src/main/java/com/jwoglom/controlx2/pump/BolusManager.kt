@@ -38,8 +38,18 @@ class BolusManager(
     }
 
     fun confirmBolusRequest(request: InitiateBolusRequest, source: BolusRequestSource) {
-        val units = twoDecimalPlaces(InsulinUnit.from1000To1(request.totalVolume))
-        Timber.i("confirmBolusRequest $units: $request")
+        // For an extended ("combo") bolus, request.totalVolume is only the immediate
+        // portion; the grand total delivered is totalVolume + extendedVolume. Use the
+        // grand total for both the displayed amount and the confirmation threshold so a
+        // large extended bolus can never bypass confirmation via a small now-portion.
+        val grandTotalUnits = InsulinUnit.from1000To1(request.totalVolume + request.extendedVolume)
+        val units = twoDecimalPlaces(grandTotalUnits)
+        val extendedSummary = if (request.extendedVolume > 0) {
+            val nowUnits = twoDecimalPlaces(InsulinUnit.from1000To1(request.totalVolume))
+            val laterUnits = twoDecimalPlaces(InsulinUnit.from1000To1(request.extendedVolume))
+            " (${nowUnits}u now + ${laterUnits}u over ${request.extendedSeconds / 60} min)"
+        } else ""
+        Timber.i("confirmBolusRequest $units$extendedSummary: $request")
         bolusNotificationId++
         prefs()?.edit()
             ?.putString("initiateBolusRequest", Hex.encodeHexString(PumpMessageSerializer.toBytes(request)))
@@ -86,14 +96,14 @@ class BolusManager(
         sendWearCommMessage(MessagePaths.TO_CLIENT_BOLUS_MIN_NOTIFY_THRESHOLD, "$minNotifyThreshold".toByteArray())
         sendWearCommMessage(MessagePaths.TO_CLIENT_WEAR_AUTO_APPROVE_TIMEOUT, "$autoApproveTimeout".toByteArray())
 
-        if (InsulinUnit.from1000To1(request.totalVolume) >= minNotifyThreshold || minNotifyThreshold == 0.0) {
+        if (grandTotalUnits >= minNotifyThreshold || minNotifyThreshold == 0.0) {
             Timber.i("Requesting permission for bolus because $units >= minNotifyThreshold=$minNotifyThreshold")
 
             val builder = confirmBolusRequestBaseNotification(
                 context,
                 "Bolus Request",
-                if (autoApproveTimeout > 0) "$units units. Auto-approving in ${autoApproveTimeout}s unless canceled."
-                else "$units units. Press Confirm to deliver."
+                if (autoApproveTimeout > 0) "$units units$extendedSummary. Auto-approving in ${autoApproveTimeout}s unless canceled."
+                else "$units units$extendedSummary. Press Confirm to deliver."
             )
                 .setSound(RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION))
                 .setVibrate(longArrayOf(500L, 500L, 500L, 500L, 500L, 500L, 500L, 500L, 500L, 500L))

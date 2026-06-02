@@ -117,6 +117,13 @@ class DataStore {
     val bolusCarbsRawValue = MutableLiveData<String?>()
     val bolusGlucoseRawValue = MutableLiveData<String?>()
 
+    // Extended ("combo") bolus configuration for the in-progress bolus. Read by the
+    // bolus construction path (gated behind FeatureFlag.ExtendedBolus); a UI region to
+    // populate these will be added separately. null/false => standard bolus.
+    val bolusExtendedEnabled = MutableLiveData<Boolean>()
+    val bolusExtendedNowPercent = MutableLiveData<Int>()
+    val bolusExtendedDurationMinutes = MutableLiveData<Int>()
+
     val tempRatePercentRawValue = MutableLiveData<String?>()
     val tempRateMinutesRawValue = MutableLiveData<String?>()
     val tempRateHoursRawValue = MutableLiveData<String?>()
@@ -231,6 +238,9 @@ class DataStore {
         bolusUnitsRawValue.logOnChange("bolusUnitsRawValue")
         bolusCarbsRawValue.logOnChange("bolusCarbsRawValue")
         bolusGlucoseRawValue.logOnChange("bolusGlucoseRawValue")
+        bolusExtendedEnabled.logOnChange("bolusExtendedEnabled")
+        bolusExtendedNowPercent.logOnChange("bolusExtendedNowPercent")
+        bolusExtendedDurationMinutes.logOnChange("bolusExtendedDurationMinutes")
 
         tempRatePercentRawValue.logOnChange("tempRatePercentRawValue")
         tempRateMinutesRawValue.logOnChange("tempRateMinutesRawValue")

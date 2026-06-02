@@ -48,6 +48,7 @@ import com.jwoglom.controlx2.presentation.screens.PumpSetupStage
 import com.jwoglom.controlx2.presentation.screens.sections.messagePairToJson
 import com.jwoglom.controlx2.presentation.screens.sections.verbosePumpMessage
 import com.jwoglom.controlx2.presentation.util.ShouldLogToFile
+import com.jwoglom.controlx2.shared.FeatureFlag
 import com.jwoglom.controlx2.shared.MessagePaths
 import com.jwoglom.controlx2.shared.PumpMessageSerializer
 import com.jwoglom.pumpx2.shared.Hex
@@ -64,6 +65,7 @@ import com.jwoglom.controlx2.shared.util.shortTime
 import com.jwoglom.controlx2.shared.util.shortTimeAgo
 import com.jwoglom.controlx2.shared.util.twoDecimalPlaces1000Unit
 import com.jwoglom.controlx2.shared.util.extractPumpSid
+import com.jwoglom.controlx2.pump.InitiateBolusRequestBuilder
 import com.jwoglom.controlx2.pump.pairing.PairingCodeEntry
 import com.jwoglom.pumpx2.pump.PumpState
 import com.jwoglom.pumpx2.pump.bluetooth.PumpReadyState
@@ -472,31 +474,56 @@ class MainActivity : ComponentActivity() {
         }
 
         val iobUnits = dataSnapshot.iob
-        val bolusRequest = InitiateBolusRequest(
-            numUnits,
-            bolusId,
-            BolusDeliveryHistoryLog.BolusType.toBitmask(*bolusTypes.toTypedArray()),
-            foodVolume,
-            corrVolume,
-            numCarbs,
-            bgValue,
-            iobUnits
+        val extendedConfig = extendedBolusConfig(numUnits)
+        val bolusRequest = InitiateBolusRequestBuilder.create(
+            bolusId = bolusId,
+            totalMilliunits = numUnits,
+            baseBolusTypes = bolusTypes,
+            foodVolume = foodVolume,
+            correctionVolume = corrVolume,
+            carbs = numCarbs,
+            bgMgdl = bgValue,
+            iob = iobUnits,
+            extended = extendedConfig,
         )
 
-        Timber.i("sendServiceBolusRequest: numUnits=$numUnits numCarbs=$numCarbs bgValue=$bgValue foodVolume=$foodVolume corrVolume=$corrVolume iobUnits=$iobUnits: bolusRequest=$bolusRequest preCommands=$preCommands")
+        Timber.i("sendServiceBolusRequest: numUnits=$numUnits numCarbs=$numCarbs bgValue=$bgValue foodVolume=$foodVolume corrVolume=$corrVolume iobUnits=$iobUnits extended=$extendedConfig: bolusRequest=$bolusRequest preCommands=$preCommands")
         this.sendMessage(MessagePaths.TO_SERVER_BOLUS_REQUEST_PHONE, PumpMessageSerializer.toBytes(bolusRequest))
+    }
+
+    /**
+     * Reads the extended-bolus configuration for the in-progress bolus from
+     * [dataStore], gated behind the [FeatureFlag.ExtendedBolus] runtime flag.
+     *
+     * Returns null (=> standard bolus) unless the flag is enabled, the user
+     * opted into an extended bolus, a positive duration is set, and the grand
+     * total meets the pump's extended-bolus minimum. Falling back to a standard
+     * bolus when the total is too small keeps [InitiateBolusRequest]'s own
+     * validation from rejecting the request.
+     */
+    private fun extendedBolusConfig(totalMilliunits: Long): InitiateBolusRequestBuilder.ExtendedConfig? {
+        if (!FeatureFlag.enabled(this, FeatureFlag.ExtendedBolus)) return null
+        if (dataStore.bolusExtendedEnabled.value != true) return null
+        val durationMinutes = dataStore.bolusExtendedDurationMinutes.value ?: 0
+        if (durationMinutes <= 0) return null
+        if (!InitiateBolusRequestBuilder.isValidExtendedTotal(totalMilliunits)) {
+            Timber.w("extendedBolusConfig: total $totalMilliunits mu is below the extended-bolus minimum; delivering as a standard bolus")
+            return null
+        }
+        val nowPercent = dataStore.bolusExtendedNowPercent.value ?: 100
+        return InitiateBolusRequestBuilder.ExtendedConfig(nowPercent, durationMinutes)
     }
 
 
     private var bolusConfirmDialog: AlertDialog? = null
 
-    private fun showBolusConfirmDialog(units: String, requestBytes: ByteArray, source: String, autoApproveTimeout: Int) {
+    private fun showBolusConfirmDialog(units: String, requestBytes: ByteArray, source: String, autoApproveTimeout: Int, extendedSummary: String = "") {
         bolusConfirmDialog?.dismiss()
 
         val message = if (autoApproveTimeout > 0) {
-            "$units units from $source. Will auto-approve in ${autoApproveTimeout}s unless canceled."
+            "$units units$extendedSummary from $source. Will auto-approve in ${autoApproveTimeout}s unless canceled."
         } else {
-            "$units units from $source. Press Confirm to deliver."
+            "$units units$extendedSummary from $source. Press Confirm to deliver."
         }
 
         bolusConfirmDialog = AlertDialog.Builder(this)
@@ -775,10 +802,19 @@ class MainActivity : ComponentActivity() {
                     val requestBytes = Hex.decodeHex(requestHex)
                     val request = PumpMessageSerializer.fromBytes(requestBytes) as? com.jwoglom.pumpx2.pump.messages.request.control.InitiateBolusRequest
                     if (request != null) {
-                        val units = com.jwoglom.controlx2.shared.util.twoDecimalPlaces(
-                            com.jwoglom.pumpx2.pump.messages.models.InsulinUnit.from1000To1(request.totalVolume))
+                        // request.totalVolume is the immediate portion only; show the grand total.
+                        val grandTotal = com.jwoglom.pumpx2.pump.messages.models.InsulinUnit.from1000To1(
+                            request.totalVolume + request.extendedVolume)
+                        val units = com.jwoglom.controlx2.shared.util.twoDecimalPlaces(grandTotal)
+                        val extendedSummary = if (request.extendedVolume > 0) {
+                            val nowUnits = com.jwoglom.controlx2.shared.util.twoDecimalPlaces(
+                                com.jwoglom.pumpx2.pump.messages.models.InsulinUnit.from1000To1(request.totalVolume))
+                            val laterUnits = com.jwoglom.controlx2.shared.util.twoDecimalPlaces(
+                                com.jwoglom.pumpx2.pump.messages.models.InsulinUnit.from1000To1(request.extendedVolume))
+                            " (${nowUnits}u now + ${laterUnits}u over ${request.extendedSeconds / 60} min)"
+                        } else ""
                         runOnUiThread {
-                            showBolusConfirmDialog(units, requestBytes, source, autoApproveTimeout)
+                            showBolusConfirmDialog(units, requestBytes, source, autoApproveTimeout, extendedSummary)
                         }
                     }
                 }

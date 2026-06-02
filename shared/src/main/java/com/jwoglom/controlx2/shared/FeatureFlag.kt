@@ -14,6 +14,14 @@ import android.content.Context
  */
 enum class FeatureFlag {
     BTHostSwitch,
+
+    /**
+     * Enables extended ("combo") bolus delivery: splitting a bolus into an
+     * immediate portion plus an extended portion delivered over a duration.
+     * While off, all boluses are delivered as standard boluses regardless of
+     * any extended configuration in the DataStore.
+     */
+    ExtendedBolus,
     ;
 
     val slug: String get() = name
