@@ -18,6 +18,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.tooling.preview.Preview
 import com.jwoglom.controlx2.LocalDataStore
+import com.jwoglom.controlx2.presentation.BolusExtendedParameters
 import com.jwoglom.controlx2.presentation.DataStore
 import com.jwoglom.controlx2.presentation.components.HeaderLine
 import com.jwoglom.controlx2.presentation.navigation.BolusInputPrefill
@@ -26,6 +27,8 @@ import com.jwoglom.controlx2.presentation.screens.sections.components.bolus.Appr
 import com.jwoglom.controlx2.presentation.screens.sections.components.bolus.BolusConditionPromptRegion
 import com.jwoglom.controlx2.presentation.screens.sections.components.bolus.BolusDeliverActionRegion
 import com.jwoglom.controlx2.presentation.screens.sections.components.bolus.BolusEntryFormRegion
+import com.jwoglom.controlx2.presentation.screens.sections.components.bolus.BolusExtendedInputMode
+import com.jwoglom.controlx2.presentation.screens.sections.components.bolus.BolusExtendedRegion
 import com.jwoglom.controlx2.presentation.screens.sections.components.bolus.BolusPermissionDialogRegion
 import com.jwoglom.controlx2.presentation.screens.sections.components.bolus.CancelledDialogRegion
 import com.jwoglom.controlx2.presentation.screens.sections.components.bolus.CancellingDialogRegion
@@ -101,6 +104,20 @@ fun BolusWindow(
     var showCancellingDialog by remember { mutableStateOf(false) }
     var showCancelledDialog by remember { mutableStateOf(false) }
     var pendingPrefill by remember(prefill) { mutableStateOf(prefill) }
+
+    // Extended bolus inputs/state.
+    val extendedEnabled = dataStore.bolusExtendedEnabled.observeAsState(false)
+    val extendedNowPercentRaw = dataStore.bolusExtendedNowPercentRawValue.observeAsState()
+    val extendedNowUnitsRaw = dataStore.bolusExtendedNowUnitsRawValue.observeAsState()
+    val extendedHoursRaw = dataStore.bolusExtendedHoursRawValue.observeAsState()
+    val extendedMinutesRaw = dataStore.bolusExtendedMinutesRawValue.observeAsState()
+    var extendedInputMode by remember { mutableStateOf(BolusExtendedInputMode.PERCENT) }
+    var extendedPreviewText by remember { mutableStateOf<String?>(null) }
+    var extendedErrorText by remember { mutableStateOf<String?>(null) }
+
+    // When extended bolus is enabled, the resolved split must also be valid (non-null).
+    fun extendedValidIfEnabled(): Boolean =
+        !extendedEnabled.value || dataStore.bolusCurrentExtendedParameters.value != null
 
     val commands = listOf(
         BolusCalcDataSnapshotRequest(),
@@ -281,6 +298,24 @@ fun BolusWindow(
             autofilledBg != null -> "CGM ($unitAbbrev)"
             else -> "BG ($unitAbbrev)"
         }
+
+        if (extendedEnabled.value) {
+            val result = resolveExtendedBolus(
+                totalUnits = dataStore.bolusCurrentParameters.value?.units,
+                mode = extendedInputMode,
+                nowPercentRaw = rawToInt(extendedNowPercentRaw.value),
+                nowUnitsRaw = rawToDouble(extendedNowUnitsRaw.value),
+                hoursRaw = rawToInt(extendedHoursRaw.value),
+                minutesRaw = rawToInt(extendedMinutesRaw.value),
+            )
+            dataStore.bolusCurrentExtendedParameters.value = result.params
+            extendedPreviewText = result.previewText
+            extendedErrorText = result.error
+        } else {
+            dataStore.bolusCurrentExtendedParameters.value = null
+            extendedPreviewText = null
+            extendedErrorText = null
+        }
     }
 
     fun requestBolusDeliveryFromInputSubmit() {
@@ -291,7 +326,7 @@ fun BolusWindow(
         if (validBolus(
                 params = dataStore.bolusCurrentParameters.value,
                 maxBolusAmount1000 = dataStore.bolusCalcDataSnapshot.value?.maxBolusAmount?.toLong()
-            )
+            ) && extendedValidIfEnabled()
         ) {
             dataStore.bolusFinalConditions.value =
                 bolusCalcDecision(dataStore.bolusCalculatorBuilder.value, dataStore.bolusConditionsExcluded.value)?.conditions
@@ -299,6 +334,8 @@ fun BolusWindow(
             val pair = bolusCalcParameters(dataStore.bolusCalculatorBuilder.value, dataStore.bolusConditionsExcluded.value)
             dataStore.bolusFinalParameters.value = pair.first
             dataStore.bolusFinalCalcUnits.value = pair.second
+            dataStore.bolusFinalExtendedParameters.value =
+                if (extendedEnabled.value) dataStore.bolusCurrentExtendedParameters.value else null
 
             showPermissionCheckDialog = true
             sendPumpCommands(SendType.BUST_CACHE, listOf(BolusPermissionRequest()))
@@ -309,7 +346,8 @@ fun BolusWindow(
         refresh()
     }
 
-    LaunchedEffect (unitsRawValue.value, carbsRawValue.value, glucoseRawValue.value, bolusCalcDataSnapshot.value, bolusCalcLastBG.value) {
+    LaunchedEffect (unitsRawValue.value, carbsRawValue.value, glucoseRawValue.value, bolusCalcDataSnapshot.value, bolusCalcLastBG.value,
+        extendedEnabled.value, extendedNowPercentRaw.value, extendedNowUnitsRaw.value, extendedHoursRaw.value, extendedMinutesRaw.value, extendedInputMode) {
         recalculate()
     }
 
@@ -338,17 +376,35 @@ fun BolusWindow(
         },
     )
 
+    BolusExtendedRegion(
+        enabled = extendedEnabled.value,
+        onEnabledChange = { dataStore.bolusExtendedEnabled.value = it },
+        inputMode = extendedInputMode,
+        onInputModeChange = { extendedInputMode = it },
+        nowPercentRawValue = extendedNowPercentRaw.value,
+        onNowPercentChange = { dataStore.bolusExtendedNowPercentRawValue.value = it },
+        nowUnitsRawValue = extendedNowUnitsRaw.value,
+        onNowUnitsChange = { dataStore.bolusExtendedNowUnitsRawValue.value = it },
+        hoursRawValue = extendedHoursRaw.value,
+        onHoursChange = { dataStore.bolusExtendedHoursRawValue.value = it },
+        minutesRawValue = extendedMinutesRaw.value,
+        onMinutesChange = { dataStore.bolusExtendedMinutesRawValue.value = it },
+        previewText = extendedPreviewText,
+        errorText = extendedErrorText,
+    )
+
     BolusConditionPromptRegion(
         recalculate = { recalculate() }
     )
 
     val bolusCurrentParameters = dataStore.bolusCurrentParameters.observeAsState()
+    val bolusCurrentExtendedParameters = dataStore.bolusCurrentExtendedParameters.observeAsState()
 
-    LaunchedEffect (bolusCurrentParameters.value) {
+    LaunchedEffect (bolusCurrentParameters.value, bolusCurrentExtendedParameters.value, extendedEnabled.value) {
         bolusButtonEnabled = validBolus(
             params = bolusCurrentParameters.value,
             maxBolusAmount1000 = dataStore.bolusCalcDataSnapshot.value?.maxBolusAmount?.toLong()
-        )
+        ) && extendedValidIfEnabled()
     }
 
     BolusDeliverActionRegion(
@@ -366,12 +422,14 @@ fun BolusWindow(
             val pair = bolusCalcParameters(dataStore.bolusCalculatorBuilder.value, dataStore.bolusConditionsExcluded.value)
             dataStore.bolusFinalParameters.value = pair.first
             dataStore.bolusFinalCalcUnits.value = pair.second
+            dataStore.bolusFinalExtendedParameters.value =
+                if (extendedEnabled.value) dataStore.bolusCurrentExtendedParameters.value else null
         },
         isValidBolus = {
             validBolus(
                 params = bolusCurrentParameters.value,
                 maxBolusAmount1000 = dataStore.bolusCalcDataSnapshot.value?.maxBolusAmount?.toLong()
-            )
+            ) && extendedValidIfEnabled()
         }
     )
 
@@ -496,6 +554,112 @@ private fun validBolus(params: BolusParameters?, maxBolusAmount1000: Long?): Boo
     return true
 }
 
+// Pump/protocol constraints on the extended ("square wave") portion.
+// pumpx2 InitiateBolusRequest.MIN_EXTENDED_BOLUS_MILLIUNITS = 400 (0.40 u).
+private const val MIN_EXTENDED_BOLUS_UNITS = 0.40
+private const val MIN_EXTENDED_DURATION_MIN = 15
+private const val MAX_EXTENDED_DURATION_MIN = 8 * 60 // 8 hours
+
+data class BolusExtendedResult(
+    val params: BolusExtendedParameters? = null,
+    val previewText: String? = null,
+    val error: String? = null,
+)
+
+/**
+ * Resolves the now/extended split (in milliunits) and validates it against the pump's
+ * extended-bolus constraints. Returns a non-null [BolusExtendedResult.params] only when the
+ * inputs are complete and valid; otherwise [BolusExtendedResult.error] explains why.
+ */
+fun resolveExtendedBolus(
+    totalUnits: Double?,
+    mode: BolusExtendedInputMode,
+    nowPercentRaw: Int?,
+    nowUnitsRaw: Double?,
+    hoursRaw: Int?,
+    minutesRaw: Int?,
+): BolusExtendedResult {
+    if (totalUnits == null || totalUnits <= 0.0) {
+        return BolusExtendedResult(error = "Enter the total bolus units first.")
+    }
+    // Matches InsulinUnit.from1To1000 used when building the request, so the split is exact.
+    val totalMilli = Math.round(totalUnits * 1000)
+
+    val nowMilli: Long = when (mode) {
+        BolusExtendedInputMode.PERCENT -> {
+            if (nowPercentRaw == null) {
+                return BolusExtendedResult(error = "Enter the percent to deliver now.")
+            }
+            if (nowPercentRaw < 0 || nowPercentRaw > 100) {
+                return BolusExtendedResult(error = "Now percent must be between 0 and 100.")
+            }
+            Math.round(totalMilli * (nowPercentRaw / 100.0))
+        }
+        BolusExtendedInputMode.UNITS -> {
+            if (nowUnitsRaw == null) {
+                return BolusExtendedResult(error = "Enter the units to deliver now.")
+            }
+            if (nowUnitsRaw < 0.0) {
+                return BolusExtendedResult(error = "Now units must be 0 or greater.")
+            }
+            val m = Math.round(nowUnitsRaw * 1000)
+            if (m > totalMilli) {
+                return BolusExtendedResult(error = "Now units cannot exceed the total bolus.")
+            }
+            m
+        }
+    }
+    val extendedMilli = totalMilli - nowMilli
+
+    if (hoursRaw == null && minutesRaw == null) {
+        return BolusExtendedResult(error = "Enter an extended duration.")
+    }
+    val hours = hoursRaw ?: 0
+    val minutes = minutesRaw ?: 0
+    if (hours < 0 || minutes < 0 || minutes >= 60) {
+        return BolusExtendedResult(error = "Duration must use 0-59 minutes.")
+    }
+    val totalMinutes = hours * 60 + minutes
+    if (totalMinutes < MIN_EXTENDED_DURATION_MIN) {
+        return BolusExtendedResult(error = "Extended duration must be at least $MIN_EXTENDED_DURATION_MIN minutes.")
+    }
+    if (totalMinutes > MAX_EXTENDED_DURATION_MIN) {
+        return BolusExtendedResult(error = "Extended duration cannot exceed ${MAX_EXTENDED_DURATION_MIN / 60} hours.")
+    }
+
+    if (extendedMilli < Math.round(MIN_EXTENDED_BOLUS_UNITS * 1000)) {
+        return BolusExtendedResult(
+            error = "Extended portion must be at least ${twoDecimalPlaces(MIN_EXTENDED_BOLUS_UNITS)}u. " +
+                "Lower the now amount or turn off extended bolus."
+        )
+    }
+    if (nowMilli in 1L..49L) {
+        return BolusExtendedResult(error = "Now portion must be 0 or at least 0.05u.")
+    }
+
+    val previewText = "Now ${twoDecimalPlaces(nowMilli / 1000.0)}u · " +
+        "Extended ${twoDecimalPlaces(extendedMilli / 1000.0)}u over ${prettyExtendedDuration(totalMinutes)}"
+
+    return BolusExtendedResult(
+        params = BolusExtendedParameters(
+            nowMilliUnits = nowMilli,
+            extendedMilliUnits = extendedMilli,
+            durationSeconds = totalMinutes.toLong() * 60,
+        ),
+        previewText = previewText,
+    )
+}
+
+private fun prettyExtendedDuration(minutes: Int): String {
+    val h = minutes / 60
+    val m = minutes % 60
+    return when {
+        h > 0 && m > 0 -> "${h}h ${m}m"
+        h > 0 -> "${h}h"
+        else -> "${m}m"
+    }
+}
+
 
 fun buildBolusCalculator(
     dataSnapshot: BolusCalcDataSnapshotResponse?,
@@ -571,6 +735,13 @@ fun resetBolusDataStoreState(dataStore: DataStore) {
     dataStore.bolusUnitsRawValue.value = null
     dataStore.bolusCarbsRawValue.value = null
     dataStore.bolusGlucoseRawValue.value = null
+    dataStore.bolusExtendedEnabled.value = false
+    dataStore.bolusExtendedNowPercentRawValue.value = null
+    dataStore.bolusExtendedNowUnitsRawValue.value = null
+    dataStore.bolusExtendedHoursRawValue.value = null
+    dataStore.bolusExtendedMinutesRawValue.value = null
+    dataStore.bolusCurrentExtendedParameters.value = null
+    dataStore.bolusFinalExtendedParameters.value = null
 }
 
 @Preview

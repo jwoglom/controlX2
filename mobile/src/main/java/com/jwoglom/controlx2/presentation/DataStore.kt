@@ -44,6 +44,24 @@ import com.jwoglom.pumpx2.pump.messages.response.currentStatus.TempRateResponse
 import timber.log.Timber
 import java.time.Instant
 
+/**
+ * Resolved extended-bolus split used to build an [com.jwoglom.pumpx2.pump.messages.request.control.InitiateBolusRequest].
+ *
+ * Volumes are pre-resolved (in milliunits) from a single calculation pass so the request
+ * builder performs no further math: [nowMilliUnits] maps to the request's totalVolume
+ * (delivered immediately) and [extendedMilliUnits] to extendedVolume (delivered linearly
+ * over [durationSeconds]). The total bolus delivered is nowMilliUnits + extendedMilliUnits.
+ *
+ * @param nowMilliUnits       portion delivered immediately, in milliunits.
+ * @param extendedMilliUnits  portion delivered over the extended window, in milliunits.
+ * @param durationSeconds     length of the extended window, in seconds (pumpx2 expects seconds).
+ */
+data class BolusExtendedParameters(
+    val nowMilliUnits: Long,
+    val extendedMilliUnits: Long,
+    val durationSeconds: Long,
+)
+
 class DataStore {
     val pumpConnected = MutableLiveData<Boolean>()
     val pumpLastConnectionTimestamp = MutableLiveData<Instant>()
@@ -116,6 +134,18 @@ class DataStore {
     val bolusUnitsRawValue = MutableLiveData<String?>()
     val bolusCarbsRawValue = MutableLiveData<String?>()
     val bolusGlucoseRawValue = MutableLiveData<String?>()
+
+    // Extended ("square wave") bolus: deliver bolusExtendedNowPercent of the total
+    // bolus immediately and the remainder linearly over the configured duration.
+    val bolusExtendedEnabled = MutableLiveData<Boolean>()
+    val bolusExtendedNowPercentRawValue = MutableLiveData<String?>()
+    val bolusExtendedNowUnitsRawValue = MutableLiveData<String?>()
+    val bolusExtendedHoursRawValue = MutableLiveData<String?>()
+    val bolusExtendedMinutesRawValue = MutableLiveData<String?>()
+    // Resolved split (computed from the raw inputs + calculated total) used to build
+    // the InitiateBolusRequest. Null when extended bolus is disabled or not yet valid.
+    val bolusCurrentExtendedParameters = MutableLiveData<BolusExtendedParameters?>()
+    val bolusFinalExtendedParameters = MutableLiveData<BolusExtendedParameters?>()
 
     val tempRatePercentRawValue = MutableLiveData<String?>()
     val tempRateMinutesRawValue = MutableLiveData<String?>()
@@ -231,6 +261,14 @@ class DataStore {
         bolusUnitsRawValue.logOnChange("bolusUnitsRawValue")
         bolusCarbsRawValue.logOnChange("bolusCarbsRawValue")
         bolusGlucoseRawValue.logOnChange("bolusGlucoseRawValue")
+
+        bolusExtendedEnabled.logOnChange("bolusExtendedEnabled")
+        bolusExtendedNowPercentRawValue.logOnChange("bolusExtendedNowPercentRawValue")
+        bolusExtendedNowUnitsRawValue.logOnChange("bolusExtendedNowUnitsRawValue")
+        bolusExtendedHoursRawValue.logOnChange("bolusExtendedHoursRawValue")
+        bolusExtendedMinutesRawValue.logOnChange("bolusExtendedMinutesRawValue")
+        bolusCurrentExtendedParameters.logOnChange("bolusCurrentExtendedParameters")
+        bolusFinalExtendedParameters.logOnChange("bolusFinalExtendedParameters")
 
         tempRatePercentRawValue.logOnChange("tempRatePercentRawValue")
         tempRateMinutesRawValue.logOnChange("tempRateMinutesRawValue")
