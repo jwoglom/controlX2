@@ -14,6 +14,15 @@
     <uses-permission android:name="android.permission.BLUETOOTH_SCAN" />
     <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+    <!--
+        Pre-S BLE scan requires fine location at runtime; coarse alone is
+        not sufficient on API <= 30 (BLUETOOTH_SCAN doesn't exist yet).
+        Scoped via maxSdkVersion so API 31+ relies on BLUETOOTH_SCAN. Declared
+        explicitly to cap the uncapped ACCESS_FINE_LOCATION that blessed-android
+        otherwise merges in at every SDK level.
+    -->
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION"
+        android:maxSdkVersion="30" />
 
     <uses-feature android:name="android.hardware.type.watch" />
 
