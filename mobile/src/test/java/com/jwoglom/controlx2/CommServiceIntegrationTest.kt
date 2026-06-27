@@ -7,7 +7,6 @@ import android.os.Looper
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.jwoglom.controlx2.messaging.MessageBusFactory
-import com.jwoglom.controlx2.shared.FeatureFlag
 import com.jwoglom.controlx2.shared.InitiateConfirmedBolusSerializer
 import com.jwoglom.controlx2.shared.MessagePaths
 import com.jwoglom.controlx2.shared.PumpMessageSerializer
@@ -766,8 +765,8 @@ class CommServiceIntegrationTest {
     }
 
     @Test
-    fun connectedPump_cgmResponse_withBGInNotificationFlag_showsBgInNotification() {
-        FeatureFlag.set(context, FeatureFlag.BGInNotification, true)
+    fun connectedPump_cgmResponse_withShowBGInNotificationPref_showsBgInNotification() {
+        Prefs(context).setShowBGInNotification(true)
         startServiceAndConnectPump()
 
         val response = CurrentEGVGuiDataResponse(1710000000, 123, 1, 2)
@@ -783,8 +782,8 @@ class CommServiceIntegrationTest {
     }
 
     @Test
-    fun connectedPump_cgmResponse_withoutBGInNotificationFlag_omitsBgFromNotification() {
-        // BGInNotification defaults to off; do not enable it.
+    fun connectedPump_cgmResponse_withoutShowBGInNotificationPref_omitsBgFromNotification() {
+        // showBGInNotification defaults to off; do not enable it.
         startServiceAndConnectPump()
 
         val response = CurrentEGVGuiDataResponse(1710000000, 123, 1, 2)

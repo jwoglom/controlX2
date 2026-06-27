@@ -42,7 +42,6 @@ import com.jwoglom.controlx2.util.HistoryLogFetcher
 import com.jwoglom.controlx2.util.HistoryLogSyncWorker
 import com.jwoglom.pumpx2.pump.TandemError
 import com.jwoglom.controlx2.shared.CommServiceCodes
-import com.jwoglom.controlx2.shared.FeatureFlag
 import com.jwoglom.controlx2.shared.FeatureFlags
 import com.jwoglom.controlx2.shared.InitiateConfirmedBolusSerializer
 import com.jwoglom.controlx2.shared.MessagePaths
@@ -665,14 +664,14 @@ class CommService : Service(), CommServiceCallbacks {
                 currentPumpData.cartridgeRemainingUnits = message.currentInsulinAmount
             }
             is CurrentEGVGuiDataResponse -> {
-                if (FeatureFlag.enabled(this, FeatureFlag.BGInNotification)) {
+                if (Prefs(applicationContext).showBGInNotification()) {
                     changed = currentPumpData.cgmReading != message.cgmReading
                 }
                 currentPumpData.cgmReading = message.cgmReading
             }
             is HomeScreenMirrorResponse -> {
                 val arrow = message.cgmTrendIcon.arrow()
-                if (FeatureFlag.enabled(this, FeatureFlag.BGInNotification)) {
+                if (Prefs(applicationContext).showBGInNotification()) {
                     changed = currentPumpData.cgmTrendArrow != arrow
                 }
                 currentPumpData.cgmTrendArrow = arrow
@@ -879,7 +878,7 @@ class CommService : Service(), CommServiceCallbacks {
         }
 
         var contentText = ""
-        if (FeatureFlag.enabled(this, FeatureFlag.BGInNotification) && currentPumpData.cgmReading != null) {
+        if (Prefs(applicationContext).showBGInNotification() && currentPumpData.cgmReading != null) {
             val glucoseUnit = Prefs(applicationContext).glucoseUnit() ?: GlucoseUnit.MGDL
             val bgText = GlucoseConverter.format(currentPumpData.cgmReading!!, glucoseUnit)
             val arrow = currentPumpData.cgmTrendArrow
