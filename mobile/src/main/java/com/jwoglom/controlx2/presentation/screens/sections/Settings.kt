@@ -232,6 +232,56 @@ fun Settings(
             }
 
             item {
+                var bolusButton by remember { mutableStateOf(Prefs(context).showBolusNotificationButton()) }
+                ListItem(
+                    headlineContent = { Text("Bolus button in notification") },
+                    supportingContent = {
+                        Text(
+                            if (bolusButton) "Shown. Tap to remove the Bolus shortcut from the ongoing notification."
+                            else "Hidden. Tap to add a Bolus shortcut to the ongoing notification."
+                        )
+                    },
+                    leadingContent = {
+                        Icon(
+                            if (bolusButton) Icons.Filled.NotificationsActive else Icons.Filled.Notifications,
+                            contentDescription = "Bolus notification button",
+                        )
+                    },
+                    modifier = Modifier.clickable {
+                        bolusButton = !bolusButton
+                        Prefs(context).setShowBolusNotificationButton(bolusButton)
+                        sendMessage(MessagePaths.TO_SERVER_APPLY_RUNTIME_PREFS, "".toByteArray())
+                    }
+                )
+                Divider()
+            }
+
+            item {
+                var tempRateButton by remember { mutableStateOf(Prefs(context).showTempRateNotificationButton()) }
+                ListItem(
+                    headlineContent = { Text("Temp rate button in notification") },
+                    supportingContent = {
+                        Text(
+                            if (tempRateButton) "Shown. Tap to remove the Temp Rate shortcut from the ongoing notification."
+                            else "Hidden. Tap to add a Temp Rate shortcut to the ongoing notification."
+                        )
+                    },
+                    leadingContent = {
+                        Icon(
+                            if (tempRateButton) Icons.Filled.NotificationsActive else Icons.Filled.Notifications,
+                            contentDescription = "Temp rate notification button",
+                        )
+                    },
+                    modifier = Modifier.clickable {
+                        tempRateButton = !tempRateButton
+                        Prefs(context).setShowTempRateNotificationButton(tempRateButton)
+                        sendMessage(MessagePaths.TO_SERVER_APPLY_RUNTIME_PREFS, "".toByteArray())
+                    }
+                )
+                Divider()
+            }
+
+            item {
                 ListItem(
                     headlineContent = { Text("Reconfigure pump") },
                     supportingContent = { Text("Disconnect and re-pair with a pump.") },
