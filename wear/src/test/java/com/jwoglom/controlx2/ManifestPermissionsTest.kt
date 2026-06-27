@@ -48,15 +48,18 @@ class ManifestPermissionsTest {
             "android.permission.ACCESS_COARSE_LOCATION",
             // Merged in by libraries at every SDK
             "android.permission.BLUETOOTH_ADVERTISE", // blessed-android
-            "android.permission.ACCESS_FINE_LOCATION", // blessed-android (no SDK cap)
             "com.google.android.wearable.permission.BIND_WATCH_FACE_CONTROL", // wear watchface
             "com.jwoglom.controlx2.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION", // androidx.core
         )
 
-        // Auto-stripped by the platform past API 30.
+        // Only present on API <= 30. BLUETOOTH and BLUETOOTH_ADMIN are
+        // auto-stripped by the platform past API 30; ACCESS_FINE_LOCATION
+        // is gated via android:maxSdkVersion="30" in our manifest (capping
+        // the otherwise-uncapped permission merged in by blessed-android).
         private val LEGACY_ONLY = setOf(
             "android.permission.BLUETOOTH",
             "android.permission.BLUETOOTH_ADMIN",
+            "android.permission.ACCESS_FINE_LOCATION",
         )
 
         private data class Case(val deviceSdk: Int, val expected: Set<String>)
