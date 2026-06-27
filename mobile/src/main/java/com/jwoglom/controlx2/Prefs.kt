@@ -133,6 +133,30 @@ class Prefs(val context: Context) {
     }
 
     /**
+     * Whether the ongoing service notification shows a "Bolus" quick-action button
+     * that deep-links into the bolus entry screen (issue #152).
+     */
+    fun showBolusNotificationButton(): Boolean {
+        return prefs().getBoolean("show-bolus-notification-button", true)
+    }
+
+    fun setShowBolusNotificationButton(b: Boolean) {
+        prefs().edit().putBoolean("show-bolus-notification-button", b).commit()
+    }
+
+    /**
+     * Whether the ongoing service notification shows a "Temp Rate" quick-action button
+     * that deep-links into the temp-rate entry screen (issue #152).
+     */
+    fun showTempRateNotificationButton(): Boolean {
+        return prefs().getBoolean("show-temp-rate-notification-button", true)
+    }
+
+    fun setShowTempRateNotificationButton(b: Boolean) {
+        prefs().edit().putBoolean("show-temp-rate-notification-button", b).commit()
+    }
+
+    /**
      * Sends basic application version telemetry to the server and enables automatic update checks.
      */
     fun checkForUpdates(): Boolean {

@@ -377,6 +377,9 @@ class CommService : Service(), CommServiceCallbacks {
                     Timber.i("apply-runtime-prefs: enabling onlySnoopBluetooth")
                     PumpState.onlySnoopBluetooth = true
                 }
+                // Rebuild the ongoing notification so toggled quick-action buttons
+                // (bolus / temp-rate, issue #152) appear or disappear immediately.
+                updateNotification()
             }
             MessagePaths.TO_SERVER_SERVICE_STATUS_ACKNOWLEDGED -> {
                 Timber.i("service-status acknowledged, stopping periodic sender")
@@ -869,7 +872,7 @@ class CommService : Service(), CommServiceCallbacks {
             contentText += "    \nConnection established at: ${shortTime(it)}"
         }
 
-        return builder
+        builder
             .setContentTitle(title)
             .setContentText(contentText)
             .setContentIntent(pendingIntent)
@@ -878,7 +881,40 @@ class CommService : Service(), CommServiceCallbacks {
             .setTicker(currentPumpData.statusText)
             .setPriority(NotificationCompat.PRIORITY_MAX) // for under android 26 compatibility
             .setOngoing(true)
-            .build()
+
+        // Optional quick-action buttons that deep-link into the bolus / temp-rate
+        // entry screens (issue #152). Each is gated by its own preference and reuses
+        // MainActivity's exported ACTION_OPEN_* deep links.
+        if (Prefs(applicationContext).showBolusNotificationButton()) {
+            builder.addAction(
+                R.drawable.bolus_icon, "Bolus",
+                openActivityAction(MainActivity.ACTION_OPEN_BOLUS, 2010)
+            )
+        }
+        if (Prefs(applicationContext).showTempRateNotificationButton()) {
+            builder.addAction(
+                R.drawable.bolus_icon_secondary, "Temp Rate",
+                openActivityAction(MainActivity.ACTION_OPEN_TEMP_RATE, 2011)
+            )
+        }
+
+        return builder.build()
+    }
+
+    /**
+     * Builds a PendingIntent that opens MainActivity for the given deep-link action
+     * (e.g. MainActivity.ACTION_OPEN_BOLUS). SINGLE_TOP ensures an already-foreground
+     * activity receives it via onNewIntent() instead of spawning a duplicate.
+     */
+    private fun openActivityAction(action: String, requestCode: Int): PendingIntent {
+        val intent = Intent(this, MainActivity::class.java).apply {
+            this.action = action
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP
+        }
+        return PendingIntent.getActivity(
+            this, requestCode, intent,
+            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
+        )
     }
 
     private fun prefs(context: Context): SharedPreferences? {
