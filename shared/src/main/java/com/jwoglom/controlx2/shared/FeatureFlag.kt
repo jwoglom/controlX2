@@ -14,6 +14,7 @@ import android.content.Context
  */
 enum class FeatureFlag {
     BTHostSwitch,
+    BGInNotification,
     ;
 
     val slug: String get() = name

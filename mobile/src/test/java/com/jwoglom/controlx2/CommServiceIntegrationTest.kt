@@ -1,11 +1,13 @@
 package com.jwoglom.controlx2
 
+import android.app.Notification
 import android.content.Context
 import android.content.SharedPreferences
 import android.os.Looper
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.jwoglom.controlx2.messaging.MessageBusFactory
+import com.jwoglom.controlx2.shared.FeatureFlag
 import com.jwoglom.controlx2.shared.InitiateConfirmedBolusSerializer
 import com.jwoglom.controlx2.shared.MessagePaths
 import com.jwoglom.controlx2.shared.PumpMessageSerializer
@@ -752,6 +754,47 @@ class CommServiceIntegrationTest {
         assertTrue(
             "CGM response should be forwarded to wear",
             messageBus.hasMessage(MessagePaths.TO_CLIENT_SERVICE_RECEIVE_MESSAGE)
+        )
+    }
+
+    /**
+     * Read the content text of the most recently posted foreground notification.
+     */
+    private fun lastNotificationText(): String? {
+        val notification = shadowOf(service).lastForegroundNotification ?: return null
+        return notification.extras?.getCharSequence(Notification.EXTRA_TEXT)?.toString()
+    }
+
+    @Test
+    fun connectedPump_cgmResponse_withBGInNotificationFlag_showsBgInNotification() {
+        FeatureFlag.set(context, FeatureFlag.BGInNotification, true)
+        startServiceAndConnectPump()
+
+        val response = CurrentEGVGuiDataResponse(1710000000, 123, 1, 2)
+        capturedPump!!.onReceiveMessage(mockPeripheral, response)
+        shadowOf(Looper.getMainLooper()).idle()
+
+        val text = lastNotificationText()
+        assertNotNull("Foreground notification should be present", text)
+        assertTrue(
+            "Notification should include BG reading when flag is enabled (was: $text)",
+            text!!.contains("BG: 123")
+        )
+    }
+
+    @Test
+    fun connectedPump_cgmResponse_withoutBGInNotificationFlag_omitsBgFromNotification() {
+        // BGInNotification defaults to off; do not enable it.
+        startServiceAndConnectPump()
+
+        val response = CurrentEGVGuiDataResponse(1710000000, 123, 1, 2)
+        capturedPump!!.onReceiveMessage(mockPeripheral, response)
+        shadowOf(Looper.getMainLooper()).idle()
+
+        val text = lastNotificationText()
+        assertFalse(
+            "Notification should not include BG when flag is disabled (was: $text)",
+            text?.contains("BG:") ?: false
         )
     }
 
