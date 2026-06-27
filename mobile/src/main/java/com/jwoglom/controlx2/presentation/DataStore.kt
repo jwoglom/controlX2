@@ -87,6 +87,10 @@ class DataStore {
     val controlIQStatus = MutableLiveData<String>()
     val controlIQMode = MutableLiveData<UserMode>()
     val controlIQEnabled = MutableLiveData<Boolean>()
+    // Whether the pump's Control-IQ firmware allows extended boluses while closed-loop is on
+    // (PumpFeaturesV2Response CONTROL_IQ_FEATURES → EXTENDED_BOLUS_ENABLED). Null = unknown/not
+    // fetched (e.g. pre-V2.5 pump); the extended-bolus UI fails open when this is null.
+    val controlIQExtendedBolusEnabled = MutableLiveData<Boolean?>()
     val controlIQWeight = MutableLiveData<Int>()
     val controlIQWeightUnit = MutableLiveData<String>()
     val controlIQTotalDailyInsulin = MutableLiveData<Int>()
@@ -213,6 +217,7 @@ class DataStore {
         controlIQStatus.logOnChange("controlIQStatus")
         controlIQMode.logOnChange("controlIQMode")
         controlIQEnabled.logOnChange("controlIQEnabled")
+        controlIQExtendedBolusEnabled.logOnChange("controlIQExtendedBolusEnabled")
         controlIQWeight.logOnChange("controlIQWeight")
         controlIQWeightUnit.logOnChange("controlIQWeightUnit")
         controlIQTotalDailyInsulin.logOnChange("controlIQTotalDailyInsulin")

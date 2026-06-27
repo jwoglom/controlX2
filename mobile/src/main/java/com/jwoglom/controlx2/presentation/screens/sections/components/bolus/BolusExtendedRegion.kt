@@ -36,9 +36,14 @@ enum class BolusExtendedInputMode {
  * layout (and its snapshot baselines) is unchanged. When enabled, the user picks how the
  * "deliver now" portion is entered (a percent of the total, or an absolute unit amount)
  * and a duration; the derived split is shown in [previewText].
+ *
+ * When [available] is false (e.g. Control-IQ is on and this pump's firmware doesn't allow
+ * extended boluses) the toggle is shown disabled with [unavailableReason], and no inputs render.
  */
 @Composable
 fun BolusExtendedRegion(
+    available: Boolean,
+    unavailableReason: String?,
     enabled: Boolean,
     onEnabledChange: (Boolean) -> Unit,
     inputMode: BolusExtendedInputMode,
@@ -63,9 +68,24 @@ fun BolusExtendedRegion(
     ) {
         Text("Extended bolus", style = MaterialTheme.typography.bodyLarge)
         Switch(
-            checked = enabled,
+            checked = enabled && available,
             onCheckedChange = onEnabledChange,
+            enabled = available,
         )
+    }
+
+    if (!available) {
+        unavailableReason?.let {
+            Text(
+                text = it,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 20.dp, vertical = 4.dp),
+            )
+        }
+        return
     }
 
     if (!enabled) {

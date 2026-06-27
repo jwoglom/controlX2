@@ -115,6 +115,13 @@ fun BolusWindow(
     var extendedPreviewText by remember { mutableStateOf<String?>(null) }
     var extendedErrorText by remember { mutableStateOf<String?>(null) }
 
+    // Control-IQ gating: extended bolus is unavailable only when we positively know CIQ is on
+    // AND this pump's CIQ firmware reports extended bolus disabled. Unknown -> available (fail open).
+    val controlIQEnabled = dataStore.controlIQEnabled.observeAsState()
+    val controlIQExtendedBolusEnabled = dataStore.controlIQExtendedBolusEnabled.observeAsState()
+    val extendedBolusAvailable =
+        !(controlIQEnabled.value == true && controlIQExtendedBolusEnabled.value == false)
+
     // When extended bolus is enabled, the resolved split must also be valid (non-null).
     fun extendedValidIfEnabled(): Boolean =
         !extendedEnabled.value || dataStore.bolusCurrentExtendedParameters.value != null
@@ -351,6 +358,14 @@ fun BolusWindow(
         recalculate()
     }
 
+    // If Control-IQ gating turns extended bolus off while it was enabled, disable it so a stale
+    // extended config can't be carried into the request.
+    LaunchedEffect (extendedBolusAvailable) {
+        if (!extendedBolusAvailable && extendedEnabled.value) {
+            dataStore.bolusExtendedEnabled.value = false
+        }
+    }
+
     HeaderLine("Bolus")
 
     BolusEntryFormRegion(
@@ -377,6 +392,8 @@ fun BolusWindow(
     )
 
     BolusExtendedRegion(
+        available = extendedBolusAvailable,
+        unavailableReason = if (!extendedBolusAvailable) "Not available while Control-IQ is on for this pump." else null,
         enabled = extendedEnabled.value,
         onEnabledChange = { dataStore.bolusExtendedEnabled.value = it },
         inputMode = extendedInputMode,

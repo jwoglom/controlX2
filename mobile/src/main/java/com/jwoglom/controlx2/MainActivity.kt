@@ -107,6 +107,7 @@ import com.jwoglom.pumpx2.pump.messages.response.currentStatus.GlobalMaxBolusSet
 import com.jwoglom.pumpx2.pump.messages.response.currentStatus.HistoryLogStatusResponse
 import com.jwoglom.pumpx2.pump.messages.response.currentStatus.HomeScreenMirrorResponse
 import com.jwoglom.pumpx2.pump.messages.response.currentStatus.InsulinStatusResponse
+import com.jwoglom.pumpx2.pump.messages.response.currentStatus.PumpFeaturesV2Response
 import com.jwoglom.pumpx2.pump.messages.response.currentStatus.LastBGResponse
 import com.jwoglom.pumpx2.pump.messages.response.currentStatus.LastBolusStatusAbstractResponse
 import com.jwoglom.pumpx2.pump.messages.response.currentStatus.LoadStatusResponse
@@ -927,6 +928,14 @@ class MainActivity : ComponentActivity() {
             }
             is ControlIQSleepScheduleResponse -> {
                 dataStore.controlIQSleepScheduleResponse.value = message
+            }
+            is PumpFeaturesV2Response -> {
+                // Only the CONTROL_IQ_FEATURES index response populates controlIqFeatures;
+                // other index responses leave it null and are ignored here.
+                message.controlIqFeatures?.let { features ->
+                    dataStore.controlIQExtendedBolusEnabled.value =
+                        features.contains(PumpFeaturesV2Response.ControlIqFeatureType.EXTENDED_BOLUS_ENABLED)
+                }
             }
             is BasalLimitSettingsResponse -> {
                 dataStore.basalLimitSettingsResponse.value = message
