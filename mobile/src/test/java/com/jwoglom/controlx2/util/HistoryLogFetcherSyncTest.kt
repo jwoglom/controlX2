@@ -177,10 +177,19 @@ class HistoryLogFetcherSyncTest {
         fetcher.onStatusResponse(status, scope)
         waitForFetchCompletion(scope, timeoutMs = 60_000L)
 
+        // Heal the hole — and ONLY the hole. A regression that re-scans from the bottom of the
+        // window would still satisfy a "hole is present" check while needlessly re-fetching
+        // thousands of already-stored logs, so assert the exact fetched ids and totals.
         val requested = requestedSeqIds()
-        for (id in 7001L..7010L) {
-            assertTrue("hole seqId $id should be re-requested", id in requested)
-        }
+        assertEquals(
+            "must request exactly the 10-id hole, not the rest of the window",
+            (7001L..7010L).toSet(),
+            requested
+        )
+        assertEquals("a single chunk request covers the hole", 1, sentCommands.size)
+        assertEquals("total history logs fetched == 10", 10L, sentCommands.sumOf { it.second.toLong() })
+        assertEquals("exactly 10 logs were streamed in and stored", 10, broadcastedItems.size)
+
         val windowIds = repo.getAllIds(TEST_PUMP_SID, windowStart, pumpLastSeq)
         assertEquals(
             "whole retained window should be present after healing the hole",
@@ -241,6 +250,23 @@ class HistoryLogFetcherSyncTest {
             (pumpLastSeq - windowStart + 1).toInt(),
             windowIds.size
         )
+
+        // Efficiency: fetch the two gaps and NOTHING else. Without this, a regression that
+        // re-scans the whole window from the bottom would re-fetch ~5000 already-stored logs
+        // and still satisfy the "everything is present" assertions above.
+        val requested = requestedSeqIds()
+        assertEquals(
+            "must request exactly the hole + the new tail, nothing already stored",
+            ((7001L..7010L) + (7991L..8000L)).toSet(),
+            requested
+        )
+        assertEquals("one chunk request per gap (no whole-history re-fetch)", 2, sentCommands.size)
+        assertEquals(
+            "total history logs fetched == 20 (the two 10-id gaps)",
+            20L,
+            sentCommands.sumOf { it.second.toLong() }
+        )
+        assertEquals("exactly 20 logs were streamed in and stored", 20, broadcastedItems.size)
     }
 
     @Test
@@ -259,10 +285,13 @@ class HistoryLogFetcherSyncTest {
         waitForFetchCompletion(scope)
 
         assertEquals("new logs fetched incrementally", 150L, repo.getCount(TEST_PUMP_SID).firstOrNull())
-        val lowestRequested = sentCommands.minOf { (start, count) -> start - count + 1 }
-        assertTrue(
-            "already-synced logs must not be re-requested (lowest requested $lowestRequested)",
-            lowestRequested >= 101
+        // The second sync must request only the 50 newly-added ids, never re-request 1..100.
+        val requested = requestedSeqIds()
+        assertEquals("second sync must request exactly the new tail 101..150", (101L..150L).toSet(), requested)
+        assertEquals(
+            "total history logs fetched in the second sync == 50",
+            50L,
+            sentCommands.sumOf { it.second.toLong() }
         )
     }
 
@@ -279,8 +308,15 @@ class HistoryLogFetcherSyncTest {
         fetcher.onStatusResponse(status, scope)
         waitForFetchCompletion(scope, timeoutMs = 60_000L)
 
-        val lowestRequested = sentCommands.minOf { (start, count) -> start - count + 1 }
-        assertTrue("should not request aged-out seqIds (lowest requested $lowestRequested)", lowestRequested >= 900)
+        // Fetch exactly the retained window [900,1000]: never below firstSequenceNum, and never
+        // the aged rows we already hold.
+        val requested = requestedSeqIds()
+        assertEquals("must request exactly the retained window 900..1000", (900L..1000L).toSet(), requested)
+        assertEquals(
+            "total history logs fetched == 101 (retained window size)",
+            101L,
+            sentCommands.sumOf { it.second.toLong() }
+        )
         assertEquals("retained window should be fully fetched", 101, repo.getAllIds(TEST_PUMP_SID, 900, 1000).size)
         assertEquals("aged rows below firstSequenceNum should not be deleted", 50, repo.getAllIds(TEST_PUMP_SID, 1, 50).size)
     }
