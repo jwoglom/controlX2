@@ -15,6 +15,7 @@ import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.time.Instant
+import java.util.TimeZone
 
 class XdripMessageDispatcherTest {
     private data class SentValue<T>(val payload: T, val minimumIntervalSeconds: Int?)
@@ -228,5 +229,88 @@ class XdripMessageDispatcherTest {
 
         assertEquals(1, broadcaster.sgvPayloads.size)
         assertEquals(15, broadcaster.sgvPayloads.single().minimumIntervalSeconds)
+    }
+
+    @Test
+    fun onReceiveMessage_repeatedIdenticalBolusStatusPolls_onlyBroadcastOnce() {
+        // Regression test for https://github.com/jwoglom/controlX2/issues/137:
+        // CurrentBolusStatusResponse is polled repeatedly while a bolus is DELIVERING.
+        // Each identical poll must not create a separate xDrip "Bolus" treatment.
+        val broadcaster = FakeBroadcaster()
+        val dispatcher = XdripMessageDispatcher(
+            broadcaster = broadcaster,
+            configProvider = {
+                XdripSyncConfig(
+                    enabled = true,
+                    sendCgmSgv = false,
+                    sendPumpDeviceStatus = false,
+                    sendStatusLine = false
+                )
+            },
+            nowProvider = { Instant.parse("2026-01-01T00:00:00Z") }
+        )
+
+        // statusId=1 -> DELIVERING, bolusId=77, polled three times with the same status.
+        dispatcher.onReceiveMessage(CurrentBolusStatusResponse(1, 77, 1710001234, 2300, 0, 0))
+        dispatcher.onReceiveMessage(CurrentBolusStatusResponse(1, 77, 1710001240, 2300, 0, 0))
+        dispatcher.onReceiveMessage(CurrentBolusStatusResponse(1, 77, 1710001250, 2300, 0, 0))
+
+        assertEquals(1, broadcaster.treatmentPayloads.size)
+
+        // statusId=0 -> ALREADY_DELIVERED_OR_INVALID: a real state transition, so it should
+        // still produce a second (final) broadcast.
+        dispatcher.onReceiveMessage(CurrentBolusStatusResponse(0, 77, 1710001260, 2300, 0, 0))
+        assertEquals(2, broadcaster.treatmentPayloads.size)
+
+        // A different bolusId is a distinct physical bolus and must always broadcast.
+        dispatcher.onReceiveMessage(CurrentBolusStatusResponse(1, 78, 1710001300, 1000, 0, 0))
+        assertEquals(3, broadcaster.treatmentPayloads.size)
+    }
+
+    @Test
+    fun onReceiveMessage_bolusStatusTimestamp_correctedForLocalUtcOffset() {
+        // Regression test for https://github.com/jwoglom/controlX2/issues/137:
+        // CurrentBolusStatusResponse.timestampInstant is the pump's wall-clock reading
+        // encoded as if it were UTC (Dates.fromJan12008EpochSecondsToDate), so it must be
+        // shifted by the local UTC offset before being uploaded to xDrip, or treatments
+        // show up shifted forward by that offset (e.g. an hour ahead in UTC+1/UTC+2).
+        val original = TimeZone.getDefault()
+        try {
+            TimeZone.setDefault(TimeZone.getTimeZone("Europe/Berlin")) // always ahead of UTC
+            val offsetMillis = TimeZone.getDefault().getOffset(java.util.Date().time)
+            assertTrue("Test zone must be ahead of UTC for this assertion to be meaningful", offsetMillis > 0)
+
+            val broadcaster = FakeBroadcaster()
+            val dispatcher = XdripMessageDispatcher(
+                broadcaster = broadcaster,
+                configProvider = {
+                    XdripSyncConfig(
+                        enabled = true,
+                        sendCgmSgv = false,
+                        sendPumpDeviceStatus = false,
+                        sendStatusLine = false
+                    )
+                }
+            )
+
+            // pumpTimeSec=1710001234 encoded as fake-UTC: the pump's raw wall-clock reading,
+            // uncorrected for the local UTC offset.
+            val rawFakeUtcInstant = java.time.Instant.ofEpochSecond(1710001234L + 1199145600L)
+            dispatcher.onReceiveMessage(CurrentBolusStatusResponse(1, 90, 1710001234, 2300, 0, 0))
+
+            val status = JSONArray(broadcaster.treatmentPayloads.single().payload).getJSONObject(0)
+            val uploadedMills = status.getLong("mills")
+
+            assertTrue(
+                "Expected uploaded timestamp to be shifted earlier than the raw pump clock reading",
+                uploadedMills < rawFakeUtcInstant.toEpochMilli()
+            )
+            assertEquals(
+                rawFakeUtcInstant.toEpochMilli() - offsetMillis,
+                uploadedMills
+            )
+        } finally {
+            TimeZone.setDefault(original)
+        }
     }
 }
