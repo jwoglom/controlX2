@@ -1,5 +1,6 @@
 package com.jwoglom.controlx2.sync.xdrip.models
 
+import com.jwoglom.controlx2.shared.util.pumpTimeToLocalTz
 import com.jwoglom.pumpx2.pump.messages.models.InsulinUnit
 import com.jwoglom.pumpx2.pump.messages.response.control.InitiateBolusResponse
 import com.jwoglom.pumpx2.pump.messages.response.currentStatus.CurrentBolusStatusResponse
@@ -45,10 +46,15 @@ data class XdripTreatmentPayload(
         }
 
         fun fromCurrentBolusStatusResponse(response: CurrentBolusStatusResponse): XdripTreatmentPayload {
+            // response.timestampInstant is the pump's wall-clock reading encoded as if it
+            // were UTC (same "fake epoch" convention as HistoryLogItem.pumpTimeSec) — it must
+            // be corrected via pumpTimeToLocalTz before use as a real UTC instant, or the
+            // uploaded treatment ends up shifted by the local UTC offset (e.g. an hour ahead).
+            val correctedInstant = pumpTimeToLocalTz(response.timestampInstant)
             return XdripTreatmentPayload(
                 eventType = "Bolus",
-                createdAt = response.timestampInstant.toString(),
-                mills = response.timestampInstant.toEpochMilli(),
+                createdAt = correctedInstant.toString(),
+                mills = correctedInstant.toEpochMilli(),
                 insulin = InsulinUnit.from1000To1(response.requestedVolume),
                 notes = "ControlX2 bolus status bolusId=${response.bolusId} status=${response.status}"
             )
