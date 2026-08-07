@@ -141,6 +141,10 @@ class XdripMessageDispatcherTest {
             nowProvider = { now }
         )
 
+        // InitiateBolusResponse still broadcasts (a note-only marker in xDrip, distinct from
+        // the numeric dose marker -- see XdripBroadcastIntegrationTest for the xDrip-side
+        // rendering distinction), and the first CurrentBolusStatusResponse for this bolusId
+        // broadcasts the actual dose. Two broadcasts total, not a duplicate dose entry.
         dispatcher.onReceiveMessage(InitiateBolusResponse(0, 77, 0))
         dispatcher.onReceiveMessage(CurrentBolusStatusResponse(0, 77, 1710001234, 2300, 0, 0))
 
@@ -232,10 +236,17 @@ class XdripMessageDispatcherTest {
     }
 
     @Test
-    fun onReceiveMessage_repeatedIdenticalBolusStatusPolls_onlyBroadcastOnce() {
+    fun onReceiveMessage_bolusLifecycle_broadcastsInitiationPlusOnceOnFirstStatusPoll() {
         // Regression test for https://github.com/jwoglom/controlX2/issues/137:
-        // CurrentBolusStatusResponse is polled repeatedly while a bolus is DELIVERING.
-        // Each identical poll must not create a separate xDrip "Bolus" treatment.
+        // a single physical bolus previously produced a growing pile of xDrip "Bolus"
+        // dose entries -- one per CurrentBolusStatusResponse poll, since polling repeats
+        // (often once/second) while the bolus confirmation dialog is open. Gating on the
+        // pump reaching a terminal status doesn't work either: that polling is scoped to
+        // the dialog's lifetime and commonly stops (dialog dismissed, app backgrounded)
+        // before a terminal status ever arrives, silently dropping the entry. Instead,
+        // only the *first* status poll for a given bolusId broadcasts a dose (requestedVolume
+        // is fixed at request time, already correct on that first poll). InitiateBolusResponse
+        // still broadcasts too, but as a no-insulin note-only marker, not a dose duplicate.
         val broadcaster = FakeBroadcaster()
         val dispatcher = XdripMessageDispatcher(
             broadcaster = broadcaster,
@@ -250,20 +261,29 @@ class XdripMessageDispatcherTest {
             nowProvider = { Instant.parse("2026-01-01T00:00:00Z") }
         )
 
-        // statusId=1 -> DELIVERING, bolusId=77, polled three times with the same status.
-        dispatcher.onReceiveMessage(CurrentBolusStatusResponse(1, 77, 1710001234, 2300, 0, 0))
-        dispatcher.onReceiveMessage(CurrentBolusStatusResponse(1, 77, 1710001240, 2300, 0, 0))
-        dispatcher.onReceiveMessage(CurrentBolusStatusResponse(1, 77, 1710001250, 2300, 0, 0))
-
+        dispatcher.onReceiveMessage(InitiateBolusResponse(0, 77, 0))
         assertEquals(1, broadcaster.treatmentPayloads.size)
 
-        // statusId=0 -> ALREADY_DELIVERED_OR_INVALID: a real state transition, so it should
-        // still produce a second (final) broadcast.
+        // statusId=2 -> REQUESTING: the first status poll, broadcasts the dose once.
+        dispatcher.onReceiveMessage(CurrentBolusStatusResponse(2, 77, 1710001230, 2300, 0, 0))
+        assertEquals(2, broadcaster.treatmentPayloads.size)
+
+        // Further polls for the same bolusId (still in flight, or eventually terminal)
+        // must not re-broadcast -- the dialog may never live long enough to see completion.
+        dispatcher.onReceiveMessage(CurrentBolusStatusResponse(1, 77, 1710001234, 2300, 0, 0))
+        dispatcher.onReceiveMessage(CurrentBolusStatusResponse(1, 77, 1710001240, 2300, 0, 0))
         dispatcher.onReceiveMessage(CurrentBolusStatusResponse(0, 77, 1710001260, 2300, 0, 0))
         assertEquals(2, broadcaster.treatmentPayloads.size)
 
-        // A different bolusId is a distinct physical bolus and must always broadcast.
-        dispatcher.onReceiveMessage(CurrentBolusStatusResponse(1, 78, 1710001300, 1000, 0, 0))
+        // bolusId=0 means "no active bolus" and must never broadcast a dose, whether seen
+        // before any bolus (idle) or after the pump resets once this one is fully done.
+        dispatcher.onReceiveMessage(CurrentBolusStatusResponse(0, 0, 1710001270, 0, 0, 0))
+        assertEquals(2, broadcaster.treatmentPayloads.size)
+
+        // A different bolusId is a distinct physical bolus and must broadcast its dose once.
+        dispatcher.onReceiveMessage(CurrentBolusStatusResponse(2, 78, 1710001300, 1000, 0, 0))
+        assertEquals(3, broadcaster.treatmentPayloads.size)
+        dispatcher.onReceiveMessage(CurrentBolusStatusResponse(1, 78, 1710001310, 1000, 0, 0))
         assertEquals(3, broadcaster.treatmentPayloads.size)
     }
 
@@ -294,9 +314,10 @@ class XdripMessageDispatcherTest {
             )
 
             // pumpTimeSec=1710001234 encoded as fake-UTC: the pump's raw wall-clock reading,
-            // uncorrected for the local UTC offset.
+            // uncorrected for the local UTC offset. This is the first status poll for
+            // bolusId=90, so it's the one that gets broadcast.
             val rawFakeUtcInstant = java.time.Instant.ofEpochSecond(1710001234L + 1199145600L)
-            dispatcher.onReceiveMessage(CurrentBolusStatusResponse(1, 90, 1710001234, 2300, 0, 0))
+            dispatcher.onReceiveMessage(CurrentBolusStatusResponse(2, 90, 1710001234, 2300, 0, 0))
 
             val status = JSONArray(broadcaster.treatmentPayloads.single().payload).getJSONObject(0)
             val uploadedMills = status.getLong("mills")
