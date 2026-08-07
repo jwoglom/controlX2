@@ -46,10 +46,28 @@ jobs:
         run: touch local.properties
 
       - name: Decode Keystore
+        id: keystore
         env:
           ENCODED_STRING: ${{ secrets.RELEASE_STORE_BASE64 }}
+          STORE_PASSWORD: ${{ secrets.RELEASE_STORE_PASSWORD }}
         run: |
-          echo $ENCODED_STRING | base64 -di > release.keystore
+          set -euo pipefail
+          # Workflow runs from forked PRs never receive repository secrets, even
+          # after a maintainer approves the run — that's a platform rule, not a
+          # repo setting. Fall back to the checked-in debug.keystore (which is
+          # what signingConfigs.release already defaults to) rather than writing
+          # a 0-byte release.keystore and failing seven minutes later inside
+          # :wear:packageRelease with "Tag number over 30 is not supported".
+          if [ -z "${ENCODED_STRING:-}" ]; then
+            echo "No signing secrets available (fork PR) — release APKs will be debug-signed."
+            echo "signed=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          printf '%s' "$ENCODED_STRING" | base64 -di > release.keystore
+          # A truncated or re-wrapped secret decodes silently into junk; catch it
+          # here instead of inside the Gradle signing task.
+          keytool -list -keystore release.keystore -storepass "$STORE_PASSWORD" >/dev/null
+          echo "signed=true" >> "$GITHUB_OUTPUT"
 
       # Cache the Robolectric framework jars across runs. Key includes the
       # workflow file hash so a change to the version list invalidates it.
@@ -120,26 +138,51 @@ jobs:
         # Drops the prior `gradle build assembleRelease` which also ran
         # assembleDebug, testReleaseUnitTest, lintAnalyzeDebug, and
         # lintVitalAnalyzeRelease — none of which the workflow ships.
+        #
+        # `--continue` so a packaging failure doesn't cancel testDebugUnitTest in
+        # the same invocation: a broken signing config used to hide every unit
+        # test result behind one Gradle error.
+        #
+        # The -D flags are omitted entirely when there's no release keystore, so
+        # signingConfigs.release falls through to its debug.keystore defaults
+        # instead of being handed empty strings.
+        env:
+          RELEASE_STORE_PASSWORD: ${{ secrets.RELEASE_STORE_PASSWORD }}
+          RELEASE_KEY_ALIAS: ${{ secrets.RELEASE_KEY_ALIAS }}
+          RELEASE_KEY_PASSWORD: ${{ secrets.RELEASE_KEY_PASSWORD }}
         run: |
-          ./gradlew :mobile:assembleRelease :wear:assembleRelease testDebugUnitTest \
-            -DRELEASE_STORE_FILE=../release.keystore \
-            -DRELEASE_STORE_PASSWORD='${{ secrets.RELEASE_STORE_PASSWORD }}' \
-            -DRELEASE_KEY_ALIAS='${{ secrets.RELEASE_KEY_ALIAS }}' \
-            -DRELEASE_KEY_PASSWORD='${{ secrets.RELEASE_KEY_PASSWORD }}'
+          set -eo pipefail
+          SIGNING_ARGS=()
+          if [ "${{ steps.keystore.outputs.signed }}" = "true" ]; then
+            SIGNING_ARGS=(
+              -DRELEASE_STORE_FILE=../release.keystore
+              -DRELEASE_STORE_PASSWORD="$RELEASE_STORE_PASSWORD"
+              -DRELEASE_KEY_ALIAS="$RELEASE_KEY_ALIAS"
+              -DRELEASE_KEY_PASSWORD="$RELEASE_KEY_PASSWORD"
+            )
+          fi
+          ./gradlew --continue \
+            :mobile:assembleRelease :wear:assembleRelease testDebugUnitTest \
+            "${SIGNING_ARGS[@]}"
 
+      # Only publish APKs that carry the real release key. A debug-signed build
+      # uploaded under the name `mobile-release.apk` looks installable but can
+      # never update an existing install, so don't hand one out.
       - name: Upload release mobile APK
         uses: actions/upload-artifact@v4
+        if: steps.keystore.outputs.signed == 'true'
         with:
           name: mobile-release.apk
           path: mobile/build/outputs/apk/release/mobile-release.apk
-          if-no-files-found: warn
+          if-no-files-found: error
 
       - name: Upload release wear APK
         uses: actions/upload-artifact@v4
+        if: steps.keystore.outputs.signed == 'true'
         with:
           name: wear-release.apk
           path: wear/build/outputs/apk/release/wear-release.apk
-          if-no-files-found: warn
+          if-no-files-found: error
 
       - name: Android Test Report
         uses: asadmansr/android-test-report-action@v1.2.0
