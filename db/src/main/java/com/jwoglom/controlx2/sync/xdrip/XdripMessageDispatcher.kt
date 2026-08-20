@@ -48,11 +48,17 @@ class XdripMessageDispatcher(
 
     private val latestPumpSnapshot = XdripDeviceStatusSnapshot()
 
-    // Tracks the last (bolusId, status) pair broadcast to xDrip so repeated
+    // Tracks the most recent real bolusId broadcast to xDrip so repeated
     // CurrentBolusStatusResponse polls for the same in-flight bolus (e.g. multiple
     // "DELIVERING" updates while it progresses) don't each create a separate xDrip
-    // treatment entry for what is really a single physical bolus.
-    private var lastBolusStatusBroadcast: Pair<Int, String>? = null
+    // treatment entry for what is really a single physical bolus. We can't wait for
+    // a terminal status: CurrentBolusStatusRequest polling is scoped to the bolus
+    // confirmation dialog's lifetime (BolusDialogs/BolusApprovedPhase) and commonly
+    // stops -- dialog dismissed, app backgrounded -- long before the pump reports a
+    // final state, so gating on completion silently drops the entry. requestedVolume
+    // is the bolus's *requested* amount (fixed at request time, not a running
+    // delivered-so-far tally), so the first poll already carries the right figure.
+    private var lastBroadcastBolusId: Int? = null
 
     fun onReceiveMessage(message: Message) {
         onEvent(message.toDispatchEvent())
@@ -81,6 +87,10 @@ class XdripMessageDispatcher(
 
         if (config.sendTreatments && StatusCategory.TREATMENT in categories) {
             val treatmentPayload = when (event) {
+                // No insulin/carbs on this payload -- xDrip (Treatments.noteOnly()) renders
+                // it as a distinct note-only graph marker, separate from the numeric dose
+                // marker the first status poll below produces. Not a duplicate dose entry,
+                // so unlike the repeated status polls, this is safe to keep sending as-is.
                 is DispatchEvent.TreatmentInitiated -> XdripTreatmentPayload(
                     eventType = "Bolus",
                     createdAt = receivedAt.toString(),
@@ -89,11 +99,13 @@ class XdripMessageDispatcher(
                 ).toJsonArrayString()
 
                 is DispatchEvent.TreatmentStatus -> {
-                    val statusKey = event.bolusId to event.status
-                    if (statusKey == lastBolusStatusBroadcast) {
+                    // bolusId=0 means "no active bolus" (see CurrentBolusStatusResponse.isValid())
+                    // -- both before any bolus starts and once the pump has fully reset after one
+                    // finishes. Only the first poll of a real, non-zero bolusId broadcasts.
+                    if (event.bolusId == 0 || event.bolusId == lastBroadcastBolusId) {
                         null
                     } else {
-                        lastBolusStatusBroadcast = statusKey
+                        lastBroadcastBolusId = event.bolusId
                         XdripTreatmentPayload
                             .fromStatus(
                                 bolusId = event.bolusId,

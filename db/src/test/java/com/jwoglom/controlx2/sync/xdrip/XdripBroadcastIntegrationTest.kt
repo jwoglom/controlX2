@@ -159,11 +159,16 @@ class XdripBroadcastIntegrationTest {
     // ---------------------------------------------------------------
 
     @Test
-    fun fullPipeline_treatmentInitiatedBroadcast_matchesXdripSchema() {
+    fun fullPipeline_treatmentInitiatedBroadcast_isNoteOnlyNotDoseEntry() {
+        // InitiateBolusResponse broadcasts with no insulin/carbs field at all, so xDrip
+        // (Treatments.noteOnly(): carbs==0 && insulin==0 && notes present) renders it as a
+        // distinct note-only graph marker rather than a numeric dose marker -- it does not
+        // add a second dose to the count the first CurrentBolusStatusResponse poll produces
+        // (fullPipeline_treatmentStatusBroadcast_matchesXdripSchema), so keeping it doesn't
+        // reintroduce the duplicate-dose entries from #137.
         config = config.copy(sendCgmSgv = false, sendPumpDeviceStatus = false, sendStatusLine = false)
         dispatcher.onReceiveMessage(InitiateBolusResponse(0, 42, 0))
 
-        // xDrip receives both NEW_TREATMENT and NEW_FOOD
         val treatmentBroadcasts = broadcastsWithAction(XdripBroadcastSender.ACTION_NEW_TREATMENT)
         val foodBroadcasts = broadcastsWithAction(XdripBroadcastSender.ACTION_NEW_FOOD)
         assertEquals("one treatment broadcast", 1, treatmentBroadcasts.size)
@@ -172,22 +177,40 @@ class XdripBroadcastIntegrationTest {
         val bc = treatmentBroadcasts.single()
         assertEquals("treatments", bc.extraKey)
 
-        // xDrip parses: JSONArray(extras.getString("treatments")).getJSONObject(i)
         val arr = JSONArray(bc.payload)
         assertTrue("payload must be non-empty array", arr.length() > 0)
         val trtMap = jsonToMap(arr.getJSONObject(0).toString())
 
-        // xDrip reads mills or date: if neither is present, timestamp=0 → treatment rejected
         val mills = trtMap["mills"] ?: trtMap["date"]
         assertNotNull("xDrip reads 'mills'/'date' for timestamp — null causes rejection", mills)
         assertTrue("timestamp must be > 0 or treatment rejected", (mills as Number).toLong() > 0)
 
-        // xDrip reads eventType
         assertNotNull("eventType required", trtMap["eventType"])
         assertEquals("Bolus", trtMap["eventType"].toString())
 
-        // Food broadcast has same extra key
-        assertEquals("treatments", foodBroadcasts.single().extraKey)
+        // No insulin/carbs keys at all -- this is what makes it noteOnly() on the xDrip side.
+        assertTrue("must not carry an insulin field", !trtMap.containsKey("insulin"))
+        assertTrue("must not carry a carbs field", !trtMap.containsKey("carbs"))
+
+        // Notes present and identifying -- this is the marker's whole content.
+        assertNotNull("notes required for a note-only marker", trtMap["notes"])
+        assertTrue(trtMap["notes"].toString().contains("bolusId=42"))
+    }
+
+    @Test
+    fun fullPipeline_repeatedBolusStatusPolls_broadcastOnlyOnce() {
+        // CurrentBolusStatusRequest is polled repeatedly (up to once/second) while the bolus
+        // confirmation dialog is open (see BolusDialogs/BolusApprovedPhase) -- without this,
+        // every poll of the same in-flight bolus created a separate xDrip entry (see #137).
+        config = config.copy(sendCgmSgv = false, sendPumpDeviceStatus = false, sendStatusLine = false)
+
+        dispatcher.onReceiveMessage(CurrentBolusStatusResponse(2, 55, 1710001230, 1500, 0, 0)) // REQUESTING
+        nowMillis += 1000
+        dispatcher.onReceiveMessage(CurrentBolusStatusResponse(1, 55, 1710001234, 1500, 0, 0)) // DELIVERING
+        nowMillis += 1000
+        dispatcher.onReceiveMessage(CurrentBolusStatusResponse(1, 55, 1710001240, 1500, 0, 0)) // still DELIVERING
+
+        assertEquals("only the first poll broadcasts", 1, broadcastsWithAction(XdripBroadcastSender.ACTION_NEW_TREATMENT).size)
     }
 
     @Test
@@ -196,7 +219,7 @@ class XdripBroadcastIntegrationTest {
 
         // Send a status update (bolus in progress with insulin amount)
         nowMillis += 1000 // advance time to avoid dedup
-        dispatcher.onReceiveMessage(CurrentBolusStatusResponse(0, 77, 1710001234, 2300, 0, 0))
+        dispatcher.onReceiveMessage(CurrentBolusStatusResponse(2, 77, 1710001234, 2300, 0, 0))
 
         val treatmentBroadcasts = broadcastsWithAction(XdripBroadcastSender.ACTION_NEW_TREATMENT)
         assertEquals("one treatment broadcast", 1, treatmentBroadcasts.size)
