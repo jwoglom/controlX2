@@ -27,6 +27,7 @@ import androidx.compose.ui.unit.sp
 import com.jwoglom.controlx2.LocalDataStore
 import com.jwoglom.controlx2.Prefs
 import com.jwoglom.controlx2.R
+import com.jwoglom.controlx2.presentation.BolusExtendedParameters
 import com.jwoglom.controlx2.shared.util.SendType
 import com.jwoglom.controlx2.shared.util.snakeCaseToSpace
 import com.jwoglom.controlx2.shared.util.twoDecimalPlaces
@@ -108,6 +109,8 @@ fun BolusPermissionDialogRegion(
     val dataStore = LocalDataStore.current
     val bolusCurrentParameters = dataStore.bolusCurrentParameters.observeAsState()
     val bolusFinalParameters = dataStore.bolusFinalParameters.observeAsState()
+    val bolusCurrentExtendedParameters = dataStore.bolusCurrentExtendedParameters.observeAsState()
+    val extendedParams = bolusCurrentExtendedParameters.value
     val bolusPermissionResponse = dataStore.bolusPermissionResponse.observeAsState()
 
     fun sendBolusRequest(
@@ -132,6 +135,9 @@ fun BolusPermissionDialogRegion(
         title = {
             Text("Deliver ${bolusCurrentParameters.value?.units?.let { "${twoDecimalPlaces(it)}u " }}bolus?")
         },
+        text = if (extendedParams != null) {
+            { Text(extendedBolusBreakdownText(extendedParams)) }
+        } else null,
         icon = {
             Image(
                 if (isSystemInDarkTheme()) painterResource(R.drawable.bolus_icon_secondary)
@@ -489,4 +495,17 @@ fun CancelledDialogRegion(
             }
         }
     )
+}
+
+private fun extendedBolusBreakdownText(ext: BolusExtendedParameters): String {
+    val totalMin = (ext.durationSeconds / 60).toInt()
+    val h = totalMin / 60
+    val m = totalMin % 60
+    val duration = when {
+        h > 0 && m > 0 -> "${h}h ${m}m"
+        h > 0 -> "${h}h"
+        else -> "${m}m"
+    }
+    return "${twoDecimalPlaces(ext.nowMilliUnits / 1000.0)}u now + " +
+        "${twoDecimalPlaces(ext.extendedMilliUnits / 1000.0)}u over $duration"
 }
