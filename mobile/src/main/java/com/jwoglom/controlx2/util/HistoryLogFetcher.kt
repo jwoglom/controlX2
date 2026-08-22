@@ -154,21 +154,19 @@ class HistoryLogFetcher(
         val dbLatestId = dbLatest?.seqId
         val dbCount = historyLogRepo.getCount(pumpSid).firstOrNull() ?: 0
         
-        val catchupThreshold = message.lastSequenceNum - InitialHistoryLogCount
-        var startId = when {
-            dbLatestId != null && dbLatestId >= catchupThreshold && dbLatestId <= message.lastSequenceNum -> {
-                // Use the catchup threshold if we have far fewer rows than expected,
-                // e.g. when a previous fetch was interrupted mid-way. The DB has the
-                // latest seq but is missing many older entries within the window.
-                val expectedCount = dbLatestId - catchupThreshold
-                if (expectedCount > 0 && dbCount < expectedCount / 2) {
-                    catchupThreshold
-                } else {
-                    dbLatestId
-                }
-            }
-            else -> catchupThreshold
-        }
+        // Always scan the entire retained window — [lastSequenceNum - InitialHistoryLogCount,
+        // lastSequenceNum] — for gaps, rather than only fetching entries newer than the newest
+        // one already stored. getAllIds()/getMissingIds() below detect every hole in this
+        // window and triggerRange() only issues requests for ranges that are actually missing,
+        // so a fully synced DB still sends zero commands.
+        //
+        // Previously startId was set to dbLatestId (the newest stored seq id) whenever the DB
+        // looked "mostly full" (at least half of the expected rows present). That assumed every
+        // entry below the newest stored one had already been fetched. A fetch interrupted by a
+        // BLE disconnect can leave a small hole *below* dbLatestId; because the scan started at
+        // dbLatestId, that hole was never re-requested and the sync bar stayed pinned just under
+        // 100% forever (the "history sync stops at 99%" report).
+        var startId = message.lastSequenceNum - InitialHistoryLogCount
 
         // don't try and fetch earlier than the first available seq number on the pump
         // (this is not always 0; after a pump has been used for a long period old
