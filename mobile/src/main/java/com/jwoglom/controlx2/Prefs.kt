@@ -66,6 +66,14 @@ class Prefs(val context: Context) {
         prefs().edit().putBoolean("connection-sharing-enabled", b).commit()
     }
 
+    fun showBGInNotification(): Boolean {
+        return prefs().getBoolean("show-bg-in-notification", false)
+    }
+
+    fun setShowBGInNotification(b: Boolean) {
+        prefs().edit().putBoolean("show-bg-in-notification", b).commit()
+    }
+
     fun onlySnoopBluetoothEnabled(): Boolean {
         return prefs().getBoolean("only-snoop-bluetooth-enabled", false)
     }
