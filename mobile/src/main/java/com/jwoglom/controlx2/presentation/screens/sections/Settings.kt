@@ -24,6 +24,7 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -357,6 +358,42 @@ fun Settings(
                     )
                     Divider()
                 }
+            }
+
+            item {
+                HeaderLine("Notifications")
+                Divider()
+            }
+
+            item {
+                var showBGInNotification by remember { mutableStateOf(Prefs(context).showBGInNotification()) }
+                fun applyShowBGInNotification(checked: Boolean) {
+                    showBGInNotification = checked
+                    Prefs(context).setShowBGInNotification(checked)
+                    coroutineScope.launch {
+                        delay(250)
+                        // Reload the service so the ongoing notification is rebuilt with the new setting.
+                        sendMessage(MessagePaths.TO_SERVER_FORCE_RELOAD, "".toByteArray())
+                    }
+                }
+                ListItem(
+                    headlineContent = { Text("Show glucose in notification") },
+                    supportingContent = { Text("Include the latest CGM reading and trend arrow in the ongoing ControlX2 notification.") },
+                    leadingContent = {
+                        Icon(
+                            Icons.Filled.Notifications,
+                            contentDescription = null,
+                        )
+                    },
+                    trailingContent = {
+                        Switch(
+                            checked = showBGInNotification,
+                            onCheckedChange = { applyShowBGInNotification(it) },
+                        )
+                    },
+                    modifier = Modifier.clickable { applyShowBGInNotification(!showBGInNotification) }
+                )
+                Divider()
             }
 
             item {

@@ -49,6 +49,7 @@ import com.jwoglom.controlx2.shared.PumpMessageSerializer
 import com.jwoglom.controlx2.shared.messaging.MessageBus
 import com.jwoglom.controlx2.shared.messaging.MessageBusSender
 import com.jwoglom.controlx2.shared.messaging.MessageListener
+import com.jwoglom.controlx2.shared.util.GlucoseConverter
 import com.jwoglom.controlx2.shared.util.registerAppReloadShutdownHook
 import com.jwoglom.controlx2.shared.util.setupTimber
 import com.jwoglom.controlx2.shared.util.triggerAppReload
@@ -64,10 +65,14 @@ import com.jwoglom.pumpx2.pump.messages.models.KnownApiVersion
 import com.jwoglom.pumpx2.pump.messages.models.PairingCodeType
 import com.jwoglom.pumpx2.pump.messages.request.control.InitiateBolusRequest
 import com.jwoglom.pumpx2.pump.messages.request.currentStatus.ControlIQIOBRequest
+import com.jwoglom.pumpx2.pump.messages.request.currentStatus.CurrentEGVGuiDataRequest
 import com.jwoglom.pumpx2.pump.messages.request.currentStatus.HistoryLogStatusRequest
+import com.jwoglom.pumpx2.pump.messages.request.currentStatus.HomeScreenMirrorRequest
 import com.jwoglom.pumpx2.pump.messages.request.currentStatus.InsulinStatusRequest
 import com.jwoglom.pumpx2.pump.messages.response.currentStatus.ControlIQIOBResponse
 import com.jwoglom.pumpx2.pump.messages.response.currentStatus.CurrentBatteryAbstractResponse
+import com.jwoglom.pumpx2.pump.messages.response.currentStatus.CurrentEGVGuiDataResponse
+import com.jwoglom.pumpx2.pump.messages.response.currentStatus.HomeScreenMirrorResponse
 import com.jwoglom.pumpx2.pump.messages.response.currentStatus.InsulinStatusResponse
 import com.welie.blessed.BluetoothPeripheral
 import kotlinx.coroutines.CoroutineScope
@@ -169,6 +174,8 @@ class CommService : Service(), CommServiceCallbacks {
                 CurrentBatteryRequestBuilder.create(apiVersion()),
                 ControlIQIOBRequest(),
                 InsulinStatusRequest(),
+                CurrentEGVGuiDataRequest(),
+                HomeScreenMirrorRequest(),
                 HistoryLogStatusRequest()
             )))
         }
@@ -634,6 +641,8 @@ class CommService : Service(), CommServiceCallbacks {
         var batteryPercent: Int? = null,
         var iobUnits: Double? = null,
         var cartridgeRemainingUnits: Int? = null,
+        var cgmReading: Int? = null,
+        var cgmTrendArrow: String? = null,
     )
 
     private val currentPumpData: DisplayablePumpData = DisplayablePumpData()
@@ -656,6 +665,19 @@ class CommService : Service(), CommServiceCallbacks {
             is InsulinStatusResponse -> {
                 changed = currentPumpData.cartridgeRemainingUnits != message.currentInsulinAmount
                 currentPumpData.cartridgeRemainingUnits = message.currentInsulinAmount
+            }
+            is CurrentEGVGuiDataResponse -> {
+                if (Prefs(applicationContext).showBGInNotification()) {
+                    changed = currentPumpData.cgmReading != message.cgmReading
+                }
+                currentPumpData.cgmReading = message.cgmReading
+            }
+            is HomeScreenMirrorResponse -> {
+                val arrow = message.cgmTrendIcon.arrow()
+                if (Prefs(applicationContext).showBGInNotification()) {
+                    changed = currentPumpData.cgmTrendArrow != arrow
+                }
+                currentPumpData.cgmTrendArrow = arrow
             }
         }
 
@@ -859,6 +881,16 @@ class CommService : Service(), CommServiceCallbacks {
         }
 
         var contentText = ""
+        if (Prefs(applicationContext).showBGInNotification() && currentPumpData.cgmReading != null) {
+            val glucoseUnit = Prefs(applicationContext).glucoseUnit() ?: GlucoseUnit.MGDL
+            val bgText = GlucoseConverter.format(currentPumpData.cgmReading!!, glucoseUnit)
+            val arrow = currentPumpData.cgmTrendArrow
+            contentText += if (arrow.isNullOrEmpty()) {
+                "BG: $bgText\u00A0\u00A0\u00A0"
+            } else {
+                "BG: $bgText $arrow\u00A0\u00A0\u00A0"
+            }
+        }
         if (currentPumpData.batteryPercent != null) {
             contentText += "Battery: ${currentPumpData.batteryPercent}%\u00A0\u00A0\u00A0"
         }
