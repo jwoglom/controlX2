@@ -8,6 +8,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -33,6 +34,9 @@ fun HorizBatteryIcon(
     color: Color = Color.Unspecified,
     modifier: Modifier = Modifier
 ) {
+    // Preload all battery icons to avoid jank on first render
+    preloadBatteryIcons()
+
     batteryPercent?.let {
         Row(modifier.height(height)) {
             Box(
@@ -40,30 +44,12 @@ fun HorizBatteryIcon(
                 contentAlignment = Alignment.Center
             ) {
                 Icon(
-                    getPainterForBatteryPercent(it),
-                    "Battery icon",
+                    painter = rememberBatteryPainter(it, batteryCharging == true),
+                    "电池图标",
                     tint = color,
                     modifier = modifier.height(height)
                 )
-                if (batteryCharging == true) {
-                    Box(
-                        contentAlignment = Alignment.Center,
-                        modifier = Modifier
-                            .height(height)
-                    ) {
-                        Text(
-                            when (batteryCharging) {
-                                true -> " ⚡"
-                                else -> ""
-                            },
-                            color = color,
-                            textAlign = TextAlign.Center,
-                            fontSize = 8.sp,
-                            fontWeight = FontWeight.Bold,
-                            lineHeight = 24.sp
-                        )
-                    }
-                }
+
             }
             // HACK: text should be aligned with the icon as-is...
             Box(
@@ -81,17 +67,63 @@ fun HorizBatteryIcon(
 }
 
 @Composable
-fun getPainterForBatteryPercent(batteryPercent: Int): Painter {
-    return painterResource(
-        when {
-            batteryPercent >= 80 -> R.drawable.battery_horiz_100
-            batteryPercent >= 60 -> R.drawable.battery_horiz_075
-            batteryPercent >= 40 -> R.drawable.battery_horiz_050
-            batteryPercent >= 25 -> R.drawable.battery_horiz_025
-            batteryPercent >= 10 -> R.drawable.battery_horiz_010
-            else -> R.drawable.battery_horiz_000
-        }
-    )
+private fun preloadBatteryIcons() {
+    listOf(
+        R.drawable.battery_horiz_000,
+        R.drawable.battery_horiz_010,
+        R.drawable.battery_horiz_025,
+        R.drawable.battery_horiz_050,
+        R.drawable.battery_horiz_075,
+        R.drawable.battery_horiz_100,
+        R.drawable.battery_horiz_000_charging,
+        R.drawable.battery_horiz_010_charging,
+        R.drawable.battery_horiz_025_charging,
+        R.drawable.battery_horiz_050_charging,
+        R.drawable.battery_horiz_075_charging,
+        R.drawable.battery_horiz_100_charging,
+    ).forEach { painterResource(it) }
+}
+
+@Composable
+fun getPainterForBatteryPercent(batteryPercent: Int, charging: Boolean = false): Painter {
+    val base = when {
+        batteryPercent >= 80 -> R.drawable.battery_horiz_100
+        batteryPercent >= 60 -> R.drawable.battery_horiz_075
+        batteryPercent >= 40 -> R.drawable.battery_horiz_050
+        batteryPercent >= 25 -> R.drawable.battery_horiz_025
+        batteryPercent >= 10 -> R.drawable.battery_horiz_010
+        else -> R.drawable.battery_horiz_000
+    }
+    val res = if (!charging) base else when (base) {
+        R.drawable.battery_horiz_100 -> R.drawable.battery_horiz_100_charging
+        R.drawable.battery_horiz_075 -> R.drawable.battery_horiz_075_charging
+        R.drawable.battery_horiz_050 -> R.drawable.battery_horiz_050_charging
+        R.drawable.battery_horiz_025 -> R.drawable.battery_horiz_025_charging
+        R.drawable.battery_horiz_010 -> R.drawable.battery_horiz_010_charging
+        else -> R.drawable.battery_horiz_000_charging
+    }
+    return painterResource(res)
+}
+
+@Composable
+fun rememberBatteryPainter(batteryPercent: Int, charging: Boolean = false): Painter {
+    val base = when {
+        batteryPercent >= 80 -> R.drawable.battery_horiz_100
+        batteryPercent >= 60 -> R.drawable.battery_horiz_075
+        batteryPercent >= 40 -> R.drawable.battery_horiz_050
+        batteryPercent >= 25 -> R.drawable.battery_horiz_025
+        batteryPercent >= 10 -> R.drawable.battery_horiz_010
+        else -> R.drawable.battery_horiz_000
+    }
+    val res = if (!charging) base else when (base) {
+        R.drawable.battery_horiz_100 -> R.drawable.battery_horiz_100_charging
+        R.drawable.battery_horiz_075 -> R.drawable.battery_horiz_075_charging
+        R.drawable.battery_horiz_050 -> R.drawable.battery_horiz_050_charging
+        R.drawable.battery_horiz_025 -> R.drawable.battery_horiz_025_charging
+        R.drawable.battery_horiz_010 -> R.drawable.battery_horiz_010_charging
+        else -> R.drawable.battery_horiz_000_charging
+    }
+    return painterResource(id = res)
 }
 
 @Preview
