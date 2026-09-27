@@ -152,18 +152,14 @@ class HistoryLogFetcher(
         val dbLatestId = dbLatest?.seqId
         val dbCount = historyLogRepo.getCount(pumpSid).firstOrNull() ?: 0
 
-        val catchupThreshold = message.lastSequenceNum - InitialHistoryLogCount
-        var startId = when {
-            dbLatestId != null && dbLatestId >= catchupThreshold && dbLatestId <= message.lastSequenceNum -> {
-                val expectedCount = dbLatestId - catchupThreshold
-                if (expectedCount > 0 && dbCount < expectedCount / 2) {
-                    catchupThreshold
-                } else {
-                    dbLatestId
-                }
-            }
-            else -> catchupThreshold
-        }
+        // Always scan the entire retained window — [lastSequenceNum - InitialHistoryLogCount,
+        // lastSequenceNum] — for gaps, rather than only fetching entries newer than the newest
+        // one already stored. getAllIds()/getMissingIds() below detect every hole in this
+        // window and triggerRange() only issues requests for ranges that are actually missing,
+        // so a fully synced DB still sends zero commands. Starting the scan at dbLatestId (the
+        // previous behavior) meant a hole left below the newest stored entry by an interrupted
+        // fetch was never re-requested, pinning the sync progress just under 100% ("stuck at 99%").
+        var startId = message.lastSequenceNum - InitialHistoryLogCount
 
         startId = max(startId, message.firstSequenceNum)
         startId = min(startId, message.lastSequenceNum)
