@@ -50,6 +50,8 @@ import com.jwoglom.pumpx2.pump.messages.request.currentStatus.CurrentEGVGuiDataR
 import com.jwoglom.pumpx2.pump.messages.request.currentStatus.GlobalMaxBolusSettingsRequest
 import com.jwoglom.pumpx2.pump.messages.request.currentStatus.HomeScreenMirrorRequest
 import com.jwoglom.pumpx2.pump.messages.request.currentStatus.InsulinStatusRequest
+import com.jwoglom.pumpx2.pump.messages.request.currentStatus.PumpFeaturesV2Request
+import com.jwoglom.pumpx2.pump.messages.response.currentStatus.PumpFeaturesV2Response
 import com.jwoglom.controlx2.LocalDataStore
 import com.jwoglom.controlx2.Prefs
 import com.jwoglom.controlx2.dataStore
@@ -271,6 +273,9 @@ val dashboardCommands = listOf(
     CGMStatusRequest(),
     CurrentEGVGuiDataRequest(),
     GlobalMaxBolusSettingsRequest(),
+    // Control-IQ feature set: tells us if extended bolus is allowed while closed-loop is on.
+    // Filtered out below on pre-V2.5 pumps (minApi), where it stays unknown (UI fails open).
+    PumpFeaturesV2Request(PumpFeaturesV2Response.SupportedFeatureIndex.CONTROL_IQ_FEATURES),
     // trigger HistoryLogFetcher
     HistoryLogStatusRequest(),
     // update notification badge

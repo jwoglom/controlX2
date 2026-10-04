@@ -10,6 +10,8 @@ import android.content.SharedPreferences
 import android.os.Handler
 import android.os.Looper
 import androidx.core.app.NotificationCompat
+import com.jwoglom.controlx2.pump.bolusBreakdownSuffix
+import com.jwoglom.controlx2.pump.bolusTotalDisplayUnits
 import com.jwoglom.controlx2.pump.confirmBolusRequestBaseNotification
 import com.jwoglom.controlx2.messaging.MessageBusFactory
 import com.jwoglom.controlx2.shared.InitiateConfirmedBolusSerializer
@@ -369,11 +371,7 @@ class BolusNotificationBroadcastReceiver : BroadcastReceiver() {
     }
 
     private fun bolusSummaryText(intentRequest: InitiateBolusRequest): String {
-        return "${
-            twoDecimalPlaces(
-                InsulinUnit.from1000To1(intentRequest.totalVolume)
-            )
-        }u bolus"
+        return "${twoDecimalPlaces(bolusTotalDisplayUnits(intentRequest))}u bolus${bolusBreakdownSuffix(intentRequest)}"
     }
 
     private fun getCurrentBolusToConfirm(context: Context?): InitiateBolusRequest? {

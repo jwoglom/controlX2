@@ -38,7 +38,7 @@ class BolusManager(
     }
 
     fun confirmBolusRequest(request: InitiateBolusRequest, source: BolusRequestSource) {
-        val units = twoDecimalPlaces(InsulinUnit.from1000To1(request.totalVolume))
+        val units = twoDecimalPlaces(bolusTotalDisplayUnits(request))
         Timber.i("confirmBolusRequest $units: $request")
         bolusNotificationId++
         prefs()?.edit()
@@ -86,14 +86,15 @@ class BolusManager(
         sendWearCommMessage(MessagePaths.TO_CLIENT_BOLUS_MIN_NOTIFY_THRESHOLD, "$minNotifyThreshold".toByteArray())
         sendWearCommMessage(MessagePaths.TO_CLIENT_WEAR_AUTO_APPROVE_TIMEOUT, "$autoApproveTimeout".toByteArray())
 
-        if (InsulinUnit.from1000To1(request.totalVolume) >= minNotifyThreshold || minNotifyThreshold == 0.0) {
+        if (bolusTotalDisplayUnits(request) >= minNotifyThreshold || minNotifyThreshold == 0.0) {
             Timber.i("Requesting permission for bolus because $units >= minNotifyThreshold=$minNotifyThreshold")
 
+            val breakdown = bolusBreakdownSuffix(request)
             val builder = confirmBolusRequestBaseNotification(
                 context,
                 "Bolus Request",
-                if (autoApproveTimeout > 0) "$units units. Auto-approving in ${autoApproveTimeout}s unless canceled."
-                else "$units units. Press Confirm to deliver."
+                if (autoApproveTimeout > 0) "$units units$breakdown. Auto-approving in ${autoApproveTimeout}s unless canceled."
+                else "$units units$breakdown. Press Confirm to deliver."
             )
                 .setSound(RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION))
                 .setVibrate(longArrayOf(500L, 500L, 500L, 500L, 500L, 500L, 500L, 500L, 500L, 500L))
@@ -182,6 +183,35 @@ class BolusManager(
             _autoApproveRunnable = null
             _autoApproveHandler = null
         }
+    }
+}
+
+/**
+ * The total insulin a bolus delivers, in units. For an extended bolus this is the immediate
+ * (totalVolume) plus the extended (extendedVolume) portion — important so confirmation prompts
+ * and the notify threshold reflect the whole bolus, not just the "now" portion.
+ */
+fun bolusTotalDisplayUnits(request: InitiateBolusRequest): Double =
+    InsulinUnit.from1000To1(request.totalVolume + request.extendedVolume)
+
+/** A human-readable " (X.XXu now + Y.YYu over Hh Mm)" suffix for extended boluses, else "". */
+fun bolusBreakdownSuffix(request: InitiateBolusRequest): String {
+    if (request.extendedVolume <= 0) {
+        return ""
+    }
+    val now = twoDecimalPlaces(InsulinUnit.from1000To1(request.totalVolume))
+    val ext = twoDecimalPlaces(InsulinUnit.from1000To1(request.extendedVolume))
+    return " (${now}u now + ${ext}u over ${prettyBolusDurationSeconds(request.extendedSeconds)})"
+}
+
+private fun prettyBolusDurationSeconds(seconds: Long): String {
+    val totalMin = (seconds / 60).toInt()
+    val h = totalMin / 60
+    val m = totalMin % 60
+    return when {
+        h > 0 && m > 0 -> "${h}h ${m}m"
+        h > 0 -> "${h}h"
+        else -> "${m}m"
     }
 }
 

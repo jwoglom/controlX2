@@ -107,6 +107,7 @@ import com.jwoglom.pumpx2.pump.messages.response.currentStatus.GlobalMaxBolusSet
 import com.jwoglom.pumpx2.pump.messages.response.currentStatus.HistoryLogStatusResponse
 import com.jwoglom.pumpx2.pump.messages.response.currentStatus.HomeScreenMirrorResponse
 import com.jwoglom.pumpx2.pump.messages.response.currentStatus.InsulinStatusResponse
+import com.jwoglom.pumpx2.pump.messages.response.currentStatus.PumpFeaturesV2Response
 import com.jwoglom.pumpx2.pump.messages.response.currentStatus.LastBGResponse
 import com.jwoglom.pumpx2.pump.messages.response.currentStatus.LastBolusStatusAbstractResponse
 import com.jwoglom.pumpx2.pump.messages.response.currentStatus.LoadStatusResponse
@@ -472,18 +473,39 @@ class MainActivity : ComponentActivity() {
         }
 
         val iobUnits = dataSnapshot.iob
-        val bolusRequest = InitiateBolusRequest(
-            numUnits,
-            bolusId,
-            BolusDeliveryHistoryLog.BolusType.toBitmask(*bolusTypes.toTypedArray()),
-            foodVolume,
-            corrVolume,
-            numCarbs,
-            bgValue,
-            iobUnits
-        )
+        val extended = dataStore.bolusFinalExtendedParameters.value
+        val bolusRequest = if (extended != null) {
+            // Extended ("square wave") bolus: totalVolume is the amount delivered now and
+            // extendedVolume is delivered linearly over extendedSeconds. The two volumes were
+            // pre-resolved (in milliunits) from the same calculated total, so they sum to it.
+            bolusTypes.add(BolusDeliveryHistoryLog.BolusType.EXTENDED)
+            InitiateBolusRequest(
+                extended.nowMilliUnits,
+                bolusId,
+                BolusDeliveryHistoryLog.BolusType.toBitmask(*bolusTypes.toTypedArray()),
+                foodVolume,
+                corrVolume,
+                numCarbs,
+                bgValue,
+                iobUnits,
+                extended.extendedMilliUnits,
+                extended.durationSeconds,
+                0L // extended3: unknown per pumpx2, set to 0
+            )
+        } else {
+            InitiateBolusRequest(
+                numUnits,
+                bolusId,
+                BolusDeliveryHistoryLog.BolusType.toBitmask(*bolusTypes.toTypedArray()),
+                foodVolume,
+                corrVolume,
+                numCarbs,
+                bgValue,
+                iobUnits
+            )
+        }
 
-        Timber.i("sendServiceBolusRequest: numUnits=$numUnits numCarbs=$numCarbs bgValue=$bgValue foodVolume=$foodVolume corrVolume=$corrVolume iobUnits=$iobUnits: bolusRequest=$bolusRequest preCommands=$preCommands")
+        Timber.i("sendServiceBolusRequest: numUnits=$numUnits numCarbs=$numCarbs bgValue=$bgValue foodVolume=$foodVolume corrVolume=$corrVolume iobUnits=$iobUnits extended=$extended: bolusRequest=$bolusRequest preCommands=$preCommands")
         this.sendMessage(MessagePaths.TO_SERVER_BOLUS_REQUEST_PHONE, PumpMessageSerializer.toBytes(bolusRequest))
     }
 
@@ -775,8 +797,9 @@ class MainActivity : ComponentActivity() {
                     val requestBytes = Hex.decodeHex(requestHex)
                     val request = PumpMessageSerializer.fromBytes(requestBytes) as? com.jwoglom.pumpx2.pump.messages.request.control.InitiateBolusRequest
                     if (request != null) {
+                        // Show the full bolus (now + extended), not just the immediate portion.
                         val units = com.jwoglom.controlx2.shared.util.twoDecimalPlaces(
-                            com.jwoglom.pumpx2.pump.messages.models.InsulinUnit.from1000To1(request.totalVolume))
+                            com.jwoglom.controlx2.pump.bolusTotalDisplayUnits(request))
                         runOnUiThread {
                             showBolusConfirmDialog(units, requestBytes, source, autoApproveTimeout)
                         }
@@ -905,6 +928,14 @@ class MainActivity : ComponentActivity() {
             }
             is ControlIQSleepScheduleResponse -> {
                 dataStore.controlIQSleepScheduleResponse.value = message
+            }
+            is PumpFeaturesV2Response -> {
+                // Only the CONTROL_IQ_FEATURES index response populates controlIqFeatures;
+                // other index responses leave it null and are ignored here.
+                message.controlIqFeatures?.let { features ->
+                    dataStore.controlIQExtendedBolusEnabled.value =
+                        features.contains(PumpFeaturesV2Response.ControlIqFeatureType.EXTENDED_BOLUS_ENABLED)
+                }
             }
             is BasalLimitSettingsResponse -> {
                 dataStore.basalLimitSettingsResponse.value = message
