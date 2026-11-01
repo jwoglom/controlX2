@@ -797,8 +797,8 @@ internal fun LandingSettingsPreview() {
     }
 }
 
-private const val CANNULA_ORANGE_MS = 36L * 60 * 60 * 1000
-private const val CANNULA_RED_MS = 48L * 60 * 60 * 1000
+private const val CANNULA_ORANGE_MS = 60L * 60 * 60 * 1000
+private const val CANNULA_RED_MS = 72L * 60 * 60 * 1000
 private val CANNULA_LIGHT_ORANGE = androidx.compose.ui.graphics.Color(0xFFFFB74D)
 private val CANNULA_DARK_RED = androidx.compose.ui.graphics.Color(0xFFC62828)
 
