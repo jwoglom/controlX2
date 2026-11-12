@@ -25,6 +25,15 @@ class Prefs(val context: Context) {
         prefs().edit().putBoolean("service-enabled", b).commit()
     }
 
+    /** Hora (epoch ms) a la que se registro el ultimo cambio de canula; 0 si nunca. */
+    fun cannulaInsertedAt(): Long {
+        return prefs().getLong("cannula-inserted-at", 0L)
+    }
+
+    fun setCannulaInsertedAt(epochMillis: Long) {
+        prefs().edit().putLong("cannula-inserted-at", epochMillis).commit()
+    }
+
     fun pumpFinderServiceEnabled(): Boolean {
         return prefs().getBoolean("pumpfinder-service-enabled", false)
     }

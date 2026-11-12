@@ -33,8 +33,20 @@ import com.jwoglom.controlx2.presentation.screens.setUpPreviewState
 import com.jwoglom.controlx2.presentation.theme.CardBackground
 import com.jwoglom.controlx2.presentation.theme.ControlX2Theme
 import com.jwoglom.controlx2.presentation.theme.Elevation
+import com.jwoglom.controlx2.presentation.theme.GlucoseColors
 import com.jwoglom.controlx2.presentation.theme.Spacing
 import com.jwoglom.controlx2.presentation.theme.SurfaceBackground
+
+/**
+ * Color de las unidades restantes del reservorio: menos de 50 naranja, menos de 30 naranja oscuro,
+ * menos de 20 rojo. Con 50 o mas (o sin dato) se devuelve Unspecified, es decir, el color normal.
+ */
+private fun cartridgeWarnColor(units: Int?): Color = when {
+    units == null -> Color.Unspecified
+    units < 20 -> GlucoseColors.Low
+    units < 50 -> GlucoseColors.Elevated
+    else -> Color.Unspecified
+}
 
 @Composable
 fun PumpStatusBar(middleContent: @Composable () -> Unit = {}) {
@@ -60,7 +72,8 @@ fun PumpStatusBar(middleContent: @Composable () -> Unit = {}) {
             val cartridgeRemainingUnits = ds.cartridgeRemainingUnits.observeAsState()
             val cartridgeRemainingEstimate = ds.cartridgeRemainingEstimate.observeAsState()
             HorizCartridgeIcon(cartridgeRemainingUnits.value,
-                cartridgeAmountEstimate = cartridgeRemainingEstimate.value == true)
+                cartridgeAmountEstimate = cartridgeRemainingEstimate.value == true,
+                color = cartridgeWarnColor(cartridgeRemainingUnits.value))
         }
     }
 }

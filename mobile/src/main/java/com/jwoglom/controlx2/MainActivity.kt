@@ -997,6 +997,14 @@ class MainActivity : ComponentActivity() {
             is CurrentEGVGuiDataResponse -> {
                 dataStore.cgmReading.value = message.cgmReading
                 dataStore.cgmDelta.value = message.trendRate
+                // Hora de la lectura (no depende del valor: dos lecturas iguales seguidas cuentan como nuevas)
+                if (message.bgReadingTimestampSeconds.toLong() > 0L) {
+                    dataStore.cgmReadingTimeSeconds.value = pumpTimeToLocalTz(
+                        com.jwoglom.pumpx2.pump.messages.helpers.Dates.fromJan12008EpochSecondsToDate(
+                            message.bgReadingTimestampSeconds.toLong()
+                        )
+                    ).epochSecond
+                }
             }
             is GetSavedG7PairingCodeResponse -> {
                 dataStore.savedG7PairingCode.value = message.pairingCode

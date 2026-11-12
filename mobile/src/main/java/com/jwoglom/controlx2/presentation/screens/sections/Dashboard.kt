@@ -200,6 +200,40 @@ fun Dashboard(
                 item {
                     val cgmReading = ds.cgmReading.observeAsState()
                     val cgmDeltaArrow = ds.cgmDeltaArrow.observeAsState()
+                    val cgmDeltaLogs = historyLogViewModel?.latestItemsForTypes(
+                        com.jwoglom.controlx2.presentation.screens.sections.components.CgmReadingHistoryLogs,
+                        4
+                    )?.observeAsState()
+                    // Se refresca cada 30 s para que los minutos avancen solos
+                    val cgmNowSeconds by androidx.compose.runtime.produceState(System.currentTimeMillis() / 1000) {
+                        while (true) {
+                            kotlinx.coroutines.delay(30_000L)
+                            value = System.currentTimeMillis() / 1000
+                        }
+                    }
+                    // Edad segun la hora de la ultima lectura que dio la bomba (no el valor). Si aun no
+                    // hay, se usa el historial como respaldo.
+                    val cgmReadingTime = ds.cgmReadingTimeSeconds.observeAsState()
+                    val cgmAgeMinutes = remember(cgmReadingTime.value, cgmDeltaLogs?.value, cgmReading.value, cgmNowSeconds) {
+                        cgmReadingTime.value?.let { maxOf(0L, (cgmNowSeconds - it) / 60).toInt() }
+                            ?: com.jwoglom.controlx2.presentation.screens.sections.components.cards.cgmAgeMinutes(
+                                cgmDeltaLogs?.value, cgmReading.value, cgmNowSeconds
+                            )
+                    }
+                    // Variacion respecto a la lectura anterior guardada por el servicio (persistente)
+                    val dashContext = androidx.compose.ui.platform.LocalContext.current
+                    val liveDelta = remember(cgmReadingTime.value, cgmReading.value) {
+                        val t = cgmReadingTime.value
+                        val v = cgmReading.value
+                        if (t != null && v != null && v > 0) {
+                            com.jwoglom.controlx2.util.CgmLiveHistory.delta(dashContext, t, v)
+                        } else null
+                    }
+                    val cgmDeltaMgdl = remember(cgmDeltaLogs?.value, cgmReading.value, cgmReadingTime.value, liveDelta) {
+                        liveDelta ?: com.jwoglom.controlx2.presentation.screens.sections.components.cards.cgmDeltaMgdl(
+                            cgmDeltaLogs?.value, cgmReading.value, cgmReadingTime.value
+                        )
+                    }
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -209,6 +243,8 @@ fun Dashboard(
                         GlucoseHeroCard(
                             glucoseValue = cgmReading.value,
                             deltaArrow = cgmDeltaArrow.value,
+                            deltaMgdl = cgmDeltaMgdl,
+                            ageMinutes = cgmAgeMinutes,
                             modifier = Modifier.weight(1f).fillMaxHeight()
                         )
 

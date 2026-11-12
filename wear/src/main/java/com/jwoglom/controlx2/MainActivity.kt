@@ -678,10 +678,8 @@ class MainActivity : ComponentActivity() {
                     }
                 } else {
                     if (dataStore.connectionStatus.value == "") {
-                        runOnUiThread {
-                            Toast.makeText(applicationContext, "Disconnected", Toast.LENGTH_SHORT)
-                                .show()
-                        }
+                        // Toast "Disconnected" desactivado: encendia la pantalla del reloj.
+                        Timber.i("Pump disconnected")
                     }
                 }
                 dataStore.connectionStatus.value = "Reconnecting"

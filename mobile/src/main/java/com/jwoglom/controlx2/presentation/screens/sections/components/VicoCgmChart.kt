@@ -46,6 +46,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color as ComposeColor
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.layout.layout
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
@@ -249,7 +250,7 @@ internal fun hoveredChartTimestampFromTargets(
 }
 
 internal fun formatBasalRate(rate: Float): String {
-    return "${String.format(Locale.US, "%.2f", rate).trimEnd('0').trimEnd('.')}u/hr"
+    return "${String.format(Locale.US, "%.2f", rate).trimEnd('0').trimEnd('.')}u/h"
 }
 
 private fun formatHoverGlucoseLabel(
@@ -383,6 +384,8 @@ private const val CARB_LABEL_TEXT_SIZE_SP = 12f
 private const val CGM_CHART_HEIGHT_DP = 240
 private const val BASAL_CHART_HEIGHT_DP = 90
 private const val CHART_Y_AXIS_WIDTH_DP = 40
+// Hueco fijo arriba del grafico de glucosa para la etiqueta del marcador (3 lineas)
+private const val CHART_TOP_INSET_DP = 80f
 
 private data class BolusMarkerPoint(
     val markerTimestamp: Long,  // Snapped chart X position (timestamp in seconds)
@@ -428,8 +431,17 @@ private fun rememberCgmChartData(
         (timeRange.hours * 60 / 5) + 20  // Extra buffer
     )?.observeAsState(emptyList())
 
-    return remember(cgmData?.value, timeRange) {
-        cgmData?.value?.mapNotNull { dao -> dao.toCgmDataPoint() }?.reversed() ?: emptyList()
+    val liveContext = LocalContext.current
+    // Clave de minuto: se recalcula al recomponer (p. ej. al entrar en la pantalla)
+    val minuteKey = System.currentTimeMillis() / 60_000L
+    return remember(cgmData?.value, timeRange, minuteKey) {
+        val fromHistory = cgmData?.value?.mapNotNull { dao -> dao.toCgmDataPoint() }?.reversed() ?: emptyList()
+        // Lecturas en directo que el historial de la bomba aun no tiene (a mas de 2 min de cualquier punto)
+        val since = System.currentTimeMillis() / 1000 - timeRange.hours * 3600L
+        val live = com.jwoglom.controlx2.util.CgmLiveHistory.since(liveContext, since)
+            .filter { (t, _) -> fromHistory.none { Math.abs(it.timestamp - t) <= 120L } }
+            .map { (t, v) -> CgmDataPoint(t, v.toFloat()) }
+        (fromHistory + live).sortedBy { it.timestamp }
     }
 }
 
@@ -520,6 +532,35 @@ private class IndicatorOnlyPersistentMarker(
         model: CartesianChartModel
     ) {
         // Indicator-only persistent markers should not reserve label space.
+    }
+}
+
+/**
+ * Envuelve el marcador que sale al arrastrar el dedo y fija el hueco que reserva arriba para su
+ * etiqueta (hora, glucosa e IOB: 3 lineas) en [CHART_TOP_INSET_DP]. Asi el hueco es un valor
+ * conocido y las etiquetas del eje Y se colocan con el mismo calculo. Antes el hueco dependia del
+ * tamano de la etiqueta (mas lineas = mas hueco) y la linea se comprimia sin que el eje lo supiera.
+ */
+private class FixedTopInsetMarker(
+    private val base: CartesianMarker,
+    private val topInsetDp: Float
+) : CartesianMarker by base {
+    override fun updateLayerMargins(
+        context: CartesianMeasuringContext,
+        layerMargins: CartesianLayerMargins,
+        layerDimensions: CartesianLayerDimensions,
+        model: CartesianChartModel
+    ) {
+        layerMargins.ensureValuesAtLeast(top = with(context) { dpToPx(topInsetDp) })
+    }
+}
+
+/** Coloca el composable centrado en [xPx] (en pixeles dentro del padre), sin salirse por los lados. */
+private fun Modifier.centeredAtX(xPx: Float): Modifier = this.layout { measurable, constraints ->
+    val placeable = measurable.measure(constraints.copy(minWidth = 0))
+    layout(placeable.width, placeable.height) {
+        val maxX = (constraints.maxWidth - placeable.width).coerceAtLeast(0)
+        placeable.placeRelative((xPx - placeable.width / 2f).roundToInt().coerceIn(0, maxX), 0)
     }
 }
 
@@ -645,12 +686,22 @@ private fun rememberBasalData(
         ?: HistoryLogViewModel.estimateCurrentPumpTimeSec()
     val rangeSeconds = currentTimeSeconds - startTimeSeconds
     val minPumpTimeSec = currentPumpTimeSec - rangeSeconds - BASAL_LOOKBACK_SECONDS
-    val basalHistoryLogs = historyLogViewModel?.itemsForTypesSince(
-        basalClasses,
-        minPumpTimeSec
-    )?.observeAsState()
+    // La consulta se recreaba en cada recomposicion (minPumpTimeSec cambia cada segundo porque se
+    // estima con la hora actual), y la grafica podia quedarse sin datos hasta salir y volver a entrar.
+    // Se fija con una clave de 5 min y se conserva el ultimo resultado mientras llega el nuevo.
+    val basalQueryKey = minPumpTimeSec / 300L
+    val basalLiveData = remember(historyLogViewModel, basalQueryKey) {
+        historyLogViewModel?.itemsForTypesSince(basalClasses, basalQueryKey * 300L)
+    }
+    val lastBasalLogs = remember { mutableStateOf<List<HistoryLogItem>?>(null) }
+    val basalHistoryLogs = basalLiveData?.observeAsState(lastBasalLogs.value)
+    androidx.compose.runtime.SideEffect {
+        basalHistoryLogs?.value?.let { lastBasalLogs.value = it }
+    }
 
-    val basalChartData = remember(basalHistoryLogs?.value, timeRange, startTimeSeconds, currentTimeSeconds) {
+    val basalLiveContext = LocalContext.current
+    val basalMinuteKey = System.currentTimeMillis() / 60_000L
+    val basalChartData = remember(basalHistoryLogs?.value, timeRange, startTimeSeconds, currentTimeSeconds, basalMinuteKey) {
         val rawLogs = basalHistoryLogs?.value ?: emptyList()
         val lookbackStartTimeSeconds = startTimeSeconds - BASAL_LOOKBACK_SECONDS
         val events = mutableListOf<BasalDataPoint>()
@@ -755,11 +806,18 @@ private fun rememberBasalData(
             }
         }
 
+        val historyEvents = events
+            .filter { it.timestamp in lookbackStartTimeSeconds..currentTimeSeconds }
+            .distinctBy { Triple(it.timestamp, it.rate, it.isTemp) }
+            .sortedBy { it.timestamp }
+        // Basal en directo posterior al ultimo registro del historial (que llega con retraso)
+        val lastHistoryTs = historyEvents.maxOfOrNull { it.timestamp } ?: 0L
+        val liveEvents = com.jwoglom.controlx2.util.BasalLiveHistory.since(basalLiveContext, lookbackStartTimeSeconds)
+            .filter { it.first > lastHistoryTs && it.first <= currentTimeSeconds }
+            .map { BasalDataPoint(timestamp = it.first, rate = it.second.toFloat(), isTemp = false, duration = null) }
+
         BasalChartData(
-            events = events
-                .filter { it.timestamp in lookbackStartTimeSeconds..currentTimeSeconds }
-                .distinctBy { Triple(it.timestamp, it.rate, it.isTemp) }
-                .sortedBy { it.timestamp },
+            events = historyEvents + liveEvents,
             rawLogCount = rawLogs.size,
             parseFailureCount = parseFailureCount,
             sampleFailureSeqIds = sampleFailureSeqIds,
@@ -1006,7 +1064,14 @@ fun VicoCgmChart(
     val basalLimitSettings by dataStore.basalLimitSettingsResponse.observeAsState()
 
     // Fetch all chart data
-    val currentTimeSeconds = remember(timeRange) {
+    // La hora de "ahora" se recalcula al volver a la app/pantalla (ON_START) y al cambiar el rango.
+    // Antes solo se calculaba la primera vez y se quedaba parada.
+    var resumeTick by remember { mutableStateOf(0) }
+    com.jwoglom.controlx2.presentation.util.LifecycleStateObserver(
+        onStop = {},
+        onStart = { resumeTick++ }
+    )
+    val currentTimeSeconds = remember(timeRange, resumeTick) {
         previewData?.currentTimeSeconds ?: Instant.now().epochSecond
     }
     val rangeSeconds = timeRange.hours * 3600L
@@ -1150,14 +1215,24 @@ fun VicoCgmChart(
     val basalIntervals = remember(startTimeSeconds, currentTimeSeconds, basalDataPoints) {
         buildBasalIntervals(startTimeSeconds, currentTimeSeconds, basalDataPoints)
     }
-    val hoveredGlucoseLabel = remember(hoveredChartTimestamp, glucoseValueByTimestamp, glucoseUnit) {
+    val hoverContext = LocalContext.current
+    val hoveredGlucoseLabel = remember(hoveredChartTimestamp, glucoseValueByTimestamp, glucoseUnit, hoveredBasalDataPoint) {
         hoveredChartTimestamp?.let { timestamp ->
-            formatHoverGlucoseLabel(
-                timestamp = timestamp,
-                glucoseValueByTimestamp = glucoseValueByTimestamp,
-                glucoseUnit = glucoseUnit,
-                timeFormatter = SimpleDateFormat("h:mm a", Locale.getDefault())
-            )
+            val timeText = formatChartTimestamp(timestamp, SimpleDateFormat("h:mm a", Locale.getDefault()))
+            // Lectura exacta o la mas cercana (max. 10 min); si no hay, "--" (la etiqueta nunca desaparece).
+            val g = glucoseValueByTimestamp[timestamp]?.takeIf { it > 0.0 }
+                ?: glucoseValueByTimestamp.entries
+                    .filter { (it.value ?: 0.0) > 0.0 && Math.abs(it.key - timestamp) <= 600L }
+                    .minByOrNull { Math.abs(it.key - timestamp) }?.value
+            val glucoseText = when {
+                g == null -> if (glucoseUnit == GlucoseUnit.MGDL) "-- mg/dL" else "-- mmol/L"
+                glucoseUnit == GlucoseUnit.MGDL -> "${g.roundToInt()} mg/dL"
+                else -> "${String.format("%.1f", g.roundToInt() * GlucoseConverter.MGDL_TO_MMOL_FACTOR)} mmol/L"
+            }
+            val iob = com.jwoglom.controlx2.util.IobHistory.valueAt(hoverContext, timestamp)
+            val iobText = if (iob != null) String.format("%.2fu IOB", iob) else "-- IOB"
+            val basalText = hoveredBasalDataPoint?.let { formatBasalRate(it.rate) } ?: "-- u/h"
+            "$timeText\n$glucoseText\n$iobText\n$basalText"
         }
     }
     val hoveredBasalRatio = remember(hoveredChartTimestamp, startTimeSeconds, currentTimeSeconds) {
@@ -1338,6 +1413,7 @@ fun VicoCgmChart(
     val axisTimeFormatter = remember {
         SimpleDateFormat("h:mm a", Locale.getDefault())
     }
+    val markerContext = LocalContext.current
     val markerValueFormatter = remember(glucoseUnit, glucoseValueByTimestamp) {
         DefaultCartesianMarker.ValueFormatter { _, targets ->
             val lineTarget = targets.filterIsInstance<LineCartesianLayerMarkerTarget>().firstOrNull()
@@ -1348,17 +1424,23 @@ fun VicoCgmChart(
             }
             // entry.x is now a timestamp in seconds
             val timestamp = entry.x.toLong()
-            val glucoseAtTimestamp = glucoseValueByTimestamp[timestamp] ?: return@ValueFormatter ""
-            if (glucoseAtTimestamp <= 0.0) {
-                return@ValueFormatter ""
-            }
+            // Si justo ese instante no tiene lectura, usa la mas cercana (max. 10 min) en vez de
+            // devolver "" (antes la etiqueta, el IOB y la linea desaparecian).
+            val glucoseAtTimestamp = glucoseValueByTimestamp[timestamp]?.takeIf { it > 0.0 }
+                ?: glucoseValueByTimestamp.entries
+                    .filter { (it.value ?: 0.0) > 0.0 && Math.abs(it.key - timestamp) <= 600L }
+                    .minByOrNull { Math.abs(it.key - timestamp) }?.value
+                ?: return@ValueFormatter ""
             val timeText = formatChartTimestamp(timestamp, axisTimeFormatter)
             val glucoseValue = glucoseAtTimestamp.roundToInt()
             val glucoseText = when (glucoseUnit) {
                 GlucoseUnit.MGDL -> "$glucoseValue mg/dL"
                 GlucoseUnit.MMOL -> "${String.format("%.1f", glucoseValue * GlucoseConverter.MGDL_TO_MMOL_FACTOR)} mmol/L"
             }
-            "$timeText\n$glucoseText"
+            // IOB real de la bomba registrado en ese momento ("--" si no hay dato, p. ej. antes de instalar)
+            val iobAtTimestamp = com.jwoglom.controlx2.util.IobHistory.valueAt(markerContext, timestamp)
+            val iobText = if (iobAtTimestamp != null) String.format("%.2fu IOB", iobAtTimestamp) else "-- IOB"
+            "$timeText\n$glucoseText\n$iobText"
         }
     }
     val dragMarkerLabelColor = MaterialTheme.colorScheme.onSurface
@@ -1369,7 +1451,7 @@ fun VicoCgmChart(
             textSizeSp = 12f,
             textAlignment = Layout.Alignment.ALIGN_CENTER,
             lineHeightSp = null,
-            lineCount = 2,
+            lineCount = 4,
             truncateAt = null,
             margins = Insets(4f, 4f, 4f, 4f),
             padding = Insets(6f, 4f, 6f, 4f),
@@ -1380,27 +1462,17 @@ fun VicoCgmChart(
     // Re-enable the drag marker with the NaN-safe fork
     val dragMarker = rememberDefaultCartesianMarker(
         label = dragMarkerLabel,
-        valueFormatter = markerValueFormatter
+        valueFormatter = DefaultCartesianMarker.ValueFormatter { _, _ -> "" },
+        guideline = null
     )
+    val dragMarkerNoInset = remember(dragMarker) { FixedTopInsetMarker(dragMarker, CHART_TOP_INSET_DP) }
+    // El estado del toque lo gestiona un detector de puntero propio (misma conversion tiempo<->x
+    // para linea, etiqueta e IOB); el marcador de Vico ya no pinta linea ni texto.
     val cgmMarkerVisibilityListener = remember {
         object : CartesianMarkerVisibilityListener {
-            override fun onShown(marker: CartesianMarker, targets: List<CartesianMarker.Target>) {
-                hoverDrivenByBasal = false
-                hoveredChartTimestamp = hoveredChartTimestampFromTargets(targets)
-                hoveredChartCanvasX = targets.firstOrNull()?.canvasX
-            }
-
-            override fun onUpdated(marker: CartesianMarker, targets: List<CartesianMarker.Target>) {
-                hoverDrivenByBasal = false
-                hoveredChartTimestamp = hoveredChartTimestampFromTargets(targets)
-                hoveredChartCanvasX = targets.firstOrNull()?.canvasX
-            }
-
-            override fun onHidden(marker: CartesianMarker) {
-                hoverDrivenByBasal = false
-                hoveredChartTimestamp = null
-                hoveredChartCanvasX = null
-            }
+            override fun onShown(marker: CartesianMarker, targets: List<CartesianMarker.Target>) {}
+            override fun onUpdated(marker: CartesianMarker, targets: List<CartesianMarker.Target>) {}
+            override fun onHidden(marker: CartesianMarker) {}
         }
     }
     val axisLabels = remember(startTimeSeconds, currentTimeSeconds) {
@@ -1434,7 +1506,8 @@ fun VicoCgmChart(
         }
     }
 
-    if (cgmDataPoints.isEmpty() || !hasValidCgmData) {
+    // Solo se oculta todo si no hay ni glucosa ni basal; si falla el sensor, la basal se sigue dibujando.
+    if ((cgmDataPoints.isEmpty() || !hasValidCgmData) && !hasBasalSeries) {
         // Show placeholder when no data
         Text(
             text = "CGM data unavailable",
@@ -1657,18 +1730,23 @@ fun VicoCgmChart(
             }
         }
         
-        val cgmLineRangeProvider = remember {
+        // Eje X fijo = todo el rango de tiempo (primer a ultimo bucket). Antes era "de la primera a la
+        // ultima lectura", asi que si faltaban lecturas al principio o al final (p. ej. en 24 h), la curva
+        // se estiraba y no coincidia con las horas del eje ni con la basal.
+        val fixedMinX = bucketTimes.first().toDouble()
+        val fixedMaxX = bucketTimes.last().toDouble()
+        val cgmLineRangeProvider = remember(fixedMinX, fixedMaxX) {
             object : CartesianLayerRangeProvider {
-                override fun getMinX(minX: Double, maxX: Double, extraStore: ExtraStore): Double = minX
-                override fun getMaxX(minX: Double, maxX: Double, extraStore: ExtraStore): Double = maxX
+                override fun getMinX(minX: Double, maxX: Double, extraStore: ExtraStore): Double = fixedMinX
+                override fun getMaxX(minX: Double, maxX: Double, extraStore: ExtraStore): Double = fixedMaxX
                 override fun getMinY(minY: Double, maxY: Double, extraStore: ExtraStore): Double = fixedMinGlucose.toDouble()
                 override fun getMaxY(minY: Double, maxY: Double, extraStore: ExtraStore): Double = fixedMaxGlucose.toDouble()
             }
         }
-        val basalLineRangeProvider = remember(basalMaxUnitsPerHour) {
+        val basalLineRangeProvider = remember(basalMaxUnitsPerHour, fixedMinX, fixedMaxX) {
             object : CartesianLayerRangeProvider {
-                override fun getMinX(minX: Double, maxX: Double, extraStore: ExtraStore): Double = minX
-                override fun getMaxX(minX: Double, maxX: Double, extraStore: ExtraStore): Double = maxX
+                override fun getMinX(minX: Double, maxX: Double, extraStore: ExtraStore): Double = fixedMinX
+                override fun getMaxX(minX: Double, maxX: Double, extraStore: ExtraStore): Double = fixedMaxX
                 override fun getMinY(minY: Double, maxY: Double, extraStore: ExtraStore): Double = 0.0
                 override fun getMaxY(minY: Double, maxY: Double, extraStore: ExtraStore): Double = basalMaxUnitsPerHour
             }
@@ -1746,20 +1824,33 @@ fun VicoCgmChart(
             Row(
                 modifier = Modifier.fillMaxSize()
             ) {
-                Column(
+                BoxWithConstraints(
                     modifier = Modifier
                         .fillMaxHeight()
                         .width(CHART_Y_AXIS_WIDTH_DP.dp)
-                        .padding(end = 1.dp),
-                    verticalArrangement = Arrangement.SpaceBetween,
-                    horizontalAlignment = Alignment.End
+                        .padding(end = 1.dp)
                 ) {
-                    yAxisLabels.forEach { label ->
-                        Text(
-                            text = label,
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
+                    // Misma escala que la linea: 30..410 mg/dL sobre la altura libre (sin el hueco de arriba)
+                    val plotHeight = maxHeight - CHART_TOP_INSET_DP.dp
+                    val yAxisValues = listOf(400, 360, 320, 280, 240, 200, 160, 120, 80, 40)
+                    yAxisLabels.forEachIndexed { i, label ->
+                        if (label.isNotBlank()) {
+                            val fromTop = (fixedMaxGlucose - yAxisValues[i]) / fixedGlucoseSpan
+                            Text(
+                                text = label,
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier
+                                    .align(Alignment.TopEnd)
+                                    .offset(y = CHART_TOP_INSET_DP.dp + plotHeight * fromTop)
+                                    // Centra el texto en su valor con su altura REAL (antes se
+                                    // suponian 16 dp, y con letra grande quedaba ~2-3 dp mas abajo)
+                                    .layout { measurable, constraints ->
+                                        val p = measurable.measure(constraints)
+                                        layout(p.width, p.height) { p.placeRelative(0, -p.height / 2) }
+                                    }
+                            )
+                        }
                     }
                 }
 
@@ -1767,24 +1858,62 @@ fun VicoCgmChart(
                     modifier = Modifier
                         .fillMaxHeight()
                         .weight(1f)
+                        .pointerInput(startTimeSeconds, currentTimeSeconds, bucketSeconds, bucketCount) {
+                            awaitPointerEventScope {
+                                while (true) {
+                                    // Pasada Initial y sin consumir: solo observa, Vico sigue a lo suyo.
+                                    val event = awaitPointerEvent(androidx.compose.ui.input.pointer.PointerEventPass.Initial)
+                                    val change = event.changes.firstOrNull()
+                                    if (change == null || !change.pressed) {
+                                        hoverDrivenByBasal = false
+                                        hoveredChartTimestamp = null
+                                    } else {
+                                        hoverDrivenByBasal = false
+                                        hoveredChartTimestamp = hoverTimestampForPosition(
+                                            x = change.position.x,
+                                            width = size.width.toFloat(),
+                                            startTimeSeconds = startTimeSeconds,
+                                            currentTimeSeconds = currentTimeSeconds,
+                                            bucketSeconds = bucketSeconds,
+                                            bucketCount = bucketCount
+                                        )
+                                    }
+                                }
+                            }
+                        }
                 ) {
                     val hoveredCgmOffset = hoveredBasalRatio?.let { ratio ->
                         (maxWidth * ratio) - 26.dp
                     }
                     val guidelineColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.45f)
 
-                    CartesianChartHost(
-                        chart = rememberCartesianChart(
-                            cgmLineLayer,
-                            marker = dragMarker,
-                            markerVisibilityListener = cgmMarkerVisibilityListener,
-                            persistentMarkers = persistentMarkers
-                        ),
-                        scrollState = cgmScrollState,
-                        consumeMoveEvents = true,
-                        modelProducer = cgmModelProducer,
-                        modifier = Modifier.fillMaxSize()
-                    )
+                    // Sin lecturas validas no se dibuja el grafico: el productor conservaba el modelo
+                    // anterior (otro rango) y mostraba lecturas viejas bajo "CGM data unavailable".
+                    if (hasValidCgmData) {
+                        CartesianChartHost(
+                            chart = rememberCartesianChart(
+                                cgmLineLayer,
+                                marker = dragMarkerNoInset,
+                                markerVisibilityListener = cgmMarkerVisibilityListener,
+                                persistentMarkers = persistentMarkers
+                            ),
+                            scrollState = cgmScrollState,
+                            consumeMoveEvents = true,
+                            modelProducer = cgmModelProducer,
+                            modifier = Modifier.fillMaxSize()
+                        )
+                    }
+
+                    // x exacto del marcador de Vico (coincide con su propia linea, asi no hay dos);
+                    // si se arrastra sobre la basal, se usa la proporcion de tiempo.
+                    if (cgmDataPoints.isEmpty() || !hasValidCgmData) {
+                        Text(
+                            text = "CGM data unavailable",
+                            modifier = Modifier.align(Alignment.Center),
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
 
                     if (hoveredBasalRatio != null) {
                         Canvas(modifier = Modifier.fillMaxSize()) {
@@ -1798,14 +1927,14 @@ fun VicoCgmChart(
                         }
                     }
 
-                    if (hoverDrivenByBasal && hoveredGlucoseLabel != null) {
+                    if (hoveredGlucoseLabel != null && hoveredBasalRatio != null) {
                         Text(
                             text = hoveredGlucoseLabel,
                             modifier = Modifier
                                 .align(Alignment.TopStart)
-                                .offset(x = (hoveredCgmOffset ?: 0.dp).coerceAtLeast(0.dp))
-                                .padding(top = 4.dp),
-                            style = MaterialTheme.typography.labelSmall,
+                                .centeredAtX(constraints.maxWidth * hoveredBasalRatio)
+                                .padding(top = 2.dp),
+                            style = MaterialTheme.typography.labelMedium.copy(fontWeight = androidx.compose.ui.text.font.FontWeight.Bold),
                             color = MaterialTheme.colorScheme.onSurface,
                             textAlign = TextAlign.Center
                         )
@@ -1915,17 +2044,6 @@ fun VicoCgmChart(
                     }
                 }
 
-                if (hoveredBasalDataPoint != null) {
-                    Text(
-                        text = formatBasalRate(hoveredBasalDataPoint.rate),
-                        modifier = Modifier
-                            .align(Alignment.TopStart)
-                            .offset(x = (hoveredBasalOffset ?: 0.dp).coerceAtLeast(0.dp))
-                            .padding(top = 2.dp),
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurface
-                    )
-                }
             }
         }
 
