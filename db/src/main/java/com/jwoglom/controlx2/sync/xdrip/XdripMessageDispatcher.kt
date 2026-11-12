@@ -160,13 +160,14 @@ class XdripMessageDispatcher(
         }
 
         if (config.sendStatusLine && StatusCategory.PUMP_STATUS in categories) {
+            // Linea corta para que quepa en la fila del reloj (junto a "3'" y la bateria del movil):
+            // "IOB 8,88u 0,65u/h". Los minutos desde la lectura ya los pone xDrip en esa fila.
             val statusline = buildString {
-                append("Pump")
-                latestPumpSnapshot.sgvMgdl?.value?.let { append(" SGV:$it") }
-                latestPumpSnapshot.iobUnits?.value?.let { append(" IOB:${twoDecimalPlaces(it)}U") }
-                latestPumpSnapshot.cartridgeUnits?.value?.let { append(" Cart:${it}U") }
-                latestPumpSnapshot.basalUnitsPerHour?.value?.let { append(" ${twoDecimalPlaces(it)}U/h") }
-                latestPumpSnapshot.batteryPercent?.value?.let { append(" Batt:$it") }
+                latestPumpSnapshot.iobUnits?.value?.let { append("IOB ${twoDecimalPlaces(it)}u") }
+                latestPumpSnapshot.basalUnitsPerHour?.value?.let {
+                    if (isNotEmpty()) append(' ')
+                    append("${twoDecimalPlaces(it)}u/h")
+                }
             }
             broadcaster.sendExternalStatusline(statusline, config.statusLineMinimumIntervalSeconds)
         }
