@@ -814,6 +814,11 @@ class CommService : Service(), CommServiceCallbacks {
     override fun onDestroy() {
         super.onDestroy()
         unregisterAppReloadShutdownHook(appReloadShutdownHook)
+        try {
+            unregisterReceiver(bleChangeReceiver)
+        } catch (e: IllegalArgumentException) {
+            Timber.w(e, "bleChangeReceiver was not registered")
+        }
         pumpCommHandler?.stopHistoryLogSyncWorker()
         scope.cancel()
         messageBus.close()
