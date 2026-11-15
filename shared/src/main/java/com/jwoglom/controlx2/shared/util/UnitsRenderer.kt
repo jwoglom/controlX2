@@ -12,7 +12,9 @@ import kotlin.math.abs
 import kotlin.time.DurationUnit
 
 fun pumpTimeToLocalTz(time: Instant): Instant {
-    val offsetSeconds = TimeZone.getDefault().getOffset(Date().time) / 1000
+    // Offset must be taken at the event time, not the current time: entries
+    // that cross a DST change would otherwise shift by an hour (VicoCgmChartTest).
+    val offsetSeconds = TimeZone.getDefault().getOffset(time.toEpochMilli()) / 1000
     return time.minusSeconds(offsetSeconds.toLong())
 }
 
