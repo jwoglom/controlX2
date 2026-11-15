@@ -161,12 +161,14 @@ class XdripMessageDispatcher(
 
         if (config.sendStatusLine && StatusCategory.PUMP_STATUS in categories) {
             // Linea corta para que quepa en la fila del reloj (junto a "3'" y la bateria del movil):
-            // "IOB 8,88u 0,65u/h". Los minutos desde la lectura ya los pone xDrip en esa fila.
+            // "IOB 8,88u 0,65U/h". Los minutos desde la lectura ya los pone xDrip en esa fila.
+            // OJO: la basal DEBE acabar en "U/h" con U mayuscula: xDrip saca de ahi la linea de basal
+            // de su grafico (regex "[0-9.,]+ ?U/h", sensible a mayusculas). Con "u/h" la basal sale plana.
             val statusline = buildString {
                 latestPumpSnapshot.iobUnits?.value?.let { append("IOB ${twoDecimalPlaces(it)}u") }
                 latestPumpSnapshot.basalUnitsPerHour?.value?.let {
                     if (isNotEmpty()) append(' ')
-                    append("${twoDecimalPlaces(it)}u/h")
+                    append("${twoDecimalPlaces(it)}U/h")
                 }
             }
             broadcaster.sendExternalStatusline(statusline, config.statusLineMinimumIntervalSeconds)
