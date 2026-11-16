@@ -39,8 +39,6 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Badge
 import androidx.compose.material3.BadgedBox
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.FabPosition
 import androidx.compose.material3.Icon
@@ -58,7 +56,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.key
 import androidx.compose.runtime.livedata.observeAsState
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -151,10 +148,6 @@ fun Landing(
     // Local state owns in-screen sheet toggles, while parent can still force a new initial sheet.
     var bottomScaffoldState by remember(_bottomScaffoldState) { mutableStateOf(_bottomScaffoldState) }
     var bolusPrefill by remember { mutableStateOf<BolusInputPrefill?>(null) }
-    // true mientras el panel de bolo esta abierto desde el menu de "0,05 u" y sin confirmar
-    var microBolusOpen by remember { mutableStateOf(false) }
-    // cambia para recrear la ventana de bolo (vacia) cuando se descarta el de 0,05 u
-    var bolusWindowKey by remember { mutableStateOf(0) }
     var showCannulaDialog by remember { mutableStateOf(false) }
     var cannulaInsertedAt by remember { mutableStateOf(Prefs(context).cannulaInsertedAt()) }
     var nowMs by remember { mutableStateOf(System.currentTimeMillis()) }
@@ -336,22 +329,20 @@ fun Landing(
                                     Spacer(Modifier.size(100.dp))
                                 }
                                 if (bottomScaffoldState == BottomScaffoldState.BOLUS_WINDOW) {
-                                    key(bolusWindowKey) {
-                                        BolusWindow(
-                                            sendPumpCommands = sendPumpCommands,
-                                            sendServiceBolusRequest = sendServiceBolusRequest,
-                                            sendServiceBolusCancel = sendServiceBolusCancel,
-                                            prefill = bolusPrefill,
-                                            onPrefillConsumed = { bolusPrefill = null },
-                                            closeWindow = {
-                                                coroutineScope.launch {
-                                                    displayBottomScaffold.bottomSheetState.collapse()
-                                                    resetBolusDataStoreState(ds)
-                                                    bottomScaffoldState = BottomScaffoldState.NONE
-                                                }
+                                    BolusWindow(
+                                        sendPumpCommands = sendPumpCommands,
+                                        sendServiceBolusRequest = sendServiceBolusRequest,
+                                        sendServiceBolusCancel = sendServiceBolusCancel,
+                                        prefill = bolusPrefill,
+                                        onPrefillConsumed = { bolusPrefill = null },
+                                        closeWindow = {
+                                            coroutineScope.launch {
+                                                displayBottomScaffold.bottomSheetState.collapse()
+                                                resetBolusDataStoreState(ds)
+                                                bottomScaffoldState = BottomScaffoldState.NONE
                                             }
-                                        )
-                                    }
+                                        }
+                                    )
                                 }
                                 if (bottomScaffoldState == BottomScaffoldState.TEMP_RATE_WINDOW) {
                                     TempRateWindow(
@@ -582,11 +573,10 @@ fun Landing(
                                 )
                             }
                         )
-                        // Pulsacion larga en "Bolus": menu con 0,05 u. NO administra nada por si solo: abre el
-                        // dialogo de bolo normal con 0,05 u ya escritas, y ahi se pasa por los mismos pasos y la
-                        // misma confirmacion que un bolo manual.
+                        // Pulsacion larga (medio segundo) en "Bolus": abre directamente el dialogo de bolo con 0,05 u
+                        // ya escritas, sin menu intermedio. NO administra nada por si solo: desde ahi se pasa por los
+                        // mismos pasos y la misma confirmacion que un bolo manual. "Cancel" cierra el panel.
                         val bolusInteraction = remember { MutableInteractionSource() }
-                        var showMicroBolusMenu by remember { mutableStateOf(false) }
                         var bolusLongPressHandled by remember { mutableStateOf(false) }
                         LaunchedEffect(bolusInteraction) {
                             var pressJob: Job? = null
@@ -599,12 +589,22 @@ fun Landing(
                                             delay(500)
                                             // Solo si el panel de bolo esta cerrado
                                             if (displayBottomScaffold.bottomSheetState.isCollapsed) {
+                                                // Al soltar el dedo se ignora el toque normal (si no, cerraria el panel)
                                                 bolusLongPressHandled = true
-                                                showMicroBolusMenu = true
+                                                bolusPrefill = BolusInputPrefill(unitsRawValue = "0.05")
+                                                bottomScaffoldState = BottomScaffoldState.BOLUS_WINDOW
+                                                runCatching { displayBottomScaffold.bottomSheetState.expand() }
+                                                if (!displayBottomScaffold.bottomSheetState.isExpanded) {
+                                                    delay(150)
+                                                    runCatching { displayBottomScaffold.bottomSheetState.expand() }
+                                                }
                                             }
                                         }
                                     }
-                                    is PressInteraction.Release, is PressInteraction.Cancel -> pressJob?.cancel()
+                                    is PressInteraction.Release, is PressInteraction.Cancel -> {
+                                        // Una vez disparada la pulsacion larga no hay que cancelarla
+                                        if (!bolusLongPressHandled) pressJob?.cancel()
+                                    }
                                     else -> {}
                                 }
                             }
@@ -618,19 +618,8 @@ fun Landing(
                                         bolusLongPressHandled = false
                                         return@ExtendedFloatingActionButton
                                     }
-                                    if (microBolusOpen && !displayBottomScaffold.bottomSheetState.isCollapsed) {
-                                        // El panel esta abierto con el bolo de 0,05 u sin confirmar (si hubiera un dialogo de
-                                        // confirmacion o de bolo en curso, este boton no se podria pulsar): se descarta y
-                                        // queda el bolo normal, vacio.
-                                        microBolusOpen = false
-                                        bolusPrefill = null
-                                        resetBolusDataStoreState(ds)
-                                        bolusWindowKey++
-                                        return@ExtendedFloatingActionButton
-                                    }
                                     coroutineScope.launch {
                                         if (displayBottomScaffold.bottomSheetState.isCollapsed) {
-                                            microBolusOpen = false
                                             bolusPrefill = null
                                             bottomScaffoldState = BottomScaffoldState.BOLUS_WINDOW
                                             displayBottomScaffold.bottomSheetState.expand()
@@ -666,30 +655,6 @@ fun Landing(
                                     )
                                 }
                             )
-                            DropdownMenu(
-                                expanded = showMicroBolusMenu,
-                                onDismissRequest = { showMicroBolusMenu = false }
-                            ) {
-                                DropdownMenuItem(
-                                    text = { Text("0,05 u (abre el bolo con 0,05 u)") },
-                                    onClick = {
-                                        showMicroBolusMenu = false
-                                        coroutineScope.launch {
-                                            bolusPrefill = BolusInputPrefill(unitsRawValue = "0.05")
-                                            microBolusOpen = true
-                                            bottomScaffoldState = BottomScaffoldState.BOLUS_WINDOW
-                                            // Igual que la app al abrir el panel desde fuera: si el primer "expand" no llega a
-                                            // abrirlo (al cerrarse el menu), se reintenta. El rotulo del boton ("Cancel") solo
-                                            // cambia cuando el panel esta realmente expandido.
-                                            runCatching { displayBottomScaffold.bottomSheetState.expand() }
-                                            if (!displayBottomScaffold.bottomSheetState.isExpanded) {
-                                                delay(150)
-                                                runCatching { displayBottomScaffold.bottomSheetState.expand() }
-                                            }
-                                        }
-                                    }
-                                )
-                            }
                         }
                     }
                 else -> {}
