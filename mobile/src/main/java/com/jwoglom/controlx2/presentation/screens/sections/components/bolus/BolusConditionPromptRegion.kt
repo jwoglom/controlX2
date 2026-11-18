@@ -49,20 +49,10 @@ fun BolusConditionPromptRegion(
                 Column(Modifier.weight(1f)) {
                     OutlinedButton(
                         onClick = {
-                            bolusConditionsPrompt.value?.let {
-                                if (dataStore.bolusConditionsPromptAcknowledged.value == null) {
-                                    dataStore.bolusConditionsPromptAcknowledged.value = mutableListOf(it.first())
-                                } else {
-                                    dataStore.bolusConditionsPromptAcknowledged.value!!.add(it.first())
-                                }
-
-                                if (dataStore.bolusConditionsExcluded.value == null) {
-                                    dataStore.bolusConditionsExcluded.value = mutableSetOf(it.first())
-                                } else {
-                                    dataStore.bolusConditionsExcluded.value?.add(it.first())
-                                }
-
-                                dataStore.bolusConditionsPrompt.value?.drop(0)
+                            bolusConditionsPrompt.value?.firstOrNull()?.let { cond ->
+                                // X: se rechaza el ajuste y se cierra el cuadro
+                                dataStore.bolusConditionsExcluded.value = mutableSetOf(cond)
+                                dataStore.bolusConditionsPrompt.value = mutableListOf()
                                 recalculate()
                             }
                         },
@@ -75,18 +65,10 @@ fun BolusConditionPromptRegion(
                 Column(Modifier.weight(1f)) {
                     OutlinedButton(
                         onClick = {
-                            bolusConditionsPrompt.value?.let {
-                                if (dataStore.bolusConditionsPromptAcknowledged.value == null) {
-                                    dataStore.bolusConditionsPromptAcknowledged.value = mutableListOf(it.first())
-                                } else {
-                                    dataStore.bolusConditionsPromptAcknowledged.value!!.add(it.first())
-                                }
-
-                                if (dataStore.bolusConditionsExcluded.value != null) {
-                                    dataStore.bolusConditionsExcluded.value?.remove(it.first())
-                                }
-
-                                dataStore.bolusConditionsPrompt.value?.drop(0)
+                            if (!bolusConditionsPrompt.value.isNullOrEmpty()) {
+                                // check: se aplica el ajuste y se cierra el cuadro
+                                dataStore.bolusConditionsExcluded.value = mutableSetOf()
+                                dataStore.bolusConditionsPrompt.value = mutableListOf()
                                 recalculate()
                             }
                         },
@@ -105,14 +87,11 @@ fun BolusConditionPromptRegion(
                 Modifier
                     .fillMaxWidth()
                     .clickable {
-                        // Reabre el cuadro para aceptar (check) o rechazar (X) el ajuste.
+                        // Abre el cuadro para aceptar (check) o rechazar (X). No cambia la dosis
+                        // hasta que decidas.
                         Timber.i("bolusConditionsPromptAcknowledged click")
-                        dataStore.bolusConditionsPrompt.value = mutableListOf<BolusCalcCondition>().let {
-                            it.addAll(bolusConditionsPromptAcknowledged.value!!)
-                            it
-                        }
-                        dataStore.bolusConditionsPromptAcknowledged.value = mutableListOf()
-                        dataStore.bolusConditionsExcluded.value = mutableSetOf()
+                        dataStore.bolusConditionsPrompt.value =
+                            mutableListOf<BolusCalcCondition>().apply { addAll(bolusConditionsPromptAcknowledged.value ?: emptyList()) }
                         recalculate()
                     }
             ) {
