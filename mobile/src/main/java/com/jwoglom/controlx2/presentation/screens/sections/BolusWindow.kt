@@ -204,7 +204,7 @@ fun BolusWindow(
         )
 
         dataStore.bolusCurrentParameters.value =
-            bolusCalcParameters(dataStore.bolusCalculatorBuilder.value, bolusConditionsExcluded.value).first
+            bolusCalcParameters(dataStore.bolusCalculatorBuilder.value, dataStore.bolusConditionsExcluded.value).first
 
         fun sortConditions(set: Set<BolusCalcCondition>?): List<BolusCalcCondition> {
             if (set == null) {
@@ -221,57 +221,40 @@ fun BolusWindow(
                 )
             )
         }
-        val conditions = bolusCalcDecision(dataStore.bolusCalculatorBuilder.value, bolusConditionsExcluded.value)?.conditions
+        val conditions = bolusCalcDecision(dataStore.bolusCalculatorBuilder.value, dataStore.bolusConditionsExcluded.value)?.conditions
         dataStore.bolusCurrentConditions.value = sortConditions(conditions)
 
-        val conditionsWithPrompt = conditions?.filter {
-            it.prompt != null
+        // --- Ajuste de dosis por glucosa/IOB: estado derivado en cada calculo ---
+        // Por defecto el ajuste se aplica solo y se ve en la barra gris. Al tocar la barra se abre
+        // el cuadro con aceptar (check) / rechazar (X); el cuadro esta abierto mientras
+        // bolusConditionsPrompt no este vacio. Todo se reasigna con objetos nuevos en cada calculo
+        // para que la pantalla se actualice siempre.
+        val conditionsWithPrompt = conditions?.filter { it.prompt != null } ?: emptyList()
+        val excludedNow: Set<BolusCalcCondition> = dataStore.bolusConditionsExcluded.value ?: emptySet()
+        val ignoredMsgs = conditions
+            ?.mapNotNull { c -> c.msg?.takeIf { it.startsWith("Ignoring '") }?.removePrefix("Ignoring '")?.removeSuffix("'") }
+            ?: emptyList()
+        // condicion actual: la que se esta aplicando, o la que el usuario ha rechazado
+        val activeCond: BolusCalcCondition? = when {
+            conditionsWithPrompt.size == 1 -> conditionsWithPrompt[0]
+            conditionsWithPrompt.isEmpty() -> excludedNow.firstOrNull { it.msg in ignoredMsgs }
+            else -> null
         }
-        // Limpia avisos y exclusiones antiguos: mientras se escribe (p. ej. "8" y luego "80") pueden
-        // aparecer condiciones intermedias que ya no aplican. Solo se conservan las condiciones que
-        // siguen activas (con prompt) o que el usuario ha rechazado y siguen en el calculo.
-        val activeConditionMsgs = (conditionsWithPrompt?.map { it.msg } ?: emptyList()) +
-            (conditions?.mapNotNull { c ->
-                c.msg?.takeIf { it.startsWith("Ignoring '") }?.removePrefix("Ignoring '")?.removeSuffix("'")
-            } ?: emptyList())
-        dataStore.bolusConditionsPromptAcknowledged.value?.removeAll { it.msg !in activeConditionMsgs }
-        dataStore.bolusConditionsExcluded.value?.removeAll { it.msg !in activeConditionMsgs }
-        val conditionsAcknowledged = dataStore.bolusConditionsPromptAcknowledged.value
-        Timber.d("bolusCalc conditionsWithPrompt: $conditionsWithPrompt conditionsAcknowledged: $conditionsAcknowledged conditions: $conditions")
-        if (conditionsWithPrompt?.size == 1) {
-            var alreadyAcked = false
-            conditionsAcknowledged?.forEach {
-                if (conditionsWithPrompt[0] == it) {
-                    alreadyAcked = true
-                }
-            }
-            if (alreadyAcked) {
-                Timber.d("bolusCalc: Not displaying acknowledged prompt again: $conditionsAcknowledged")
-                dataStore.bolusConditionsPrompt.value = mutableListOf<BolusCalcCondition>()
-            } else {
-                val cond = conditionsWithPrompt[0]
-                val promptAlreadyOpen = dataStore.bolusConditionsPrompt.value?.contains(cond) == true
-                if (promptAlreadyOpen) {
-                    // El usuario toco la barra para revisar el ajuste: se mantiene el cuadro
-                    // con aceptar / rechazar hasta que decida.
-                    dataStore.bolusConditionsPrompt.value = mutableListOf<BolusCalcCondition>().let {
-                        it.addAll(conditionsWithPrompt)
-                        it
-                    }
-                } else {
-                    // Por defecto el ajuste se aplica solo (equivale a pulsar el check).
-                    if (dataStore.bolusConditionsPromptAcknowledged.value == null) {
-                        dataStore.bolusConditionsPromptAcknowledged.value = mutableListOf(cond)
-                    } else {
-                        dataStore.bolusConditionsPromptAcknowledged.value!!.add(cond)
-                    }
-                    dataStore.bolusConditionsExcluded.value?.remove(cond)
-                    dataStore.bolusConditionsPrompt.value = mutableListOf<BolusCalcCondition>()
-                }
-            }
-        } else {
+        Timber.d("bolusCalc activeCond: $activeCond excluded: $excludedNow conditions: $conditions")
+        if (activeCond == null) {
+            dataStore.bolusConditionsExcluded.value = mutableSetOf()
+            dataStore.bolusConditionsPromptAcknowledged.value = mutableListOf()
             dataStore.bolusConditionsPrompt.value = null
-            // showBolusConditionPrompt = false
+        } else {
+            val reviewing = dataStore.bolusConditionsPrompt.value?.any { it.msg == activeCond.msg } == true
+            dataStore.bolusConditionsExcluded.value = excludedNow.filter { it.msg == activeCond.msg }.toMutableSet()
+            if (reviewing) {
+                dataStore.bolusConditionsPrompt.value = mutableListOf(activeCond)
+                dataStore.bolusConditionsPromptAcknowledged.value = mutableListOf()
+            } else {
+                dataStore.bolusConditionsPrompt.value = mutableListOf()
+                dataStore.bolusConditionsPromptAcknowledged.value = mutableListOf(activeCond)
+            }
         }
 
         if (dataStore.bolusCurrentParameters.value != null &&
