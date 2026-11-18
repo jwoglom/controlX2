@@ -240,16 +240,25 @@ fun BolusWindow(
                 Timber.d("bolusCalc: Not displaying acknowledged prompt again: $conditionsAcknowledged")
                 dataStore.bolusConditionsPrompt.value = mutableListOf<BolusCalcCondition>()
             } else {
-                // Auto-apply the suggested adjustment (equivalent to pressing the check button):
-                // mark as acknowledged, make sure it is not excluded, and do not show the prompt.
                 val cond = conditionsWithPrompt[0]
-                if (dataStore.bolusConditionsPromptAcknowledged.value == null) {
-                    dataStore.bolusConditionsPromptAcknowledged.value = mutableListOf(cond)
+                val promptAlreadyOpen = dataStore.bolusConditionsPrompt.value?.contains(cond) == true
+                if (promptAlreadyOpen) {
+                    // El usuario toco la barra para revisar el ajuste: se mantiene el cuadro
+                    // con aceptar / rechazar hasta que decida.
+                    dataStore.bolusConditionsPrompt.value = mutableListOf<BolusCalcCondition>().let {
+                        it.addAll(conditionsWithPrompt)
+                        it
+                    }
                 } else {
-                    dataStore.bolusConditionsPromptAcknowledged.value!!.add(cond)
+                    // Por defecto el ajuste se aplica solo (equivale a pulsar el check).
+                    if (dataStore.bolusConditionsPromptAcknowledged.value == null) {
+                        dataStore.bolusConditionsPromptAcknowledged.value = mutableListOf(cond)
+                    } else {
+                        dataStore.bolusConditionsPromptAcknowledged.value!!.add(cond)
+                    }
+                    dataStore.bolusConditionsExcluded.value?.remove(cond)
+                    dataStore.bolusConditionsPrompt.value = mutableListOf<BolusCalcCondition>()
                 }
-                dataStore.bolusConditionsExcluded.value?.remove(cond)
-                dataStore.bolusConditionsPrompt.value = mutableListOf<BolusCalcCondition>()
             }
         } else {
             dataStore.bolusConditionsPrompt.value = null
