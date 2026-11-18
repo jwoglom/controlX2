@@ -87,6 +87,8 @@ class DataStore {
     val cgmTransmitterStatus = MutableLiveData<String>()
     val cgmReading = MutableLiveData<Int>()
     val cgmDelta = MutableLiveData<Int>()
+    // Hora real (epoch s, zona local) de la ultima lectura del sensor segun la bomba
+    val cgmReadingTimeSeconds = MutableLiveData<Long>()
     val cgmStatusText = MutableLiveData<String>()
     val cgmHighLowState = MutableLiveData<String>()
     val cgmDeltaArrow = MutableLiveData<String>()

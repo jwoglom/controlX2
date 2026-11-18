@@ -4,10 +4,14 @@
 
 package com.jwoglom.controlx2.presentation.screens
 
+import android.widget.Toast
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.PressInteraction
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
@@ -23,6 +27,7 @@ import androidx.compose.material.ExperimentalMaterialApi
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Build
 import androidx.compose.material.icons.filled.Create
+import androidx.compose.material.icons.filled.Healing
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Refresh
@@ -30,10 +35,12 @@ import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material.rememberBottomSheetState
 import androidx.compose.material.rememberBottomSheetScaffoldState
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Badge
 import androidx.compose.material3.BadgedBox
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExtendedFloatingActionButton
+import androidx.compose.material3.FabPosition
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -42,6 +49,7 @@ import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
@@ -97,10 +105,12 @@ import com.jwoglom.controlx2.presentation.navigation.SheetLaunchRequest
 import com.jwoglom.controlx2.presentation.navigation.SheetLaunchTarget
 import com.jwoglom.controlx2.presentation.navigation.TempRateInputPrefill
 import com.jwoglom.controlx2.presentation.theme.Colors
+import com.jwoglom.controlx2.presentation.theme.GlucoseColors
 import com.jwoglom.controlx2.presentation.theme.ControlX2Theme
 import com.jwoglom.controlx2.shared.enums.BasalStatus
 import com.jwoglom.controlx2.shared.enums.UserMode
 import com.jwoglom.controlx2.shared.util.SendType
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import timber.log.Timber
@@ -138,6 +148,24 @@ fun Landing(
     // Local state owns in-screen sheet toggles, while parent can still force a new initial sheet.
     var bottomScaffoldState by remember(_bottomScaffoldState) { mutableStateOf(_bottomScaffoldState) }
     var bolusPrefill by remember { mutableStateOf<BolusInputPrefill?>(null) }
+    var showCannulaDialog by remember { mutableStateOf(false) }
+    var cannulaInsertedAt by remember { mutableStateOf(Prefs(context).cannulaInsertedAt()) }
+    var nowMs by remember { mutableStateOf(System.currentTimeMillis()) }
+    LaunchedEffect(Unit) {
+        while (true) {
+            nowMs = System.currentTimeMillis()
+            delay(60L * 60 * 1000) // cada hora basta
+        }
+    }
+    // Color del texto del boton "Cánula" segun el tiempo desde el ultimo cambio registrado:
+    // 36 h naranja claro, 48 h rojo oscuro. Antes de las 36 h, el color normal (null).
+    val cannulaAgeMs = if (cannulaInsertedAt > 0L) nowMs - cannulaInsertedAt else 0L
+    val cannulaWarnColor: androidx.compose.ui.graphics.Color? = when {
+        cannulaInsertedAt <= 0L -> null
+        cannulaAgeMs >= CANNULA_RED_MS -> CANNULA_DARK_RED
+        cannulaAgeMs >= CANNULA_ORANGE_MS -> CANNULA_LIGHT_ORANGE
+        else -> null
+    }
     var tempRatePrefill by remember { mutableStateOf<TempRateInputPrefill?>(null) }
 
     LaunchedEffect(bottomScaffoldState) {
@@ -210,6 +238,32 @@ fun Landing(
     fun showBottomScaffold(): Boolean {
         return displayBottomScaffold.bottomSheetState.isExpanded ||
             _bottomScaffoldState != BottomScaffoldState.NONE
+    }
+
+    if (showCannulaDialog) {
+        AlertDialog(
+            onDismissRequest = { showCannulaDialog = false },
+            title = { Text("Cambio de cánula") },
+            text = {
+                Text(
+                    "¿Registrar el cambio de cánula ahora?\n" +
+                        "Último cambio: ${cannulaAgeText(cannulaInsertedAt, nowMs)}"
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    val t = System.currentTimeMillis()
+                    Prefs(context).setCannulaInsertedAt(t)
+                    cannulaInsertedAt = t
+                    nowMs = t
+                    showCannulaDialog = false
+                    Toast.makeText(context, "Cánula registrada", Toast.LENGTH_SHORT).show()
+                }) { Text("Registrar") }
+            },
+            dismissButton = {
+                TextButton(onClick = { showCannulaDialog = false }) { Text("Cancelar") }
+            }
+        )
     }
 
     Scaffold(
@@ -487,48 +541,122 @@ fun Landing(
                 }
             }
         },
+        floatingActionButtonPosition = FabPosition.Center,
         floatingActionButton = {
             when (selectedItem) {
                 LandingSection.DASHBOARD ->
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
                         ExtendedFloatingActionButton(
                             onClick = {
-                                coroutineScope.launch {
-                                    if (displayBottomScaffold.bottomSheetState.isCollapsed) {
-                                        bolusPrefill = null
-                                        bottomScaffoldState = BottomScaffoldState.BOLUS_WINDOW
-                                        displayBottomScaffold.bottomSheetState.expand()
-
-                                    } else {
-                                        displayBottomScaffold.bottomSheetState.collapse()
-                                        bottomScaffoldState = BottomScaffoldState.NONE
-                                    }
-                                }
+                                nowMs = System.currentTimeMillis() // el cuadro muestra la edad al abrirlo
+                                showCannulaDialog = true
                             },
                             icon = {
-                                if (!showBottomScaffold() || bottomScaffoldState != BottomScaffoldState.BOLUS_WINDOW) {
-                                    Image(
-                                        if (isSystemInDarkTheme()) painterResource(R.drawable.bolus_icon)
-                                        else painterResource(R.drawable.bolus_icon_secondary),
-                                        "Bolus icon",
-                                        Modifier.size(24.dp)
-                                    )
-                                } else {
-                                    Image(
-                                        if (isSystemInDarkTheme()) painterResource(R.drawable.bolus_x)
-                                        else painterResource(R.drawable.bolus_x_secondary),
-                                        "Cancel bolus icon",
-                                        Modifier.size(24.dp)
-                                    )
-                                }
+                                Icon(
+                                    Icons.Filled.Healing,
+                                    "Cannula icon",
+                                    Modifier.size(24.dp),
+                                    tint = cannulaWarnColor
+                                        ?: if (isSystemInDarkTheme()) Colors.primary
+                                        else Colors.onPrimary
+                                )
                             },
                             text = {
                                 Text(
-                                    if (!showBottomScaffold() || bottomScaffoldState != BottomScaffoldState.BOLUS_WINDOW) "Bolus" else "Cancel",
-                                    color = if (isSystemInDarkTheme()) Colors.primary
-                                    else Colors.onPrimary
+                                    "Cánula",
+                                    color = cannulaWarnColor
+                                        ?: if (isSystemInDarkTheme()) Colors.primary
+                                        else Colors.onPrimary
                                 )
                             }
                         )
+                        // Pulsacion larga (medio segundo) en "Bolus": abre directamente el dialogo de bolo con 0,05 u
+                        // ya escritas, sin menu intermedio. NO administra nada por si solo: desde ahi se pasa por los
+                        // mismos pasos y la misma confirmacion que un bolo manual. "Cancel" cierra el panel.
+                        val bolusInteraction = remember { MutableInteractionSource() }
+                        var bolusLongPressHandled by remember { mutableStateOf(false) }
+                        LaunchedEffect(bolusInteraction) {
+                            var pressJob: Job? = null
+                            bolusInteraction.interactions.collect { interaction ->
+                                when (interaction) {
+                                    is PressInteraction.Press -> {
+                                        bolusLongPressHandled = false
+                                        pressJob?.cancel()
+                                        pressJob = launch {
+                                            delay(500)
+                                            // Solo si el panel de bolo esta cerrado
+                                            if (displayBottomScaffold.bottomSheetState.isCollapsed) {
+                                                // Al soltar el dedo se ignora el toque normal (si no, cerraria el panel)
+                                                bolusLongPressHandled = true
+                                                bolusPrefill = BolusInputPrefill(unitsRawValue = "0.05")
+                                                bottomScaffoldState = BottomScaffoldState.BOLUS_WINDOW
+                                                runCatching { displayBottomScaffold.bottomSheetState.expand() }
+                                                if (!displayBottomScaffold.bottomSheetState.isExpanded) {
+                                                    delay(150)
+                                                    runCatching { displayBottomScaffold.bottomSheetState.expand() }
+                                                }
+                                            }
+                                        }
+                                    }
+                                    is PressInteraction.Release, is PressInteraction.Cancel -> {
+                                        // Una vez disparada la pulsacion larga no hay que cancelarla
+                                        if (!bolusLongPressHandled) pressJob?.cancel()
+                                    }
+                                    else -> {}
+                                }
+                            }
+                        }
+                        Box {
+                            ExtendedFloatingActionButton(
+                                interactionSource = bolusInteraction,
+                                onClick = {
+                                    // Si venia de una pulsacion larga (se abrio el menu), no abrir ademas el bolo normal
+                                    if (bolusLongPressHandled) {
+                                        bolusLongPressHandled = false
+                                        return@ExtendedFloatingActionButton
+                                    }
+                                    coroutineScope.launch {
+                                        if (displayBottomScaffold.bottomSheetState.isCollapsed) {
+                                            bolusPrefill = null
+                                            bottomScaffoldState = BottomScaffoldState.BOLUS_WINDOW
+                                            displayBottomScaffold.bottomSheetState.expand()
+
+                                        } else {
+                                            displayBottomScaffold.bottomSheetState.collapse()
+                                            bottomScaffoldState = BottomScaffoldState.NONE
+                                        }
+                                    }
+                                },
+                                icon = {
+                                    if (!showBottomScaffold() || bottomScaffoldState != BottomScaffoldState.BOLUS_WINDOW) {
+                                        Image(
+                                            if (isSystemInDarkTheme()) painterResource(R.drawable.bolus_icon)
+                                            else painterResource(R.drawable.bolus_icon_secondary),
+                                            "Bolus icon",
+                                            Modifier.size(24.dp)
+                                        )
+                                    } else {
+                                        Image(
+                                            if (isSystemInDarkTheme()) painterResource(R.drawable.bolus_x)
+                                            else painterResource(R.drawable.bolus_x_secondary),
+                                            "Cancel bolus icon",
+                                            Modifier.size(24.dp)
+                                        )
+                                    }
+                                },
+                                text = {
+                                    Text(
+                                        if (!showBottomScaffold() || bottomScaffoldState != BottomScaffoldState.BOLUS_WINDOW) "Bolus" else "Cancel",
+                                        color = if (isSystemInDarkTheme()) Colors.primary
+                                        else Colors.onPrimary
+                                    )
+                                }
+                            )
+                        }
+                    }
                 else -> {}
             }
         },
@@ -714,4 +842,15 @@ internal fun LandingSettingsPreview() {
             )
         }
     }
+}
+
+private const val CANNULA_ORANGE_MS = 60L * 60 * 60 * 1000
+private const val CANNULA_RED_MS = 72L * 60 * 60 * 1000
+private val CANNULA_LIGHT_ORANGE = androidx.compose.ui.graphics.Color(0xFFFFB74D)
+private val CANNULA_DARK_RED = androidx.compose.ui.graphics.Color(0xFFC62828)
+
+private fun cannulaAgeText(insertedAtMs: Long, nowMs: Long = System.currentTimeMillis()): String {
+    if (insertedAtMs <= 0L) return "sin registro previo"
+    val mins = ((nowMs - insertedAtMs) / 60000).coerceAtLeast(0)
+    return "hace ${mins / 60} h ${mins % 60} min"
 }

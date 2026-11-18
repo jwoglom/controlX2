@@ -420,6 +420,7 @@ class WearPumpCommService : Service(), CommServiceCallbacks {
     }
 
     override fun showToast(text: String, duration: Int) {
+        // Solo lo usan avisos de error (p. ej. bomba aun emparejada) y el de eventos, que es opcional.
         Toast.makeText(this, text, duration).show()
     }
 
@@ -630,7 +631,7 @@ class WearPumpCommService : Service(), CommServiceCallbacks {
         }
 
         started = true
-        Toast.makeText(this, "ControlX2 pump host starting", Toast.LENGTH_SHORT).show()
+        Timber.i("ControlX2 pump host starting")
         updateNotification("Initializing...")
 
         if (WearPrefs(applicationContext).pumpFinderServiceEnabled()) {
@@ -658,7 +659,7 @@ class WearPumpCommService : Service(), CommServiceCallbacks {
         try {
             unregisterReceiver(bleChangeReceiver)
         } catch (_: Exception) {}
-        Toast.makeText(this, "ControlX2 pump host stopped", Toast.LENGTH_SHORT).show()
+        Timber.i("ControlX2 pump host stopped")
     }
 
     private fun prefs(context: Context): SharedPreferences? {

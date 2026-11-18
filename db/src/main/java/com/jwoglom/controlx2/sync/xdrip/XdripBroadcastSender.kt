@@ -5,6 +5,8 @@ import android.content.Intent
 import com.jwoglom.controlx2.sync.xdrip.models.XdripDeviceStatusPayload
 import com.jwoglom.controlx2.sync.xdrip.models.XdripSgvPayload
 import com.jwoglom.controlx2.sync.xdrip.models.XdripTreatmentPayload
+import org.json.JSONArray
+import org.json.JSONObject
 import timber.log.Timber
 
 interface XdripBroadcaster {
@@ -21,16 +23,30 @@ interface XdripBroadcaster {
 
 /**
  * Sends xDrip-compatible broadcast intents for glucose, treatments, and status updates.
+ *
+ * Glucose (SGV) is sent through two routes:
+ *  - NSClient-style broadcast (info.nightscout.client.NEW_SGV), as before.
+ *  - NS_EMULATOR broadcast (com.eveningoutpost.dexdrip.NS_EMULATOR) with extras
+ *    "collection" and "data", using a minimal JSON (type, sgv, date, direction).
  */
 class XdripBroadcastSender(
     private val sendBroadcastFn: (action: String, extraKey: String, payload: String) -> Unit,
-    private val nowMillisFn: () -> Long = { System.currentTimeMillis() }
+    private val nowMillisFn: () -> Long = { System.currentTimeMillis() },
+    private val sendNsEmulatorFn: (collection: String, data: String) -> Unit = { _, _ -> }
 ) : XdripBroadcaster {
     constructor(context: Context) : this(
         sendBroadcastFn = { action, extraKey, payload ->
             val intent = Intent(action).apply {
                 `package` = "com.eveningoutpost.dexdrip"
                 putExtra(extraKey, payload)
+            }
+            context.sendBroadcast(intent)
+        },
+        sendNsEmulatorFn = { collection, data ->
+            val intent = Intent(ACTION_NS_EMULATOR).apply {
+                `package` = "com.eveningoutpost.dexdrip"
+                putExtra("collection", collection)
+                putExtra("data", data)
             }
             context.sendBroadcast(intent)
         }
@@ -42,6 +58,10 @@ class XdripBroadcastSender(
         const val ACTION_NEW_TREATMENT = "info.nightscout.client.NEW_TREATMENT"
         const val ACTION_NEW_FOOD = "info.nightscout.client.NEW_FOOD"
         const val ACTION_EXTERNAL_STATUSLINE = "com.eveningoutpost.dexdrip.ExternalStatusline"
+        const val ACTION_NS_EMULATOR = "com.eveningoutpost.dexdrip.NS_EMULATOR"
+
+        /** true = se envía la flecha calculada por ControlX2 (con las horas reales); false = "NONE". */
+        private const val NS_EMULATOR_SEND_DIRECTION = true
 
         private const val EXTRA_SGVS = XdripSgvPayload.EXTRA_KEY
         private const val EXTRA_DEVICESTATUS = XdripDeviceStatusPayload.EXTRA_KEY
@@ -57,13 +77,61 @@ class XdripBroadcastSender(
     private val cache: MutableMap<String, LastSentState> = mutableMapOf()
 
     override fun sendSgv(sgvsJsonArrayString: String, minimumIntervalSeconds: Int?): Boolean {
-        return sendWithCache(
+        val sent = sendWithCache(
             cacheKey = "sgv",
             action = ACTION_NEW_SGV,
             extraKey = EXTRA_SGVS,
             payload = sgvsJsonArrayString,
             minimumIntervalSeconds = minimumIntervalSeconds
         )
+
+        if (sent) {
+            val nsPayload = toNsEmulatorPayload(sgvsJsonArrayString)
+            Timber.i("NS_EMULATOR in=%s out=%s", sgvsJsonArrayString, nsPayload)
+            if (nsPayload != "[]") {
+                // Mismo payload (mismo valor y misma hora de lectura) ya lo filtra sendWithCache,
+                // asi que aqui solo llegan lecturas nuevas.
+                sendNsEmulatorFn("entries", nsPayload)
+                Timber.i("Sent xDrip NS_EMULATOR entries broadcast")
+            }
+        }
+
+        return sent
+    }
+
+    /**
+     * Rebuilds the SGV array as the minimal JSON that xDrip+'s NS emulator receiver accepts:
+     * [{"type":"sgv","sgv":<mg/dL int>,"date":<epoch ms>,"direction":"<name>"}]
+     */
+    private fun toNsEmulatorPayload(json: String): String {
+        val out = JSONArray()
+        try {
+            val src = JSONArray(json)
+            for (i in 0 until src.length()) {
+                val o = src.getJSONObject(i)
+                val sgv = if (o.has("sgv")) o.optDouble("sgv", Double.NaN) else o.optDouble("mgdl", Double.NaN)
+                var date = if (o.has("date")) o.optLong("date", 0L) else o.optLong("mills", 0L)
+                if (date in 1..99_999_999_999L) date *= 1000 // seconds -> milliseconds
+                if (sgv.isNaN() || sgv <= 0 || date <= 0L) {
+                    Timber.w("NS_EMULATOR: entrada descartada: %s", o)
+                    continue
+                }
+                out.put(JSONObject().apply {
+                    put("type", "sgv")
+                    put("sgv", sgv.toInt())
+                    put("date", date)
+                    // xDrip+ calcula la tendencia con sus propias lecturas. Se envía "NONE"
+                    // para que no use la flecha de ControlX2 (que sale siempre DoubleDown).
+                    put(
+                        "direction",
+                        if (NS_EMULATOR_SEND_DIRECTION) o.optString("direction", "").ifBlank { "NONE" } else "NONE"
+                    )
+                })
+            }
+        } catch (e: Exception) {
+            Timber.w(e, "NS_EMULATOR: JSON no válido: %s", json)
+        }
+        return out.toString()
     }
 
     override fun sendDeviceStatus(deviceStatusJsonString: String, minimumIntervalSeconds: Int?): Boolean {
@@ -81,8 +149,15 @@ class XdripBroadcastSender(
         minimumIntervalSeconds: Int?,
         alsoSendNewFood: Boolean
     ): Boolean {
+        Timber.i("treatments=%s", treatmentsJsonString)
         val sentTreatment = sendWithCache(
-            cacheKey = "treatments",
+            // Cache aparte para basal y bolus: antes un basal intercalado borraba el ultimo bolus
+            // de la cache y el mismo bolus se reenviaba varias veces.
+            cacheKey = when {
+                treatmentsJsonString.contains("\"Temp Basal\"") -> "treatments_basal"
+                treatmentsJsonString.contains("\"Carb Correction\"") -> "treatments_carbs"
+                else -> "treatments_bolus"
+            },
             action = ACTION_NEW_TREATMENT,
             extraKey = EXTRA_TREATMENTS,
             payload = treatmentsJsonString,
@@ -97,6 +172,7 @@ class XdripBroadcastSender(
     }
 
     override fun sendExternalStatusline(statusline: String, minimumIntervalSeconds: Int?): Boolean {
+        Timber.i("statusline=%s", statusline)
         return sendWithCache(
             cacheKey = "statusline",
             action = ACTION_EXTERNAL_STATUSLINE,

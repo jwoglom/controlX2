@@ -174,6 +174,8 @@ class CommService : Service(), CommServiceCallbacks {
                 CurrentBatteryRequestBuilder.create(apiVersion()),
                 ControlIQIOBRequest(),
                 InsulinStatusRequest(),
+                // Basal que la bomba esta administrando ahora (incluye los ajustes de Control-IQ)
+                com.jwoglom.pumpx2.pump.messages.request.currentStatus.CurrentBasalStatusRequest(),
                 CurrentEGVGuiDataRequest(),
                 HomeScreenMirrorRequest(),
                 HistoryLogStatusRequest()
@@ -483,9 +485,42 @@ class CommService : Service(), CommServiceCallbacks {
     }
 
     private val xdripMessageDispatcher by lazy { XdripMessageDispatcher(applicationContext) }
+    private val pumpSilenceMonitor by lazy { PumpSilenceMonitor(applicationContext) }
 
     override fun dispatchExternalMessage(message: com.jwoglom.pumpx2.pump.messages.Message) {
         xdripMessageDispatcher.onReceiveMessage(message)
+        // IOB real de la bomba, para mostrarlo al tocar el grafico
+        if (message is ControlIQIOBResponse) {
+            com.jwoglom.controlx2.util.IobHistory.record(
+                applicationContext,
+                Instant.now().epochSecond,
+                InsulinUnit.from1000To1(message.pumpDisplayedIOB)
+            )
+        }
+        // Basal en directo, para el grafico y el texto al tocar
+        if (message is com.jwoglom.pumpx2.pump.messages.response.currentStatus.CurrentBasalStatusResponse) {
+            com.jwoglom.controlx2.util.BasalLiveHistory.record(
+                applicationContext,
+                InsulinUnit.from1000To1(message.currentBasalRate)
+            )
+        }
+        // Lecturas de glucosa en directo (con la hora real de la lectura), para delta y grafico
+        if (message is CurrentEGVGuiDataResponse && message.cgmReading > 0 && message.bgReadingTimestampSeconds.toLong() > 0L) {
+            try {
+                com.jwoglom.controlx2.util.CgmLiveHistory.record(
+                    applicationContext,
+                    com.jwoglom.controlx2.shared.util.pumpTimeToLocalTz(
+                        com.jwoglom.pumpx2.pump.messages.helpers.Dates.fromJan12008EpochSecondsToDate(
+                            message.bgReadingTimestampSeconds.toLong()
+                        )
+                    ).epochSecond,
+                    message.cgmReading
+                )
+            } catch (e: Exception) {
+                Timber.w(e, "No se pudo guardar la lectura en directo")
+            }
+        }
+        pumpSilenceMonitor.onMessage(message)
     }
 
     override fun updateComplicationData(key: String, value: String, timestamp: Instant) {
@@ -550,6 +585,7 @@ class CommService : Service(), CommServiceCallbacks {
     }
 
     override fun showToast(text: String, duration: Int) {
+        // Solo lo usan avisos de error (p. ej. bomba aun emparejada) y el de eventos, que es opcional.
         Toast.makeText(this, text, duration).show()
     }
 
@@ -567,7 +603,8 @@ class CommService : Service(), CommServiceCallbacks {
         }
 
         started = true
-        Toast.makeText(this, "ControlX2 service starting", Toast.LENGTH_SHORT).show()
+        Timber.i("ControlX2 service starting")
+        pumpSilenceMonitor.start()
 
         updateNotification("Initializing...")
 
@@ -625,10 +662,13 @@ class CommService : Service(), CommServiceCallbacks {
 
     override fun onTaskRemoved(rootIntent: Intent?) {
         super.onTaskRemoved(rootIntent)
-        Timber.w("CommService onTaskRemoved")
-        triggerAppReload(applicationContext)
-        Toast.makeText(this, "ControlX2 service removed", Toast.LENGTH_SHORT).show()
-        stopSelf()
+        // Antes: triggerAppReload() + stopSelf(). Cuando Android quita la tarea de recientes
+        // (o el usuario la desliza), triggerAppReload() intenta relanzar MainActivity desde
+        // segundo plano, Android lo bloquea (BAL_BLOCK) y la app termina con Runtime.exit(0),
+        // dejando el servicio de lecturas parado. Android vuelve a entregar onTaskRemoved a los
+        // procesos reiniciados y se repite hasta que deja de reiniciar el servicio.
+        // Un servicio en primer plano sigue funcionando sin la tarea, asi que solo se anota.
+        Timber.w("CommService onTaskRemoved (ignored: service keeps running)")
     }
 
     private data class DisplayablePumpData(
@@ -638,6 +678,7 @@ class CommService : Service(), CommServiceCallbacks {
         var batteryPercent: Int? = null,
         var iobUnits: Double? = null,
         var cartridgeRemainingUnits: Int? = null,
+        var basalUnitsPerHour: Double? = null,
         var cgmReading: Int? = null,
         var cgmTrendArrow: String? = null,
     )
@@ -658,6 +699,11 @@ class CommService : Service(), CommServiceCallbacks {
             is ControlIQIOBResponse -> {
                 changed = currentPumpData.iobUnits != InsulinUnit.from1000To1(message.pumpDisplayedIOB)
                 currentPumpData.iobUnits = InsulinUnit.from1000To1(message.pumpDisplayedIOB)
+            }
+            is com.jwoglom.pumpx2.pump.messages.response.currentStatus.CurrentBasalStatusResponse -> {
+                val rate = InsulinUnit.from1000To1(message.currentBasalRate)
+                changed = currentPumpData.basalUnitsPerHour != rate
+                currentPumpData.basalUnitsPerHour = rate
             }
             is InsulinStatusResponse -> {
                 changed = currentPumpData.cartridgeRemainingUnits != message.currentInsulinAmount
@@ -837,7 +883,8 @@ class CommService : Service(), CommServiceCallbacks {
         scope.cancel()
         messageBus.close()
         httpDebugApiService?.stop()
-        Toast.makeText(this, "ControlX2 service destroyed", Toast.LENGTH_SHORT).show()
+        pumpSilenceMonitor.stop()
+        Timber.i("ControlX2 service destroyed")
     }
 
     private fun createNotification(): Notification {
@@ -877,26 +924,25 @@ class CommService : Service(), CommServiceCallbacks {
             title += " at ${shortTime(it)}"
         }
 
+        // Orden: glucosa y flecha, IOB, basal, bateria, cartucho
+        val longGap = "\u00A0\u00A0\u00A0"
+        val shortGap = "\u00A0"
+        val loc = java.util.Locale.getDefault()
         var contentText = ""
+        // Cada dato lleva delante su separador (corto antes de IOB y de Basal, normal en el resto)
+        fun add(text: String, gapBefore: String) {
+            contentText += if (contentText.isEmpty()) text else gapBefore + text
+        }
         if (Prefs(applicationContext).showBGInNotification() && currentPumpData.cgmReading != null) {
             val glucoseUnit = Prefs(applicationContext).glucoseUnit() ?: GlucoseUnit.MGDL
             val bgText = GlucoseConverter.format(currentPumpData.cgmReading!!, glucoseUnit)
             val arrow = currentPumpData.cgmTrendArrow
-            contentText += if (arrow.isNullOrEmpty()) {
-                "BG: $bgText\u00A0\u00A0\u00A0"
-            } else {
-                "BG: $bgText $arrow\u00A0\u00A0\u00A0"
-            }
+            add(if (arrow.isNullOrEmpty()) bgText else "$bgText $arrow", longGap)
         }
-        if (currentPumpData.batteryPercent != null) {
-            contentText += "Battery: ${currentPumpData.batteryPercent}%\u00A0\u00A0\u00A0"
-        }
-        if (currentPumpData.iobUnits != null) {
-            contentText += "IOB: ${currentPumpData.iobUnits}u\u00A0\u00A0\u00A0"
-        }
-        if (currentPumpData.cartridgeRemainingUnits != null) {
-            contentText += "Cartridge: ${currentPumpData.cartridgeRemainingUnits}u"
-        }
+        currentPumpData.iobUnits?.let { add("IOB: ${String.format(loc, "%.2f", it)}u", shortGap) }
+        currentPumpData.basalUnitsPerHour?.let { add("Basal: ${String.format(loc, "%.2f", it)} u/h", shortGap) }
+        currentPumpData.batteryPercent?.let { add("Battery: $it%", longGap) }
+        currentPumpData.cartridgeRemainingUnits?.let { add("Cartridge: ${it}u", longGap) }
         currentPumpData.connectionTime?.let {
             contentText += "    \nConnection established at: ${shortTime(it)}"
         }

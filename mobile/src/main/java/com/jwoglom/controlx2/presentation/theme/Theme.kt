@@ -11,10 +11,11 @@ import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.SideEffect
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
-import androidx.core.view.ViewCompat
+import androidx.core.view.WindowCompat
 
 private val DarkColorScheme = darkColorScheme(
     primary = Purple80,
@@ -58,8 +59,15 @@ fun ControlX2Theme(
         SideEffect {
             val context = view.context
             if (context is Activity) {
-                context.window.statusBarColor = colorScheme.primary.toArgb()
-                ViewCompat.getWindowInsetsController(view)?.isAppearanceLightStatusBars = darkTheme
+                // Color real que queda detras de la barra de estado: en tema oscuro la barra
+                // superior de Landing usa el color de superficie (oscuro) y en tema claro el color
+                // primario. Con Android 15+ (targetSdk 35) la barra de estado es transparente y
+                // se ve ese color, asi que los iconos deben contrastar con el.
+                // Antes: iconos oscuros siempre en tema oscuro -> invisibles sobre fondo oscuro.
+                val barColor = if (darkTheme) colorScheme.surface else colorScheme.primary
+                context.window.statusBarColor = barColor.toArgb()
+                WindowCompat.getInsetsController(context.window, view)
+                    .isAppearanceLightStatusBars = barColor.luminance() > 0.5f
             }
         }
     }

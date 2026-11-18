@@ -23,6 +23,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.jwoglom.controlx2.LocalDataStore
+import com.jwoglom.controlx2.db.historylog.HistoryLogItem
+import com.jwoglom.controlx2.presentation.screens.sections.components.toCgmDataPoint
 import com.jwoglom.controlx2.presentation.theme.CardBackground
 import com.jwoglom.controlx2.presentation.theme.ControlX2Theme
 import com.jwoglom.controlx2.presentation.theme.Elevation
@@ -35,7 +37,11 @@ import com.jwoglom.controlx2.shared.util.GlucoseConverter
 fun GlucoseHeroCard(
     glucoseValue: Int?,
     deltaArrow: String?,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    // Variacion respecto a la lectura anterior, en mg/dL (null = no mostrar)
+    deltaMgdl: Int? = null,
+    // Minutos desde la lectura (null = no mostrar)
+    ageMinutes: Int? = null
 ) {
     val dataStore = LocalDataStore.current
     val glucoseUnit by dataStore.glucoseUnitPreference.observeAsState(GlucoseUnit.MGDL)
@@ -113,14 +119,70 @@ fun GlucoseHeroCard(
 
             }
 
-            // Unit label
-            Text(
-                glucoseUnit.abbreviation,
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
+            // Unit label + variacion respecto a la lectura anterior
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.Center
+            ) {
+                if (!noCgmConnected && ageMinutes != null) {
+                    Text(
+                        "${ageMinutes}min ",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                if (!noCgmConnected && deltaMgdl != null) {
+                    val deltaText = when (glucoseUnit) {
+                        GlucoseUnit.MGDL -> String.format("%+d", deltaMgdl)
+                        GlucoseUnit.MMOL -> String.format("%+.1f", deltaMgdl * GlucoseConverter.MGDL_TO_MMOL_FACTOR)
+                    }
+                    Text(
+                        "$deltaText ",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                Text(
+                    glucoseUnit.abbreviation,
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
         }
     }
+}
+
+/**
+ * Variacion en mg/dL entre la lectura actual y la anterior, a partir del historial de la bomba.
+ * Devuelve null si no hay dos lecturas cercanas (mas de 12 min entre ellas).
+ */
+fun cgmDeltaMgdl(logs: List<HistoryLogItem>?, current: Int?, currentReadingSeconds: Long? = null): Int? {
+    if (logs == null || current == null || current <= 0) return null
+    val points = logs.mapNotNull { it.toCgmDataPoint() }.sortedByDescending { it.timestamp }
+    if (points.isEmpty()) return null
+    val latest = points[0]
+    // Si la lectura actual aun no esta en el historial, se compara con la ultima del historial,
+    // pero solo si es la lectura inmediatamente anterior (<= 7 min respecto a la actual). Antes se
+    // comparaba con una lectura de hace 10-12 min y salia +21 donde xDrip decia +9.
+    if (current != latest.value.toInt()) {
+        val ref = currentReadingSeconds ?: (System.currentTimeMillis() / 1000)
+        val gap = ref - latest.timestamp
+        return if (gap in 0..(7 * 60)) current - latest.value.toInt() else null
+    }
+    val previous = points.getOrNull(1) ?: return null
+    if (latest.timestamp - previous.timestamp > 7 * 60) return null
+    return latest.value.toInt() - previous.value.toInt()
+}
+
+/**
+ * Minutos transcurridos desde la ultima lectura segun el historial de la bomba.
+ * Si la lectura actual aun no esta en el historial, se considera recien llegada (0).
+ */
+fun cgmAgeMinutes(logs: List<HistoryLogItem>?, current: Int?, nowSeconds: Long): Int? {
+    if (logs == null || current == null || current <= 0) return null
+    val latest = logs.mapNotNull { it.toCgmDataPoint() }.maxByOrNull { it.timestamp } ?: return null
+    if (current != latest.value.toInt()) return 0
+    return maxOf(0L, (nowSeconds - latest.timestamp) / 60).toInt()
 }
 
 @Composable

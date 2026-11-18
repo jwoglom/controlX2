@@ -15,7 +15,8 @@ data class XdripTreatmentPayload(
     val duration: Int? = null,
     val rate: Double? = null,
     val absolute: Double? = null,
-    val notes: String
+    val notes: String,
+    val carbs: Double? = null
 ) {
     fun toJsonObject(): JSONObject {
         return JSONObject().apply {
@@ -26,6 +27,7 @@ data class XdripTreatmentPayload(
             duration?.let { put("duration", it) }
             rate?.let { put("rate", it) }
             absolute?.let { put("absolute", it) }
+            carbs?.let { put("carbs", it) }
             put("notes", notes)
         }
     }
@@ -66,6 +68,20 @@ data class XdripTreatmentPayload(
                 mills = timestamp.toEpochMilli(),
                 insulin = InsulinUnit.from1000To1(requestedVolumeMilli),
                 notes = "ControlX2 bolus status bolusId=$bolusId status=$status"
+            )
+        }
+
+        fun forCarbs(
+            grams: Int,
+            seqId: Long,
+            timestamp: Instant
+        ): XdripTreatmentPayload {
+            return XdripTreatmentPayload(
+                eventType = "Carb Correction",
+                createdAt = timestamp.toString(),
+                mills = timestamp.toEpochMilli(),
+                carbs = grams.toDouble(),
+                notes = "ControlX2 carbs ${grams}g seq=$seqId"
             )
         }
 

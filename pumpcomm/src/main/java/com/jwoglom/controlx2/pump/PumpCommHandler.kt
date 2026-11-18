@@ -539,7 +539,8 @@ class PumpCommHandler(
             )
             callbacks.markConnectionTime()
             callbacks.updateNotification("Disconnected from pump")
-            callbacks.showToast("Pump disconnected: $status", Toast.LENGTH_SHORT)
+            // Toast desactivado: encendia la pantalla del reloj en cada desconexion. Queda en el log.
+            Timber.i("Pump disconnected: $status")
             shutdownLatch?.countDown()
             return super.onPumpDisconnected(peripheral, status)
         }
