@@ -1222,10 +1222,17 @@ fun VicoCgmChart(
             // Si hay bolo o hidratos cerca del punto tocado (tolerancia del dedo segun el rango),
             // se anaden en la linea de la hora para no cambiar la altura de la etiqueta.
             val eventTolerance = maxOf(bucketSeconds, rangeSeconds / 60L)
-            val nearBoluses = bolusEvents.filter { Math.abs(it.timestamp - timestamp) <= eventTolerance }
-            val nearCarbs = carbEvents.filter { Math.abs(it.timestamp - timestamp) <= eventTolerance }
-            nearBoluses.forEach { timeText += " \u00B7 " + (if (it.isAutomated) "Auto " else "Bolus ") + formatBolusUnits(it.units) }
-            nearCarbs.forEach { timeText += " \u00B7 " + formatCarbGrams(it.grams) + " carbs" }
+            // Se toma el evento mas cercano al dedo y se muestran juntos todos los que estan a
+            // menos de un intervalo (5 min) de el, para que bolo e hidratos salgan a la vez.
+            val closestEventTs = (bolusEvents.map { it.timestamp } + carbEvents.map { it.timestamp })
+                .filter { Math.abs(it - timestamp) <= eventTolerance }
+                .minByOrNull { Math.abs(it - timestamp) }
+            if (closestEventTs != null) {
+                bolusEvents.filter { Math.abs(it.timestamp - closestEventTs) <= bucketSeconds }
+                    .forEach { timeText += " \u00B7 " + (if (it.isAutomated) "Auto " else "Bolus ") + formatBolusUnits(it.units) }
+                carbEvents.filter { Math.abs(it.timestamp - closestEventTs) <= bucketSeconds }
+                    .forEach { timeText += " \u00B7 " + formatCarbGrams(it.grams) + " carbs" }
+            }
             // Lectura exacta o la mas cercana (max. 10 min); si no hay, "--" (la etiqueta nunca desaparece).
             val g = glucoseValueByTimestamp[timestamp]?.takeIf { it > 0.0 }
                 ?: glucoseValueByTimestamp.entries
