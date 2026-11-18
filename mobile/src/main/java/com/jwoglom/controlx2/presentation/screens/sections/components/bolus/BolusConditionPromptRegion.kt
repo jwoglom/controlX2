@@ -101,17 +101,21 @@ fun BolusConditionPromptRegion(
 
     if (bolusConditionsPromptAcknowledged.value != null && bolusConditionsPromptAcknowledged.value!!.isNotEmpty()) {
         bolusConditionsPromptAcknowledged.value?.forEach {
+            val cond = it
             Card(
                 Modifier
                     .fillMaxWidth()
                     .clickable {
-                        Timber.i("bolusConditionsPromptAcknowledged click")
-                        dataStore.bolusConditionsPrompt.value = mutableListOf<BolusCalcCondition>().let {
-                            it.addAll(bolusConditionsPromptAcknowledged.value!!)
-                            it
+                        // Interruptor: aplica o ignora el ajuste de dosis y recalcula.
+                        Timber.i("bolusConditionsPromptAcknowledged click (toggle)")
+                        val excluded = dataStore.bolusConditionsExcluded.value ?: mutableSetOf()
+                        if (excluded.contains(cond)) {
+                            excluded.remove(cond)
+                        } else {
+                            excluded.add(cond)
                         }
-                        dataStore.bolusConditionsPromptAcknowledged.value = mutableListOf()
-                        dataStore.bolusConditionsExcluded.value = mutableSetOf()
+                        dataStore.bolusConditionsExcluded.value = excluded
+                        recalculate()
                     }
             ) {
                 Text(buildAnnotatedString {
