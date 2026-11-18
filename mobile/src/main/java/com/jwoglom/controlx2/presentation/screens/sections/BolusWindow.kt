@@ -227,6 +227,15 @@ fun BolusWindow(
         val conditionsWithPrompt = conditions?.filter {
             it.prompt != null
         }
+        // Limpia avisos y exclusiones antiguos: mientras se escribe (p. ej. "8" y luego "80") pueden
+        // aparecer condiciones intermedias que ya no aplican. Solo se conservan las condiciones que
+        // siguen activas (con prompt) o que el usuario ha rechazado y siguen en el calculo.
+        val activeConditionMsgs = (conditionsWithPrompt?.map { it.msg } ?: emptyList()) +
+            (conditions?.mapNotNull { c ->
+                c.msg?.takeIf { it.startsWith("Ignoring '") }?.removePrefix("Ignoring '")?.removeSuffix("'")
+            } ?: emptyList())
+        dataStore.bolusConditionsPromptAcknowledged.value?.removeAll { it.msg !in activeConditionMsgs }
+        dataStore.bolusConditionsExcluded.value?.removeAll { it.msg !in activeConditionMsgs }
         val conditionsAcknowledged = dataStore.bolusConditionsPromptAcknowledged.value
         Timber.d("bolusCalc conditionsWithPrompt: $conditionsWithPrompt conditionsAcknowledged: $conditionsAcknowledged conditions: $conditions")
         if (conditionsWithPrompt?.size == 1) {
